@@ -2,6 +2,7 @@ import numpy as np
 import cluspy.MDLCosts as mdl
 from cluspy.subspace.SubKmeans import SubKmeans
 
+
 def _get_mdl_costs(X, subkmeans):
     data_dimensionality = X.shape[1]
     n_points = X.shape[0]

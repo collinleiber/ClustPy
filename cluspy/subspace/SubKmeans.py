@@ -1,8 +1,11 @@
 """
-Mautz, Dominik, et al. "Towards an optimal subspace for k-means." Proceedings of the 23rd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining. 2017.
+Mautz, Dominik, et al. "Towards an optimal subspace for
+k-means." Proceedings of the 23rd ACM SIGKDD International
+Conference on Knowledge Discovery and Data Mining. 2017.
 """
 
-from cluspy.nr.nrkmeans_vanilla import NrKmeans
+from cluspy.nonredundant.nrkmeans_vanilla import NrKmeans
+
 
 class SubKmeans():
 
@@ -12,7 +15,7 @@ class SubKmeans():
     def fit(self, X):
         nrkmeans = NrKmeans(self.n_clusters)
         nrkmeans.fit(X)
-        self.labels = nrkmeans.labels[0] # TODO: has to be changed with new version of NrKmeans
+        self.labels = nrkmeans.labels[0]  # TODO: has to be changed with new version of NrKmeans
         self.centers = nrkmeans.centers
         self.V = nrkmeans.V
         self.P = nrkmeans.P

@@ -1,9 +1,12 @@
 """
-Pelleg, Dan, and Andrew W. Moore. "X-means: Extending k-means with efficient estimation of the number of clusters." Icml. Vol. 1. 2000.
+Pelleg, Dan, and Andrew W. Moore. "X-means: Extending
+k-means with efficient estimation of the number of clusters."
+Icml. Vol. 1. 2000.
 """
 
 from pyclustering.cluster.xmeans import xmeans
 import numpy as np
+
 
 class XMeans():
 
