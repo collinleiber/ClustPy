@@ -9,10 +9,8 @@ import numpy as np
 
 
 def _multi_density_dbscan(X, k, var, min_cluster_size, always_sort_densities):
-    if var < 1:
-        raise Exception("var must be >= 1")
-    if var < 1:
-        raise Exception("var must be >= 1")
+    assert var >= 1, "var must be >= 1"
+    assert min_cluster_size > 1, "min_cluster_size must be > 1"
     # Calculate distance matrix
     dist_matrix = squareform(pdist(X))
     # Get k nearest neighbors ids for each point
