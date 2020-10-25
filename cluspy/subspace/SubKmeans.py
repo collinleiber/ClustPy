@@ -21,7 +21,7 @@ class SubKmeans():
         nrkmeans = NrKmeans(self.n_clusters, mdl_for_noisespace=self.mdl_for_noisespace, outliers=self.outliers,
                             max_iter=self.max_iter, random_state=self.random_state)
         nrkmeans.fit(X)
-        self.labels = nrkmeans.labels  # TODO: has to be changed with new version of NrKmeans
+        self.labels = nrkmeans.labels
         self.centers = nrkmeans.centers
         self.V = nrkmeans.V
         self.P = nrkmeans.P

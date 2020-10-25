@@ -10,7 +10,7 @@ import numpy as np
 
 class XMeans():
 
-    def __init__(self, max_n_clusters=np.inf):
+    def __init__(self, max_n_clusters=9999):
         self.max_n_clusters = max_n_clusters
 
     def fit(self, X):

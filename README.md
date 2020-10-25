@@ -1,5 +1,7 @@
 # ClusPy
 
+Clustering data in python.
+
 Nützliche Algorithmen zur Bestimmung von k wären:
 
 - XMeans (pyclustering , https://github.com/mynameisfiber/pyxmeans/blob/master/pyxmeans/xmeans.py)

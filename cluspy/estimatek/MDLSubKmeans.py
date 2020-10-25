@@ -1,7 +1,6 @@
 import numpy as np
-import cluspy.MDLCosts as mdl
 from cluspy.subspace.SubKmeans import SubKmeans
-from cluspy.nonredundant.NrKmeans import calculate_mdl_costs
+from cluspy.nonredundant.NrKmeans import _calculate_mdl_costs
 
 
 def _get_n_clusters(X, max_n_clusters, add_noise_space, repetitions, mdl_for_noisespace,
@@ -15,7 +14,7 @@ def _get_n_clusters(X, max_n_clusters, add_noise_space, repetitions, mdl_for_noi
         for i in range(repetitions):
             subkmeans = SubKmeans(n_clusters, add_noise_space, mdl_for_noisespace, outliers, max_iter, random_state)
             subkmeans.fit(X)
-            costs = calculate_mdl_costs(X, subkmeans)[0]
+            costs = _calculate_mdl_costs(X, subkmeans)[0]
             if costs < tmp_min_costs:
                 tmp_min_costs = costs
                 tmp_best_subkmeans = subkmeans

@@ -21,19 +21,21 @@ def _multi_density_dbscan(X, k, var, min_cluster_size, always_sort_densities):
     order = np.argsort(densities)
     # Start parameters
     labels = np.full(X.shape[0], -1)
+    cluster_densities = []
     c_id = 0
     # Iterate over all points
     for p1 in order:
         if labels[p1] != -1:
             # Point is already assigned to a cluster
             continue
-        cluster_points = _gather(p1, c_id, densities, knns, labels, var, always_sort_densities)
+        cluster_points, cluster_density = _gather(p1, c_id, densities, knns, labels, var, always_sort_densities)
         # Check if cluster is large enough
         if len(cluster_points) >= min_cluster_size:
             c_id += 1
+            cluster_densities.append(cluster_density)
         else:
             labels[cluster_points] = -1
-    return labels
+    return labels, cluster_densities
 
 
 def _gather(p1, c_id, densities, knns, labels, var, always_sort_densities):
@@ -61,7 +63,7 @@ def _gather(p1, c_id, densities, knns, labels, var, always_sort_densities):
                 neighbors += [kn for kn in knns[p2, :] if labels[kn] == -1]
                 if always_sort_densities:
                     neighbors = _sort_neighbors_by_densities(neighbors, densities)
-    return cluster_points
+    return cluster_points, cluster_density
 
 
 def _sort_neighbors_by_densities(neighbors, densities):
@@ -78,5 +80,6 @@ class MultiDensityDBSCAN():
         self.always_sort_densities = always_sort_densities
 
     def fit(self, X):
-        labels = _multi_density_dbscan(X, self.k, self.var, self.min_cluster_size, self.always_sort_densities)
+        labels, cluster_densities = _multi_density_dbscan(X, self.k, self.var, self.min_cluster_size, self.always_sort_densities)
         self.labels = labels
+        self.cluster_densities = cluster_densities

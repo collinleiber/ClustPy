@@ -33,7 +33,7 @@ def _nrkmeans(X, n_clusters, V, m, P, centers, mdl_for_noisespace, outliers, max
     :param P: list containing projections for each subspace
     :param centers: list containing the cluster centers for each subspace
     :param mdl_for_noisespace: boolean defining if MDL should be used to identify noise space dimensions
-    :param outliers: boolean defining if outliers should be defined
+    :param outliers: boolean defining if outliers should be identified
     :param max_iter: maximum number of iterations for the algorithm
     :param random_state: use a fixed random state to get a repeatable solution
     :return: labels, centers, V, m, P, n_clusters (can get lost), scatter_matrices
@@ -101,7 +101,7 @@ def _initialize_nrkmeans_parameters(X, n_clusters, V, m, P, centers, mdl_for_noi
     :param P: list containing projections for each subspace
     :param centers: list containing the cluster centers for each subspace
     :param mdl_for_noisespace: boolean defining if MDL should be used to identify noise space dimensions
-    :param outliers: boolean defining if outliers should be defined
+    :param outliers: boolean defining if outliers should be identified
     :param max_iter: maximum number of iterations for the algorithm
     :param random_state: use a fixed random state to get a repeatable solution
     :return: checked V, m, P, centers, random_state, number of subspaces, labels, scatter_matrices
@@ -294,7 +294,7 @@ def _update_rotation(X, V, first_index, second_index, n_clusters, P, scatter_mat
     :param P: list containing projections for each subspace
     :param scatter_matrices: list containing scatter matrices for each subspace
     :param mdl_for_noisespace: boolean defining if MDL should be used to identify noise space dimensions
-    :param outliers: boolean defining if outliers should be defined
+    :param outliers: boolean defining if outliers should be identified
     :param n_outliers: number of outliers
     :return: P_1_new, P_2_new, V_new - new P for the first subspace, new P for the second subspace and new V
     """
@@ -475,7 +475,7 @@ def _compare_possible_splits(X, V, cluster_index, noise_index, n_negative_e, P_c
     :param P_combined: combined projections of clsuter and noise space
     :param n_clusters: list containing number of clusters for each subspace
     :param scatter_matrices: list containing scatter matrices for each subspace
-    :param outliers: boolean defining if outliers should be defined
+    :param outliers: boolean defining if outliers should be identified
     :param n_outliers: number of outliers
     :return: P_cluster, P_noise - projections for cluster and noise space
     """
@@ -618,7 +618,7 @@ def _mdl_m_dependant_subspace_costs(X, V, cluster_index, noise_index, m_cluster,
     :param P_noise: projections of the noise space
     :param scatter_matrices: list containing all scatter matrices of the subspaces
     :param n_clusters: list containing number of clusters for each subspace
-    :param outliers: boolean defining if outliers should be defined
+    :param outliers: boolean defining if outliers should be identified
     :param n_outliers: number of outliers
     :return: total costs for this selection of dimensionalites
     """
@@ -652,7 +652,7 @@ def _mdl_m_dependant_subspace_costs(X, V, cluster_index, noise_index, m_cluster,
     return cluster_costs + noise_costs
 
 
-def calculate_mdl_costs(X, nrkmeans):
+def _calculate_mdl_costs(X, nrkmeans):
     """
     Calculate the total mdl cost of a non redudant clustering found by NrKmeans.
     Total costs consists of general costs which describe the whole system (number of subspaces, V, data dimensionality)
@@ -666,7 +666,7 @@ def calculate_mdl_costs(X, nrkmeans):
     :param V: orthogonal rotation matrix
     :param scatter_matrices: list containing all scatter matrices of the subspaces
     :param labels: list with the labels of the cluster assingments for each subspace. -1 equals outlier
-    :param outliers: boolean defining if outliers should be defined
+    :param outliers: boolean defining if outliers should be identified
     :return: total costs (int), subspace costs (list)
     """
     n_points = X.shape[0]
@@ -728,7 +728,7 @@ class NrKmeans():
         :param P: list containing projections for each subspace (optional)
         :param centers: list containing the cluster centers for each subspace (optional)
         :param mdl_for_noisespace: boolean defining if MDL should be used to identify noise space dimensions (default: True)
-        :param outliers: boolean defining if outliers should be defined (default: False)
+        :param outliers: boolean defining if outliers should be identified (default: False)
         :param max_iter: maximum number of iterations for the NrKmaens algorithm (default: 300)
         :param random_state: use a fixed random state to get a repeatable solution (optional)
         """
