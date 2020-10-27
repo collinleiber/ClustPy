@@ -10,7 +10,7 @@ def evaluate(X, evaluation_algorithms, evaluation_metrics=None, GT=None, repetit
     from cluspy.data.synthetic_data_creator import create_subspace_data
     from cluspy.density.MultiDensityDBSCAN import MultiDensityDBSCAN
     from cluspy.subspace.SubKmeans import SubKmeans
-    from cluspy.estimatek.XMeans import XMeans
+    from cluspy.centroid.XMeans import XMeans
     from sklearn.metrics import normalized_mutual_info_score as nmi, adjusted_mutual_info_score as ami, adjusted_rand_score as ars, silhouette_score as sc
     X, L = create_subspace_data(1500, total_features=2)
     algorithms = [EvaluationAlgorithm("MDDBSCAN_k=15", MultiDensityDBSCAN, {"k":15}), EvaluationAlgorithm("MDDBSCAN_k=25", MultiDensityDBSCAN, {"k":25}),

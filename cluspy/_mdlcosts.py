@@ -3,8 +3,9 @@ import numpy as np
 """
 Basic MDL Methods
 """
-LOG_2_PI = np.log(2 * np.pi)
-LOG_2 = np.log(2)
+
+_LOG_2_PI = np.log(2 * np.pi)
+_LOG_2 = np.log(2)
 
 
 def mdl_costs_orthogonal_matrix(dimensionality, costs_for_element):
@@ -57,7 +58,8 @@ Gaussian Mixtrure Models
 """
 
 
-def mdl_costs_gmm_multiple_covariances(cropped_V, m_subspace, scatter_matrices_subspace, labels_subspace, covariance_type="single"):
+def mdl_costs_gmm_multiple_covariances(cropped_V, m_subspace, scatter_matrices_subspace, labels_subspace,
+                                       covariance_type="single"):
     """
     Calculate the coding costs of all points within a subspace. Calculates log(pdf(X)) with help of the scatter matrices
     of the clusters.
@@ -68,7 +70,8 @@ def mdl_costs_gmm_multiple_covariances(cropped_V, m_subspace, scatter_matrices_s
     :param labels_subspace: labels of the cluster assingments for the subspace. -1 equals outlier
     :return: coding costs for all points for this subspace
     """
-    assert covariance_type in ["single", "diagonal", "full"], "covariance_type must equal 'single', 'diagonal' or 'full'"
+    assert covariance_type in ["single", "diagonal",
+                               "full"], "covariance_type must equal 'single', 'diagonal' or 'full'"
     if m_subspace == 0:
         return 0
     full_pdf_costs = 0
@@ -81,16 +84,18 @@ def mdl_costs_gmm_multiple_covariances(cropped_V, m_subspace, scatter_matrices_s
                                                                  scatter_matrix_cluster, m_subspace)
         elif covariance_type == "diagonal":
             full_pdf_costs += mdl_costs_gaussian_diagonal_covariance(cropped_V, n_points_in_cluster,
-                                                                 scatter_matrix_cluster, m_subspace)
+                                                                     scatter_matrix_cluster, m_subspace)
         elif covariance_type == "full":
             full_pdf_costs += mdl_costs_gaussian_full_covariance(cropped_V, n_points_in_cluster,
-                                                                     scatter_matrix_cluster, m_subspace)
+                                                                 scatter_matrix_cluster, m_subspace)
     # Return pdf_costs
     return full_pdf_costs
 
 
-def mdl_costs_gmm_single_covariance(cropped_V, m_subspace, scatter_matrices_subspace, n_points_non_outliers, covariance_type="single"):
-    assert covariance_type in ["single", "diagonal", "full"], "covariance_type must equal 'single', 'diagonal' or 'full'"
+def mdl_costs_gmm_single_covariance(cropped_V, m_subspace, scatter_matrices_subspace, n_points_non_outliers,
+                                    covariance_type="single"):
+    assert covariance_type in ["single", "diagonal",
+                               "full"], "covariance_type must equal 'single', 'diagonal' or 'full'"
     if m_subspace == 0:
         return 0
     # Get costs for each cluster
@@ -98,13 +103,13 @@ def mdl_costs_gmm_single_covariance(cropped_V, m_subspace, scatter_matrices_subs
     # Get number of points which are not outliers
     if covariance_type == "single":
         full_pdf_costs = mdl_costs_gaussian_single_variance(cropped_V, n_points_non_outliers,
-                                                        sum_scatter_matrices, m_subspace)
+                                                            sum_scatter_matrices, m_subspace)
     elif covariance_type == "diagonal":
         full_pdf_costs = mdl_costs_gaussian_diagonal_covariance(cropped_V, n_points_non_outliers,
-                                                        sum_scatter_matrices, m_subspace)
+                                                                sum_scatter_matrices, m_subspace)
     elif covariance_type == "full":
         full_pdf_costs = mdl_costs_gaussian_full_covariance(cropped_V, n_points_non_outliers,
-                                                        sum_scatter_matrices, m_subspace)
+                                                            sum_scatter_matrices, m_subspace)
     # Return pdf_costs
     return full_pdf_costs
 
@@ -124,8 +129,8 @@ def mdl_costs_gaussian_single_variance(cropped_V, n_points_in_cluster, scatter_m
     # Can occur if all points in this cluster lie on the same position
     if trace <= 1e-20:
         return 0
-    pdf_costs = 1 + LOG_2_PI + np.log(trace / m_subspace / n_points_in_cluster)
-    pdf_costs *= n_points_in_cluster * m_subspace / 2 / LOG_2
+    pdf_costs = 1 + _LOG_2_PI + np.log(trace / m_subspace / n_points_in_cluster)
+    pdf_costs *= n_points_in_cluster * m_subspace / 2 / _LOG_2
     return pdf_costs
 
 
@@ -135,9 +140,9 @@ def mdl_costs_gaussian_diagonal_covariance(cropped_V, n_points_in_cluster, scatt
     if n_points_in_cluster <= 1 or m_subspace == 0:
         return 0
     cropped_scatter = np.matmul(np.matmul(cropped_V.transpose(), scatter_matrix_cluster), cropped_V)
-    pdf_costs = m_subspace + m_subspace * LOG_2_PI - m_subspace * np.log(n_points_in_cluster) + np.sum(
+    pdf_costs = m_subspace + m_subspace * _LOG_2_PI - m_subspace * np.log(n_points_in_cluster) + np.sum(
         np.log(cropped_scatter.diagonal()))
-    pdf_costs *= n_points_in_cluster / 2 / LOG_2
+    pdf_costs *= n_points_in_cluster / 2 / _LOG_2
     return pdf_costs
 
 
@@ -156,6 +161,6 @@ def mdl_costs_gaussian_full_covariance(cropped_V, n_points_in_cluster, scatter_m
                 pdf_costs += cropped_scatter[row, col] * inv[row, col]
             else:
                 pdf_costs += 2 * cropped_scatter[row, col] * inv[row, col]
-    pdf_costs += m_subspace * LOG_2_PI - m_subspace * np.log(n_points_in_cluster) + np.log(det)
-    pdf_costs *= n_points_in_cluster / 2 / LOG_2
+    pdf_costs += m_subspace * _LOG_2_PI - m_subspace * np.log(n_points_in_cluster) + np.log(det)
+    pdf_costs *= n_points_in_cluster / 2 / _LOG_2
     return pdf_costs

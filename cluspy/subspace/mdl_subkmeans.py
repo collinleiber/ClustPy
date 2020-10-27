@@ -1,6 +1,6 @@
 import numpy as np
-from cluspy.subspace.SubKmeans import SubKmeans
-from cluspy.nonredundant.NrKmeans import _mdl_costs
+from cluspy.subspace.subkmeans import SubKmeans
+from cluspy.nonredundant.nrkmeans import _mdl_costs
 
 
 def _get_n_clusters(X, max_n_clusters, add_noise_space, repetitions, mdl_for_noisespace,

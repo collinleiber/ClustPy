@@ -15,10 +15,10 @@ from sklearn.metrics import normalized_mutual_info_score as nmi
 import seaborn as sns
 import matplotlib.pyplot as plt
 import pandas as pd
-import cluspy.MDLCosts as mdl
+import cluspy._mdlcosts as mdl
 
-ACCEPTED_NUMERICAL_ERROR = 1e-6
-NOISE_SPACE_THRESHOLD = -1e-7
+_ACCEPTED_NUMERICAL_ERROR = 1e-6
+_NOISE_SPACE_THRESHOLD = -1e-7
 
 
 def _nrkmeans(X, n_clusters, V, m, P, centers, mdl_for_noisespace, outliers, max_iter, random_state):
@@ -341,7 +341,7 @@ def _update_rotation(X, V, first_index, second_index, n_clusters, P, scatter_mat
                                                         n_negative_e, P_combined, n_clusters,
                                                         scatter_matrices, labels, outliers, n_outliers)
         else:
-            n_negative_e = len(e[e < NOISE_SPACE_THRESHOLD])
+            n_negative_e = len(e[e < _NOISE_SPACE_THRESHOLD])
             P_1_new, P_2_new = _update_projections(P_combined, n_negative_e)
     else:
         P_1_new, P_2_new = _update_projections(P_combined, n_negative_e)
@@ -430,7 +430,7 @@ def _is_matrix_orthogonal(matrix):
     if matrix.shape[0] != matrix.shape[1]:
         return False
     matrix_product = np.matmul(matrix, matrix.transpose())
-    return np.allclose(matrix_product, np.identity(matrix.shape[0]), atol=ACCEPTED_NUMERICAL_ERROR)
+    return np.allclose(matrix_product, np.identity(matrix.shape[0]), atol=_ACCEPTED_NUMERICAL_ERROR)
 
 
 def _is_matrix_symmetric(matrix):
@@ -441,7 +441,7 @@ def _is_matrix_symmetric(matrix):
     """
     if matrix.shape[0] != matrix.shape[1]:
         return False
-    return np.allclose(matrix, matrix.T, atol=ACCEPTED_NUMERICAL_ERROR)
+    return np.allclose(matrix, matrix.T, atol=_ACCEPTED_NUMERICAL_ERROR)
 
 
 def _are_labels_equal(labels_new, labels_old):

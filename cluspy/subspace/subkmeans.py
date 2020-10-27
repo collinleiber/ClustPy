@@ -4,7 +4,7 @@ k-means." Proceedings of the 23rd ACM SIGKDD International
 Conference on Knowledge Discovery and Data Mining. 2017.
 """
 
-from cluspy.nonredundant.NrKmeans import NrKmeans
+from cluspy.nonredundant.nrkmeans import NrKmeans
 
 
 class SubKmeans():

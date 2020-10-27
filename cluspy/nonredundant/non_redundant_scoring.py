@@ -3,15 +3,15 @@ from sklearn.metrics import normalized_mutual_info_score as nmi, adjusted_mutual
     adjusted_rand_score as ari, mutual_info_score as mi
 from itertools import permutations
 
-METRICS = ["nmi", "ami", "ari", "f1", "rand", "jaccard", "precision", "recall", "mi", "vi"]
-NR_METRICS = ["nr-f1", "nr-rand", "nr-jaccard", "nr-precision", "nr-recall"]
-AGGREGATIONS = ["max", "min", "permut-max", "permut-min", "avg"]
+_METRICS = ["nmi", "ami", "ari", "f1", "rand", "jaccard", "precision", "recall", "mi", "vi"]
+_NR_METRICS = ["nr-f1", "nr-rand", "nr-jaccard", "nr-precision", "nr-recall"]
+_AGGREGATIONS = ["max", "min", "permut-max", "permut-min", "avg"]
 
 
 def get_supported_metrics(add_non_redundant_metrics=False):
-    supported_metrics = METRICS.copy()
+    supported_metrics = _METRICS.copy()
     if add_non_redundant_metrics:
-        supported_metrics += NR_METRICS
+        supported_metrics += _NR_METRICS
     return supported_metrics
 
 
@@ -143,7 +143,7 @@ def _anywhere_same_cluster(labels, i, j):
 
 
 def _get_score_from_confusion_matrix(confusion_matrix, strategy):
-    _check_input(strategy, AGGREGATIONS)
+    _check_input(strategy, _AGGREGATIONS)
     # Permutation strategy
     if strategy == "permut-max" or strategy == "permut-min":
         best_score = -np.inf if strategy == "permut-max" else np.inf
@@ -187,7 +187,7 @@ Non-Redundant Scoring Class
 """
 
 
-class NRScoring():
+class NrScoring():
     def __init__(self, ground_truth, prediction):
         _check_number_of_points(ground_truth, prediction)
         self.ground_truth = ground_truth
@@ -209,8 +209,8 @@ class NRScoring():
         :param metric: the metric can be "nmi", "ami", "rand", "f1" or "pc-f1" (default: "nmi")
         :return: scring result. Between 0 <= score <= 1
         """
-        _check_input(metric, METRICS + NR_METRICS)
-        _check_input(aggregation, AGGREGATIONS)
+        _check_input(metric, _METRICS + _NR_METRICS)
+        _check_input(aggregation, _AGGREGATIONS)
         # Is noise space desired?
         ground_truth, prediction = self._get_labelings(remove_noise_spaces)
         # Calculate non-redundant scores
@@ -240,7 +240,7 @@ class NRScoring():
         return best_score
 
     def get_scoring_confusion_matrix(self, metric, remove_noise_spaces=True):
-        _check_input(metric, METRICS)
+        _check_input(metric, _METRICS)
         # Is noise space desired?
         ground_truth, prediction = self._get_labelings(remove_noise_spaces)
         if ground_truth.shape[1] == 0 or prediction.shape[1] == 0:
@@ -287,7 +287,7 @@ class NRScoring():
         return result
 
     def measure_average_redundancy(self, metric, labelings="pred", remove_noise_spaces=True, confusion_matrix=None):
-        _check_input(metric, METRICS)
+        _check_input(metric, _METRICS)
         _check_input(labelings, ["pred", "gt"])
         # Is noise space desired?
         ground_truth, prediction = self._get_labelings(remove_noise_spaces)
