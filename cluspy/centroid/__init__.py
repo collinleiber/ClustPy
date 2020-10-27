@@ -1,6 +1,9 @@
-# from .cmeans import
+from .fuzzy_cmeans import FuzzyCMeans
 from .pgmeans import PGMeans
 from .xmeans import XMeans
+from .gmeans import GMeans
 
-__all__ = ['PGMeans',
-           'XMeans']
+__all__ = ['GMeans',
+           'PGMeans',
+           'XMeans',
+           'FuzzyCMeans']

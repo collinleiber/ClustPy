@@ -99,13 +99,11 @@ class PGMeans():
                  max_n_clusters=np.inf):
         self.confidence = confidence
         if n_projections is None:
-            self.n_projections = math.ceil(-2.6198 * np.log(confidence))
-        else:
-            self.n_projections = n_projections
+            n_projections = math.ceil(-2.6198 * np.log(confidence))
+        self.n_projections = n_projections
         if n_samples is None:
-            self.n_samples = math.ceil(3 / self.confidence)
-        else:
-            self.n_samples = n_samples
+            n_samples = math.ceil(3 / self.confidence)
+        self.n_samples = n_samples
         self.n_new_centers = n_new_centers
         self.max_n_clusters = max_n_clusters
         self.random_centers = random_centers
