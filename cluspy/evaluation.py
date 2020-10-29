@@ -4,7 +4,7 @@ import time
 
 
 def evaluate(X, evaluation_algorithms, evaluation_metrics=None, GT=None, repetitions=10, add_runtime=True,
-                     save_path=None):
+             add_n_clusters=False, save_path=None):
     """
     Example:
     from cluspy.data.synthetic_data_creator import create_subspace_data
@@ -20,28 +20,32 @@ def evaluate(X, evaluation_algorithms, evaluation_metrics=None, GT=None, repetit
 
     :param X: dataset
     :param evaluation_algorithms: input algorithms - list of EvaluationAlgorithm
-    :param evaluation_metrics: input metrics - list of EvaluationMetric (can be None)
+    :param evaluation_metrics: input metrics - list of EvaluationMetric (default: None)
     :param GT: ground truth (Default: None)
-    :param repetitions: number of repetitions to execute
-    :param save_path: path where the results should be saved (optional)
+    :param repetitions: number of repetitions to execute (default: 10)
+    :param add_runtime: add runtime into the results table (default: True)
+    :param add_n_clusters: add n_clusters into the results table (default: False)
+    :param save_path: optional - path where the results should be saved (default: None)
     :return: dataframe with evaluation results
     """
-    assert evaluation_metrics is not None or add_runtime, "Either evaluation metrics must be defined or add_runtime must be True"
+    assert evaluation_metrics is not None or add_runtime or add_n_clusters, \
+        "Either evaluation metrics must be defined or add_runtime/add_n_clusters must be True"
     if type(evaluation_algorithms) is not list:
         evaluation_algorithms = [evaluation_algorithms]
     if type(evaluation_metrics) is not list and evaluation_metrics is not None:
         evaluation_metrics = [evaluation_metrics]
     algo_names = [a.name for a in evaluation_algorithms]
+    metric_names = [] if evaluation_metrics is None else [m.name for m in evaluation_metrics]
     if add_runtime:
-        metric_names = [] if evaluation_metrics is None else [m.name for m in evaluation_metrics]
         metric_names += ["runtime"]
-    else:
-        metric_names = [m.name for m in evaluation_metrics]
+    if add_n_clusters:
+        metric_names = ["n_clusters"]
     header = pd.MultiIndex.from_product([algo_names, metric_names], names=["algorithm", "metric"])
     data = np.zeros((repetitions, len(algo_names) * len(metric_names)))
     df = pd.DataFrame(data, columns=header, index=range(repetitions))
     for eval_algo in evaluation_algorithms:
         assert type(eval_algo) is EvaluationAlgorithm, "The algortihms must be of type EvaluationAlgortihm"
+        # Execute the algorithm multiple times
         for rep in range(repetitions):
             start_time = time.time()
             algo_obj = eval_algo.obj(**eval_algo.params)
@@ -49,14 +53,19 @@ def evaluate(X, evaluation_algorithms, evaluation_metrics=None, GT=None, repetit
             runtime = time.time() - start_time
             if add_runtime:
                 df.at[rep, (eval_algo.name, "runtime")] = runtime
+            if add_n_clusters:
+                df.at[rep, (eval_algo.name, "n_clusters")] = algo_obj.n_clusters
             labels = algo_obj.labels if eval_algo.label_column is None else algo_obj.labels[:, eval_algo.label_column]
+            # Get result of all metrics
             if evaluation_metrics is not None:
                 for eval_metric in evaluation_metrics:
                     assert type(eval_metric) is EvaluationMetric, "The metrics must be of type EvaluationMetric"
+                    # Check if metric uses ground truth (e.g. NMI, ACC, ...)
                     if eval_metric.use_gt:
                         assert GT is not None, "Ground truth can not be None if it is used for the chosen metric"
                         result = eval_metric.method(GT, labels, **eval_metric.params)
                     else:
+                        # Metric does not use ground truth (e.g. Silhouette, ...)
                         result = eval_metric.method(X, labels, **eval_metric.params)
                     df.at[rep, (eval_algo.name, eval_metric.name)] = result
     if save_path is not None:

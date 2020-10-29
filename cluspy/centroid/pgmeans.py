@@ -17,9 +17,10 @@ def _pgmeans(X, confidence, n_projections, n_samples, n_new_centers, random_cent
     highs = np.max(X, axis=0)
     lows = np.min(X, axis=0)
     # Start parameters
-    n_clusters = 1
+    n_clusters = 0
     input_centers = [np.mean(X, axis=0).reshape(1, -1)]
-    while n_clusters <= max_n_clusters:
+    while n_clusters < max_n_clusters:
+        n_clusters += 1
         best_gmm = None
         best_log_likelihood = -np.inf
         # Try different center possibilities
@@ -49,7 +50,6 @@ def _pgmeans(X, confidence, n_projections, n_samples, n_new_centers, random_cent
             break
         else:
             # Add new centers
-            n_clusters += 1
             n_random_centers = math.floor(n_new_centers * random_centers)
             # Add centers farthest away from other centroids
             if n_random_centers < n_new_centers:

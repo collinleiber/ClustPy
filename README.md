@@ -1,21 +1,24 @@
 # ClusPy
 
 Clustering data in python.
+The package is a combination of own implementations as well as wrappers for 'sklearn' and 'pyclustering' algorithms.
 
 ## Implemented algorithms
 
-- Density-based
-    - Multi Density DBSCAN
-- Centroid-based
+- Centroid-based clustering
     - X-Means
     - G-Means
     - PG-Means
     - Fuzzy-C-Means
-- Non-redundant clustering (alternative clustering)
-    - NR-Kmeans
+- Density-based clustering
+    - Multi Density DBSCAN
 - Subspace clustering
     - SubKmeans
     - MDL-SubKmeans
+- Alternative clustering (Non-redundant clustering)
+    - NR-Kmeans
+- Deep clustering
+    - ...
 
 ## Other interesting algorithms
 - XMeans (pyclustering , https://github.com/mynameisfiber/pyxmeans/blob/master/pyxmeans/xmeans.py)

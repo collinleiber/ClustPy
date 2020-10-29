@@ -1,6 +1,6 @@
 import numpy as np
 from cluspy.subspace.subkmeans import SubKmeans
-from cluspy.nonredundant.nrkmeans import _mdl_costs
+from cluspy.alternative.nrkmeans import _mdl_costs
 
 
 def _get_n_clusters(X, max_n_clusters, add_noise_space, repetitions, mdl_for_noisespace,
@@ -30,8 +30,7 @@ def _get_n_clusters(X, max_n_clusters, add_noise_space, repetitions, mdl_for_noi
 class MDLSubKmeans():
 
     def __init__(self, max_n_clusters=np.inf, add_noise_space=True, repetitions=10, mdl_for_noisespace=True,
-                 outliers=False,
-                 max_iter=300, random_state=None):
+                 outliers=False, max_iter=300, random_state=None):
         self.max_n_clusters = max_n_clusters
         self.add_noise_space = add_noise_space
         self.repetitions = repetitions
@@ -42,8 +41,7 @@ class MDLSubKmeans():
 
     def fit(self, X):
         subkmeans = _get_n_clusters(X, self.max_n_clusters, self.add_noise_space, self.repetitions,
-                                    self.mdl_for_noisespace,
-                                    self.outliers, self.max_iter, self.random_state)
+                                    self.mdl_for_noisespace, self.outliers, self.max_iter, self.random_state)
         self.labels = subkmeans.labels
         self.centers = subkmeans.centers
         self.n_clusters = subkmeans.n_clusters
