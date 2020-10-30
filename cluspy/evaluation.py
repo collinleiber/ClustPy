@@ -104,11 +104,12 @@ def evaluate_multiple_datasets(evaluation_datasets, evaluation_algorithms, evalu
 
 class EvaluationDataset():
 
-    def __init__(self, name, path, gt_columns=0, delimiter=",", preprocess_method = None, preprocess_params = {}):
+    def __init__(self, name, path, gt_columns=-1, delimiter=",", preprocess_method = None, preprocess_params = {}):
         assert type(name) is str, "name must be a string"
         self.name = name
         assert type(path) is str, "path must be a string"
         self.path = path
+        assert type(gt_columns) is int or type(gt_columns) is list, "gt_columns must be an int or a list"
         self.gt_columns = gt_columns
         assert type(delimiter) is str, "delimiter must be a string"
         self.delimiter = delimiter

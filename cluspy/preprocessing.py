@@ -25,5 +25,5 @@ def preprocess_data(X, strategy="std", axis=0):
 def preprocess_features(X, strategy="std"):
     return preprocess_data(X, strategy, 0)
 
-def preprocess_vecotrs(X, strategy="std"):
+def preprocess_vectors(X, strategy="std"):
     return preprocess_data(X, strategy, 1)

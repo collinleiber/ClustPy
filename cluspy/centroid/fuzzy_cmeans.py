@@ -4,10 +4,11 @@ Advances in neural information processing systems. 2004.
 """
 
 from pyclustering.cluster.fcm import fcm
-from cluspy._pyclustering_wrapper import adjust_lists, adjust_labels
+from cluspy._wrapper_methods import pyclustering_adjust_labels
 from sklearn.cluster._kmeans import _k_init as kpp
 from sklearn.utils.extmath import row_norms
 from sklearn.utils import check_random_state
+import numpy as np
 
 
 class FuzzyCMeans():
@@ -26,6 +27,6 @@ class FuzzyCMeans():
         fuzzycmeans_obj = fcm(X, initial_centers=self.initial_centers, tolerance=self.tolerance,
                               itermax=self.itermax, m=self.m)
         fuzzycmeans_obj.process()
-        self.labels = adjust_labels(X.shape[0], fuzzycmeans_obj.get_clusters())
-        self.centers = adjust_lists(fuzzycmeans_obj.get_centers())
-        self.membership = adjust_lists(fuzzycmeans_obj.get_membership())
+        self.labels = pyclustering_adjust_labels(X.shape[0], fuzzycmeans_obj.get_clusters())
+        self.centers = np.array((fuzzycmeans_obj.get_centers()))
+        self.membership = np.array((fuzzycmeans_obj.get_membership()))

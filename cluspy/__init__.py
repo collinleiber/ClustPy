@@ -1,5 +1,5 @@
 from .evaluation import evaluate_dataset, evaluate_multiple_datasets, EvaluationMetric, EvaluationAlgorithm, EvaluationDataset
-from .preprocessing import preprocess_data, preprocess_decompose, preprocess_features, preprocess_vecotrs
+from .preprocessing import preprocess_data, preprocess_decompose, preprocess_features, preprocess_vectors
 
 __all__ = ['evaluate_dataset',
            'evaluate_multiple_datasets',
@@ -9,4 +9,4 @@ __all__ = ['evaluate_dataset',
            'preprocess_data',
            'preprocess_decompose',
            'preprocess_features',
-           'preprocess_vecotrs']
+           'preprocess_vectors']
