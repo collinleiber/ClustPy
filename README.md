@@ -10,6 +10,8 @@ The package is a combination of own implementations as well as wrappers for 'skl
     - G-Means
     - PG-Means
     - Fuzzy-C-Means
+    - Dip-Means
+    - Projected Dip-Means
 - Density-based clustering
     - Multi Density DBSCAN
 - Subspace clustering

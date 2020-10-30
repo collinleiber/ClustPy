@@ -95,6 +95,7 @@ def _add_non_random_centers(X, centers, n_non_random_centers):
 
 
 class PGMeans():
+    
     def __init__(self, confidence=0.01, n_projections=None, n_samples=None, n_new_centers=10, random_centers=0.5,
                  max_n_clusters=np.inf):
         self.confidence = confidence

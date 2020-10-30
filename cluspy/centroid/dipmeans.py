@@ -51,7 +51,7 @@ def _dipmeans(X, pval_threshold, split_viewers_threshold, pval_strategy, n_boots
         # Check if any cluster has to be split
         if cluster_scores[cluster_id_to_split] > 0:
             # Split cluster using bisecting kmeans
-            km = _execute_bisecting_kmeans(X, n_clusters, ids_in_each_cluster, cluster_id_to_split, centers,
+            km = _execute_bisecting_kmeans(X, ids_in_each_cluster, cluster_id_to_split, centers,
                                            n_new_centers)
             labels = km.labels_
             centers = km.cluster_centers_
@@ -60,7 +60,7 @@ def _dipmeans(X, pval_threshold, split_viewers_threshold, pval_strategy, n_boots
     return n_clusters, centers, labels
 
 
-def _execute_bisecting_kmeans(X, n_clusters, ids_in_each_cluster, cluster_id_to_split, centers, n_new_centers):
+def _execute_bisecting_kmeans(X, ids_in_each_cluster, cluster_id_to_split, centers, n_new_centers):
     # Prepare cluster for splitting
     old_center = centers[cluster_id_to_split, :]
     reduced_centers = np.delete(centers, cluster_id_to_split, axis=0)
@@ -75,7 +75,7 @@ def _execute_bisecting_kmeans(X, n_clusters, ids_in_each_cluster, cluster_id_to_
         adjusted_center = (old_center - (random_center - old_center)).reshape(1, -1)
         # Run kmeans with new centers
         tmp_centers = np.r_[reduced_centers, random_center, adjusted_center]
-        km = KMeans(n_clusters=n_clusters + 1, init=tmp_centers, n_init=1)
+        km = KMeans(n_clusters=tmp_centers.shape[0], init=tmp_centers, n_init=1)
         km.fit(X)
         # Check squared distances to find best kmeans result
         if km.inertia_ < min_squared_dist:
@@ -85,6 +85,7 @@ def _execute_bisecting_kmeans(X, n_clusters, ids_in_each_cluster, cluster_id_to_
 
 
 class DipMeans():
+
     def __init__(self, pval_threshold=0, split_viewers_threshold=0.01, pval_strategy=PVAL_BY_TABLE, n_boots=2000,
                  n_new_centers=10, max_n_clusters=np.inf):
         self.pval_threshold = pval_threshold

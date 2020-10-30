@@ -8,6 +8,7 @@ from cluspy._pyclustering_wrapper import adjust_lists, adjust_labels
 
 
 class GMeans():
+
     def __init__(self, init_n_clusters=1, tolerance=0.025, kmeans_repetitions=3):
         self.init_n_clusters = init_n_clusters
         self.tolerance = tolerance
