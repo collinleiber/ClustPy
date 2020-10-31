@@ -28,10 +28,8 @@ def _dipmeans(X, pval_threshold, split_viewers_threshold, pval_strategy, n_boots
             ids_in_each_cluster.append(ids_in_cluster)
             # Get pairwise distances of points in cluster
             cluster_dist_matrix = data_dist_matrix[np.ix_(ids_in_cluster, ids_in_cluster)]
-            # Sort distances
-            sorted_cluster_dist_matrix = np.sort(cluster_dist_matrix, axis=1)
             # Calculate dip values for the distances of each point
-            cluster_dips = np.array([dip(sorted_cluster_dist_matrix[p, :], just_dip=True, data_is_sorted=True) for p in
+            cluster_dips = np.array([dip(cluster_dist_matrix[p, :], just_dip=True) for p in
                                      range(ids_in_cluster.shape[0])])
             # Calculate p-values
             if pval_strategy == PVAL_BY_BOOT:

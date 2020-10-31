@@ -25,11 +25,9 @@ def _proj_dipmeans(X, pval_threshold, n_random_projections, pval_strategy, n_boo
             ids_in_each_cluster.append(ids_in_cluster)
             # Get projections
             projections = _get_projected_data(X[ids_in_cluster], n_random_projections)
-            # Sort distances
-            sorted_projections = np.sort(projections, axis=0)
             # Calculate dip values for the distances of each point
-            cluster_dips = np.array([dip(sorted_projections[:, p], just_dip=True, data_is_sorted=True) for p in
-                                     range(sorted_projections.shape[1])])
+            cluster_dips = np.array([dip(projections[:, p], just_dip=True) for p in
+                                     range(projections.shape[1])])
             # Calculate p-values of maximum dip
             pval = dip_pval(np.max(cluster_dips), ids_in_cluster.shape[0], pval_strategy=pval_strategy, n_boots=n_boots)
             # Calculate cluster score
@@ -49,21 +47,17 @@ def _proj_dipmeans(X, pval_threshold, n_random_projections, pval_strategy, n_boo
 
 
 def _get_projected_data(X, n_random_projections):
-    n_projections = 2 * X.shape[1] + n_random_projections  # Axis + PCA + random
-    projections = np.zeros((X.shape[0], n_projections))
     # Execute PCA
-    pca = PCA(n_components=X.shape[1])
-    pca_X = pca.fit_transform(X)
-    for i in range(X.shape[1]):
-        # Add axis vector
-        projections[:, i * 2] = X[:, i]
-        # Add pca vector
-        projections[:, i * 2 + 1] = pca_X[:, i]
+    pca = PCA()
+    pca_X = pca.fit_transform(X) if X.shape[0] > 1 else np.empty((X.shape[0], 0))
+    # Add random projections
+    random_projections = np.zeros((X.shape[0], n_random_projections))
     for i in range(n_random_projections):
         # Add random vector
         projection_vector = np.random.rand(X.shape[1])
         projected_X = np.dot(X, projection_vector)
-        projections[:, 2 * X.shape[1] + i] = projected_X
+        random_projections[:, i] = projected_X
+    projections = np.c_[X, pca_X, random_projections]
     return projections
 
 

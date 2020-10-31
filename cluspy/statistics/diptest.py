@@ -21,17 +21,15 @@ PVAL_BY_BOOT = 1
 PVAL_BY_FUNCTION = 2
 
 
-def dip(X, just_dip=False, data_is_sorted=False):
+def dip(X, just_dip=False):
     """
         Compute the Hartigans' dip statistic either for a histogram of
         samples (with equidistant bins) or for a set of samples.
     """
-    if not data_is_sorted:
-        X = np.sort(X)
-
-    counts = collections.Counter(X)
-    idxs = np.msort(list(counts.keys()))
-    histogram = np.array([counts[i] for i in idxs])
+    # Set precision to less than float64 since the subtraction in _lcm_ is having problems with the precision and
+    # produces duplicates
+    X = np.around(X, 15)
+    idxs, histogram = np.unique(X, return_counts=True)
 
     # check for case 1<N<4 or all identical values
     if len(idxs) <= 4 or idxs[0] == idxs[-1]:
@@ -92,7 +90,7 @@ def dip(X, just_dip=False, data_is_sorted=False):
         right[:0] = right_part[xr:-1]
 
 
-def diptest(X, data_is_sorted=False, pval_strategy=PVAL_BY_TABLE, n_boots=2000):
+def diptest(X, pval_strategy=PVAL_BY_TABLE, n_boots=2000):
     """
     Hartigan & Hartigan's dip test for unimodality.
     For X ~ F i.i.d., the null hypothesis is that F is a unimodal distribution.
@@ -119,7 +117,7 @@ def diptest(X, data_is_sorted=False, pval_strategy=PVAL_BY_TABLE, n_boots=2000):
         The Annals of Statistics.
     """
     n_points = X.shape[0]
-    data_dip = dip(X, just_dip=True, data_is_sorted=data_is_sorted)
+    data_dip = dip(X, just_dip=True)
     pval = dip_pval(data_dip, n_points, pval_strategy, n_boots)
     return data_dip, pval
 
@@ -139,17 +137,19 @@ def dip_pval(data_dip, n_points, pval_strategy=PVAL_BY_TABLE, n_boots=2000):
             "pval_strategy must be 0 (table), 1 (boot) or 2 (function). Your input: {0}".format(pval_strategy))
     return pval
 
+
 def dip_boot_samples(n_points, n_boots):
     # random uniform vectors
     boot_samples = np.random.rand(n_boots, n_points)
     # faster to pre-sort
-    boot_samples.sort(axis=1)
-    boot_dips = np.array([dip(boot_s, just_dip=True, data_is_sorted=True) for boot_s in boot_samples])
+    boot_dips = np.array([dip(boot_s, just_dip=True) for boot_s in boot_samples])
     return boot_dips
+
 
 """
 Dip p-value methods
 """
+
 
 def _dip_pval_table(data_dip, n_points):
     N, SIG, CV = _dip_table_values()
@@ -168,6 +168,7 @@ def _dip_pval_table(data_dip, n_points):
     sD = np.sqrt(n_points) * data_dip
     pval = 1. - np.interp(sD, y0 + fn * (y1 - y0), SIG)
     return pval
+
 
 def _dip_pval_function(data_dip, n_points):
     a = 1.0

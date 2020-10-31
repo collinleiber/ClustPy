@@ -6,6 +6,7 @@ The package is a combination of own implementations as well as wrappers for 'skl
 ## Implemented algorithms
 
 - Centroid-based clustering
+    - MeanShift
     - X-Means
     - G-Means
     - PG-Means
