@@ -9,18 +9,16 @@ def _get_n_clusters(X, max_n_clusters, add_noise_space, repetitions, mdl_for_noi
     min_costs = np.inf
     best_subkmeans = None
     while n_clusters <= max_n_clusters:
-        tmp_min_costs = np.inf
-        tmp_best_subkmeans = None
+        better_found = False
         for i in range(repetitions):
             subkmeans = SubKmeans(n_clusters, add_noise_space, mdl_for_noisespace, outliers, max_iter, random_state)
             subkmeans.fit(X)
             costs = _mdl_costs(X, subkmeans)[0]
-            if costs < tmp_min_costs:
-                tmp_min_costs = costs
-                tmp_best_subkmeans = subkmeans
-        if tmp_min_costs < min_costs:
-            min_costs = tmp_min_costs
-            best_subkmeans = tmp_best_subkmeans
+            if costs < min_costs:
+                better_found = True
+                min_costs = costs
+                best_subkmeans = subkmeans
+        if better_found:
             n_clusters += 1
         else:
             break

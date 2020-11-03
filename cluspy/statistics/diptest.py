@@ -13,7 +13,6 @@ and
 https://github.com/alimuldal/diptest
 """
 
-import collections
 import numpy as np
 
 PVAL_BY_TABLE = 0
@@ -28,7 +27,7 @@ def dip(X, just_dip=False):
     """
     # Set precision to less than float64 since the subtraction in _lcm_ is having problems with the precision and
     # produces duplicates
-    X = np.around(X, 15)
+    X = np.around(X, 12)
     idxs, histogram = np.unique(X, return_counts=True)
 
     # check for case 1<N<4 or all identical values
