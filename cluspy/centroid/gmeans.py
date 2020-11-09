@@ -4,7 +4,7 @@ Advances in neural information processing systems. 2004.
 """
 
 from pyclustering.cluster.gmeans import gmeans
-from cluspy._wrapper_methods import pyclustering_adjust_labels
+from cluspy.utils._wrapper_methods import pyclustering_adjust_labels
 import numpy as np
 
 
@@ -18,6 +18,6 @@ class GMeans():
     def fit(self, X):
         gmeans_obj = gmeans(X, k_init=self.init_n_clusters, tolerance=self.tolerance, repeat=self.kmeans_repetitions)
         gmeans_obj.process()
-        self.labels = pyclustering_adjust_labels(X.shape[0], gmeans_obj.get_clusters())
-        self.centers = np.array((gmeans_obj.get_centers()))
-        self.n_clusters = self.centers.shape[0]
+        self.labels_ = pyclustering_adjust_labels(X.shape[0], gmeans_obj.get_clusters())
+        self.cluster_centers_ = np.array((gmeans_obj.get_centers()))
+        self.n_clusters_ = self.centers.shape[0]

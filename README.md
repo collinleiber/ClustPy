@@ -1,16 +1,16 @@
 # ClusPy
 
-Clustering data in python.
-The package is a combination of own implementations as well as wrappers for 'sklearn' and 'pyclustering' algorithms.
+The package offers an easy way to cluster data in python.
+It can be combined with all algorithms from [sklearn clustering](https://scikit-learn.org/stable/modules/clustering.html).
+Furthermore, it contains wrappers for [pyclustering](https://pyclustering.github.io/) implementations.
 
 ## Implemented algorithms
 
 - Centroid-based clustering
-    - MeanShift
-    - X-Means
-    - G-Means
+    - X-Means (from [pyclustering](https://pyclustering.github.io/docs/0.10.0/html/d2/d8b/namespacepyclustering_1_1cluster_1_1xmeans.html))
+    - G-Means (from [pyclustering](https://pyclustering.github.io/docs/0.10.0/html/dc/d86/namespacepyclustering_1_1cluster_1_1gmeans.html))
     - PG-Means
-    - Fuzzy-C-Means
+    - Fuzzy-C-Means (from [pyclustering](https://pyclustering.github.io/docs/0.10.0/html/de/df0/namespacepyclustering_1_1cluster_1_1fcm.html))
     - Dip-Means
     - Projected Dip-Means
 - Density-based clustering
@@ -21,12 +21,6 @@ The package is a combination of own implementations as well as wrappers for 'skl
 - Alternative clustering (Non-redundant clustering)
     - NR-Kmeans
 - Deep clustering
-    - ...
-
-## Other interesting algorithms
-- XMeans (pyclustering , https://github.com/mynameisfiber/pyxmeans/blob/master/pyxmeans/xmeans.py)
-- GMeans (https://github.com/shahanesanket/Clustering-Gmeans/blob/master/gmeans.py , https://github.com/jkerriga/frequentist-gmeans/blob/master/gMeans.py , https://github.com/LewieWang94/means-family-clustering/blob/master/gmeans.py)
-- DipMeans (https://github.com/Theofilos-Chamalis/Clustering-methods-based-on-statistical-testing-of-the-unimodality-of-the-data)
-- Projected DipMeans (https://github.com/Theofilos-Chamalis/Clustering-methods-based-on-statistical-testing-of-the-unimodality-of-the-data)
-- cmeans (https://github.com/scikit-fuzzy/scikit-fuzzy/blob/master/skfuzzy/cluster/_cmeans.py,
-          https://github.com/omadson/fuzzy-c-means)
+    - DEC
+    - IDEC
+    - DCN

@@ -40,9 +40,10 @@ class MDLSubKmeans():
     def fit(self, X):
         subkmeans = _get_n_clusters(X, self.max_n_clusters, self.add_noise_space, self.repetitions,
                                     self.mdl_for_noisespace, self.outliers, self.max_iter, self.random_state)
-        self.labels = subkmeans.labels
-        self.centers = subkmeans.centers
+        self.labels_ = subkmeans.labels_
+        self.cluster_centers_ = subkmeans.cluster_centers_
         self.n_clusters = subkmeans.n_clusters
         self.V = subkmeans.V
         self.P = subkmeans.P
         self.m = subkmeans.m
+        self.scatter_matrices_ = subkmeans.scatter_matrices_

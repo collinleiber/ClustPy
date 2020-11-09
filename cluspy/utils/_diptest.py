@@ -27,7 +27,7 @@ def dip(X, just_dip=False):
     """
     # Set precision to less than float64 since the subtraction in _lcm_ is having problems with the precision and
     # produces duplicates
-    X = np.around(X, 12)
+    X = np.around(X, 15)
     idxs, histogram = np.unique(X, return_counts=True)
 
     # check for case 1<N<4 or all identical values
@@ -40,7 +40,7 @@ def dip(X, just_dip=False):
     cdf = np.cumsum(histogram, dtype=float)
     cdf /= cdf[-1]
 
-    work_idxs = idxs
+    work_idxs = np.asarray(idxs, dtype=float)
     work_histogram = np.asarray(histogram, dtype=float) / np.sum(histogram)
     work_cdf = cdf
 

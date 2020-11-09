@@ -21,10 +21,10 @@ class SubKmeans():
         nrkmeans = NrKmeans(self.n_clusters, mdl_for_noisespace=self.mdl_for_noisespace, outliers=self.outliers,
                             max_iter=self.max_iter, random_state=self.random_state)
         nrkmeans.fit(X)
-        self.labels = nrkmeans.labels
-        self.centers = nrkmeans.centers
+        self.labels_ = nrkmeans.labels_
+        self.cluster_centers_ = nrkmeans.cluster_centers_
         self.V = nrkmeans.V
         self.P = nrkmeans.P
         self.m = nrkmeans.m
-        self.scatter_matrices = nrkmeans.scatter_matrices
+        self.scatter_matrices_ = nrkmeans.scatter_matrices_
         self.n_clusters = nrkmeans.n_clusters

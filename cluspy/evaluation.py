@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import time
-
+from cluspy.utils._wrapper_methods import _get_n_clusters_from_algo
 
 def evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=None, gt=None, repetitions=10, add_average=True,
                      add_runtime=True, add_n_clusters=False, save_path=None):
@@ -49,6 +49,7 @@ def evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=None, gt=None,
         assert type(eval_algo) is EvaluationAlgorithm, "All algortihms must be of type EvaluationAlgortihm"
         # Execute the algorithm multiple times
         for rep in range(repetitions):
+            print("- Iteration {0}".format(rep + 1))
             start_time = time.time()
             algo_obj = eval_algo.obj(**eval_algo.params)
             algo_obj.fit(X)
@@ -56,7 +57,8 @@ def evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=None, gt=None,
             if add_runtime:
                 df.at[rep, (eval_algo.name, "runtime")] = runtime
             if add_n_clusters:
-                n_clusters = algo_obj.n_clusters if eval_algo.label_column is None else algo_obj.n_clusters[
+                all_n_clusters = _get_n_clusters_from_algo(algo_obj)
+                n_clusters = all_n_clusters if eval_algo.label_column is None else all_n_clusters[
                     eval_algo.label_column]
                 df.at[rep, (eval_algo.name, "n_clusters")] = n_clusters
             labels = algo_obj.labels if eval_algo.label_column is None else algo_obj.labels[:, eval_algo.label_column]
@@ -93,9 +95,11 @@ def evaluate_multiple_datasets(evaluation_datasets, evaluation_algorithms, evalu
         gt = data_file[:, eval_data.gt_columns]
         if eval_data.preprocess_method is not None:
             X = eval_data.preprocess_method(X, **eval_data.preprocess_params)
+        inner_save_path = None if save_path is None else "{0}_{1}.{2}".format(save_path.split(".")[0], eval_data.name,
+                                                                            save_path.split(".")[1])
         df = evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=evaluation_metrics, gt=gt,
                                    repetitions=repetitions, add_average=add_average, add_runtime=add_runtime,
-                                   add_n_clusters=add_n_clusters, save_path=None)
+                                   add_n_clusters=add_n_clusters, save_path=inner_save_path)
         df_list.append(df)
     all_dfs = pd.concat(df_list, keys=data_names)
     if save_path is not None:

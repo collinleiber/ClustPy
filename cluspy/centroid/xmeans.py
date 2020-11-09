@@ -5,7 +5,7 @@ Icml. Vol. 1. 2000.
 """
 
 from pyclustering.cluster.xmeans import xmeans
-from cluspy._wrapper_methods import pyclustering_adjust_labels
+from cluspy.utils._wrapper_methods import pyclustering_adjust_labels
 import numpy as np
 
 class XMeans():
@@ -22,6 +22,6 @@ class XMeans():
         xmeans_obj = xmeans(X, kmax=self.max_n_clusters, initial_centers=self.initial_centers, tolerance=self.tolerance,
                             repeat=self.kmeans_repetitions)
         xmeans_obj.process()
-        self.labels = pyclustering_adjust_labels(X.shape[0], xmeans_obj.get_clusters())
-        self.centers = np.array((xmeans_obj.get_centers()))
-        self.n_clusters = self.centers.shape[0]
+        self.labels_ = pyclustering_adjust_labels(X.shape[0], xmeans_obj.get_clusters())
+        self.cluster_centers_ = np.array((xmeans_obj.get_centers()))
+        self.n_clusters_ = self.centers.shape[0]

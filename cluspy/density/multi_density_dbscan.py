@@ -83,6 +83,6 @@ class MultiDensityDBSCAN():
     def fit(self, X):
         n_clusters, labels, cluster_densities = _multi_density_dbscan(X, self.k, self.var, self.min_cluster_size,
                                                                       self.always_sort_densities)
-        self.n_clusters = n_clusters
-        self.labels = labels
-        self.cluster_densities = cluster_densities
+        self.n_clusters_ = n_clusters
+        self.labels_ = labels
+        self.cluster_densities_ = cluster_densities

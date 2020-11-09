@@ -112,6 +112,6 @@ class PGMeans():
     def fit(self, X):
         n_clusters, centers, labels = _pgmeans(X, self.confidence, self.n_projections, self.n_samples,
                                                self.n_new_centers, self.random_centers, self.max_n_clusters)
-        self.n_clusters = n_clusters
-        self.centers = centers
-        self.labels = labels
+        self.n_clusters_ = n_clusters
+        self.cluster_centers_ = centers
+        self.labels_ = labels

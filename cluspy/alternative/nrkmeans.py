@@ -15,7 +15,7 @@ from sklearn.metrics import normalized_mutual_info_score as nmi
 import seaborn as sns
 import matplotlib.pyplot as plt
 import pandas as pd
-import cluspy._mdlcosts as mdl
+import cluspy.utils._mdlcosts as mdl
 
 _ACCEPTED_NUMERICAL_ERROR = 1e-6
 _NOISE_SPACE_THRESHOLD = -1e-7
@@ -696,7 +696,7 @@ def _mdl_costs(X, nrkmeans):
         outlier_costs = 0
         if nrkmeans.outliers:
             # Encode number of outliers
-            n_outliers = len(nrkmeans.labels[:, subspace_nr][nrkmeans.labels[:, subspace_nr] == -1])
+            n_outliers = len(nrkmeans.labels_[:, subspace_nr][nrkmeans.labels_[:, subspace_nr] == -1])
             model_costs += mdl.mdl_costs_integer_value(n_outliers)
             # Encode coding costs of outliers
             outlier_costs += _mdl_outlier_costs(n_points, nrkmeans.m[subspace_nr]) * n_outliers
@@ -704,7 +704,7 @@ def _mdl_costs(X, nrkmeans):
         assignment_costs = (n_points - n_outliers) * mdl.mdl_costs_uniform_distribution(nrkmeans.n_clusters[subspace_nr])
         # Coding costs for each point
         coding_costs = mdl.mdl_costs_gmm_single_covariance(cropped_V, nrkmeans.m[subspace_nr],
-                                                           nrkmeans.scatter_matrices[subspace_nr], n_points - n_outliers)
+                                                           nrkmeans.scatter_matrices_[subspace_nr], n_points - n_outliers)
         # Save this subspace costs
         all_subspace_costs.append(model_costs + outlier_costs + assignment_costs + coding_costs)
     # return full and single subspace costs
@@ -721,7 +721,7 @@ def _mdl_outlier_costs(n_points, m_subspace):
 
 
 class NrKmeans():
-    def __init__(self, n_clusters, V=None, m=None, P=None, centers=None, mdl_for_noisespace=True, outliers=False,
+    def __init__(self, n_clusters, V=None, m=None, P=None, input_centers=None, mdl_for_noisespace=True, outliers=False,
                  max_iter=300, random_state=None):
         """
         Create new NrKmeans instance. Gives the opportunity to use the fit() method to cluster a dataset.
@@ -729,7 +729,7 @@ class NrKmeans():
         :param V: orthogonal rotation matrix (optional)
         :param m: list containing number of dimensionalities for each subspace (optional)
         :param P: list containing projections for each subspace (optional)
-        :param centers: list containing the cluster centers for each subspace (optional)
+        :param input_centers: list containing the cluster centers for each subspace (optional)
         :param mdl_for_noisespace: boolean defining if MDL should be used to identify noise space dimensions (default: True)
         :param outliers: boolean defining if outliers should be identified (default: False)
         :param max_iter: maximum number of iterations for the NrKmaens algorithm (default: 300)
@@ -743,12 +743,10 @@ class NrKmeans():
         self.outliers = outliers
         # Variables
         self.n_clusters = n_clusters
-        self.labels = None
-        self.centers = centers
+        self.input_centers = input_centers
         self.V = V
         self.m = m
         self.P = P
-        self.scatter_matrices = None
 
     def fit(self, X):
         """
@@ -758,18 +756,18 @@ class NrKmeans():
         :return: the Nr-Kmeans object
         """
         labels, centers, V, m, P, n_clusters, scatter_matrices = _nrkmeans(X, self.n_clusters, self.V, self.m,
-                                                                           self.P, self.centers,
+                                                                           self.P, self.input_centers,
                                                                            self.mdl_for_noisespace,
                                                                            self.outliers, self.max_iter,
                                                                            self.random_state)
         # Update class variables
-        self.labels = labels
-        self.centers = centers
+        self.labels_ = labels
+        self.cluster_centers_ = centers
         self.V = V
         self.m = m
         self.P = P
         self.n_clusters = n_clusters
-        self.scatter_matrices = scatter_matrices
+        self.scatter_matrices_ = scatter_matrices
         return self
 
 
@@ -871,10 +869,10 @@ class NrKmeans():
         :param labels: the labels to use for the plot (default: labels found by Nr-Kmeans)
         :return: a scatter matrix plot of the input data
         """
-        if self.labels is None:
+        if self.labels_ is None:
             raise Exception("The NrKmeans algorithm has not run yet. Use the fit() function first.")
         if labels is None:
-            labels = self.labels[:, subspace_index]
+            labels = self.labels_[:, subspace_index]
         if X.shape[0] != labels.shape[0]:
             raise Exception("Number of data objects must match the number of labels.")
         if self.m[subspace_index] > 10:
@@ -914,8 +912,8 @@ class NrKmeans():
         P^T*V^T*S*V*P
         :return: result of the NrKmeans cost function
         """
-        if self.labels is None:
+        if self.labels_ is None:
             raise Exception("The NrKmeans algorithm has not run yet. Use the fit() function first.")
         costs = np.sum(
-            [_get_cost_function_of_subspace(self.V[:, self.P[i]], s) for i, s in enumerate(self.scatter_matrices)])
+            [_get_cost_function_of_subspace(self.V[:, self.P[i]], s) for i, s in enumerate(self.scatter_matrices_)])
         return costs
