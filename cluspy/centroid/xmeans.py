@@ -24,4 +24,4 @@ class XMeans():
         xmeans_obj.process()
         self.labels_ = pyclustering_adjust_labels(X.shape[0], xmeans_obj.get_clusters())
         self.cluster_centers_ = np.array((xmeans_obj.get_centers()))
-        self.n_clusters_ = self.centers.shape[0]
+        self.n_clusters_ = self.cluster_centers_.shape[0]

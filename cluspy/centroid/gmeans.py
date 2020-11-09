@@ -20,4 +20,4 @@ class GMeans():
         gmeans_obj.process()
         self.labels_ = pyclustering_adjust_labels(X.shape[0], gmeans_obj.get_clusters())
         self.cluster_centers_ = np.array((gmeans_obj.get_centers()))
-        self.n_clusters_ = self.centers.shape[0]
+        self.n_clusters_ = self.cluster_centers_.shape[0]

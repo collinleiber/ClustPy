@@ -61,7 +61,7 @@ def evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=None, gt=None,
                 n_clusters = all_n_clusters if eval_algo.label_column is None else all_n_clusters[
                     eval_algo.label_column]
                 df.at[rep, (eval_algo.name, "n_clusters")] = n_clusters
-            labels = algo_obj.labels if eval_algo.label_column is None else algo_obj.labels[:, eval_algo.label_column]
+            labels = algo_obj.labels_ if eval_algo.label_column is None else algo_obj.labels_[:, eval_algo.label_column]
             # Get result of all metrics
             if evaluation_metrics is not None:
                 for eval_metric in evaluation_metrics:
