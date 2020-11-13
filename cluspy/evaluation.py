@@ -3,6 +3,7 @@ import numpy as np
 import time
 from cluspy.utils._wrapper_methods import _get_n_clusters_from_algo
 
+
 def evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=None, gt=None, repetitions=10, add_average=True,
                      add_runtime=True, add_n_clusters=False, save_path=None):
     """
@@ -88,27 +89,41 @@ def evaluate_multiple_datasets(evaluation_datasets, evaluation_algorithms, evalu
     data_names = [d.name for d in evaluation_datasets]
     df_list = []
     for eval_data in evaluation_datasets:
-        print("=== Start evaluation of {0} ===". format(eval_data.name))
+        print("=== Start evaluation of {0} ===".format(eval_data.name))
         assert type(eval_data) is EvaluationDataset, "All datasets must be of type EvaluationDataset"
         data_file = np.genfromtxt(eval_data.path, delimiter=eval_data.delimiter)
         X = np.delete(data_file, eval_data.gt_columns, axis=1)
         gt = data_file[:, eval_data.gt_columns]
-        if eval_data.preprocess_method is not None:
-            X = eval_data.preprocess_method(X, **eval_data.preprocess_params)
+        if eval_data.preprocess_methods is not None:
+            # Do preprocessing
+            if type(eval_data.preprocess_methods) is list:
+                # Execute multiple preprocessing steps
+                assert type(eval_data.preprocess_params) is list and len(eval_data.preprocess_params) == len(
+                    eval_data.preprocess_methods), \
+                    "preprocess_params must be a list of equal length if preprocess_methods is a list"
+                for method_index, preprocess_method in enumerate(eval_data.preprocess_methods):
+                    local_params = eval_data.preprocess_params[method_index]
+                    assert type(local_params) is dict, "All entries of preprocess_params must be of type dict"
+                    assert callable(preprocess_method), "All entries of preprocess_methods must be methods"
+                    X = preprocess_method(X, **local_params)
+            else:
+                # Execute single preprocessing step
+                X = eval_data.preprocess_methods(X, **eval_data.preprocess_params)
         inner_save_path = None if save_path is None else "{0}_{1}.{2}".format(save_path.split(".")[0], eval_data.name,
-                                                                            save_path.split(".")[1])
+                                                                              save_path.split(".")[1])
         df = evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=evaluation_metrics, gt=gt,
-                                   repetitions=repetitions, add_average=add_average, add_runtime=add_runtime,
-                                   add_n_clusters=add_n_clusters, save_path=inner_save_path)
+                              repetitions=repetitions, add_average=add_average, add_runtime=add_runtime,
+                              add_n_clusters=add_n_clusters, save_path=inner_save_path)
         df_list.append(df)
     all_dfs = pd.concat(df_list, keys=data_names)
     if save_path is not None:
         all_dfs.to_csv(save_path)
     return all_dfs
 
+
 class EvaluationDataset():
 
-    def __init__(self, name, path, gt_columns=-1, delimiter=",", preprocess_method = None, preprocess_params = {}):
+    def __init__(self, name, path, gt_columns=-1, delimiter=",", preprocess_methods=None, preprocess_params={}):
         assert type(name) is str, "name must be a string"
         self.name = name
         assert type(path) is str, "path must be a string"
@@ -117,10 +132,13 @@ class EvaluationDataset():
         self.gt_columns = gt_columns
         assert type(delimiter) is str, "delimiter must be a string"
         self.delimiter = delimiter
-        assert callable(preprocess_method) or preprocess_method is None, "preprocess_method must be a method or None"
-        self.preprocess_method = preprocess_method
-        assert type(preprocess_params) is dict, "preprocess_params must be a dict"
+        assert callable(preprocess_methods) or type(
+            preprocess_methods) is list or preprocess_methods is None, "preprocess_methods must be a method, a list of methods or None"
+        self.preprocess_methods = preprocess_methods
+        assert type(preprocess_params) is dict or type(
+            preprocess_methods) is list, "preprocess_params must be a dict or a list of dicts"
         self.preprocess_params = preprocess_params
+
 
 class EvaluationMetric():
 

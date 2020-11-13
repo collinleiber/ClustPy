@@ -1,3 +1,14 @@
+"""
+Xie, Junyuan, Ross Girshick, and Ali Farhadi. "Unsupervised
+deep embedding for clustering analysis." International
+conference on machine learning. 2016.
+
+and
+
+Guo, Xifeng, et al. "Improved deep embedded clustering with
+local structure preservation." IJCAI. 2017.
+"""
+
 from cluspy.deep._utils import detect_device, _get_trained_autoencoder, encode_batchwise, squared_euclidean_distance, predict_batchwise
 import torch
 from sklearn.cluster import KMeans

@@ -10,13 +10,15 @@ import numpy as np
 
 class GMeans():
 
-    def __init__(self, init_n_clusters=1, tolerance=0.025, kmeans_repetitions=3):
+    def __init__(self, max_n_clusters=100, init_n_clusters=1, tolerance=0.025, kmeans_repetitions=3):
+        self.max_n_clusters = max_n_clusters
         self.init_n_clusters = init_n_clusters
         self.tolerance = tolerance
         self.kmeans_repetitions = kmeans_repetitions
 
     def fit(self, X):
-        gmeans_obj = gmeans(X, k_init=self.init_n_clusters, tolerance=self.tolerance, repeat=self.kmeans_repetitions)
+        gmeans_obj = gmeans(X, k_init=self.init_n_clusters, tolerance=self.tolerance, repeat=self.kmeans_repetitions,
+                            k_max=self.max_n_clusters)
         gmeans_obj.process()
         self.labels_ = pyclustering_adjust_labels(X.shape[0], gmeans_obj.get_clusters())
         self.cluster_centers_ = np.array((gmeans_obj.get_centers()))
