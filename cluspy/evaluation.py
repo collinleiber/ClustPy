@@ -5,7 +5,7 @@ from cluspy.utils._wrapper_methods import _get_n_clusters_from_algo
 
 
 def evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=None, gt=None, repetitions=10, add_average=True,
-                     add_runtime=True, add_n_clusters=False, save_path=None):
+                     add_std=True, add_runtime=True, add_n_clusters=False, save_path=None):
     """
     Example:
     from cluspy.data.synthetic_data_creator import create_subspace_data
@@ -24,7 +24,8 @@ def evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=None, gt=None,
     :param evaluation_metrics: input metrics - list of EvaluationMetric (default: None)
     :param gt: ground truth (Default: None)
     :param repetitions: number of repetitions to execute (default: 10)
-    :param add_average: add average vor each column
+    :param add_average: add average for each column (default: True)
+    :param add_std: add standard deviation for each column (default: True)
     :param add_runtime: add runtime into the results table (default: True)
     :param add_n_clusters: add n_clusters into the results table (default: False)
     :param save_path: optional - path where the results should be saved (default: None)
@@ -77,13 +78,15 @@ def evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=None, gt=None,
                     df.at[rep, (eval_algo.name, eval_metric.name)] = result
     if add_average:
         df.loc["avg"] = np.mean(df.values, axis=0)
+    if add_std:
+        df.loc["std"] = np.std(df.values, axis=0)
     if save_path is not None:
         df.to_csv(save_path)
     return df
 
 
 def evaluate_multiple_datasets(evaluation_datasets, evaluation_algorithms, evaluation_metrics=None, repetitions=10,
-                               add_average=True, add_runtime=True, add_n_clusters=False, save_path=None):
+                               add_average=True, add_std=True, add_runtime=True, add_n_clusters=False, save_path=None):
     if type(evaluation_datasets) is not list:
         evaluation_datasets = [evaluation_datasets]
     data_names = [d.name for d in evaluation_datasets]
@@ -112,8 +115,8 @@ def evaluate_multiple_datasets(evaluation_datasets, evaluation_algorithms, evalu
         inner_save_path = None if save_path is None else "{0}_{1}.{2}".format(save_path.split(".")[0], eval_data.name,
                                                                               save_path.split(".")[1])
         df = evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=evaluation_metrics, gt=gt,
-                              repetitions=repetitions, add_average=add_average, add_runtime=add_runtime,
-                              add_n_clusters=add_n_clusters, save_path=inner_save_path)
+                              repetitions=repetitions, add_average=add_average, add_std=add_std,
+                              add_runtime=add_runtime, add_n_clusters=add_n_clusters, save_path=inner_save_path)
         df_list.append(df)
     all_dfs = pd.concat(df_list, keys=data_names)
     if save_path is not None:

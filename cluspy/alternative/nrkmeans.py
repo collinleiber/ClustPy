@@ -721,7 +721,7 @@ def _mdl_outlier_costs(n_points, m_subspace):
 
 
 class NrKmeans():
-    def __init__(self, n_clusters, V=None, m=None, P=None, input_centers=None, mdl_for_noisespace=True, outliers=False,
+    def __init__(self, n_clusters, V=None, m=None, P=None, input_centers=None, mdl_for_noisespace=False, outliers=False,
                  max_iter=300, random_state=None):
         """
         Create new NrKmeans instance. Gives the opportunity to use the fit() method to cluster a dataset.
@@ -730,7 +730,7 @@ class NrKmeans():
         :param m: list containing number of dimensionalities for each subspace (optional)
         :param P: list containing projections for each subspace (optional)
         :param input_centers: list containing the cluster centers for each subspace (optional)
-        :param mdl_for_noisespace: boolean defining if MDL should be used to identify noise space dimensions (default: True)
+        :param mdl_for_noisespace: boolean defining if MDL should be used to identify noise space dimensions (default: False)
         :param outliers: boolean defining if outliers should be identified (default: False)
         :param max_iter: maximum number of iterations for the NrKmaens algorithm (default: 300)
         :param random_state: use a fixed random state to get a repeatable solution (optional)

@@ -14,5 +14,5 @@ def _get_n_clusters_from_algo(algo_obj):
     elif hasattr(algo_obj, "n_clusters_"):
         n_clusters = algo_obj.n_clusters_
     else:
-        n_clusters = np.unique(algo_obj.labels).shape[0]
+        n_clusters = np.unique(algo_obj.labels_).shape[0]
     return n_clusters

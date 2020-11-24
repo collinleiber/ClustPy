@@ -42,12 +42,12 @@ def predict_batchwise(dataloader, model, cluster_module, device):
     return torch.cat(predictions, dim=0).numpy()
 
 
-def _get_trained_autoencoder(trainloader, learning_rate, pretrain_iterations, device, optimizer_class, loss_fn,
+def _get_trained_autoencoder(trainloader, learning_rate, n_epochs, device, optimizer_class, loss_fn,
                              input_dim, embedding_size):
     # Pretrain Autoencoder
     autoencoder = Autoencoder(input_dim = input_dim, embedding_size = embedding_size)
     optimizer = optimizer_class(autoencoder.parameters(), lr=learning_rate)
-    autoencoder.pretrain(trainloader, pretrain_iterations, device, optimizer, loss_fn)
+    autoencoder.pretrain(trainloader, n_epochs, device, optimizer, loss_fn)
     return autoencoder
 
 
@@ -123,11 +123,11 @@ class Autoencoder(torch.nn.Module):
         reconstruction = self.decode(embedded)
         return reconstruction
 
-    def pretrain(self, trainloader, training_iterations, device, optimizer, loss_fn):
+    def pretrain(self, trainloader, n_epochs, device, optimizer, loss_fn):
         # load model to device
         self.to(device)
         i = 0
-        while (i < training_iterations):
+        while (i < n_epochs):
             for batch in trainloader:
                 # load batch on device
                 batch_data = batch.to(device)
@@ -139,6 +139,4 @@ class Autoencoder(torch.nn.Module):
                 loss.backward()
                 # update the internal params (weights, etc.)
                 optimizer.step()
-                if i > training_iterations:
-                    break
-                i += 1
+            i += 1

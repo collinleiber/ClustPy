@@ -10,7 +10,7 @@ import torch
 from sklearn.cluster import KMeans
 
 
-def _dcn(X, n_clusters, batch_size, learning_rate, pretrain_iterations, dcn_iterations, optimizer_class,
+def _dcn(X, n_clusters, batch_size, learning_rate, pretrain_epochs, dcn_epochs, optimizer_class,
          loss_fn, autoencoder, embedding_size, degree_of_space_distortion, degree_of_space_preservation):
     device = detect_device()
     trainloader = torch.utils.data.DataLoader(torch.from_numpy(X).float(),
@@ -25,7 +25,7 @@ def _dcn(X, n_clusters, batch_size, learning_rate, pretrain_iterations, dcn_iter
                                              shuffle=False,
                                              drop_last=False)
     if autoencoder is None:
-        autoencoder = _get_trained_autoencoder(trainloader, learning_rate, pretrain_iterations, device,
+        autoencoder = _get_trained_autoencoder(trainloader, learning_rate, pretrain_epochs, device,
                                                optimizer_class, loss_fn, X.shape[1], embedding_size)
     # Execute kmeans in embedded space
     embedded_data = encode_batchwise(testloader, autoencoder, device)
@@ -38,11 +38,16 @@ def _dcn(X, n_clusters, batch_size, learning_rate, pretrain_iterations, dcn_iter
     dcn_learning_rate = learning_rate * 0.1
     optimizer = optimizer_class(list(autoencoder.parameters()), lr=dcn_learning_rate)
     # DEC Training loop
-    dcn_module.train(autoencoder, trainloader, dcn_iterations, device, optimizer, loss_fn,
+    dcn_module.train(autoencoder, trainloader, dcn_epochs, device, optimizer, loss_fn,
                      degree_of_space_distortion, degree_of_space_preservation)
     # Get labels
-    labels = predict_batchwise(testloader, autoencoder, dcn_module, device)
-    return labels
+    dcn_labels = predict_batchwise(testloader, autoencoder, dcn_module, device)
+    dcn_centers = dcn_module.centers.detach().cpu().numpy()
+    # Do reclustering with Kmeans
+    embedded_data = encode_batchwise(testloader, autoencoder, device)
+    kmeans = KMeans(n_clusters=n_clusters)
+    kmeans.fit(embedded_data)
+    return kmeans.labels_, kmeans.cluster_centers_, dcn_labels, dcn_centers, autoencoder
 
 
 def _compute_centroids(centers, embedded, count, s):
@@ -80,14 +85,14 @@ class _DCN_Module(torch.nn.Module):
         self.to(device)
         return self
 
-    def train(self, autoencoder, trainloader, training_iterations, device, optimizer, loss_fn,
+    def train(self, autoencoder, trainloader, n_epochs, device, optimizer, loss_fn,
               degree_of_space_distortion, degree_of_space_preservation):
         # DCN training loop
         i = 0
         # Init for count from original DCN code (not reported in Paper)
         # This means centroid learning rate at the beginning is scaled by a hundred
         count = torch.ones(self.centers.shape[0], dtype=torch.int32) * 100
-        while (i < training_iterations):  # each iteration is equal to an epoch
+        while (i < n_epochs):
             # Update Network
             for batch in trainloader:
                 batch_data = batch.to(device)
@@ -126,19 +131,20 @@ class _DCN_Module(torch.nn.Module):
                     count = self.update_centroids(embedded, count.cpu(), s.cpu())
                     count = count.to(device)
                     self.centers = self.centers.to(device)
-                    i += 1
+            i += 1
 
 
 class DCN():
 
-    def __init__(self, n_clusters, batch_size=256, learning_rate=1e-3, pretrain_iterations=50000,
-                 dcn_iterations=40000, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(),
-                 degree_of_space_distortion=0.05, degree_of_space_preservation=1.0, autoencoder=None, embedding_size=10):
+    def __init__(self, n_clusters, batch_size=256, learning_rate=1e-3, pretrain_epochs=50,
+                 dcn_epochs=40, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(),
+                 degree_of_space_distortion=0.05, degree_of_space_preservation=1.0, autoencoder=None,
+                 embedding_size=10):
         self.n_clusters = n_clusters
         self.batch_size = batch_size
         self.learning_rate = learning_rate
-        self.pretrain_iterations = pretrain_iterations
-        self.dcn_iterations = dcn_iterations
+        self.pretrain_epochs = pretrain_epochs
+        self.dcn_epochs = dcn_epochs
         self.optimizer_class = optimizer_class
         self.loss_fn = loss_fn
         self.degree_of_space_distortion = degree_of_space_distortion
@@ -147,7 +153,17 @@ class DCN():
         self.embedding_size = embedding_size
 
     def fit(self, X):
-        labels = _dcn(X, self.n_clusters, self.batch_size, self.learning_rate, self.pretrain_iterations,
-                      self.dcn_iterations, self.optimizer_class, self.loss_fn, self.autoencoder, self.embedding_size,
-                      self.degree_of_space_distortion, self.degree_of_space_preservation)
-        self.labels_ = labels
+        kmeans_labels, kmeans_centers, dcn_labels, dcn_centers, autoencoder = _dcn(X, self.n_clusters, self.batch_size,
+                                                                                   self.learning_rate,
+                                                                                   self.pretrain_epochs,
+                                                                                   self.dcn_epochs,
+                                                                                   self.optimizer_class, self.loss_fn,
+                                                                                   self.autoencoder,
+                                                                                   self.embedding_size,
+                                                                                   self.degree_of_space_distortion,
+                                                                                   self.degree_of_space_preservation)
+        self.labels_ = kmeans_labels
+        self.cluster_centers_ = kmeans_centers
+        self.dcn_labels_ = dcn_labels
+        self.dcn_cluster_centers_ = dcn_centers
+        self.autoencoder = autoencoder

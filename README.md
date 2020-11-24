@@ -18,6 +18,8 @@ Furthermore, it contains wrappers for [pyclustering](https://pyclustering.github
 - Subspace clustering
     - SubKmeans
     - MDL-SubKmeans
+- Hierarchical clustering
+    - Diana
 - Alternative clustering (Non-redundant clustering)
     - NR-Kmeans
 - Deep clustering

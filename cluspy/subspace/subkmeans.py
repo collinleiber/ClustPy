@@ -9,7 +9,7 @@ from cluspy.alternative.nrkmeans import NrKmeans
 
 class SubKmeans():
 
-    def __init__(self, n_clusters, add_noise_space=True, mdl_for_noisespace=True, outliers=False,
+    def __init__(self, n_clusters, add_noise_space=True, mdl_for_noisespace=False, outliers=False,
                  max_iter=300, random_state=None):
         self.n_clusters = [n_clusters, 1] if add_noise_space else [n_clusters]
         self.mdl_for_noisespace = mdl_for_noisespace
