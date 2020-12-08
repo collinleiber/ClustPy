@@ -26,7 +26,7 @@ def _proj_dipmeans(X, pval_threshold, n_random_projections, pval_strategy, n_boo
             # Get projections
             projections = _get_projected_data(X[ids_in_cluster], n_random_projections)
             # Calculate dip values for the distances of each point
-            cluster_dips = np.array([dip(projections[:, p], just_dip=True) for p in
+            cluster_dips = np.array([dip(projections[:, p], just_dip=True, is_data_sorted=False) for p in
                                      range(projections.shape[1])])
             # Calculate p-values of maximum dip
             pval = dip_pval(np.max(cluster_dips), ids_in_cluster.shape[0], pval_strategy=pval_strategy, n_boots=n_boots)
