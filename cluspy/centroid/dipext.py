@@ -209,14 +209,13 @@ def _angle(v, w):
 class DipExt():
 
     def __init__(self, n_components=None, do_dip_scaling=True, step_size=0.1, momentum=0.95, dip_threshold=0.5,
-                 check_duplicates=True):
+                 check_duplicates=False):
         self.n_components = n_components
         self.do_dip_scaling = do_dip_scaling
         self.step_size = step_size
         self.momentum = momentum
         self.dip_threshold = dip_threshold
         self.check_duplicates = check_duplicates
-        self.dip_values_ = None
 
     def transform(self, X):
         subspace, dip_values = _dip_ext(X, self.n_components, self.do_dip_scaling, self.step_size, self.momentum,
@@ -225,11 +224,15 @@ class DipExt():
         self.dip_values_ = dip_values
         return subspace
 
-    def dip_init(self, X, n_clusters):
-        if self.dip_values_ is None:
-            subspace = self.transform(X)
-        else:
-            subspace = X
-        labels, centers = _dip_init(subspace, self.dip_values_, n_clusters)
+class DipInit(DipExt):
+
+    def __init__(self, n_clusters, n_components=None, do_dip_scaling=True, step_size=0.1, momentum=0.95, dip_threshold=0.5,
+                 check_duplicates=False):
+        super().__init__(n_components, do_dip_scaling, step_size, momentum, dip_threshold, check_duplicates)
+        self.n_clusters = n_clusters
+
+    def fit(self, X):
+        subspace = self.transform(X)
+        labels, centers = _dip_init(subspace, self.dip_values_, self.n_clusters)
         self.labels_ = labels
         self.cluster_centers_ = centers

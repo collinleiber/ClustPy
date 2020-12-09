@@ -13,11 +13,11 @@ Furthermore, it contains wrappers for [pyclustering](https://pyclustering.github
     - Fuzzy-C-Means (from [pyclustering](https://pyclustering.github.io/docs/0.10.0/html/de/df0/namespacepyclustering_1_1cluster_1_1fcm.html))
     - Dip-Means
     - Projected Dip-Means
+    - DipExt & DipInit
 - Density-based clustering
     - Multi Density DBSCAN
 - Subspace clustering
-    - SubKmeans
-    - MDL-SubKmeans
+    - SubKmeans & MDL extension
 - Hierarchical clustering
     - Diana
 - Alternative clustering (Non-redundant clustering)
