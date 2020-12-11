@@ -4,7 +4,7 @@ from .xmeans import XMeans
 from .gmeans import GMeans
 from .dipmeans import DipMeans
 from .projected_dipmeans import ProjectedDipMeans
-from .dipext import DipExt
+from .dipext import DipExt, DipInit
 
 __all__ = ['GMeans',
            'PGMeans',
@@ -12,4 +12,5 @@ __all__ = ['GMeans',
            'FuzzyCMeans',
            'DipMeans',
            'ProjectedDipMeans',
-           'DipExt']
+           'DipExt',
+           'DipInit']

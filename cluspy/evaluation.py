@@ -47,35 +47,46 @@ def evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=None, gt=None,
     data = np.zeros((repetitions, len(algo_names) * len(metric_names)))
     df = pd.DataFrame(data, columns=header, index=range(repetitions))
     for eval_algo in evaluation_algorithms:
-        print("Use algorithm {0}".format(eval_algo.name))
-        assert type(eval_algo) is EvaluationAlgorithm, "All algortihms must be of type EvaluationAlgortihm"
-        # Execute the algorithm multiple times
-        for rep in range(repetitions):
-            print("- Iteration {0}".format(rep + 1))
-            start_time = time.time()
-            algo_obj = eval_algo.obj(**eval_algo.params)
-            algo_obj.fit(X)
-            runtime = time.time() - start_time
-            if add_runtime:
-                df.at[rep, (eval_algo.name, "runtime")] = runtime
-            if add_n_clusters:
-                all_n_clusters = _get_n_clusters_from_algo(algo_obj)
-                n_clusters = all_n_clusters if eval_algo.label_column is None else all_n_clusters[
-                    eval_algo.label_column]
-                df.at[rep, (eval_algo.name, "n_clusters")] = n_clusters
-            labels = algo_obj.labels_ if eval_algo.label_column is None else algo_obj.labels_[:, eval_algo.label_column]
-            # Get result of all metrics
-            if evaluation_metrics is not None:
-                for eval_metric in evaluation_metrics:
-                    assert type(eval_metric) is EvaluationMetric, "All metrics must be of type EvaluationMetric"
-                    # Check if metric uses ground truth (e.g. NMI, ACC, ...)
-                    if eval_metric.use_gt:
-                        assert gt is not None, "Ground truth can not be None if it is used for the chosen metric"
-                        result = eval_metric.method(gt, labels, **eval_metric.params)
-                    else:
-                        # Metric does not use ground truth (e.g. Silhouette, ...)
-                        result = eval_metric.method(X, labels, **eval_metric.params)
-                    df.at[rep, (eval_algo.name, eval_metric.name)] = result
+        try:
+            print("Use algorithm {0}".format(eval_algo.name))
+            assert type(eval_algo) is EvaluationAlgorithm, "All algortihms must be of type EvaluationAlgortihm"
+            # Add n_clusters automatically to algorithm parameters if it is None
+            if "n_clusters" in eval_algo.params and eval_algo.params["n_clusters"] is None and gt is not None:
+                eval_algo.params["n_clusters"] = len(np.unique(gt[gt >= 0]))
+            # Execute the algorithm multiple times
+            for rep in range(repetitions):
+                print("- Iteration {0}".format(rep + 1))
+                start_time = time.time()
+                algo_obj = eval_algo.obj(**eval_algo.params)
+                algo_obj.fit(X)
+                runtime = time.time() - start_time
+                if add_runtime:
+                    df.at[rep, (eval_algo.name, "runtime")] = runtime
+                if add_n_clusters:
+                    all_n_clusters = _get_n_clusters_from_algo(algo_obj)
+                    n_clusters = all_n_clusters if eval_algo.label_column is None else all_n_clusters[
+                        eval_algo.label_column]
+                    df.at[rep, (eval_algo.name, "n_clusters")] = n_clusters
+                labels = algo_obj.labels_ if eval_algo.label_column is None else algo_obj.labels_[:, eval_algo.label_column]
+                # Get result of all metrics
+                if evaluation_metrics is not None:
+                    for eval_metric in evaluation_metrics:
+                        try:
+                            assert type(eval_metric) is EvaluationMetric, "All metrics must be of type EvaluationMetric"
+                            # Check if metric uses ground truth (e.g. NMI, ACC, ...)
+                            if eval_metric.use_gt:
+                                assert gt is not None, "Ground truth can not be None if it is used for the chosen metric"
+                                result = eval_metric.method(gt, labels, **eval_metric.params)
+                            else:
+                                # Metric does not use ground truth (e.g. Silhouette, ...)
+                                result = eval_metric.method(X, labels, **eval_metric.params)
+                            df.at[rep, (eval_algo.name, eval_metric.name)] = result
+                        except Exception as e:
+                            print("Metric {0} raised an exception and will be skipped".format(eval_metric.name))
+                            print(e)
+        except Exception as e:
+            print("Algorithm {0} raised an exception and will be skipped".format(eval_algo.name))
+            print(e)
     if add_average:
         df.loc["avg"] = np.mean(df.values, axis=0)
     if add_std:
@@ -92,32 +103,39 @@ def evaluate_multiple_datasets(evaluation_datasets, evaluation_algorithms, evalu
     data_names = [d.name for d in evaluation_datasets]
     df_list = []
     for eval_data in evaluation_datasets:
-        print("=== Start evaluation of {0} ===".format(eval_data.name))
-        assert type(eval_data) is EvaluationDataset, "All datasets must be of type EvaluationDataset"
-        data_file = np.genfromtxt(eval_data.path, delimiter=eval_data.delimiter)
-        X = np.delete(data_file, eval_data.gt_columns, axis=1)
-        gt = data_file[:, eval_data.gt_columns]
-        if eval_data.preprocess_methods is not None:
-            # Do preprocessing
-            if type(eval_data.preprocess_methods) is list:
-                # Execute multiple preprocessing steps
-                assert type(eval_data.preprocess_params) is list and len(eval_data.preprocess_params) == len(
-                    eval_data.preprocess_methods), \
-                    "preprocess_params must be a list of equal length if preprocess_methods is a list"
-                for method_index, preprocess_method in enumerate(eval_data.preprocess_methods):
-                    local_params = eval_data.preprocess_params[method_index]
-                    assert type(local_params) is dict, "All entries of preprocess_params must be of type dict"
-                    assert callable(preprocess_method), "All entries of preprocess_methods must be methods"
-                    X = preprocess_method(X, **local_params)
-            else:
-                # Execute single preprocessing step
-                X = eval_data.preprocess_methods(X, **eval_data.preprocess_params)
-        inner_save_path = None if save_path is None else "{0}_{1}.{2}".format(save_path.split(".")[0], eval_data.name,
-                                                                              save_path.split(".")[1])
-        df = evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=evaluation_metrics, gt=gt,
-                              repetitions=repetitions, add_average=add_average, add_std=add_std,
-                              add_runtime=add_runtime, add_n_clusters=add_n_clusters, save_path=inner_save_path)
-        df_list.append(df)
+        try:
+            print("=== Start evaluation of {0} ===".format(eval_data.name))
+            assert type(eval_data) is EvaluationDataset, "All datasets must be of type EvaluationDataset"
+            data_file = np.genfromtxt(eval_data.path, delimiter=eval_data.delimiter)
+            X = np.delete(data_file, eval_data.gt_columns, axis=1)
+            gt = data_file[:, eval_data.gt_columns]
+            if eval_data.preprocess_methods is not None:
+                # Do preprocessing
+                if type(eval_data.preprocess_methods) is list:
+                    # If no parameters for preprocessing are specified all should be None
+                    if type(eval_data.preprocess_params) is dict and not eval_data.preprocess_params:
+                        eval_data.preprocess_params = [{}] * len(eval_data.preprocess_methods)
+                    # Execute multiple preprocessing steps
+                    assert type(eval_data.preprocess_params) is list and len(eval_data.preprocess_params) == len(
+                        eval_data.preprocess_methods), \
+                        "preprocess_params must be a list of equal length if preprocess_methods is a list"
+                    for method_index, preprocess_method in enumerate(eval_data.preprocess_methods):
+                        local_params = eval_data.preprocess_params[method_index]
+                        assert type(local_params) is dict, "All entries of preprocess_params must be of type dict"
+                        assert callable(preprocess_method), "All entries of preprocess_methods must be methods"
+                        X = preprocess_method(X, **local_params)
+                else:
+                    # Execute single preprocessing step
+                    X = eval_data.preprocess_methods(X, **eval_data.preprocess_params)
+            inner_save_path = None if save_path is None else "{0}_{1}.{2}".format(save_path.split(".")[0], eval_data.name,
+                                                                                  save_path.split(".")[1])
+            df = evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=evaluation_metrics, gt=gt,
+                                  repetitions=repetitions, add_average=add_average, add_std=add_std,
+                                  add_runtime=add_runtime, add_n_clusters=add_n_clusters, save_path=inner_save_path)
+            df_list.append(df)
+        except Exception as e:
+            print("Dataset {0} raised an exception and will be skipped".format(eval_data.name))
+            print(e)
     all_dfs = pd.concat(df_list, keys=data_names)
     if save_path is not None:
         all_dfs.to_csv(save_path)

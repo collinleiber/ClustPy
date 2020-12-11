@@ -1,7 +1,8 @@
 # ClusPy
 
 The package offers an easy way to cluster data in python.
-It can be combined with all algorithms from [sklearn clustering](https://scikit-learn.org/stable/modules/clustering.html).
+It can be combined with all algorithms from [sklearn clustering](https://scikit-learn.org/stable/modules/clustering.html) 
+and [kmodes](https://github.com/nicodv/kmodes).
 Furthermore, it contains wrappers for [pyclustering](https://pyclustering.github.io/) implementations.
 
 ## Implemented algorithms
