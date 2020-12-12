@@ -51,7 +51,9 @@ def evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=None, gt=None,
             print("Use algorithm {0}".format(eval_algo.name))
             assert type(eval_algo) is EvaluationAlgorithm, "All algortihms must be of type EvaluationAlgortihm"
             # Add n_clusters automatically to algorithm parameters if it is None
-            if "n_clusters" in eval_algo.params and eval_algo.params["n_clusters"] is None and gt is not None:
+            automatically_set_n_clusters = "n_clusters" in eval_algo.params and eval_algo.params["n_clusters"] is None \
+                                           and gt is not None
+            if automatically_set_n_clusters:
                 eval_algo.params["n_clusters"] = len(np.unique(gt[gt >= 0]))
             # Execute the algorithm multiple times
             for rep in range(repetitions):
@@ -84,6 +86,8 @@ def evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=None, gt=None,
                         except Exception as e:
                             print("Metric {0} raised an exception and will be skipped".format(eval_metric.name))
                             print(e)
+            if automatically_set_n_clusters:
+                eval_algo.params["n_clusters"] = None
         except Exception as e:
             print("Algorithm {0} raised an exception and will be skipped".format(eval_algo.name))
             print(e)
