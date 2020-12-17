@@ -2,10 +2,12 @@
 
 The package offers an easy way to cluster data in python.
 It can be combined with all algorithms from [sklearn clustering](https://scikit-learn.org/stable/modules/clustering.html) 
-and [kmodes](https://github.com/nicodv/kmodes).
+and other packages.
 Furthermore, it contains wrappers for [pyclustering](https://pyclustering.github.io/) implementations.
 
-## Implemented algorithms
+## Components
+
+### Algorithms
 
 - Centroid-based clustering
     - X-Means (from [pyclustering](https://pyclustering.github.io/docs/0.10.0/html/d2/d8b/namespacepyclustering_1_1cluster_1_1xmeans.html))
@@ -27,3 +29,35 @@ Furthermore, it contains wrappers for [pyclustering](https://pyclustering.github
     - DEC
     - IDEC
     - DCN
+    - VaDE
+    
+### Other implementations
+
+- Metrics
+    - Variation of information
+    - Pair Counting Scores (f1, rand, jaccard, recall, precision)
+    - Scores for multiple labelings
+- Statistics
+    - Hartigans Dip-test
+    
+## Compatible packages
+
+- [sklearn clustering](https://scikit-learn.org/stable/modules/clustering.html) 
+    - K-Means
+    - Affinity propagation
+    - Mean-shift
+    - Spectral clustering
+    - Ward hierarchical clustering
+    - Agglomerative clustering
+    - DBSCAN
+    - OPTICS
+    - Gaussian mixtures
+	- BIRCH
+- [kmodes](https://github.com/nicodv/kmodes)
+    - k-modes
+    - k-prototypes 
+- [HDBSCAN](https://hdbscan.readthedocs.io/en/latest/how_hdbscan_works.html)
+    - HDBSCAN
+- [scikit-learn-extra](https://scikit-learn-extra.readthedocs.io/en/latest/index.html)
+    - k-medoids
+    - Density-Based common-nearest-neighbors clustering

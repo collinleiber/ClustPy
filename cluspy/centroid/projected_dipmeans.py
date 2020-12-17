@@ -7,7 +7,7 @@ Conference on Artificial Intelligence. 2018.
 import numpy as np
 from cluspy.centroid.dipmeans import _execute_bisecting_kmeans
 from sklearn.decomposition import PCA
-from cluspy.utils._diptest import dip, dip_pval, PVAL_BY_TABLE
+from cluspy.utils.diptest import dip, dip_pval, PVAL_BY_TABLE
 
 
 def _proj_dipmeans(X, pval_threshold, n_random_projections, pval_strategy, n_boots, n_new_centers, max_n_clusters):

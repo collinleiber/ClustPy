@@ -9,7 +9,7 @@ Guo, Xifeng, et al. "Improved deep embedded clustering with
 local structure preservation." IJCAI. 2017.
 """
 
-from cluspy.deep._utils import detect_device, _get_trained_autoencoder, encode_batchwise, squared_euclidean_distance, \
+from cluspy.deep._utils import detect_device, _get_trained_simple_autoencoder, encode_batchwise, squared_euclidean_distance, \
     predict_batchwise
 import torch
 from sklearn.cluster import KMeans
@@ -30,20 +30,20 @@ def _dec(X, n_clusters, alpha, batch_size, learning_rate, pretrain_epochs, dec_e
                                              shuffle=False,
                                              drop_last=False)
     if autoencoder is None:
-        autoencoder = _get_trained_autoencoder(trainloader, learning_rate, pretrain_epochs, device,
-                                               optimizer_class, loss_fn, X.shape[1], embedding_size)
+        autoencoder = _get_trained_simple_autoencoder(trainloader, learning_rate, pretrain_epochs, device,
+                                                      optimizer_class, loss_fn, X.shape[1], embedding_size)
     # Execute kmeans in embedded space
     embedded_data = encode_batchwise(testloader, autoencoder, device)
     kmeans = KMeans(n_clusters=n_clusters)
     kmeans.fit(embedded_data)
     init_centers = kmeans.cluster_centers_
     # Setup DEC Module
-    dec_module = _DEC_Module(init_centers, alpha)
+    dec_module = _DEC_Module(init_centers, alpha).to(device)
     # Reduce learning_rate from pretraining by a magnitude of 10
     dec_learning_rate = learning_rate * 0.1
     optimizer = optimizer_class(list(autoencoder.parameters()) + list(dec_module.parameters()), lr=dec_learning_rate)
     # DEC Training loop
-    dec_module.train(autoencoder, trainloader, dec_epochs, device, optimizer, loss_fn, use_reconstruction_loss,
+    dec_module.start_training(autoencoder, trainloader, dec_epochs, device, optimizer, loss_fn, use_reconstruction_loss,
                      degree_of_space_distortion)
     # Get labels
     dec_labels = predict_batchwise(testloader, autoencoder, dec_module, device)
@@ -99,12 +99,9 @@ class _DEC_Module(torch.nn.Module):
         loss = _dec_compression_loss_fn(prediction)
         return loss
 
-    def train(self, autoencoder, trainloader, n_epochs, device, optimizer, loss_fn, use_reconstruction_loss,
+    def start_training(self, autoencoder, trainloader, n_epochs, device, optimizer, loss_fn, use_reconstruction_loss,
               degree_of_space_distortion):
-        # load model to device
-        self.to(device)
-        i = 0
-        while (i < n_epochs):
+        for _ in range(n_epochs):
             for batch in trainloader:
                 batch_data = batch.to(device)
                 embedded = autoencoder.encode(batch_data)
@@ -121,13 +118,12 @@ class _DEC_Module(torch.nn.Module):
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-            i += 1
 
 
 class DEC():
 
-    def __init__(self, n_clusters, alpha=1.0, batch_size=256, learning_rate=1e-3, pretrain_epochs=50,
-                 dec_epochs=40, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(), autoencoder=None,
+    def __init__(self, n_clusters, alpha=1.0, batch_size=256, learning_rate=1e-3, pretrain_epochs=220,
+                 dec_epochs=180, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(), autoencoder=None,
                  embedding_size=10):
         self.n_clusters = n_clusters
         self.alpha = alpha

@@ -4,7 +4,7 @@ The European Conference on Machine Learning and Principles and Practice of Knowl
 in Databases 2020
 """
 
-from cluspy.utils._diptest import dip
+from cluspy.utils.diptest import dip
 import numpy as np
 from sklearn.cluster import KMeans
 

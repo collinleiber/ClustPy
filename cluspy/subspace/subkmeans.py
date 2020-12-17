@@ -44,13 +44,16 @@ class SubKmeans():
         nrkmeans = NrKmeans(self.n_clusters, mdl_for_noisespace=self.mdl_for_noisespace, outliers=self.outliers,
                             max_iter=self.max_iter, random_state=self.random_state)
         nrkmeans.fit(X)
-        self.labels_ = nrkmeans.labels_
-        self.cluster_centers_ = nrkmeans.cluster_centers_
         self.V = nrkmeans.V
-        self.P = nrkmeans.P
-        self.m = nrkmeans.m
-        self.scatter_matrices_ = nrkmeans.scatter_matrices_
-        self.n_clusters = nrkmeans.n_clusters
+        if nrkmeans.labels_.ndim == 1:
+            self.labels_ = nrkmeans.labels_
+        else:
+            self.labels_ = nrkmeans.labels_[:, 0]
+        self.cluster_centers_ = nrkmeans.cluster_centers_[0]
+        self.P = nrkmeans.P[0]
+        self.m = nrkmeans.m[0]
+        self.scatter_matrices_ = nrkmeans.scatter_matrices_[0]
+        self.n_clusters = nrkmeans.n_clusters[0]
 
 
 class MDLSubKmeans():

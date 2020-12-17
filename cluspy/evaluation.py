@@ -54,7 +54,12 @@ def evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=None, gt=None,
             automatically_set_n_clusters = "n_clusters" in eval_algo.params and eval_algo.params["n_clusters"] is None \
                                            and gt is not None
             if automatically_set_n_clusters:
-                eval_algo.params["n_clusters"] = len(np.unique(gt[gt >= 0]))
+                if gt.ndim == 1:
+                    # In case of normal ground truth
+                    eval_algo.params["n_clusters"] = len(np.unique(gt[gt >= 0]))
+                else:
+                    # In case of hierarchical or nr ground truth
+                    eval_algo.params["n_clusters"] = [len(np.unique(gt[gt[:, i] >= 0, i])) for i in range(gt.shape[1])]
             # Execute the algorithm multiple times
             for rep in range(repetitions):
                 print("- Iteration {0}".format(rep + 1))
@@ -69,7 +74,8 @@ def evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=None, gt=None,
                     n_clusters = all_n_clusters if eval_algo.label_column is None else all_n_clusters[
                         eval_algo.label_column]
                     df.at[rep, (eval_algo.name, "n_clusters")] = n_clusters
-                labels = algo_obj.labels_ if eval_algo.label_column is None else algo_obj.labels_[:, eval_algo.label_column]
+                labels = algo_obj.labels_ if eval_algo.label_column is None else algo_obj.labels_[:,
+                                                                                 eval_algo.label_column]
                 # Get result of all metrics
                 if evaluation_metrics is not None:
                     for eval_metric in evaluation_metrics:
@@ -83,6 +89,7 @@ def evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=None, gt=None,
                                 # Metric does not use ground truth (e.g. Silhouette, ...)
                                 result = eval_metric.method(X, labels, **eval_metric.params)
                             df.at[rep, (eval_algo.name, eval_metric.name)] = result
+                            print("-- {0}: {1}".format(eval_metric.name, result))
                         except Exception as e:
                             print("Metric {0} raised an exception and will be skipped".format(eval_metric.name))
                             print(e)
@@ -101,7 +108,10 @@ def evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=None, gt=None,
 
 
 def evaluate_multiple_datasets(evaluation_datasets, evaluation_algorithms, evaluation_metrics=None, repetitions=10,
-                               add_average=True, add_std=True, add_runtime=True, add_n_clusters=False, save_path=None):
+                               add_average=True, add_std=True, add_runtime=True, add_n_clusters=False, save_path=None,
+                               save_intermediate_results=False):
+    assert not save_intermediate_results or save_path is not None, "save_path can not be None if " \
+                                                                   "save_intermediate_results is True"
     if type(evaluation_datasets) is not list:
         evaluation_datasets = [evaluation_datasets]
     data_names = [d.name for d in evaluation_datasets]
@@ -131,8 +141,9 @@ def evaluate_multiple_datasets(evaluation_datasets, evaluation_algorithms, evalu
                 else:
                     # Execute single preprocessing step
                     X = eval_data.preprocess_methods(X, **eval_data.preprocess_params)
-            inner_save_path = None if save_path is None else "{0}_{1}.{2}".format(save_path.split(".")[0], eval_data.name,
-                                                                                  save_path.split(".")[1])
+            inner_save_path = None if not save_intermediate_results else "{0}_{1}.{2}".format(save_path.split(".")[0],
+                                                                                              eval_data.name,
+                                                                                              save_path.split(".")[1])
             df = evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=evaluation_metrics, gt=gt,
                                   repetitions=repetitions, add_average=add_average, add_std=add_std,
                                   add_runtime=add_runtime, add_n_clusters=add_n_clusters, save_path=inner_save_path)

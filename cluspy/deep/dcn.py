@@ -4,7 +4,7 @@ Simultaneous deep learning and clustering." international
 conference on machine learning. PMLR, 2017.
 """
 
-from cluspy.deep._utils import detect_device, _get_trained_autoencoder, encode_batchwise, squared_euclidean_distance, \
+from cluspy.deep._utils import detect_device, _get_trained_simple_autoencoder, encode_batchwise, squared_euclidean_distance, \
     predict_batchwise
 import torch
 from sklearn.cluster import KMeans
@@ -25,20 +25,20 @@ def _dcn(X, n_clusters, batch_size, learning_rate, pretrain_epochs, dcn_epochs, 
                                              shuffle=False,
                                              drop_last=False)
     if autoencoder is None:
-        autoencoder = _get_trained_autoencoder(trainloader, learning_rate, pretrain_epochs, device,
-                                               optimizer_class, loss_fn, X.shape[1], embedding_size)
+        autoencoder = _get_trained_simple_autoencoder(trainloader, learning_rate, pretrain_epochs, device,
+                                                      optimizer_class, loss_fn, X.shape[1], embedding_size)
     # Execute kmeans in embedded space
     embedded_data = encode_batchwise(testloader, autoencoder, device)
     kmeans = KMeans(n_clusters=n_clusters)
     kmeans.fit(embedded_data)
     init_centers = kmeans.cluster_centers_
     # Setup DCN Module
-    dcn_module = _DCN_Module(init_centers)
+    dcn_module = _DCN_Module(init_centers).to_device(device)
     # Reduce learning_rate from pretraining by a magnitude of 10
     dcn_learning_rate = learning_rate * 0.1
     optimizer = optimizer_class(list(autoencoder.parameters()), lr=dcn_learning_rate)
     # DEC Training loop
-    dcn_module.train(autoencoder, trainloader, dcn_epochs, device, optimizer, loss_fn,
+    dcn_module.start_training(autoencoder, trainloader, dcn_epochs, device, optimizer, loss_fn,
                      degree_of_space_distortion, degree_of_space_preservation)
     # Get labels
     dcn_labels = predict_batchwise(testloader, autoencoder, dcn_module, device)
@@ -85,7 +85,7 @@ class _DCN_Module(torch.nn.Module):
         self.to(device)
         return self
 
-    def train(self, autoencoder, trainloader, n_epochs, device, optimizer, loss_fn,
+    def start_training(self, autoencoder, trainloader, n_epochs, device, optimizer, loss_fn,
               degree_of_space_distortion, degree_of_space_preservation):
         # DCN training loop
         i = 0
@@ -136,8 +136,8 @@ class _DCN_Module(torch.nn.Module):
 
 class DCN():
 
-    def __init__(self, n_clusters, batch_size=256, learning_rate=1e-3, pretrain_epochs=50,
-                 dcn_epochs=40, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(),
+    def __init__(self, n_clusters, batch_size=256, learning_rate=1e-3, pretrain_epochs=220,
+                 dcn_epochs=180, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(),
                  degree_of_space_distortion=0.05, degree_of_space_preservation=1.0, autoencoder=None,
                  embedding_size=10):
         self.n_clusters = n_clusters

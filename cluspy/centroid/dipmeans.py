@@ -8,7 +8,7 @@ clusters." Advances in neural information processing systems.
 from sklearn.cluster import KMeans
 import numpy as np
 from scipy.spatial.distance import pdist, squareform
-from cluspy.utils._diptest import dip, dip_pval, PVAL_BY_TABLE, PVAL_BY_BOOT, dip_boot_samples
+from cluspy.utils.diptest import dip, dip_pval, PVAL_BY_TABLE, PVAL_BY_BOOT, dip_boot_samples
 
 
 def _dipmeans(X, pval_threshold, split_viewers_threshold, pval_strategy, n_boots, n_new_centers, max_n_clusters):

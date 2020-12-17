@@ -42,16 +42,16 @@ def predict_batchwise(dataloader, model, cluster_module, device):
     return torch.cat(predictions, dim=0).numpy()
 
 
-def _get_trained_autoencoder(trainloader, learning_rate, n_epochs, device, optimizer_class, loss_fn,
-                             input_dim, embedding_size):
+def _get_trained_simple_autoencoder(trainloader, learning_rate, n_epochs, device, optimizer_class, loss_fn,
+                                    input_dim, embedding_size):
     # Pretrain Autoencoder
-    autoencoder = Autoencoder(input_dim = input_dim, embedding_size = embedding_size)
+    autoencoder = SimpleAutoencoder(input_dim = input_dim, embedding_size = embedding_size).to(device)
     optimizer = optimizer_class(autoencoder.parameters(), lr=learning_rate)
-    autoencoder.pretrain(trainloader, n_epochs, device, optimizer, loss_fn)
+    autoencoder.start_training(trainloader, n_epochs, device, optimizer, loss_fn)
     return autoencoder
 
 
-class Autoencoder(torch.nn.Module):
+class SimpleAutoencoder(torch.nn.Module):
     """A vanilla symmetric autoencoder.
 
     Args:
@@ -64,7 +64,7 @@ class Autoencoder(torch.nn.Module):
     """
 
     def __init__(self, input_dim: int, embedding_size: int):
-        super(Autoencoder, self).__init__()
+        super(SimpleAutoencoder, self).__init__()
 
         # make a sequential list of all operations you want to apply for encoding a data point
         self.encoder = torch.nn.Sequential(
@@ -123,11 +123,8 @@ class Autoencoder(torch.nn.Module):
         reconstruction = self.decode(embedded)
         return reconstruction
 
-    def pretrain(self, trainloader, n_epochs, device, optimizer, loss_fn):
-        # load model to device
-        self.to(device)
-        i = 0
-        while (i < n_epochs):
+    def start_training(self, trainloader, n_epochs, device, optimizer, loss_fn):
+        for _ in range(n_epochs):
             for batch in trainloader:
                 # load batch on device
                 batch_data = batch.to(device)
@@ -139,4 +136,3 @@ class Autoencoder(torch.nn.Module):
                 loss.backward()
                 # update the internal params (weights, etc.)
                 optimizer.step()
-            i += 1

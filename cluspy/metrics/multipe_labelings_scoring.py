@@ -2,74 +2,16 @@ import numpy as np
 from sklearn.metrics import normalized_mutual_info_score as nmi, adjusted_mutual_info_score as ami, \
     adjusted_rand_score as ari, mutual_info_score as mi
 from itertools import permutations
+from .pair_counting_scores import PairCountingScore
+from .variation_of_information import variation_of_information, _check_number_of_points
 
 _METRICS = ["nmi", "ami", "ari", "f1", "rand", "jaccard", "precision", "recall", "mi", "vi"]
 _NR_METRICS = ["nr-f1", "nr-rand", "nr-jaccard", "nr-precision", "nr-recall"]
 _AGGREGATIONS = ["max", "min", "permut-max", "permut-min", "avg"]
 
-
-def get_supported_metrics(add_non_redundant_metrics=False):
-    supported_metrics = _METRICS.copy()
-    if add_non_redundant_metrics:
-        supported_metrics += _NR_METRICS
-    return supported_metrics
-
-
-"""
-Custom metrics
-"""
-
-
-def _jaccard_score(n_tp, n_fp, n_fn):
-    return 0 if (n_tp + n_fp + n_fn) == 0 else n_tp / (n_tp + n_fp + n_fn)
-
-
-def _rand_score(n_tp, n_fp, n_fn, n_tn):
-    return 0 if (n_tp + n_fp + n_fn + n_tn) == 0 else (n_tp + n_tn) / (n_tp + n_fp + n_fn + n_tn)
-
-
-def _precision_score(n_tp, n_fp):
-    return 0 if (n_tp + n_fp) == 0 else n_tp / (n_tp + n_fp)
-
-
-def _recall_score(n_tp, n_fn):
-    return 0 if (n_tp + n_fn) == 0 else n_tp / (n_tp + n_fn)
-
-
-def _f1_score(n_tp, n_fp, n_fn):
-    precision = _precision_score(n_tp, n_fp)
-    recall = _recall_score(n_tp, n_fn)
-    return 0 if (precision == 0 and recall == 0) else 2 * precision * recall / (precision + recall)
-
-
-# Source https://en.wikipedia.org/wiki/Variation_of_information
-def _variation_of_information(ground_truth_column, prediction_column):
-    n = len(ground_truth_column)
-    cluster_ids_gt = np.unique(ground_truth_column)
-    cluster_ids_pred = np.unique(prediction_column)
-    result = 0.0
-    for id_gt in cluster_ids_gt:
-        points_in_cluster_gt = np.argwhere(ground_truth_column == id_gt)[:, 0]
-        p = len(points_in_cluster_gt) / n
-        for id_pred in cluster_ids_pred:
-            points_in_cluster_pred = np.argwhere(prediction_column == id_pred)[:, 0]
-            q = len(points_in_cluster_pred) / n
-            r = len([point for point in points_in_cluster_gt if point in points_in_cluster_pred]) / n
-            if r != 0:
-                result += r * (np.log2(r / p) + np.log2(r / q))
-    return -1 * result
-
-
 """
 CHECKS
 """
-
-
-def _check_number_of_points(ground_truth, prediction):
-    if prediction.shape[0] != ground_truth.shape[0]:
-        raise Exception(
-            "Number of objects of the prediction and ground truth are not equal.\nNumber of prediction objects: " + str(
-                len(prediction.shape[0])) + "\nNumber of ground truth objects: " + str(ground_truth.shape[0]))
 
 
 def _check_input(input, possibilities):
@@ -91,55 +33,6 @@ def _identify_non_noise_spaces(labels):
         if len_unique_labels == 1:
             no_noise_spaces[c] = False
     return no_noise_spaces
-
-
-def _pair_counting_categories(ground_truth_column, prediction_column):
-    if ground_truth_column.ndim != 1 or prediction_column.ndim != 1:
-        raise Exception("Ground truth and prediction labels should just contain a single column.")
-    n_tp = 0
-    n_fp = 0
-    n_fn = 0
-    n_tn = 0
-    for i in range(prediction_column.shape[0] - 1):
-        for j in range(i + 1, prediction_column.shape[0]):
-            if prediction_column[i] == prediction_column[j]:
-                if ground_truth_column[i] == ground_truth_column[j]:
-                    n_tp += 1
-                else:
-                    n_fp += 1
-            else:
-                if ground_truth_column[i] == ground_truth_column[j]:
-                    n_fn += 1
-                else:
-                    n_tn += 1
-    return n_tp, n_fp, n_fn, n_tn
-
-
-def _nr_pair_counting_categories(ground_truth, prediction):
-    n_tp = 0
-    n_fp = 0
-    n_fn = 0
-    n_tn = 0
-    for i in range(prediction.shape[0] - 1):
-        for j in range(i + 1, prediction.shape[0]):
-            if _anywhere_same_cluster(prediction, i, j):
-                if _anywhere_same_cluster(ground_truth, i, j):
-                    n_tp += 1
-                else:
-                    n_fp += 1
-            else:
-                if _anywhere_same_cluster(ground_truth, i, j):
-                    n_fn += 1
-                else:
-                    n_tn += 1
-    return n_tp, n_fp, n_fn, n_tn
-
-
-def _anywhere_same_cluster(labels, i, j):
-    for s in range(labels.shape[1]):
-        if labels[i, s] == labels[j, s]:
-            return True
-    return False
 
 
 def _get_score_from_confusion_matrix(confusion_matrix, strategy):
@@ -187,7 +80,7 @@ Non-Redundant Scoring Class
 """
 
 
-class NrScoring():
+class MultipleLabelingsScoring():
     def __init__(self, ground_truth, prediction):
         _check_number_of_points(ground_truth, prediction)
         self.ground_truth = ground_truth
@@ -195,10 +88,10 @@ class NrScoring():
         self.ground_truth_no_ns = None
         self.prediction_no_ns = None
         self.categories = None
-        self.nr_categories = None
+        self.categories_multiple_labelings = None
 
-    def calculate_non_redundant_score(self, metric, aggregation="permut-max",
-                                      remove_noise_spaces=True, confusion_matrix=None):
+    def calculate_multiple_labelings_score(self, metric, aggregation="permut-max",
+                                           remove_noise_spaces=True, confusion_matrix=None):
         """
 
         Pair-counting measurements "Evaluation of Clusterings – Metrics and VisualSupport"
@@ -215,17 +108,18 @@ class NrScoring():
         ground_truth, prediction = self._get_labelings(remove_noise_spaces)
         # Calculate non-redundant scores
         if metric.startswith("nr-"):
-            n_tp, n_fp, n_fn, n_tn = self._get_nr_pair_counting_categories(ground_truth, prediction)
+            categories_multiple_labelings = self._get_pair_counting_categories_multiple_labelings(ground_truth,
+                                                                                                  prediction)
             if metric == "nr-rand":
-                return _rand_score(n_tp, n_fp, n_fn, n_tn)
+                return categories_multiple_labelings.rand()
             elif metric == "nr-f1":
-                return _f1_score(n_tp, n_fp, n_fn)
+                return categories_multiple_labelings.f1()
             elif metric == "nr-jaccard":
-                return _jaccard_score(n_tp, n_fp, n_fn)
+                return categories_multiple_labelings.jaccard()
             elif metric == "nr-precision":
-                return _precision_score(n_tp, n_fp)
+                return categories_multiple_labelings.precision()
             elif metric == "nr-recall":
-                return _recall_score(n_tp, n_fn)
+                return categories_multiple_labelings.recall()
         # Calculate average confusion matrix scores
         if confusion_matrix is None:
             confusion_matrix = self.get_scoring_confusion_matrix(metric, remove_noise_spaces)
@@ -257,19 +151,19 @@ class NrScoring():
                 elif metric == "mi":
                     confusion_matrix[i, j] = mi(ground_truth[:, i], prediction[:, j])
                 elif metric == "vi":
-                    confusion_matrix[i, j] = _variation_of_information(ground_truth[:, i], prediction[:, j])
+                    confusion_matrix[i, j] = variation_of_information(ground_truth[:, i], prediction[:, j])
                 else:
-                    n_tp, n_fp, n_fn, n_tn = self._get_pair_counting_categories(ground_truth, prediction)[i, j, :]
+                    categories = self._get_pair_counting_categories(ground_truth, prediction)[i][j]
                     if metric == "rand":
-                        confusion_matrix[i, j] = _rand_score(n_tp, n_fp, n_fn, n_tn)
+                        confusion_matrix[i, j] = categories.rand()
                     elif metric == "f1":
-                        confusion_matrix[i, j] = _f1_score(n_tp, n_fp, n_fn)
+                        confusion_matrix[i, j] = categories.f1()
                     elif metric == "jaccard":
-                        confusion_matrix[i, j] = _jaccard_score(n_tp, n_fp, n_fn)
+                        confusion_matrix[i, j] = categories.jaccard()
                     elif metric == "precision":
-                        confusion_matrix[i, j] = _precision_score(n_tp, n_fp)
+                        confusion_matrix[i, j] = categories.precision()
                     elif metric == "recall":
-                        confusion_matrix[i, j] = _recall_score(n_tp, n_fn)
+                        confusion_matrix[i, j] = categories.recall()
         return confusion_matrix
 
     def is_n_clusters_correct(self, remove_noise_spaces=True, check_subset=False):
@@ -330,7 +224,7 @@ class NrScoring():
                 elif metric == "mi":
                     result = mi(labelings_matrix[:, i], labelings_matrix[:, j])
                 elif metric == "vi":
-                    result = _variation_of_information(labelings_matrix[:, i], labelings_matrix[:, j])
+                    result = variation_of_information(labelings_matrix[:, i], labelings_matrix[:, j])
                 confusion_matrix[i, j] = result
                 confusion_matrix[j, i] = result
         return confusion_matrix
@@ -352,16 +246,16 @@ class NrScoring():
             prediction = self.prediction
         return ground_truth, prediction
 
-    def _get_nr_pair_counting_categories(self, ground_truth, prediction):
-        if self.nr_categories is None:
-            self.nr_categories = _nr_pair_counting_categories(ground_truth, prediction)
-        return self.nr_categories
+    def _get_pair_counting_categories_multiple_labelings(self, ground_truth, prediction):
+        if self.categories_multiple_labelings is None:
+            self.categories_multiple_labelings = PairCountingScore(ground_truth, prediction, True)
+        return self.categories_multiple_labelings
 
     def _get_pair_counting_categories(self, ground_truth, prediction):
         if self.categories is None:
-            categories = np.zeros((ground_truth.shape[1], prediction.shape[1], 4))
+            categories = [[None] * prediction.shape[1]] * ground_truth.shape[1]
             for i in range(ground_truth.shape[1]):
                 for j in range(prediction.shape[1]):
-                    categories[i, j, :] = _pair_counting_categories(ground_truth[:, i], prediction[:, j])
+                    categories[i][j] = PairCountingScore(ground_truth[:, i], prediction[:, j], False)
             self.categories = categories
         return self.categories
