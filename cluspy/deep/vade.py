@@ -2,6 +2,8 @@
 Jiang, Zhuxi, et al. "Variational deep embedding: An
 unsupervised and generative approach to clustering." arXiv
 preprint arXiv:1611.05148 (2016).
+
+@authors: Donatella Novakovic
 """
 
 import torch

@@ -2,6 +2,8 @@
 Schelling, Benjamin, et al. "Utilizing Structure-rich Features to improve Clustering." (2020).
 The European Conference on Machine Learning and Principles and Practice of Knowledge Discovery
 in Databases 2020
+
+@authors: Benjamin Schelling and Sam Maurus (original R implementation), Collin Leiber (Python implementation)
 """
 
 from cluspy.utils.diptest import dip

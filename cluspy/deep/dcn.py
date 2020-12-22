@@ -2,6 +2,8 @@
 Yang, Bo, et al. "Towards k-means-friendly spaces:
 Simultaneous deep learning and clustering." international
 conference on machine learning. PMLR, 2017.
+
+@authors Lukas Miklautz, Dominik Mautz
 """
 
 from cluspy.deep._utils import detect_device, _get_trained_simple_autoencoder, encode_batchwise, squared_euclidean_distance, \

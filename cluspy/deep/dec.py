@@ -7,10 +7,12 @@ and
 
 Guo, Xifeng, et al. "Improved deep embedded clustering with
 local structure preservation." IJCAI. 2017.
+
+@authors Lukas Miklautz, Dominik Mautz
 """
 
-from cluspy.deep._utils import detect_device, _get_trained_simple_autoencoder, encode_batchwise, squared_euclidean_distance, \
-    predict_batchwise
+from cluspy.deep._utils import detect_device, _get_trained_simple_autoencoder, encode_batchwise, \
+    squared_euclidean_distance, predict_batchwise
 import torch
 from sklearn.cluster import KMeans
 
@@ -44,7 +46,7 @@ def _dec(X, n_clusters, alpha, batch_size, learning_rate, pretrain_epochs, dec_e
     optimizer = optimizer_class(list(autoencoder.parameters()) + list(dec_module.parameters()), lr=dec_learning_rate)
     # DEC Training loop
     dec_module.start_training(autoencoder, trainloader, dec_epochs, device, optimizer, loss_fn, use_reconstruction_loss,
-                     degree_of_space_distortion)
+                              degree_of_space_distortion)
     # Get labels
     dec_labels = predict_batchwise(testloader, autoencoder, dec_module, device)
     dec_centers = dec_module.centers.detach().cpu().numpy()
@@ -100,7 +102,7 @@ class _DEC_Module(torch.nn.Module):
         return loss
 
     def start_training(self, autoencoder, trainloader, n_epochs, device, optimizer, loss_fn, use_reconstruction_loss,
-              degree_of_space_distortion):
+                       degree_of_space_distortion):
         for _ in range(n_epochs):
             for batch in trainloader:
                 batch_data = batch.to(device)

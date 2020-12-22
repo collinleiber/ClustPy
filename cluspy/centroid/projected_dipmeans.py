@@ -2,6 +2,8 @@
 Chamalis, Theofilos, and Aristidis Likas. "The projected dip-
 means clustering algorithm." Proceedings of the 10th Hellenic
 Conference on Artificial Intelligence. 2018.
+
+@authors Collin Leiber
 """
 
 import numpy as np

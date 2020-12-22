@@ -76,7 +76,7 @@ def _get_score_from_confusion_matrix(confusion_matrix, strategy):
 
 
 """
-Non-Redundant Scoring Class
+Multiple Labelings Scoring Class
 """
 
 
@@ -96,7 +96,7 @@ class MultipleLabelingsScoring():
 
         Pair-counting measurements "Evaluation of Clusterings – Metrics and VisualSupport"
 
-        Compare ground truth of a dataset with the labels form a non redundant clustering algorithm. Checks for each subspace the chosen scoring
+        Compare ground truth of a dataset with the labels form a multiple labelings clustering algorithm. Checks for each subspace the chosen scoring
         function and calculates the average over all subspaces. A perfect result will always be 1, the worst 0.
         :param ground_truth: dataset with the true labels for each subspace
         :param metric: the metric can be "nmi", "ami", "rand", "f1" or "pc-f1" (default: "nmi")
@@ -106,7 +106,7 @@ class MultipleLabelingsScoring():
         _check_input(aggregation, _AGGREGATIONS)
         # Is noise space desired?
         ground_truth, prediction = self._get_labelings(remove_noise_spaces)
-        # Calculate non-redundant scores
+        # Calculate multiple labelings scores
         if metric.startswith("nr-"):
             categories_multiple_labelings = self._get_pair_counting_categories_multiple_labelings(ground_truth,
                                                                                                   prediction)

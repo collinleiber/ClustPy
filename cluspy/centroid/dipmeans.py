@@ -3,6 +3,8 @@ Kalogeratos, Argyris, and Aristidis Likas. "Dip-means: an
 incremental clustering method for estimating the number of
 clusters." Advances in neural information processing systems.
 2012.
+
+@authors Collin Leiber
 """
 
 from sklearn.cluster import KMeans

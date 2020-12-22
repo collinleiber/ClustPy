@@ -2,6 +2,8 @@
 Mautz, Dominik, et al. "Towards an optimal subspace for
 k-means." Proceedings of the 23rd ACM SIGKDD International
 Conference on Knowledge Discovery and Data Mining. 2017.
+
+@authors Collin Leiber
 """
 
 from cluspy.alternative.nrkmeans import NrKmeans

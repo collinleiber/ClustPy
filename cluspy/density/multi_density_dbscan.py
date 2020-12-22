@@ -2,6 +2,8 @@
 Ashour, Wesam, and Saad Sunoallah. "Multi density DBSCAN."
 International Conference on Intelligent Data Engineering and
 Automated Learning. Springer, Berlin, Heidelberg, 2011.
+
+@authors Collin Leiber
 """
 
 from scipy.spatial.distance import squareform, pdist

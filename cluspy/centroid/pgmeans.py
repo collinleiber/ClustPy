@@ -2,6 +2,8 @@
 Feng, Yu, and Greg Hamerly. "PG-means: learning the number of
 clusters in data." Advances in neural information processing
 systems. 2007.
+
+@authors Collin Leiber
 """
 
 import numpy as np

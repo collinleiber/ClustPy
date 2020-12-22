@@ -3,6 +3,8 @@ Mautz, Dominik, et al. "Discovering non-redundant k-means
 clusterings in optimal subspaces." Proceedings of the 24th ACM
 SIGKDD International Conference on Knowledge Discovery &
 Data Mining. 2018.
+
+@authors Collin Leiber
 """
 
 import numpy as np

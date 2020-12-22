@@ -1,6 +1,8 @@
 """
 Kaufman, Rousseeuw "Divisive Analysis (Program DIANA)" Chapter six from Finding Groups in Data:
 An Introduction to Cluster Analysis. 1990.
+
+@authors Stephan Breimann
 """
 
 import time
