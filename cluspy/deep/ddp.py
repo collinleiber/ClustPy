@@ -118,15 +118,13 @@ def _ddp_training(X, n_clusters_current, dip_merge_threshold, cluster_loss_weigh
         if debug:
             print(
                 "Iteration {0}  (n_clusters = {4}) - reconstruction loss: {1} / cluster loss: {2} / total loss: {3}".format(
-                    i,
-                    ae_loss.item(),
-                    cluster_loss.item(),
-                    loss.item(),
-                    n_clusters_current))
+                    i, ae_loss.item(), cluster_loss.item(), loss.item(), n_clusters_current))
             print("max dip", np.max(dip_weights_cpu), " at ",
                   np.unravel_index(np.argmax(dip_weights_cpu, axis=None), dip_weights_cpu.shape))
+        # i is increased here. Else next iteration will start with i = 1 instead of 0 after a merge
+        i += 1
         # Start merging procedure
-        if i >= update_pause_epochs:
+        if i > update_pause_epochs:
             # Is merge possible?
             dip_argmax = np.unravel_index(np.argmax(dip_weights_cpu, axis=None), dip_weights_cpu.shape)
             while dip_weights_cpu[dip_argmax] >= dip_merge_threshold and n_clusters_current > n_clusters_min:
@@ -143,7 +141,7 @@ def _ddp_training(X, n_clusters_current, dip_merge_threshold, cluster_loss_weigh
                                         embedded_centers_cpu, autoencoder, device)
                 dip_argmax = np.unravel_index(np.argmax(dip_weights_cpu, axis=None), dip_weights_cpu.shape)
         # Optional: Force merging of clusters
-        if i == (ddp_epochs - 1) and n_clusters_current > n_clusters_max:
+        if i == ddp_epochs and n_clusters_current > n_clusters_max:
             # Get smallest cluster
             _, cluster_sizes = np.unique(cluster_labels, return_counts=True)
             smallest_cluster_id = np.argmin(cluster_sizes)
@@ -184,7 +182,6 @@ def _ddp_training(X, n_clusters_current, dip_merge_threshold, cluster_loss_weigh
             if debug:
                 print("Only one cluster left")
             break
-        i += 1
     return cluster_labels, n_clusters_current, centers_cpu, autoencoder
 
 
