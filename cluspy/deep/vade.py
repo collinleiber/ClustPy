@@ -7,7 +7,7 @@ preprint arXiv:1611.05148 (2016).
 """
 
 import torch
-from cluspy.deep._utils import detect_device
+from cluspy.deep._utils import detect_device, get_trained_autoencoder
 import numpy as np
 from sklearn.mixture import GaussianMixture
 
@@ -27,9 +27,8 @@ def _vade(X, n_clusters, batch_size, learning_rate, pretrain_epochs, vade_epochs
                                              shuffle=False,
                                              drop_last=False)
     if autoencoder is None:
-        autoencoder = _VadeAutoencoder(input_dim=X.shape[1], embedding_size=embedding_size).to(device)
-        ae_optimizer = optimizer_class(autoencoder.parameters(), lr=learning_rate)
-        autoencoder.start_training(trainloader, pretrain_epochs, device, ae_optimizer, loss_fn)
+        autoencoder = get_trained_autoencoder(trainloader, learning_rate, pretrain_epochs, device,
+                                              optimizer_class, loss_fn, X.shape[1], embedding_size, _Vade_Autoencoder)
     # Execute EM in embedded space
     embedded_data = _vade_encode_batchwise(testloader, autoencoder, device)
     gmm = GaussianMixture(n_components=n_clusters, covariance_type='diag', n_init=100)
@@ -115,9 +114,9 @@ def _vade_encode_batchwise(dataloader, model, device):
     return torch.cat(embeddings, dim=0).numpy()
 
 
-class _VadeAutoencoder(torch.nn.Module):
+class _Vade_Autoencoder(torch.nn.Module):
     def __init__(self, input_dim: int, embedding_size: int):
-        super(_VadeAutoencoder, self).__init__()
+        super(_Vade_Autoencoder, self).__init__()
 
         self.encoder = torch.nn.Sequential(
             torch.nn.Linear(input_dim, 500),

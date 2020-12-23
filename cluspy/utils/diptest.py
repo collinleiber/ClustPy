@@ -11,6 +11,10 @@ https://github.com/tatome/dip_test
 and
 
 https://github.com/alimuldal/diptest
+
+and
+
+Dario Ringach <dario@wotan.cns.nyu.edu>, Martin Maechler <maechler@stat.math.ethz.ch>
 """
 
 import numpy as np
@@ -260,8 +264,9 @@ def dip(X, just_dip=False, is_data_sorted=False, debug=False):
         low = gcm[ig]
         high = lcm[ih]
     dip_value /= (2 * N)
+    # TODO: Better with best low best high?
     return dip_value if just_dip else (
-    dip_value, (best_low, best_high), (modaltriangle_i1, modaltriangle_i2, modaltriangle_i3))
+    dip_value, (low, high), (modaltriangle_i1, modaltriangle_i2, modaltriangle_i3))
 
 
 def dip_fast(X, just_dip=False, is_data_sorted=False):

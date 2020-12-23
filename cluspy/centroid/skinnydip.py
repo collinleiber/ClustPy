@@ -68,7 +68,7 @@ def _extract_modal_intervals(X, significance, debug):
     clusters_raw = _get_clusters_in_interval(X, 0, X.shape[0] - 1, "----", False, significance, debug)
     clusters_raw = np.array(clusters_raw)
     # Consolidation
-    clusters = _merge_intervals(X, clusters_raw, debug)
+    clusters = _merge_intervals(X, clusters_raw, significance, debug)
     clusters = np.array(clusters)
 
     cluster_starts = clusters[list(range(0, len(clusters), 2))]
@@ -249,7 +249,7 @@ def _map_index_to_ordered_mirrored_data_index_in_original_ordered_data(index_to_
             return index_to_map
 
 
-def _merge_intervals(ordered_data, intervals, debug):
+def _merge_intervals(ordered_data, intervals, significance, debug):
     # We first need to find the merged clusters (any overlaps are merged), such that we only have mutually-exclusive clusters
     cluster_starting_indices = intervals[list(range(0, len(intervals), 2))]
     cluster_ending_indices = intervals[list(range(1, len(intervals), 2))]
@@ -273,11 +273,11 @@ def _merge_intervals(ordered_data, intervals, debug):
     # How? We know that our clusters are ordered.
     # We iterate though our clusters and perform the dip test on the range defined by successfive pairs
     # If a pair has a non-significant multimodality, we call the entire range defined by that successive pair a single cluster
-    consolidated_clusters = _consolidate_clusters(ordered_data, clusters, 0, debug)
+    consolidated_clusters = _consolidate_clusters(ordered_data, clusters, 0, significance, debug)
     return consolidated_clusters
 
 
-def _consolidate_clusters(ordered_data, clusters, index, debug):
+def _consolidate_clusters(ordered_data, clusters, index, significance, debug):
     # If index > length-1 done
     # do dip
     # If significant
@@ -294,18 +294,18 @@ def _consolidate_clusters(ordered_data, clusters, index, debug):
     ending_point_index = clusters[ending_index]
     dip_value = dip(ordered_data[starting_point_index:ending_point_index], just_dip=True, is_data_sorted=True)
     dip_p_value = dip_pval(dip_value, ending_point_index - starting_point_index)
-    if dip_p_value < 0.05:
+    if dip_p_value < significance:
         if debug:
             print("Range {0} to {1} is significant...we're happy with that cluster!".format(starting_point_index,
                                                                                             ending_point_index))
         # significant multimodality...continue with the next index
-        return _consolidate_clusters(ordered_data, clusters, index + 1, debug)
+        return _consolidate_clusters(ordered_data, clusters, index + 1, significance, debug)
     else:
         if debug:
             print("Range {0} to {1} is not significant: merging".format(starting_point_index, ending_point_index))
         ## not significant...merge and repeat with the same index
         clusters = clusters[0:starting_index + 1] + clusters[ending_index:len(clusters)]
-        return _consolidate_clusters(ordered_data, clusters, index, debug)
+        return _consolidate_clusters(ordered_data, clusters, index, significance, debug)
 
 
 class SkinnyDip():
@@ -317,4 +317,3 @@ class SkinnyDip():
         labels, n_clusters = _skinnydip_clustering_full_space(X, self.significance)
         self.labels_ = labels
         self.n_clusters_ = n_clusters
-      

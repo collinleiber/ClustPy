@@ -5,6 +5,7 @@ from .gmeans import GMeans
 from .dipmeans import DipMeans
 from .projected_dipmeans import ProjectedDipMeans
 from .dipext import DipExt, DipInit
+from .skinnydip import SkinnyDip
 
 __all__ = ['GMeans',
            'PGMeans',
@@ -13,4 +14,5 @@ __all__ = ['GMeans',
            'DipMeans',
            'ProjectedDipMeans',
            'DipExt',
-           'DipInit']
+           'DipInit',
+           'SkinnyDip']

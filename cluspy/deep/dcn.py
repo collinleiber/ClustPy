@@ -6,8 +6,8 @@ conference on machine learning. PMLR, 2017.
 @authors Lukas Miklautz, Dominik Mautz
 """
 
-from cluspy.deep._utils import detect_device, _get_trained_simple_autoencoder, encode_batchwise, squared_euclidean_distance, \
-    predict_batchwise
+from cluspy.deep._utils import detect_device, get_trained_autoencoder, encode_batchwise, \
+    squared_euclidean_distance, predict_batchwise
 import torch
 from sklearn.cluster import KMeans
 
@@ -27,8 +27,8 @@ def _dcn(X, n_clusters, batch_size, learning_rate, pretrain_epochs, dcn_epochs, 
                                              shuffle=False,
                                              drop_last=False)
     if autoencoder is None:
-        autoencoder = _get_trained_simple_autoencoder(trainloader, learning_rate, pretrain_epochs, device,
-                                                      optimizer_class, loss_fn, X.shape[1], embedding_size)
+        autoencoder = get_trained_autoencoder(trainloader, learning_rate, pretrain_epochs, device,
+                                              optimizer_class, loss_fn, X.shape[1], embedding_size)
     # Execute kmeans in embedded space
     embedded_data = encode_batchwise(testloader, autoencoder, device)
     kmeans = KMeans(n_clusters=n_clusters)
@@ -41,7 +41,7 @@ def _dcn(X, n_clusters, batch_size, learning_rate, pretrain_epochs, dcn_epochs, 
     optimizer = optimizer_class(list(autoencoder.parameters()), lr=dcn_learning_rate)
     # DEC Training loop
     dcn_module.start_training(autoencoder, trainloader, dcn_epochs, device, optimizer, loss_fn,
-                     degree_of_space_distortion, degree_of_space_preservation)
+                              degree_of_space_distortion, degree_of_space_preservation)
     # Get labels
     dcn_labels = predict_batchwise(testloader, autoencoder, dcn_module, device)
     dcn_centers = dcn_module.centers.detach().cpu().numpy()
@@ -88,13 +88,12 @@ class _DCN_Module(torch.nn.Module):
         return self
 
     def start_training(self, autoencoder, trainloader, n_epochs, device, optimizer, loss_fn,
-              degree_of_space_distortion, degree_of_space_preservation):
+                       degree_of_space_distortion, degree_of_space_preservation):
         # DCN training loop
-        i = 0
         # Init for count from original DCN code (not reported in Paper)
         # This means centroid learning rate at the beginning is scaled by a hundred
         count = torch.ones(self.centers.shape[0], dtype=torch.int32) * 100
-        while (i < n_epochs):
+        for _ in range(n_epochs):
             # Update Network
             for batch in trainloader:
                 batch_data = batch.to(device)
@@ -133,7 +132,6 @@ class _DCN_Module(torch.nn.Module):
                     count = self.update_centroids(embedded, count.cpu(), s.cpu())
                     count = count.to(device)
                     self.centers = self.centers.to(device)
-            i += 1
 
 
 class DCN():

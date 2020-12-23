@@ -17,6 +17,7 @@ Furthermore, it contains wrappers for [pyclustering](https://pyclustering.github
     - Dip-Means
     - Projected Dip-Means
     - DipExt & DipInit
+    - Skinnydip
 - Density-based clustering
     - Multi Density DBSCAN
 - Subspace clustering

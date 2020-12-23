@@ -11,7 +11,7 @@ local structure preservation." IJCAI. 2017.
 @authors Lukas Miklautz, Dominik Mautz
 """
 
-from cluspy.deep._utils import detect_device, _get_trained_simple_autoencoder, encode_batchwise, \
+from cluspy.deep._utils import detect_device, get_trained_autoencoder, encode_batchwise, \
     squared_euclidean_distance, predict_batchwise
 import torch
 from sklearn.cluster import KMeans
@@ -32,9 +32,9 @@ def _dec(X, n_clusters, alpha, batch_size, learning_rate, pretrain_epochs, dec_e
                                              shuffle=False,
                                              drop_last=False)
     if autoencoder is None:
-        autoencoder = _get_trained_simple_autoencoder(trainloader, learning_rate, pretrain_epochs, device,
-                                                      optimizer_class, loss_fn, X.shape[1], embedding_size)
-    # Execute kmeans in embedded space
+        autoencoder = get_trained_autoencoder(trainloader, learning_rate, pretrain_epochs, device,
+                                              optimizer_class, loss_fn, X.shape[1], embedding_size)
+    # Execute kmeans in embedded space - initial clustering
     embedded_data = encode_batchwise(testloader, autoencoder, device)
     kmeans = KMeans(n_clusters=n_clusters)
     kmeans.fit(embedded_data)

@@ -5,7 +5,7 @@ from cluspy.utils._wrapper_methods import _get_n_clusters_from_algo
 
 
 def evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=None, gt=None, repetitions=10, add_average=True,
-                     add_std=True, add_runtime=True, add_n_clusters=False, save_path=None):
+                     add_std=True, add_runtime=True, add_n_clusters=False, save_path=None, ignore_algorithms = []):
     """
     Example:
     from cluspy.data.synthetic_data_creator import create_subspace_data
@@ -47,6 +47,9 @@ def evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=None, gt=None,
     data = np.zeros((repetitions, len(algo_names) * len(metric_names)))
     df = pd.DataFrame(data, columns=header, index=range(repetitions))
     for eval_algo in evaluation_algorithms:
+        if eval_algo.name in ignore_algorithms:
+            print("Ignoring algorithm {0}".format(eval_algo.name))
+            continue
         try:
             print("Use algorithm {0}".format(eval_algo.name))
             assert type(eval_algo) is EvaluationAlgorithm, "All algortihms must be of type EvaluationAlgortihm"
@@ -159,7 +162,8 @@ def evaluate_multiple_datasets(evaluation_datasets, evaluation_algorithms, evalu
 
 class EvaluationDataset():
 
-    def __init__(self, name, path, gt_columns=-1, delimiter=",", preprocess_methods=None, preprocess_params={}):
+    def __init__(self, name, path, gt_columns=-1, delimiter=",", preprocess_methods=None, preprocess_params={},
+                 ignore_algorithms = []):
         assert type(name) is str, "name must be a string"
         self.name = name
         assert type(path) is str, "path must be a string"
@@ -174,6 +178,8 @@ class EvaluationDataset():
         assert type(preprocess_params) is dict or type(
             preprocess_methods) is list, "preprocess_params must be a dict or a list of dicts"
         self.preprocess_params = preprocess_params
+        assert type(ignore_algorithms) is list, "ignore_algorithms must be a list"
+        self.ignore_algorithms = ignore_algorithms
 
 
 class EvaluationMetric():
