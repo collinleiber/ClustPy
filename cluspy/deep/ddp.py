@@ -174,13 +174,15 @@ def _ddp_training(X, n_clusters_current, dip_merge_threshold, cluster_loss_weigh
                 dip_weights_torch = torch.from_numpy(dip_weights_cpu).float()
             else:
                 # Else: merge clusters with hightest dip
-                print("Force merge of clusters {0} with dip value {1}".format(dip_argmax, dip_weights_cpu[dip_argmax]))
+                if debug:
+                    print("Force merge of clusters {0} with dip value {1}".format(dip_argmax, dip_weights_cpu[dip_argmax]))
 
                 cluster_labels, centers_cpu, centers_torch, _, dip_weights_cpu, dip_weights_torch = \
                     _merge_by_dip_value(X, embedded_data, cluster_labels, dip_argmax, n_clusters_current, centers_cpu,
                                         embedded_centers_cpu, autoencoder, device)
         if n_clusters_current == 1:
-            print("Only one cluster left")
+            if debug:
+                print("Only one cluster left")
             break
         i += 1
     return cluster_labels, n_clusters_current, centers_cpu, autoencoder
