@@ -31,6 +31,7 @@ Furthermore, it contains wrappers for [pyclustering](https://pyclustering.github
     - IDEC
     - DCN
     - VaDE
+    - DDP
     
 ### Other implementations
 
