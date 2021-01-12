@@ -1,10 +1,10 @@
 from .dec import DEC, IDEC
 from .dcn import DCN
-from.vade import VaDE
-from .ddp import DDP
+from .vade import VaDE
+from .dedc import DEDC
 
 __all__ = ['DEC',
            'IDEC',
            'DCN',
            'VaDE',
-           'DDP']
+           'DEDC']

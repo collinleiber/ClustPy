@@ -228,7 +228,7 @@ class DipExt():
         self.n_starting_points_strategy = n_starting_points_strategy
         self.check_duplicates = check_duplicates
 
-    def transform(self, X):
+    def fit_transform(self, X):
         subspace, dip_values = _dip_ext(X, self.n_components, self.do_dip_scaling, self.step_size, self.momentum,
                                         self.dip_threshold, self.check_duplicates)
         self.n_components = len(dip_values)
@@ -244,7 +244,7 @@ class DipInit(DipExt):
         self.n_clusters = n_clusters
 
     def fit(self, X):
-        subspace = self.transform(X)
+        subspace = self.fit_transform(X)
         labels, centers = _dip_init(subspace, self.dip_values_, self.n_clusters)
         self.labels_ = labels
         self.cluster_centers_ = centers

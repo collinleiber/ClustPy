@@ -5,6 +5,9 @@ It can be combined with all algorithms from [sklearn clustering](https://scikit-
 and other packages.
 Furthermore, it contains wrappers for [pyclustering](https://pyclustering.github.io/) implementations.
 
+The main focus of this package is not efficiency but being able to try out a wide range of methods.
+In particular, this should also make lesser-known methods accessible in a simple and convenient way.
+
 ## Components
 
 ### Algorithms
@@ -31,7 +34,7 @@ Furthermore, it contains wrappers for [pyclustering](https://pyclustering.github
     - IDEC
     - DCN
     - VaDE
-    - DDP
+    - DEDC
     
 ### Other implementations
 
@@ -39,7 +42,8 @@ Furthermore, it contains wrappers for [pyclustering](https://pyclustering.github
     - Variation of information
     - Pair Counting Scores (f1, rand, jaccard, recall, precision)
     - Scores for multiple labelings
-- Statistics
+    - Confusion Matrix
+- Utils
     - Hartigans Dip-test
     
 ## Compatible packages
