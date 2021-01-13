@@ -10,6 +10,11 @@ import os
 import pandas as pd
 import operator
 from sklearn.metrics import pairwise_distances
+from sklearn.base import BaseEstimator, ClusterMixin
+from sklearn.utils import check_array
+from sklearn.cluster import AgglomerativeClustering
+
+pd.set_option('expand_frame_repr', False)
 
 
 # I Helper Functions
@@ -50,7 +55,7 @@ class _Diana:
     def _max_diameter_cluster(self, list_index_clusters=None):
         """Get biggest cluster of list, i.e. cluster with largest diameter.
         Diameter of 0 means that all objects are similiar)"""
-        list_diameter = [self._diameter(X=self.X.loc[index_cluster]) for index_cluster in list_index_clusters]
+        list_diameter = [self._diameter(X=self.X[index_cluster]) for index_cluster in list_index_clusters]
         max_diameter = max(list_diameter)
         index_max_diameter = list_diameter.index(max_diameter)
         list_max_diameter_cluster = list_index_clusters[index_max_diameter]
@@ -58,12 +63,12 @@ class _Diana:
 
     def _split_clust(self, list_cluster_a=None, list_cluster_b=None):
         """Split cluster a in cluster a and cluster b (splinter group) based on average dissimilarity."""
-        # Set index_cluster_a and X_a
+        # Set list_cluster_a and X_a
         if list_cluster_a is None:
             X_a = self.X
-            list_cluster_a = X_a.index.tolist()
+            list_cluster_a = list(range(0, len(X_a)))
         else:
-            X_a = self.X.loc[list_cluster_a]
+            X_a = self.X[list_cluster_a]
         # Get dict with average dissimilarity for each sample (given as index)
         dict_id_mean_dis = self._average_dissimilarity(X=X_a, list_index=list_cluster_a)
         # Recursive call if cluster a contains more than two objects
@@ -76,8 +81,8 @@ class _Diana:
             else:
                 index_selected_b = list_cluster_b + [index_max_dis]
             # Calculate diameter (max dissimilarity between two objects in cluster)
-            diameter_a = self._diameter(X=self.X.loc[index_selected_a])
-            diameter_b = self._diameter(X=self.X.loc[index_selected_b])
+            diameter_a = self._diameter(X=self.X[index_selected_a])
+            diameter_b = self._diameter(X=self.X[index_selected_b])
             # Recursive call of split clust if diameter of cluster a is higher than for cluster b
             if diameter_a >= diameter_b and len(X_a) > 1:
                 return self._split_clust(list_cluster_a=index_selected_a, list_cluster_b=index_selected_b)
@@ -119,7 +124,7 @@ class _Diana:
             return self.recursive_clustering(list_clusters=list_clusters)
 
 
-def _get_clusters_from_diana(n_dict_clusters):
+def _get_labels_hierarchy(n_dict_clusters):
     """Convert dict_n_clusters into df with cluster labels for each element and each clustering level"""
     dict_dict_cluster_ids = {}
     for i in n_dict_clusters:
@@ -129,11 +134,12 @@ def _get_clusters_from_diana(n_dict_clusters):
                 dict_cluster_ids[scale] = j + 1
         dict_dict_cluster_ids[i] = dict_cluster_ids
     df = pd.DataFrame.from_dict(dict_dict_cluster_ids, orient="index")
-    return df
+    labels_hierarchy = df[sorted(df)].transpose() # Sort columns to match y (samples)
+    return labels_hierarchy
 
 
 # II Main Functions
-class Diana:
+class Diana(BaseEstimator, ClusterMixin):
     """Divisive clustering algorithm (Top-Down) based on pairwise dissimilarity of objects
 
     Recursively splitting clusters with maximum dissimilarity
@@ -165,11 +171,10 @@ class Diana:
     Attributes
     ----------
     labels_ : ndarray of shape (n_samples)
-        cluster labels for each data point for given 'n_cluster'
+        cluster labels for each sample for given 'n_cluster'
 
-    df_hierarchy_: df (n_samples, n_clusters)
-        cluster lables for each data point (columns) for all cluster levels (index)
-
+    labels_hierarchy_: ndarray of shape (n_samples, n_clusters)
+        cluster labels for each samples (rows) and all cluster levels (columns)
 
     """
     def __init__(self, n_clusters=2, metric="euclidean", compute_full_tree=False, distance_threshold=None):
@@ -178,13 +183,15 @@ class Diana:
         self.distance_threshold = distance_threshold
         self.compute_full_tree = compute_full_tree
 
-    def fit(self, X):
+    def fit(self, X, y = None):
         """Fit hierarchical clustering from features.
 
         Parameters
         ----------
         X: array-like, shape (n_samples, n_features) or (n_samples, n_samples)
             Training instances to cluster
+        y: Ignored (samples)
+            Not used, present here for API consistency by convention.
         """
         # Check parameters
         if self.n_clusters is not None and self.n_clusters <= 0:
@@ -199,28 +206,34 @@ class Diana:
         if self.distance_threshold is None or self.distance_threshold < 0:
             # Set distance_threshold to theoretical minimum if not given or below
             self.distance_threshold = 0
-
+        X = check_array(X, ensure_min_samples=2, estimator=self)
         # Hierarchical clustering
         diana = _Diana(X=X, n_clusters=self.n_clusters,
                        metric=self.metric,
                        distance_threshold=self.distance_threshold,
                        compute_full_tree=self.compute_full_tree)
         diana.recursive_clustering()
-        df = _get_clusters_from_diana(diana.dict_n_clusters)
-        df = df[X.index.to_list()]
-        self.df_hierarchy_ = df
-        self.labels_ = df.loc[self.n_clusters].values
+        labels_hierarchy = _get_labels_hierarchy(diana.dict_n_clusters)
+        self.labels_hierarchy_ = labels_hierarchy.values
+        self.labels_ = labels_hierarchy[self.n_clusters].values
 
 
 # III Test/Caller Functions
 def diana_caller():
     """"""
-    # TODO shift into new example file ?
+    # TODO will be removed (just for testing)
     folder_data = os.path.dirname(os.path.realpath(__file__)).replace("/hierarchical", "/data/")
-    df = pd.read_excel(folder_data + "All_Scales_Norm_Modified.xlsx", index_col=0) #.transpose().sample(300, random_state=1)
-    df_t = df[[x for x in list(df) if "Lins" not in x]].transpose().sample(200, random_state=1)
-    diana = Diana(n_clusters=20)
-    diana.fit(X=df_t)
+    df = pd.read_excel(folder_data + "All_Scales_Norm_Modified.xlsx", index_col=0)
+    df_t = df.transpose().sample(300, random_state=1)
+    samples = df_t.index.to_list()
+    array = df_t.values
+    diana = Diana(n_clusters=200)
+    diana.fit(X=array, y=samples)
+    df = pd.DataFrame(diana.labels_hierarchy_, index=samples)
+    df.columns = list(range(2, len(list(df))+2))
+    print(df)
+    #df1 = pd.read_excel("test.xlsx")
+    #print(df1)
 
 
 # IV Main
