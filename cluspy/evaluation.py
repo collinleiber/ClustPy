@@ -47,12 +47,12 @@ def evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=None, gt=None,
     data = np.zeros((repetitions, len(algo_names) * len(metric_names)))
     df = pd.DataFrame(data, columns=header, index=range(repetitions))
     for eval_algo in evaluation_algorithms:
-        if eval_algo.name in ignore_algorithms:
-            print("Ignoring algorithm {0}".format(eval_algo.name))
-            continue
         try:
-            print("Use algorithm {0}".format(eval_algo.name))
             assert type(eval_algo) is EvaluationAlgorithm, "All algortihms must be of type EvaluationAlgortihm"
+            if eval_algo.name in ignore_algorithms:
+                print("Ignoring algorithm {0}".format(eval_algo.name))
+                continue
+            print("Use algorithm {0}".format(eval_algo.name))
             # Add n_clusters automatically to algorithm parameters if it is None
             automatically_set_n_clusters = "n_clusters" in eval_algo.params and eval_algo.params["n_clusters"] is None \
                                            and gt is not None
@@ -121,11 +121,21 @@ def evaluate_multiple_datasets(evaluation_datasets, evaluation_algorithms, evalu
     df_list = []
     for eval_data in evaluation_datasets:
         try:
-            print("=== Start evaluation of {0} ===".format(eval_data.name))
             assert type(eval_data) is EvaluationDataset, "All datasets must be of type EvaluationDataset"
-            data_file = np.genfromtxt(eval_data.path, delimiter=eval_data.delimiter)
-            X = np.delete(data_file, eval_data.gt_columns, axis=1)
-            gt = data_file[:, eval_data.gt_columns]
+            print("=== Start evaluation of {0} ===".format(eval_data.name))
+            # If data is a path, load file
+            if type(eval_data.data) is str:
+                data_file = np.genfromtxt(eval_data.data, **eval_data.file_reader_params)
+            else:
+                data_file = eval_data.data
+            # Check if ground truth columns are defined
+            if eval_data.gt_columns is not None:
+                X = np.delete(data_file, eval_data.gt_columns, axis=1)
+                gt = data_file[:, eval_data.gt_columns]
+            else:
+                X = data_file
+                gt = None
+            print("=== (Data shape: {0} / Ground truth shape: {1}) ===".format(X.shape, gt if gt is None else gt.shape))
             if eval_data.preprocess_methods is not None:
                 # Do preprocessing
                 if type(eval_data.preprocess_methods) is list:
@@ -163,16 +173,16 @@ def evaluate_multiple_datasets(evaluation_datasets, evaluation_algorithms, evalu
 
 class EvaluationDataset():
 
-    def __init__(self, name, path, gt_columns=-1, delimiter=",", preprocess_methods=None, preprocess_params={},
+    def __init__(self, name, data, gt_columns=None, file_reader_params={"delimiter":","}, preprocess_methods=None, preprocess_params={},
                  ignore_algorithms=[]):
         assert type(name) is str, "name must be a string"
         self.name = name
-        assert type(path) is str, "path must be a string"
-        self.path = path
-        assert type(gt_columns) is int or type(gt_columns) is list, "gt_columns must be an int or a list"
+        assert type(data) is np.ndarray or type(data) is str, "data must be a numpy array or a string containing the path to a data file"
+        self.data = data
+        assert type(gt_columns) is None or type(gt_columns) is int or type(gt_columns) is list, "gt_columns must be an int, a list or None"
         self.gt_columns = gt_columns
-        assert type(delimiter) is str, "delimiter must be a string"
-        self.delimiter = delimiter
+        assert type(file_reader_params) is dict, "file_reader_params must be a dict"
+        self.file_reader_params = file_reader_params
         assert callable(preprocess_methods) or type(
             preprocess_methods) is list or preprocess_methods is None, "preprocess_methods must be a method, a list of methods or None"
         self.preprocess_methods = preprocess_methods

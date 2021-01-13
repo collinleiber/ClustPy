@@ -5,6 +5,9 @@ It can be combined with all algorithms from [sklearn clustering](https://scikit-
 and other packages.
 Furthermore, it contains wrappers for [pyclustering](https://pyclustering.github.io/) implementations.
 
+The main focus of this package is not efficiency but being able to try out a wide range of methods.
+In particular, this should also make lesser-known methods accessible in a simple and convenient way.
+
 ## Components
 
 ### Algorithms

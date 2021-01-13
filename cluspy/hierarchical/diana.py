@@ -220,10 +220,7 @@ def diana_caller():
     df = pd.read_excel(folder_data + "All_Scales_Norm_Modified.xlsx", index_col=0) #.transpose().sample(300, random_state=1)
     df_t = df[[x for x in list(df) if "Lins" not in x]].transpose().sample(200, random_state=1)
     diana = Diana(n_clusters=20)
-    print(df_t)
     diana.fit(X=df_t)
-    print(diana.df_hierarchy_)
-    print(diana.labels_)
 
 
 # IV Main
