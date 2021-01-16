@@ -1,7 +1,10 @@
-from .variation_of_information import variation_of_information
+from .clustering_metrics import variation_of_information, unsupervised_clustering_accuracy
 from .pair_counting_scores import PairCountingScore
-from cluspy.metrics.multipe_labelings_scoring import MultipleLabelingsScoring
+from .multipe_labelings_scoring import MultipleLabelingsScoring
+from .confusion_matrix import ConfusionMatrix
 
 __all__ = ['variation_of_information',
+           'unsupervised_clustering_accuracy',
            'PairCountingScore',
-           'MultipleLabelingsScoring']
+           'MultipleLabelingsScoring',
+           'ConfusionMatrix']

@@ -47,6 +47,7 @@ def evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=None, gt=None,
     data = np.zeros((repetitions, len(algo_names) * len(metric_names)))
     df = pd.DataFrame(data, columns=header, index=range(repetitions))
     for eval_algo in evaluation_algorithms:
+        automatically_set_n_clusters = False
         try:
             assert type(eval_algo) is EvaluationAlgorithm, "All algortihms must be of type EvaluationAlgortihm"
             if eval_algo.name in ignore_algorithms:
@@ -54,8 +55,8 @@ def evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=None, gt=None,
                 continue
             print("Use algorithm {0}".format(eval_algo.name))
             # Add n_clusters automatically to algorithm parameters if it is None
-            automatically_set_n_clusters = "n_clusters" in eval_algo.params and eval_algo.params["n_clusters"] is None \
-                                           and gt is not None
+            if "n_clusters" in eval_algo.params and eval_algo.params["n_clusters"] is None and gt is not None:
+                automatically_set_n_clusters = True
             if automatically_set_n_clusters:
                 if gt.ndim == 1:
                     # In case of normal ground truth
@@ -65,10 +66,15 @@ def evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=None, gt=None,
                     eval_algo.params["n_clusters"] = [len(np.unique(gt[gt[:, i] >= 0, i])) for i in range(gt.shape[1])]
             # Execute the algorithm multiple times
             for rep in range(repetitions):
-                print("- Iteration {0}".format(rep + 1))
+                print("- Iteration {0}".format(rep))
                 start_time = time.time()
                 algo_obj = eval_algo.obj(**eval_algo.params)
-                algo_obj.fit(X)
+                try:
+                    algo_obj.fit(X)
+                except Exception as e:
+                    print("Execution of {0} raised an exception in iteration {1}".format(eval_algo.name, rep))
+                    print(e)
+                    continue
                 runtime = time.time() - start_time
                 if add_runtime:
                     df.at[rep, (eval_algo.name, "runtime")] = runtime
@@ -96,11 +102,11 @@ def evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=None, gt=None,
                         except Exception as e:
                             print("Metric {0} raised an exception and will be skipped".format(eval_metric.name))
                             print(e)
-            if automatically_set_n_clusters:
-                eval_algo.params["n_clusters"] = None
         except Exception as e:
             print("Algorithm {0} raised an exception and will be skipped".format(eval_algo.name))
             print(e)
+        if automatically_set_n_clusters:
+            eval_algo.params["n_clusters"] = None
     if add_average:
         df.loc["avg"] = np.mean(df.values, axis=0)
     if add_std:
