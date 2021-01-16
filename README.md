@@ -34,7 +34,7 @@ In particular, this should also make lesser-known methods accessible in a simple
     - IDEC
     - DCN
     - VaDE
-    - DEDC
+    - DDP
     
 ### Other implementations
 
@@ -42,8 +42,7 @@ In particular, this should also make lesser-known methods accessible in a simple
     - Variation of information
     - Pair Counting Scores (f1, rand, jaccard, recall, precision)
     - Scores for multiple labelings
-    - Confusion Matrix
-- Utils
+- Statistics
     - Hartigans Dip-test
     
 ## Compatible packages
