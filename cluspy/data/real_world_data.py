@@ -1,6 +1,6 @@
 import torchvision
 import torch
-import urllib.request, urllib.error
+import urllib.request
 import os.path
 from pathlib import Path
 import ssl
@@ -12,7 +12,7 @@ import zipfile
 def _get_download_dir():
     downloads_path = str(Path.home() / "Downloads/cluspy_datafiles")
     if not os.path.isdir(downloads_path):
-        os.mkdir(downloads_path)
+        os.makedirs(downloads_path)
     return downloads_path
 
 
