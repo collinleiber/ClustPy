@@ -238,8 +238,8 @@ class _VaDE_Module(torch.nn.Module):
 
 
 class VaDE():
-    def __init__(self, n_clusters, batch_size=256, learning_rate=1e-3, pretrain_epochs=50,
-                 vade_epochs=300, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.BCELoss(reduction='sum'),
+    def __init__(self, n_clusters, batch_size=256, learning_rate=1e-3, pretrain_epochs=100,
+                 vade_epochs=150, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.BCELoss(reduction='sum'),
                  autoencoder=None, embedding_size=10):
         self.n_clusters = n_clusters
         self.batch_size = batch_size

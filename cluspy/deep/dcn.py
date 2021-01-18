@@ -136,8 +136,8 @@ class _DCN_Module(torch.nn.Module):
 
 class DCN():
 
-    def __init__(self, n_clusters, batch_size=256, learning_rate=1e-3, pretrain_epochs=220,
-                 dcn_epochs=180, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(),
+    def __init__(self, n_clusters, batch_size=256, learning_rate=1e-3, pretrain_epochs=100,
+                 dcn_epochs=150, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(),
                  degree_of_space_distortion=0.05, degree_of_space_preservation=1.0, autoencoder=None,
                  embedding_size=10):
         self.n_clusters = n_clusters

@@ -13,32 +13,57 @@ class Simple_Autoencoder(torch.nn.Module):
         decoder: decoder part of the autoencoder, responsible for reconstructing data points from the embedding
     """
 
-    def __init__(self, input_dim: int, embedding_size: int):
+    def __init__(self, input_dim: int, embedding_size: int, small_network=False):
         super(Simple_Autoencoder, self).__init__()
 
-        # make a sequential list of all operations you want to apply for encoding a data point
-        self.encoder = torch.nn.Sequential(
-            # Linear layer (just a matrix multiplication)
-            torch.nn.Linear(input_dim, 256),
-            # apply an elementwise non-linear function
-            torch.nn.LeakyReLU(inplace=True),
-            torch.nn.Linear(256, 128),
-            torch.nn.LeakyReLU(inplace=True),
-            torch.nn.Linear(128, 64),
-            torch.nn.LeakyReLU(inplace=True),
-            torch.nn.Linear(64, embedding_size))
+        if small_network:
+            # make a sequential list of all operations you want to apply for encoding a data point
+            self.encoder = torch.nn.Sequential(
+                # Linear layer (just a matrix multiplication)
+                torch.nn.Linear(input_dim, 256),
+                # apply an elementwise non-linear function
+                torch.nn.LeakyReLU(inplace=True),
+                torch.nn.Linear(256, 128),
+                torch.nn.LeakyReLU(inplace=True),
+                torch.nn.Linear(128, 64),
+                torch.nn.LeakyReLU(inplace=True),
+                torch.nn.Linear(64, embedding_size))
 
-        # make a sequential list of all operations you want to apply for decoding a data point
-        # In our case this is a symmetric version of the encoder
-        self.decoder = torch.nn.Sequential(
-            torch.nn.Linear(embedding_size, 64),
-            torch.nn.LeakyReLU(inplace=True),
-            torch.nn.Linear(64, 128),
-            torch.nn.LeakyReLU(inplace=True),
-            torch.nn.Linear(128, 256),
-            torch.nn.LeakyReLU(inplace=True),
-            torch.nn.Linear(256, input_dim),
-        )
+            # make a sequential list of all operations you want to apply for decoding a data point
+            # In our case this is a symmetric version of the encoder
+            self.decoder = torch.nn.Sequential(
+                torch.nn.Linear(embedding_size, 64),
+                torch.nn.LeakyReLU(inplace=True),
+                torch.nn.Linear(64, 128),
+                torch.nn.LeakyReLU(inplace=True),
+                torch.nn.Linear(128, 256),
+                torch.nn.LeakyReLU(inplace=True),
+                torch.nn.Linear(256, input_dim),
+            )
+        else:
+            # make a sequential list of all operations you want to apply for encoding a data point
+            self.encoder = torch.nn.Sequential(
+                # Linear layer (just a matrix multiplication)
+                torch.nn.Linear(input_dim, 500),
+                # apply an elementwise non-linear function
+                torch.nn.LeakyReLU(inplace=True),
+                torch.nn.Linear(500, 500),
+                torch.nn.LeakyReLU(inplace=True),
+                torch.nn.Linear(500, 2000),
+                torch.nn.LeakyReLU(inplace=True),
+                torch.nn.Linear(2000, embedding_size))
+
+            # make a sequential list of all operations you want to apply for decoding a data point
+            # In our case this is a symmetric version of the encoder
+            self.decoder = torch.nn.Sequential(
+                torch.nn.Linear(embedding_size, 2000),
+                torch.nn.LeakyReLU(inplace=True),
+                torch.nn.Linear(2000, 500),
+                torch.nn.LeakyReLU(inplace=True),
+                torch.nn.Linear(500, 500),
+                torch.nn.LeakyReLU(inplace=True),
+                torch.nn.Linear(500, input_dim),
+            )
 
     def encode(self, x: torch.Tensor) -> torch.Tensor:
         """

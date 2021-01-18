@@ -130,17 +130,19 @@ def evaluate_multiple_datasets(evaluation_datasets, evaluation_algorithms, evalu
             assert type(eval_data) is EvaluationDataset, "All datasets must be of type EvaluationDataset"
             print("=== Start evaluation of {0} ===".format(eval_data.name))
             # If data is a path, load file
+            gt = None
             if type(eval_data.data) is str:
-                data_file = np.genfromtxt(eval_data.data, **eval_data.file_reader_params)
+                X = np.genfromtxt(eval_data.data, **eval_data.file_reader_params)
+            elif type(eval_data.data) is np.ndarray:
+                X = eval_data.data
             else:
-                data_file = eval_data.data
+                X, gt = eval_data.data()
             # Check if ground truth columns are defined
-            if eval_data.gt_columns is not None:
-                X = np.delete(data_file, eval_data.gt_columns, axis=1)
-                gt = data_file[:, eval_data.gt_columns]
-            else:
-                X = data_file
-                gt = None
+            if type(eval_data.gt_columns) is int or type(eval_data.gt_columns) is list:
+                gt = X[:, eval_data.gt_columns]
+                X = np.delete(X, eval_data.gt_columns, axis=1)
+            elif type(eval_data.gt_columns) is np.ndarray:
+                gt = eval_data.gt_columns
             print("=== (Data shape: {0} / Ground truth shape: {1}) ===".format(X.shape, gt if gt is None else gt.shape))
             if eval_data.preprocess_methods is not None:
                 # Do preprocessing
@@ -183,9 +185,12 @@ class EvaluationDataset():
                  ignore_algorithms=[]):
         assert type(name) is str, "name must be a string"
         self.name = name
-        assert type(data) is np.ndarray or type(data) is str, "data must be a numpy array or a string containing the path to a data file"
+        assert type(data) is np.ndarray or type(data) is str or callable(data), "data must be a numpy array, a string " \
+                                                                                "containing the path to a data file or a " \
+                                                                                "function returning a data and a labels array"
         self.data = data
-        assert type(gt_columns) is None or type(gt_columns) is int or type(gt_columns) is list, "gt_columns must be an int, a list or None"
+        assert gt_columns is None or type(gt_columns) is int or type(gt_columns) is list or type(gt_columns) is\
+               np.ndarray, "gt_columns must be an int, a list, a numpy array or None"
         self.gt_columns = gt_columns
         assert type(file_reader_params) is dict, "file_reader_params must be a dict"
         self.file_reader_params = file_reader_params

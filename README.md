@@ -30,19 +30,22 @@ In particular, this should also make lesser-known methods accessible in a simple
 - Alternative clustering (Non-redundant clustering)
     - NR-Kmeans
 - Deep clustering
+    - Simple Autoencoder
     - DEC
     - IDEC
     - DCN
     - VaDE
-    - DDP
+    - DEDC
     
 ### Other implementations
 
 - Metrics
     - Variation of information
+    - Unsupervised Clustering Accuracy
     - Pair Counting Scores (f1, rand, jaccard, recall, precision)
     - Scores for multiple labelings
-- Statistics
+    - Confusion Matrix
+- Utils
     - Hartigans Dip-test
     
 ## Compatible packages

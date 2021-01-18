@@ -86,8 +86,7 @@ def _dedc_training(X, n_clusters_current, dip_merge_threshold, cluster_loss_weig
             onehot_labels = int_to_one_hot(current_labels, n_clusters_current).float()
             # Get dip costs
             dip_weights_eye = dip_weights_torch + torch.eye(n_clusters_current)
-            if False: #TODO: Remove later
-                dip_weights_eye /= dip_weights_eye.sum(1)
+            dip_weights_eye /= dip_weights_eye.sum(1)
             cluster_relationships = torch.matmul(onehot_labels, dip_weights_eye)
             escaped_diffs = cluster_relationships * squared_diffs
             # Normalize loss by cluster distances
@@ -286,7 +285,7 @@ class _DEDC_Autoencoder(Simple_Autoencoder):
 class DEDC():
 
     def __init__(self, n_clusters_start=25, dip_merge_threshold=0.9, cluster_loss_weight=1, n_clusters_max=np.inf,
-                 n_clusters_min=1, batch_size=64, learning_rate=1e-3, pretrain_epochs=100, dedc_epochs=50,
+                 n_clusters_min=1, batch_size=256, learning_rate=1e-3, pretrain_epochs=100, dedc_epochs=50,
                  update_pause_epochs=5, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(),
                  autoencoder=None, embedding_size=5, debug=False):
         self.n_clusters_start = n_clusters_start

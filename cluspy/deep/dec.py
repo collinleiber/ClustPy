@@ -124,8 +124,8 @@ class _DEC_Module(torch.nn.Module):
 
 class DEC():
 
-    def __init__(self, n_clusters, alpha=1.0, batch_size=256, learning_rate=1e-3, pretrain_epochs=220,
-                 dec_epochs=180, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(), autoencoder=None,
+    def __init__(self, n_clusters, alpha=1.0, batch_size=256, learning_rate=1e-3, pretrain_epochs=100,
+                 dec_epochs=150, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(), autoencoder=None,
                  embedding_size=10):
         self.n_clusters = n_clusters
         self.alpha = alpha
