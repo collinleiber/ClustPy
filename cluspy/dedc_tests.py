@@ -39,7 +39,6 @@ def znorm(X):
 
 def get_subset_mnist(n_clusters):
     X, labels = load_mnist()
-    X = znorm(X)
     selection = labels < n_clusters
     X = X[selection]
     labels = labels[selection]
@@ -72,14 +71,14 @@ def get_subset_mnist_9():
 
 def robustness_test_mnist():
     datasets = [
-        EvaluationDataset("MNIST-2", data=get_subset_mnist_2),
-        EvaluationDataset("MNIST-3", data=get_subset_mnist_3),
-        EvaluationDataset("MNIST-4", data=get_subset_mnist_4),
-        EvaluationDataset("MNIST-5", data=get_subset_mnist_5),
-        EvaluationDataset("MNIST-6", data=get_subset_mnist_6),
-        EvaluationDataset("MNIST-7", data=get_subset_mnist_7),
-        EvaluationDataset("MNIST-8", data=get_subset_mnist_8),
-        EvaluationDataset("MNIST-9", data=get_subset_mnist_9),
+        EvaluationDataset("MNIST-2", data=get_subset_mnist_2, preprocess_methods=znorm),
+        EvaluationDataset("MNIST-3", data=get_subset_mnist_3, preprocess_methods=znorm),
+        EvaluationDataset("MNIST-4", data=get_subset_mnist_4, preprocess_methods=znorm),
+        EvaluationDataset("MNIST-5", data=get_subset_mnist_5, preprocess_methods=znorm),
+        EvaluationDataset("MNIST-6", data=get_subset_mnist_6, preprocess_methods=znorm),
+        EvaluationDataset("MNIST-7", data=get_subset_mnist_7, preprocess_methods=znorm),
+        EvaluationDataset("MNIST-8", data=get_subset_mnist_8, preprocess_methods=znorm),
+        EvaluationDataset("MNIST-9", data=get_subset_mnist_9, preprocess_methods=znorm),
     ]
     algorithms = [EvaluationAlgorithm("DEDC", DEDC, {"n_clusters_start": 35, "batch_size": 256, "pretrain_epochs": 100,
                                                      "dedc_epochs": 50, "embedding_size": 5})
