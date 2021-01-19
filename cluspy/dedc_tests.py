@@ -37,6 +37,59 @@ def znorm(X):
     return (X - np.mean(X)) / np.std(X)
 
 
+def get_subset_mnist(n_clusters):
+    X, labels = load_mnist()
+    X = znorm(X)
+    selection = labels < n_clusters
+    X = X[selection]
+    labels = labels[selection]
+    return X, labels
+
+
+def get_subset_mnist_2():
+    return get_subset_mnist(2)
+
+def get_subset_mnist_3():
+    return get_subset_mnist(3)
+
+def get_subset_mnist_4():
+    return get_subset_mnist(4)
+
+def get_subset_mnist_5():
+    return get_subset_mnist(5)
+
+def get_subset_mnist_6():
+    return get_subset_mnist(6)
+
+def get_subset_mnist_7():
+    return get_subset_mnist(7)
+
+def get_subset_mnist_8():
+    return get_subset_mnist(8)
+
+def get_subset_mnist_9():
+    return get_subset_mnist(9)
+
+def robustness_test_mnist():
+    datasets = [
+        EvaluationDataset("MNIST-2", data=get_subset_mnist_2),
+        EvaluationDataset("MNIST-3", data=get_subset_mnist_3),
+        EvaluationDataset("MNIST-4", data=get_subset_mnist_4),
+        EvaluationDataset("MNIST-5", data=get_subset_mnist_5),
+        EvaluationDataset("MNIST-6", data=get_subset_mnist_6),
+        EvaluationDataset("MNIST-7", data=get_subset_mnist_7),
+        EvaluationDataset("MNIST-8", data=get_subset_mnist_8),
+        EvaluationDataset("MNIST-9", data=get_subset_mnist_9),
+    ]
+    algorithms = [EvaluationAlgorithm("DEDC", DEDC, {"n_clusters_start": 35, "batch_size": 256, "pretrain_epochs": 100,
+                                                     "dedc_epochs": 50, "embedding_size": 5})
+                  ]
+    metrics = [EvaluationMetric("NMI", nmi), EvaluationMetric("ARI", ari)]
+    df = evaluate_multiple_datasets(datasets, algorithms, metrics, 10, True, True, False, True,
+                                    save_path="robustness_test_mnist.csv", save_intermediate_results=True)
+    print(df)
+
+
 def full_test():
     ignore_deep = ["DEDC", "DEC", "IDEC", "DCN", "VaDE"]
     datasets = [
@@ -85,9 +138,9 @@ def full_test():
                   ]
     metrics = [EvaluationMetric("NMI", nmi), EvaluationMetric("ARI", ari)]
     df = evaluate_multiple_datasets(datasets, algorithms, metrics, 10, True, True, False, True,
-                                    save_path="full_evaluation.csv", save_intermediate_results=True)
+                                    save_path="full_test.csv", save_intermediate_results=True)
     print(df)
 
 
 if __name__ == "__main__":
-    full_test()
+    robustness_test_mnist()

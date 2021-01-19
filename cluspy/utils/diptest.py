@@ -266,7 +266,7 @@ def dip(X, just_dip=False, is_data_sorted=False, debug=False):
     dip_value /= (2 * N)
     # TODO: Better with best low best high?
     return dip_value if just_dip else (
-    dip_value, (low, high), (modaltriangle_i1, modaltriangle_i2, modaltriangle_i3))
+        dip_value, (low, high), (modaltriangle_i1, modaltriangle_i2, modaltriangle_i3))
 
 
 def dip_fast(X, just_dip=False, is_data_sorted=False):
@@ -369,7 +369,7 @@ def dip_fast(X, just_dip=False, is_data_sorted=False):
         cumulative_xl += xl
 
 
-def dip_test(X, is_data_sorted=False, pval_strategy=PVAL_BY_TABLE, n_boots=2000):
+def dip_test(X, is_data_sorted=False, pval_strategy=PVAL_BY_TABLE, fast_dip=False, n_boots=2000):
     """
     Hartigan & Hartigan's dip test for unimodality.
     For X ~ F i.i.d., the null hypothesis is that F is a unimodal distribution.
@@ -396,7 +396,10 @@ def dip_test(X, is_data_sorted=False, pval_strategy=PVAL_BY_TABLE, n_boots=2000)
         The Annals of Statistics.
     """
     n_points = X.shape[0]
-    data_dip = dip(X, just_dip=True, is_data_sorted=is_data_sorted)
+    if fast_dip:
+        data_dip = dip_fast(X, just_dip=True)
+    else:
+        data_dip = dip(X, just_dip=True, is_data_sorted=is_data_sorted)
     pval = dip_pval(data_dip, n_points, pval_strategy, n_boots)
     return data_dip, pval
 
