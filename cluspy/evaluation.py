@@ -8,28 +8,35 @@ def evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=None, gt=None,
                      add_std=True, add_runtime=True, add_n_clusters=False, save_path=None, ignore_algorithms=[]):
     """
     Example:
-    from cluspy.data.synthetic_data_creator import create_subspace_data
-    from cluspy.density import MultiDensityDBSCAN
-    from cluspy.subspace import SubKmeans
-    from cluspy.centroid import XMeans
-    from sklearn.metrics import normalized_mutual_info_score as nmi, adjusted_mutual_info_score as ami, adjusted_rand_score as ars, silhouette_score as sc
-    X, L = create_subspace_data(1500, total_features=2)
-    algorithms = [EvaluationAlgorithm("MDDBSCAN_k=15", MultiDensityDBSCAN, {"k":15}), EvaluationAlgorithm("MDDBSCAN_k=25", MultiDensityDBSCAN, {"k":25}),
-                      EvaluationAlgorithm("Xmeans", XMeans), EvaluationAlgorithm("SubKmeans", SubKmeans, {"n_clusters":3}, 0)]
-    metrics = [EvaluationMetric("NMI", nmi), EvaluationMetric("AMI", ami), EvaluationMetric("Adjusted rand", ars), EvaluationMetric("Silhouette", sc, use_gt=False)]
-    df = evaluate_dataset(X, algorithms, metrics, L, 10, save_path="test_results.csv", add_n_clusters=True)
+    from cluspy.evaluation import *
+    from cluspy.deep import DEC, IDEC, DCN, VaDE
+    from sklearn.metrics import normalized_mutual_info_score as nmi, adjusted_rand_score as ari
+    from cluspy.data import load_usps, load_mnist
 
-    :param X: dataset
-    :param evaluation_algorithms: input algorithms - list of EvaluationAlgorithm
-    :param evaluation_metrics: input metrics - list of EvaluationMetric (default: None)
-    :param gt: ground truth (Default: None)
-    :param repetitions: number of repetitions to execute (default: 10)
-    :param add_average: add average for each column (default: True)
-    :param add_std: add standard deviation for each column (default: True)
-    :param add_runtime: add runtime into the results table (default: True)
-    :param add_n_clusters: add n_clusters into the results table (default: False)
-    :param save_path: optional - path where the results should be saved (default: None)
-    :return: dataframe with evaluation results
+    def znorm(X):
+        return (X - np.mean(X)) / np.std(X)
+
+    def identity(X):
+        return X
+
+    to_ignore = ["VaDE", "IDEC"]
+    datasets = [
+        EvaluationDataset("MNIST", data=load_mnist, preprocess_methods=znorm, ignore_algorithms=["DEC"]),
+        EvaluationDataset("USPS", data=load_usps, preprocess_methods=znorm),
+        EvaluationDataset("AE+USPS", data=load_usps, preprocess_methods=[znorm, identity],
+                          ignore_algorithms=to_ignore)
+    ]
+    algorithms = [EvaluationAlgorithm("DEC", DEC, {"n_clusters": None, "batch_size": 256, "pretrain_epochs": 100,
+                                                   "dec_epochs": 150, "embedding_size": 10}),
+                  EvaluationAlgorithm("IDEC", IDEC, {"n_clusters": None, "batch_size": 256, "pretrain_epochs": 100,
+                                                     "dec_epochs": 150, "embedding_size": 10}),
+                  EvaluationAlgorithm("DCN", DCN, {"n_clusters": None, "batch_size": 256, "pretrain_epochs": 100,
+                                                   "dcn_epochs": 150, "embedding_size": 10}),
+                  EvaluationAlgorithm("VaDE", VaDE, {"n_clusters": None, "batch_size": 256, "pretrain_epochs": 100,
+                                                     "vade_epochs": 150, "embedding_size": 10})]
+    metrics = [EvaluationMetric("NMI", nmi), EvaluationMetric("ARI", ari)]
+    df = evaluate_multiple_datasets(datasets, algorithms, metrics, 10, True, True, False, True,
+                                    save_path="valuation.csv", save_intermediate_results=True)
     """
     assert evaluation_metrics is not None or add_runtime or add_n_clusters, \
         "Either evaluation metrics must be defined or add_runtime/add_n_clusters must be True"

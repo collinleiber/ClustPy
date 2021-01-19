@@ -5,7 +5,7 @@ from sklearn.metrics import normalized_mutual_info_score as nmi, adjusted_rand_s
 from cluspy.deep import DEC, DCN, IDEC, DEDC, VaDE
 from cluspy.deep._utils import detect_device, get_trained_autoencoder, encode_batchwise
 import torch
-from cluspy.data.real_world_data import load_har, load_usps, load_mnist, load_fmnist, load_kmnist, \
+from cluspy.data import load_har, load_usps, load_mnist, load_fmnist, load_kmnist, \
     load_letterrecognition, load_optdigits, load_pendigits
 
 

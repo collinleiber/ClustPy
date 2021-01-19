@@ -43,7 +43,7 @@ def _dedc(X, n_clusters_start, dip_merge_threshold, cluster_loss_weight, n_clust
     # Initial dip values
     embedded_centers_cpu = autoencoder.encode(centers_torch).detach().cpu().numpy()
     dip_matrix_cpu = _get_dip_matrix(embedded_data, embedded_centers_cpu, cluster_labels, n_clusters_start)
-    dip_weights_torch = torch.from_numpy(dip_matrix_cpu).float()
+    dip_weights_torch = torch.from_numpy(dip_matrix_cpu).float().to(device)
     # Reduce learning_rate from pretraining by a magnitude of 10
     dedc_learning_rate = learning_rate * 0.1
     optimizer = optimizer_class(autoencoder.parameters(), lr=dedc_learning_rate)
@@ -85,7 +85,7 @@ def _dedc_training(X, n_clusters_current, dip_merge_threshold, cluster_loss_weig
             current_labels = torch.from_numpy(cluster_labels[ids_cpu]).float().to(device)
             onehot_labels = int_to_one_hot(current_labels, n_clusters_current).float()
             # Get dip costs
-            dip_weights_eye = dip_weights_torch + torch.eye(n_clusters_current)
+            dip_weights_eye = dip_weights_torch + torch.eye(n_clusters_current, device=device)
             dip_weights_eye /= dip_weights_eye.sum(1)
             cluster_relationships = torch.matmul(onehot_labels, dip_weights_eye)
             escaped_diffs = cluster_relationships * squared_diffs
@@ -114,7 +114,7 @@ def _dedc_training(X, n_clusters_current, dip_merge_threshold, cluster_loss_weig
         # Update Dips
         embedded_centers_cpu = autoencoder.encode(centers_torch).detach().cpu().numpy()
         dip_weights_cpu = _get_dip_matrix(embedded_data, embedded_centers_cpu, cluster_labels, n_clusters_current)
-        dip_weights_torch = torch.from_numpy(dip_weights_cpu).float()
+        dip_weights_torch = torch.from_numpy(dip_weights_cpu).float().to(device)
         if debug:
             print(
                 "Iteration {0}  (n_clusters = {4}) - reconstruction loss: {1} / cluster loss: {2} / total loss: {3}".format(
@@ -169,7 +169,7 @@ def _dedc_training(X, n_clusters_current, dip_merge_threshold, cluster_loss_weig
                 # Update dip values
                 dip_weights_cpu = _get_dip_matrix(embedded_data, embedded_centers_cpu, cluster_labels,
                                                   n_clusters_current)
-                dip_weights_torch = torch.from_numpy(dip_weights_cpu).float()
+                dip_weights_torch = torch.from_numpy(dip_weights_cpu).float().to(device)
             else:
                 # Else: merge clusters with hightest dip
                 if debug:
@@ -214,7 +214,7 @@ def _merge_by_dip_value(X, embedded_data, cluster_labels, dip_argmax, n_clusters
     # Update dip values
     dip_weights_cpu = _get_dip_matrix(embedded_data, embedded_centers_cpu, cluster_labels,
                                       n_clusters_current)
-    dip_weights_torch = torch.from_numpy(dip_weights_cpu).float()
+    dip_weights_torch = torch.from_numpy(dip_weights_cpu).float().to(device)
     return cluster_labels, centers_cpu, centers_torch, embedded_centers_cpu, dip_weights_cpu, dip_weights_torch
 
 
