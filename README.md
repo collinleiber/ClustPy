@@ -12,7 +12,7 @@ In particular, this should also make lesser-known methods accessible in a simple
 
 Just clone the repository, go to the directory and execute:
 
-`pip install -r requirements`
+`pip install -r requirements.txt`
 
 Afterwards, you will be good to go.
 

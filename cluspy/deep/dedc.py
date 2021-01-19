@@ -6,6 +6,7 @@ from cluspy.deep._utils import detect_device, encode_batchwise, Simple_Autoencod
     squared_euclidean_distance, int_to_one_hot, get_trained_autoencoder
 from sklearn.cluster import KMeans
 
+
 def _dedc(X, n_clusters_start, dip_merge_threshold, cluster_loss_weight, n_clusters_max, n_clusters_min, batch_size,
           learning_rate, pretrain_epochs, dedc_epochs, update_pause_epochs, optimizer_class, loss_fn, autoencoder,
           embedding_size, debug):
@@ -92,8 +93,8 @@ def _dedc_training(X, n_clusters_current, dip_merge_threshold, cluster_loss_weig
             # Normalize loss by cluster distances
             squared_center_diffs = squared_euclidean_distance(embedded_centers_torch, embedded_centers_torch)
             # Ignore zero values (diagonal)
-            mask = (squared_center_diffs != 0).nonzero()
-            masked_center_diffs = squared_center_diffs[mask[:, 0], mask[:, 1]]
+            mask = torch.where(squared_center_diffs != 0)
+            masked_center_diffs = squared_center_diffs[mask[0], mask[1]]
             sqrt_masked_center_diffs = masked_center_diffs.sqrt()
             masked_center_diffs_std = sqrt_masked_center_diffs.std() if len(sqrt_masked_center_diffs) > 2 else 0
             # Loss function
@@ -173,7 +174,8 @@ def _dedc_training(X, n_clusters_current, dip_merge_threshold, cluster_loss_weig
             else:
                 # Else: merge clusters with hightest dip
                 if debug:
-                    print("Force merge of clusters {0} with dip value {1}".format(dip_argmax, dip_weights_cpu[dip_argmax]))
+                    print("Force merge of clusters {0} with dip value {1}".format(dip_argmax,
+                                                                                  dip_weights_cpu[dip_argmax]))
 
                 cluster_labels, centers_cpu, centers_torch, _, dip_weights_cpu, dip_weights_torch = \
                     _merge_by_dip_value(X, embedded_data, cluster_labels, dip_argmax, n_clusters_current, centers_cpu,
