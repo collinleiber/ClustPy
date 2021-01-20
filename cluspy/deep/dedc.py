@@ -287,7 +287,7 @@ class _DEDC_Autoencoder(Simple_Autoencoder):
 
 class DEDC():
 
-    def __init__(self, n_clusters_start=25, dip_merge_threshold=0.9, cluster_loss_weight=1, n_clusters_max=np.inf,
+    def __init__(self, n_clusters_start=35, dip_merge_threshold=0.9, cluster_loss_weight=1, n_clusters_max=np.inf,
                  n_clusters_min=1, batch_size=256, learning_rate=1e-3, pretrain_epochs=100, dedc_epochs=50,
                  update_pause_epochs=5, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(),
                  autoencoder=None, embedding_size=5, debug=False):
