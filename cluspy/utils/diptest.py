@@ -18,13 +18,93 @@ Dario Ringach <dario@wotan.cns.nyu.edu>, Martin Maechler <maechler@stat.math.eth
 """
 
 import numpy as np
+import os
+import platform
+import ctypes
 
 PVAL_BY_TABLE = 0
 PVAL_BY_BOOT = 1
 PVAL_BY_FUNCTION = 2
 
+CAN_C_BE_USED = True
+C_DIP_FILE = None
 
-def dip(X, just_dip=False, is_data_sorted=False, debug=False):
+def dip(X, just_dip=False, is_data_sorted=False, use_c=True, debug=False):
+    global CAN_C_BE_USED
+    assert X.ndim == 1, "Data must be 1-dimensional for the dip-test. Your shape:{0}".format(X.shape)
+    N = len(X)
+    if not is_data_sorted:
+        X = np.sort(X)
+    if N < 4 or X[0] == X[-1]:
+        d = 0.0
+        return d if just_dip else (d, None, None)
+    if use_c and load_c_dip_file():
+        # Prepare data to match C data types
+        X = np.asarray(X, dtype=np.float64)
+        X_c = X.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+        N_c = np.array([N]).ctypes.data_as(ctypes.POINTER(ctypes.c_int))
+        dip_value = np.zeros(1, dtype=np.float).ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+        low_high = np.zeros(4).ctypes.data_as(ctypes.POINTER(ctypes.c_int))
+        modal_triangle = np.zeros(3).ctypes.data_as(ctypes.POINTER(ctypes.c_int))
+        gcm = np.zeros(N).ctypes.data_as(ctypes.POINTER(ctypes.c_int))
+        lcm = np.zeros(N).ctypes.data_as(ctypes.POINTER(ctypes.c_int))
+        mn = np.zeros(N).ctypes.data_as(ctypes.POINTER(ctypes.c_int))
+        mj = np.zeros(N).ctypes.data_as(ctypes.POINTER(ctypes.c_int))
+        debug_c = np.array([1 if debug else 0]).ctypes.data_as(ctypes.POINTER(ctypes.c_int))
+        # Execute C dip test
+        _ = C_DIP_FILE.diptst(X_c, N_c, dip_value, low_high, modal_triangle, gcm, lcm, mn, mj, debug_c)
+        dip_value = dip_value[0]
+        if just_dip:
+            return dip_value
+        else:
+            low_high = (low_high[0], low_high[1], low_high[2], low_high[3])
+            modal_triangle = (modal_triangle[0], modal_triangle[1], modal_triangle[2])
+            return dip_value, low_high, modal_triangle
+    else:
+        return dip_python_port(X, just_dip, debug)
+
+
+def load_c_dip_file():
+    global C_DIP_FILE
+    global CAN_C_BE_USED
+    if CAN_C_BE_USED and C_DIP_FILE is None:
+        files_path = os.path.dirname(__file__)
+        if platform.system() == "Windows":
+            dip_compiled = files_path + "/dip.dll"
+        else:
+            dip_compiled = files_path + "/dip.so"
+        if os.path.isfile(dip_compiled):
+            # load c file
+            try:
+                C_DIP_FILE = ctypes.CDLL(dip_compiled)
+                C_DIP_FILE.diptst.restype = None
+                C_DIP_FILE.diptst.argtypes = [ctypes.POINTER(ctypes.c_double),
+                                         ctypes.POINTER(ctypes.c_int),
+                                         ctypes.POINTER(ctypes.c_double),
+                                         ctypes.POINTER(ctypes.c_int),
+                                         ctypes.POINTER(ctypes.c_int),
+                                         ctypes.POINTER(ctypes.c_int),
+                                         ctypes.POINTER(ctypes.c_int),
+                                         ctypes.POINTER(ctypes.c_int),
+                                         ctypes.POINTER(ctypes.c_int),
+                                         ctypes.POINTER(ctypes.c_int)]
+                return True
+            except Exception as e:
+                print("[WARNING] C implementation can not be used for dip calculation.")
+                print(e)
+                CAN_C_BE_USED = False
+                return False
+        else:
+            print("[WARNING] C implementation can not be used for dip calculation.")
+            CAN_C_BE_USED = False
+            return False
+    elif CAN_C_BE_USED:
+        return True
+    else:
+        return False
+
+
+def dip_python_port(X, just_dip=False, is_data_sorted=False, debug=False):
     assert X.ndim == 1, "Data must be 1-dimensional for the dip-test. Your shape:{0}".format(X.shape)
     N = len(X)
     if not is_data_sorted:
@@ -90,7 +170,7 @@ def dip(X, just_dip=False, is_data_sorted=False, debug=False):
         if debug:
             print("'dip': LOOP-BEGIN: 2n*D= {0}  [low,high] = [{1},{2}]:".format(dip_value, low, high))
             print("gcm[0:{0}] = {1}".format(l_gcm, gcm[:l_gcm + 1]))
-            print("lcm[0:{0}] = {1}".format(l_lcm, lcm[:l_lcm + 1]));
+            print("lcm[0:{0}] = {1}".format(l_lcm, lcm[:l_lcm + 1]))
         d = 0.0
         if l_gcm != 1 or l_lcm != 1:
             if debug:
@@ -134,51 +214,6 @@ def dip(X, just_dip=False, is_data_sorted=False, debug=False):
             break
         if debug:
             print("  calculating dip ..")
-
-        # dip_new = 0.0
-        # tmp_modaltriangle_i1 = None
-        # tmp_modaltriangle_i2 = None
-        # tmp_modaltriangle_i3 = None
-        #
-        # jbs = gcm[ig + 1:l_gcm+1]
-        # jes = gcm[ig:l_gcm]
-        # Xjbs = X[jbs]
-        # Xjes = X[jes]
-        # select = (jes - jbs > 1) & (Xjbs != Xjes)
-        # Cs = (jes[select] - jbs[select]) / (Xjes[select] - Xjbs[select])
-        # for i, jb in enumerate(jbs[select]):
-        #     jjs = np.arange(jb, jes[select][i] + 1)
-        #     ts = (jjs - jb + 1) - (X[jjs] - X[jb]) * Cs[i]
-        #     ts_arg_max = np.argmax(ts)
-        #     if dip_new < ts[ts_arg_max]:
-        #         dip_new = ts[ts_arg_max]
-        #         tmp_modaltriangle_i1 = jb
-        #         tmp_modaltriangle_i2 = jjs[ts_arg_max]
-        #         tmp_modaltriangle_i3 = jes[select][i]
-        #
-        # jbs = lcm[ih:l_lcm]
-        # jes = lcm[ih+1:l_lcm+1]
-        # Xjbs = X[jbs]
-        # Xjes = X[jes]
-        # select = (jes - jbs > 1) & (Xjbs != Xjes)
-        # Cs = (jes[select] - jbs[select]) / (Xjes[select] - Xjbs[select])
-        # for i, jb in enumerate(jbs[select]):
-        #     jjs = np.arange(jb, jes[select][i] + 1)
-        #     ts = (X[jjs] - X[jb]) * Cs[i] - (jjs - jb - 1)
-        #     ts_arg_max = np.argmax(ts)
-        #     if dip_new < ts[ts_arg_max]:
-        #         dip_new = ts[ts_arg_max]
-        #         tmp_modaltriangle_i1 = jb
-        #         tmp_modaltriangle_i2 = jjs[ts_arg_max]
-        #         tmp_modaltriangle_i3 = jes[select][i]
-        #
-        # if dip_value < dip_new:
-        #     dip_value = dip_new
-        #     modaltriangle_i1 = tmp_modaltriangle_i1
-        #     modaltriangle_i2 = tmp_modaltriangle_i2
-        #     modaltriangle_i3 = tmp_modaltriangle_i3
-        #     if debug:
-        #         print(" -> new larger dip {0} (j_best = {2}) gcm-/lcm-centred triple ({1},{2},{3})".format(dip_new,modaltriangle_i1,modaltriangle_i2,modaltriangle_i3))
 
         j_l = None
         j_u = None
@@ -266,110 +301,10 @@ def dip(X, just_dip=False, is_data_sorted=False, debug=False):
     dip_value /= (2 * N)
     # TODO: Better with best low best high?
     return dip_value if just_dip else (
-        dip_value, (low, high), (modaltriangle_i1, modaltriangle_i2, modaltriangle_i3))
+        dip_value, (low, high, best_low, best_high), (modaltriangle_i1, modaltriangle_i2, modaltriangle_i3))
 
 
-def dip_fast(X, just_dip=False, is_data_sorted=False):
-    """
-        Compute the Hartigans' dip statistic either for a histogram of
-        samples (with equidistant bins) or for a set of samples.
-    """
-    # Set precision to less than float64 since the subtraction in _lcm_ is having problems with the precision and
-    # produces duplicates
-    assert X.ndim == 1, "Data must be 1-dimensional for the dip-test"
-    X = np.around(X, 15)
-    idxs, histogram = np.unique(X, return_counts=True)
-
-    # check for case 1<N<4 or all identical values
-    if len(idxs) <= 4 or idxs[0] == idxs[-1]:
-        left = []
-        right = [1]
-        d = 0.0
-        return d if just_dip else (d, (None, idxs, left, None, right, None), (None, None, None))
-
-    hist_cumsum = np.cumsum(histogram, dtype=int)
-    cdf = np.asarray(hist_cumsum / hist_cumsum[-1], dtype=float)
-
-    work_idxs = np.asarray(idxs, dtype=float)
-    work_histogram = np.asarray(histogram, dtype=float) / np.sum(histogram)
-    work_cdf = cdf
-
-    D = 0
-    left = [0]
-    right = [1]
-
-    cumulative_xl = 0
-    modalTriangle_i1 = None
-    modalTriangle_i2 = None
-    modalTriangle_i3 = None
-    while True:
-        left_part, left_touchpoints = _gcm_(work_cdf - work_histogram, work_idxs)
-        right_part, right_touchpoints = _lcm_(work_cdf, work_idxs)
-
-        d_left, left_diffs = _touch_diffs_(left_part,
-                                           right_part, left_touchpoints)
-        d_right, right_diffs = _touch_diffs_(left_part,
-                                             right_part, right_touchpoints)
-        if d_right > d_left:
-            xr = right_touchpoints[d_right == right_diffs][-1]
-            xl = left_touchpoints[left_touchpoints <= xr][-1]
-            d = d_right
-        else:
-            xl = left_touchpoints[d_left == left_diffs][0]
-            xr = right_touchpoints[right_touchpoints >= xl][0]
-            d = d_left
-
-        left_diff_values = np.abs(left_part[:xl + 1] - work_cdf[:xl + 1])
-        arg_left_diff = np.argmax(left_diff_values)
-        right_diff_values = np.abs(right_part[xr:]
-                                   - work_cdf[xr:]
-                                   + work_histogram[xr:])
-        arg_right_diff = np.argmax(right_diff_values)
-        # Get modal triangle values
-        if not just_dip and max(left_diff_values[arg_left_diff], right_diff_values[arg_right_diff]) > D:
-            if left_diff_values[arg_left_diff] > right_diff_values[arg_right_diff]:
-                cumulative_touchpoints = left_touchpoints + cumulative_xl
-                modalTriangle_i2 = arg_left_diff + cumulative_xl
-                modalLeft = True
-            else:
-                cumulative_touchpoints = right_touchpoints + cumulative_xl
-                modalTriangle_i2 = arg_right_diff + cumulative_xl + xr
-                modalLeft = False
-            cumulative_smaller = cumulative_touchpoints[cumulative_touchpoints < modalTriangle_i2]
-            modalTriangle_i1 = max(cumulative_smaller) if len(cumulative_smaller) != 0 else None
-            cumulative_larger = cumulative_touchpoints[cumulative_touchpoints > modalTriangle_i2]
-            modalTriangle_i3 = min(cumulative_larger) if len(cumulative_larger) != 0 else None
-            # Final modal triangle
-            if modalTriangle_i1 is not None:
-                modalTriangle_i1 = hist_cumsum[modalTriangle_i1] - 1 if modalLeft else hist_cumsum[modalTriangle_i1] - \
-                                                                                       histogram[modalTriangle_i1]
-            modalTriangle_i2 = hist_cumsum[modalTriangle_i2] - histogram[modalTriangle_i2]
-            if modalTriangle_i3 is not None:
-                modalTriangle_i3 = hist_cumsum[modalTriangle_i3] - histogram[modalTriangle_i3] if modalLeft else \
-                    hist_cumsum[modalTriangle_i3] - 1
-
-        if d <= D or xr == 0 or xl == len(work_cdf):
-            the_dip = max(np.abs(cdf[:len(left)] - left).max(),
-                          np.abs(cdf[-len(right) - 1:-1] - right).max())
-            if just_dip:
-                return the_dip / 2
-            else:
-                return the_dip / 2, (cdf, idxs, left, left_part, right, right_part), \
-                       (modalTriangle_i1, modalTriangle_i2, modalTriangle_i3)
-        else:
-            D = max(D, left_diff_values[arg_left_diff], right_diff_values[arg_right_diff])
-
-        work_cdf = work_cdf[xl:xr + 1]
-        work_idxs = work_idxs[xl:xr + 1]
-        work_histogram = work_histogram[xl:xr + 1]
-
-        left[len(left):] = left_part[1:xl + 1]
-        right[:0] = right_part[xr:-1]
-
-        cumulative_xl += xl
-
-
-def dip_test(X, is_data_sorted=False, pval_strategy=PVAL_BY_TABLE, fast_dip=False, n_boots=2000):
+def dip_test(X, is_data_sorted=False, pval_strategy=PVAL_BY_TABLE, n_boots=2000, use_c=True, debug=False):
     """
     Hartigan & Hartigan's dip test for unimodality.
     For X ~ F i.i.d., the null hypothesis is that F is a unimodal distribution.
@@ -396,10 +331,7 @@ def dip_test(X, is_data_sorted=False, pval_strategy=PVAL_BY_TABLE, fast_dip=Fals
         The Annals of Statistics.
     """
     n_points = X.shape[0]
-    if fast_dip:
-        data_dip = dip_fast(X, just_dip=True)
-    else:
-        data_dip = dip(X, just_dip=True, is_data_sorted=is_data_sorted)
+    data_dip = dip(X, just_dip=True, is_data_sorted=is_data_sorted, use_c=use_c, debug=debug)
     pval = dip_pval(data_dip, n_points, pval_strategy, n_boots)
     return data_dip, pval
 
@@ -644,3 +576,102 @@ def _lcm_(cdf, idxs):
 def _touch_diffs_(part1, part2, touchpoints):
     diff = np.abs((part2[touchpoints] - part1[touchpoints]))
     return diff.max(), diff
+
+def dip_fast(X, just_dip=False, is_data_sorted=False):
+    """
+        Compute the Hartigans' dip statistic either for a histogram of
+        samples (with equidistant bins) or for a set of samples.
+    """
+    # Set precision to less than float64 since the subtraction in _lcm_ is having problems with the precision and
+    # produces duplicates
+    assert X.ndim == 1, "Data must be 1-dimensional for the dip-test"
+    X = np.around(X, 15)
+    idxs, histogram = np.unique(X, return_counts=True)
+
+    # check for case 1<N<4 or all identical values
+    if len(idxs) <= 4 or idxs[0] == idxs[-1]:
+        left = []
+        right = [1]
+        d = 0.0
+        return d if just_dip else (d, (None, idxs, left, None, right, None), (None, None, None))
+
+    hist_cumsum = np.cumsum(histogram, dtype=int)
+    cdf = np.asarray(hist_cumsum / hist_cumsum[-1], dtype=float)
+
+    work_idxs = np.asarray(idxs, dtype=float)
+    work_histogram = np.asarray(histogram, dtype=float) / np.sum(histogram)
+    work_cdf = cdf
+
+    D = 0
+    left = [0]
+    right = [1]
+
+    cumulative_xl = 0
+    modalTriangle_i1 = None
+    modalTriangle_i2 = None
+    modalTriangle_i3 = None
+    while True:
+        left_part, left_touchpoints = _gcm_(work_cdf - work_histogram, work_idxs)
+        right_part, right_touchpoints = _lcm_(work_cdf, work_idxs)
+
+        d_left, left_diffs = _touch_diffs_(left_part,
+                                           right_part, left_touchpoints)
+        d_right, right_diffs = _touch_diffs_(left_part,
+                                             right_part, right_touchpoints)
+        if d_right > d_left:
+            xr = right_touchpoints[d_right == right_diffs][-1]
+            xl = left_touchpoints[left_touchpoints <= xr][-1]
+            d = d_right
+        else:
+            xl = left_touchpoints[d_left == left_diffs][0]
+            xr = right_touchpoints[right_touchpoints >= xl][0]
+            d = d_left
+
+        left_diff_values = np.abs(left_part[:xl + 1] - work_cdf[:xl + 1])
+        arg_left_diff = np.argmax(left_diff_values)
+        right_diff_values = np.abs(right_part[xr:]
+                                   - work_cdf[xr:]
+                                   + work_histogram[xr:])
+        arg_right_diff = np.argmax(right_diff_values)
+        # Get modal triangle values
+        if not just_dip and max(left_diff_values[arg_left_diff], right_diff_values[arg_right_diff]) > D:
+            if left_diff_values[arg_left_diff] > right_diff_values[arg_right_diff]:
+                cumulative_touchpoints = left_touchpoints + cumulative_xl
+                modalTriangle_i2 = arg_left_diff + cumulative_xl
+                modalLeft = True
+            else:
+                cumulative_touchpoints = right_touchpoints + cumulative_xl
+                modalTriangle_i2 = arg_right_diff + cumulative_xl + xr
+                modalLeft = False
+            cumulative_smaller = cumulative_touchpoints[cumulative_touchpoints < modalTriangle_i2]
+            modalTriangle_i1 = max(cumulative_smaller) if len(cumulative_smaller) != 0 else None
+            cumulative_larger = cumulative_touchpoints[cumulative_touchpoints > modalTriangle_i2]
+            modalTriangle_i3 = min(cumulative_larger) if len(cumulative_larger) != 0 else None
+            # Final modal triangle
+            if modalTriangle_i1 is not None:
+                modalTriangle_i1 = hist_cumsum[modalTriangle_i1] - 1 if modalLeft else hist_cumsum[modalTriangle_i1] - \
+                                                                                       histogram[modalTriangle_i1]
+            modalTriangle_i2 = hist_cumsum[modalTriangle_i2] - histogram[modalTriangle_i2]
+            if modalTriangle_i3 is not None:
+                modalTriangle_i3 = hist_cumsum[modalTriangle_i3] - histogram[modalTriangle_i3] if modalLeft else \
+                    hist_cumsum[modalTriangle_i3] - 1
+
+        if d <= D or xr == 0 or xl == len(work_cdf):
+            the_dip = max(np.abs(cdf[:len(left)] - left).max(),
+                          np.abs(cdf[-len(right) - 1:-1] - right).max())
+            if just_dip:
+                return the_dip / 2
+            else:
+                return the_dip / 2, (cdf, idxs, left, left_part, right, right_part), \
+                       (modalTriangle_i1, modalTriangle_i2, modalTriangle_i3)
+        else:
+            D = max(D, left_diff_values[arg_left_diff], right_diff_values[arg_right_diff])
+
+        work_cdf = work_cdf[xl:xr + 1]
+        work_idxs = work_idxs[xl:xr + 1]
+        work_histogram = work_histogram[xl:xr + 1]
+
+        left[len(left):] = left_part[1:xl + 1]
+        right[:0] = right_part[xr:-1]
+
+        cumulative_xl += xl

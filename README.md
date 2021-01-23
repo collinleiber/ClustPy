@@ -136,7 +136,7 @@ to_ignore = ["VaDE", "IDEC"]
 datasets = [
     EvaluationDataset("MNIST", data=load_mnist, preprocess_methods=znorm, ignore_algorithms=["DEC"]),
     EvaluationDataset("USPS", data=load_usps, preprocess_methods=znorm),
-    EvaluationDataset("AE+USPS", data=load_usps, preprocess_methods=[znorm, identity_plus],
+    EvaluationDataset("USPS+1", data=load_usps, preprocess_methods=[znorm, identity_plus],
                           ignore_algorithms=to_ignore)
     ]
 algorithms = [

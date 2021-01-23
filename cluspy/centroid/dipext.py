@@ -6,7 +6,7 @@ in Databases 2020
 @authors: Benjamin Schelling and Sam Maurus (original R implementation), Collin Leiber (Python implementation)
 """
 
-from cluspy.utils.diptest import dip
+from cluspy.utils import dip
 import numpy as np
 from sklearn.cluster import KMeans
 

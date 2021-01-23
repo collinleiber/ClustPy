@@ -11,7 +11,7 @@ https://github.com/samhelmholtz/skinny-dip
 """
 
 import numpy as np
-from cluspy.utils.diptest import dip, dip_pval
+from cluspy.utils import dip, dip_pval
 
 
 def _skinnydip_clustering_full_space(X, significance, debug=False):

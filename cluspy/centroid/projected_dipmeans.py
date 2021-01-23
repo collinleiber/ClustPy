@@ -9,7 +9,7 @@ Conference on Artificial Intelligence. 2018.
 import numpy as np
 from cluspy.centroid.dipmeans import _execute_bisecting_kmeans
 from sklearn.decomposition import PCA
-from cluspy.utils.diptest import dip_fast, dip_pval, PVAL_BY_TABLE
+from cluspy.utils import dip, dip_pval, PVAL_BY_TABLE
 
 
 def _proj_dipmeans(X, pval_threshold, n_random_projections, pval_strategy, n_boots, n_new_centers, max_n_clusters):
@@ -28,7 +28,7 @@ def _proj_dipmeans(X, pval_threshold, n_random_projections, pval_strategy, n_boo
             # Get projections
             projections = _get_projected_data(X[ids_in_cluster], n_random_projections)
             # Calculate dip values for the distances of each point
-            cluster_dips = np.array([dip_fast(projections[:, p], just_dip=True, is_data_sorted=False) for p in
+            cluster_dips = np.array([dip(projections[:, p], just_dip=True, is_data_sorted=False) for p in
                                      range(projections.shape[1])])
             # Calculate p-values of maximum dip
             pval = dip_pval(np.max(cluster_dips), ids_in_cluster.shape[0], pval_strategy=pval_strategy, n_boots=n_boots)

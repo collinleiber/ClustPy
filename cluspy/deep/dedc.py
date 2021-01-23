@@ -248,7 +248,7 @@ def _get_dip_matrix(data, dip_centers, dip_labels, n_clusters, max_cluster_size_
             points_in_j = data[dip_labels == j]
             points_in_i_or_j = np.append(points_in_i, points_in_j, axis=0)
             proj_points = np.dot(points_in_i_or_j, center_diff)
-            _, dip_p_value = dip_test(proj_points, pval_strategy=PVAL_BY_FUNCTION, fast_dip=True)
+            _, dip_p_value = dip_test(proj_points, pval_strategy=PVAL_BY_FUNCTION)
             # Check if clusters sizes differ heavily
             if points_in_i.shape[0] > points_in_j.shape[0] * max_cluster_size_diff_factor or \
                     points_in_j.shape[0] > points_in_i.shape[0] * max_cluster_size_diff_factor:
@@ -260,7 +260,7 @@ def _get_dip_matrix(data, dip_centers, dip_labels, n_clusters, max_cluster_size_
                                                       max_cluster_size_diff_factor, min_n_dip_samples)
                 points_in_i_or_j = np.append(points_in_i, points_in_j, axis=0)
                 proj_points = np.dot(points_in_i_or_j, center_diff)
-                _, dip_p_value_2 = dip_test(proj_points, pval_strategy=PVAL_BY_FUNCTION, fast_dip=True)
+                _, dip_p_value_2 = dip_test(proj_points, pval_strategy=PVAL_BY_FUNCTION)
                 dip_p_value = min(dip_p_value, dip_p_value_2)
             # Add pval to dip matrix
             dip_matrix[i][j] = dip_p_value

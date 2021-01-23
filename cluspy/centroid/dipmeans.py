@@ -10,7 +10,7 @@ clusters." Advances in neural information processing systems.
 from sklearn.cluster import KMeans
 import numpy as np
 from scipy.spatial.distance import pdist, squareform
-from cluspy.utils.diptest import dip_fast, dip_pval, PVAL_BY_TABLE, PVAL_BY_BOOT, dip_boot_samples
+from cluspy.utils import dip, dip_pval, PVAL_BY_TABLE, PVAL_BY_BOOT, dip_boot_samples
 
 
 def _dipmeans(X, pval_threshold, split_viewers_threshold, pval_strategy, n_boots, n_new_centers, max_n_clusters):
@@ -31,7 +31,7 @@ def _dipmeans(X, pval_threshold, split_viewers_threshold, pval_strategy, n_boots
             # Get pairwise distances of points in cluster
             cluster_dist_matrix = data_dist_matrix[np.ix_(ids_in_cluster, ids_in_cluster)]
             # Calculate dip values for the distances of each point
-            cluster_dips = np.array([dip_fast(cluster_dist_matrix[p, :], just_dip=True, is_data_sorted=False) for p in
+            cluster_dips = np.array([dip(cluster_dist_matrix[p, :], just_dip=True, is_data_sorted=False) for p in
                                      range(ids_in_cluster.shape[0])])
             # Calculate p-values
             if pval_strategy == PVAL_BY_BOOT:
