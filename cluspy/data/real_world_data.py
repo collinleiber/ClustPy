@@ -92,17 +92,29 @@ def load_usps(add_testdata=True):
     return data, labels
 
 
-def load_optdigits():
-    filename = _get_download_dir() + "/optdigits.tes"
+def load_optdigits(add_testdata=True):
+    filename = _get_download_dir() + "/optdigits.tra"
     data, labels = _load_uci_data(filename,
-                                  "https://archive.ics.uci.edu/ml/machine-learning-databases/optdigits/optdigits.tes")
+                                  "https://archive.ics.uci.edu/ml/machine-learning-databases/optdigits/optdigits.tra")
+    if add_testdata:
+        filename = _get_download_dir() + "/optdigits.tes"
+        test_data, test_labels = _load_uci_data(filename,
+                                      "https://archive.ics.uci.edu/ml/machine-learning-databases/optdigits/optdigits.tes")
+        data = np.r_[data, test_data]
+        labels = np.r_[labels, test_labels]
     return data, labels
 
 
-def load_pendigits():
-    filename = _get_download_dir() + "/pendigits.tes"
+def load_pendigits(add_testdata=True):
+    filename = _get_download_dir() + "/pendigits.tra"
     data, labels = _load_uci_data(filename,
-                                  "https://archive.ics.uci.edu/ml/machine-learning-databases/pendigits/pendigits.tes")
+                                  "https://archive.ics.uci.edu/ml/machine-learning-databases/pendigits/pendigits.tra")
+    if add_testdata:
+        filename = _get_download_dir() + "/pendigits.tes"
+        test_data, test_labels = _load_uci_data(filename,
+                                      "https://archive.ics.uci.edu/ml/machine-learning-databases/pendigits/pendigits.tes")
+        data = np.r_[data, test_data]
+        labels = np.r_[labels, test_labels]
     return data, labels
 
 

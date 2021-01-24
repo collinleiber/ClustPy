@@ -37,8 +37,8 @@ def znorm(X):
     return (X - np.mean(X)) / np.std(X)
 
 
-def get_subset_mnist(n_clusters):
-    X, labels = load_mnist()
+def get_data_subset(n_clusters, data_loader):
+    X, labels = data_loader()
     X = znorm(X)
     selection = labels < n_clusters
     X = X[selection]
@@ -46,31 +46,78 @@ def get_subset_mnist(n_clusters):
     return X, labels
 
 def get_subset_mnist_1():
-    return get_subset_mnist(1)
+    return get_data_subset(1, load_mnist)
 
 def get_subset_mnist_2():
-    return get_subset_mnist(2)
+    return get_data_subset(2, load_mnist)
 
 def get_subset_mnist_3():
-    return get_subset_mnist(3)
+    return get_data_subset(3, load_mnist)
 
 def get_subset_mnist_4():
-    return get_subset_mnist(4)
+    return get_data_subset(4, load_mnist)
 
 def get_subset_mnist_5():
-    return get_subset_mnist(5)
+    return get_data_subset(5, load_mnist)
 
 def get_subset_mnist_6():
-    return get_subset_mnist(6)
+    return get_data_subset(6, load_mnist)
 
 def get_subset_mnist_7():
-    return get_subset_mnist(7)
+    return get_data_subset(7, load_mnist)
 
 def get_subset_mnist_8():
-    return get_subset_mnist(8)
+    return get_data_subset(8, load_mnist)
 
 def get_subset_mnist_9():
-    return get_subset_mnist(9)
+    return get_data_subset(9, load_mnist)
+
+def get_subset_usps_1():
+    return get_data_subset(1, load_usps)
+
+def get_subset_usps_2():
+    return get_data_subset(2, load_usps)
+
+def get_subset_usps_3():
+    return get_data_subset(3, load_usps)
+
+def get_subset_usps_4():
+    return get_data_subset(4, load_usps)
+
+def get_subset_usps_5():
+    return get_data_subset(5, load_usps)
+
+def get_subset_usps_6():
+    return get_data_subset(6, load_usps)
+
+def get_subset_usps_7():
+    return get_data_subset(7, load_usps)
+
+def get_subset_usps_8():
+    return get_data_subset(8, load_usps)
+
+def get_subset_usps_9():
+    return get_data_subset(9, load_usps)
+
+def usps_robustness_tests():
+    datasets = [
+        EvaluationDataset("USPS-1", data=get_subset_usps_1, preprocess_methods=None),
+        EvaluationDataset("USPS-2", data=get_subset_usps_2, preprocess_methods=None),
+        EvaluationDataset("USPS-3", data=get_subset_usps_3, preprocess_methods=None),
+        EvaluationDataset("USPS-4", data=get_subset_usps_4, preprocess_methods=None),
+        EvaluationDataset("USPS-5", data=get_subset_usps_5, preprocess_methods=None),
+        EvaluationDataset("USPS-6", data=get_subset_usps_6, preprocess_methods=None),
+        EvaluationDataset("USPS-7", data=get_subset_usps_7, preprocess_methods=None),
+        EvaluationDataset("USPS-8", data=get_subset_usps_8, preprocess_methods=None),
+        EvaluationDataset("USPS-9", data=get_subset_usps_9, preprocess_methods=None),
+    ]
+    algorithms = [EvaluationAlgorithm("DEDC", DEDC, {"n_clusters_start": 35, "batch_size": 256, "pretrain_epochs": 100,
+                                                     "dedc_epochs": 50, "embedding_size": 5})
+                  ]
+    metrics = [EvaluationMetric("NMI", nmi), EvaluationMetric("ARI", ari)]
+    df = evaluate_multiple_datasets(datasets, algorithms, metrics, 10, True, True, False, True,
+                                    save_path="usps_robustness_tests.csv", save_intermediate_results=True)
+    print(df)
 
 def mnist_robustness_tests():
     datasets = [
@@ -95,9 +142,13 @@ def mnist_robustness_tests():
 
 def k_robustness_tests():
     datasets = [
-        EvaluationDataset("HAR", data=load_har),
+        # EvaluationDataset("MNIST", data=load_mnist, preprocess_methods=znorm),
+        # EvaluationDataset("F-MNIST", data=load_mnist, preprocess_methods=znorm),
+        # EvaluationDataset("K-MNIST", data=load_mnist, preprocess_methods=znorm),
         EvaluationDataset("USPS", data=load_usps, preprocess_methods=znorm),
-        EvaluationDataset("optdigits", data=load_optdigits, preprocess_methods=znorm)
+        EvaluationDataset("optdigits", data=load_optdigits, preprocess_methods=znorm),
+        EvaluationDataset("pendigits", data=load_pendigits, preprocess_methods=preprocess_features),
+        # EvaluationDataset("letterrecognition", data=load_letterrecognition, preprocess_methods=preprocess_features)
     ]
     algorithms = [EvaluationAlgorithm("DEDC_k15", DEDC,
                                       {"n_clusters_start": 15, "batch_size": 256, "pretrain_epochs": 100,
@@ -132,9 +183,13 @@ def k_robustness_tests():
 
 def threshold_robustness_tests():
     datasets = [
-        EvaluationDataset("HAR", data=load_har),
+        # EvaluationDataset("MNIST", data=load_mnist, preprocess_methods=znorm),
+        # EvaluationDataset("F-MNIST", data=load_fmnist, preprocess_methods=znorm),
+        # EvaluationDataset("K-MNIST", data=load_kmnist, preprocess_methods=znorm),
         EvaluationDataset("USPS", data=load_usps, preprocess_methods=znorm),
-        EvaluationDataset("optdigits", data=load_optdigits, preprocess_methods=znorm)
+        EvaluationDataset("optdigits", data=load_optdigits, preprocess_methods=znorm),
+        EvaluationDataset("pendigits", data=load_pendigits, preprocess_methods=preprocess_features),
+        # EvaluationDataset("letterrecognition", data=load_letterrecognition, preprocess_methods=preprocess_features)
     ]
     algorithms = [EvaluationAlgorithm("DEDC_t60", DEDC,
                                       {"n_clusters_start": 35, "batch_size": 256, "pretrain_epochs": 100,
@@ -163,12 +218,13 @@ def threshold_robustness_tests():
                   ]
     metrics = [EvaluationMetric("NMI", nmi), EvaluationMetric("ARI", ari)]
     df = evaluate_multiple_datasets(datasets, algorithms, metrics, 10, True, True, False, True,
-                                    save_path="threshold_robustness_test.csv", save_intermediate_results=True)
+                                    save_path="threshold_robustness_tests.csv", save_intermediate_results=True)
     print(df)
 
 
 def all_robustness_tests():
-    mnist_robustness_tests()
+    # mnist_robustness_tests()
+    usps_robustness_tests()
     k_robustness_tests()
     threshold_robustness_tests()
 
@@ -222,4 +278,64 @@ def full_test():
     metrics = [EvaluationMetric("NMI", nmi), EvaluationMetric("ARI", ari)]
     df = evaluate_multiple_datasets(datasets, algorithms, metrics, 10, True, True, False, True,
                                     save_path="full_test.csv", save_intermediate_results=True)
+    print(df)
+
+
+def load_gtsrb():
+    dataset = np.genfromtxt("cluspy/data/gtsrb.txt", delimiter=",")
+    data = dataset[:,:-1]
+    labels = dataset[:,-1]
+    interesting_clusters = [2,3,4,5,6,7,8,9]
+    selection = [l in interesting_clusters for l in labels]
+    data = data[selection]
+    labels = labels[selection]
+    return data, labels
+
+
+def gtsrb_test():
+    ignore_deep = ["DEDC", "DEC", "IDEC", "DCN", "VaDE"]
+    datasets = [
+        EvaluationDataset("MNIST", data=load_gtsrb),
+        EvaluationDataset("AE+MNIST", data=load_gtsrb, preprocess_methods=[znorm, preprocess_with_autoencoder],
+                          ignore_algorithms=ignore_deep),
+    ]
+    algorithms = [EvaluationAlgorithm("DEDC", DEDC, {"n_clusters_start": 35, "batch_size": 256, "pretrain_epochs": 100,
+                                                     "dedc_epochs": 50, "embedding_size": 5}),
+                  EvaluationAlgorithm("DEC", DEC, {"n_clusters": None, "batch_size": 256, "pretrain_epochs": 100,
+                                                   "dec_epochs": 150, "embedding_size": 10}),
+                  EvaluationAlgorithm("IDEC", IDEC, {"n_clusters": None, "batch_size": 256, "pretrain_epochs": 100,
+                                                     "dec_epochs": 150, "embedding_size": 10}),
+                  EvaluationAlgorithm("DCN", DCN, {"n_clusters": None, "batch_size": 256, "pretrain_epochs": 100,
+                                                   "dcn_epochs": 150, "embedding_size": 10}),
+                  EvaluationAlgorithm("VaDE", VaDE, {"n_clusters": None, "batch_size": 256, "pretrain_epochs": 100,
+                                                     "vade_epochs": 150, "embedding_size": 10}),
+                  EvaluationAlgorithm("XMeans", XMeans, {"max_n_clusters": 35}),
+                  EvaluationAlgorithm("GMeans", GMeans, {"max_n_clusters": 35}),
+                  EvaluationAlgorithm("PGMeans", PGMeans, {"max_n_clusters": 35}),
+                  EvaluationAlgorithm("DipMeans", DipMeans, {"max_n_clusters": 35}),
+                  EvaluationAlgorithm("ProjDipMeans", ProjectedDipMeans, {"max_n_clusters": 35}),
+                  ]
+    metrics = [EvaluationMetric("NMI", nmi), EvaluationMetric("ARI", ari)]
+    df = evaluate_multiple_datasets(datasets, algorithms, metrics, 10, True, True, False, True,
+                                    save_path="full_test.csv", save_intermediate_results=True)
+    print(df)
+
+
+def vade_test():
+    datasets = [
+        EvaluationDataset("MNIST", data=load_mnist),
+        EvaluationDataset("FMNIST", data=load_fmnist),
+        EvaluationDataset("KMNIST", data=load_kmnist),
+        EvaluationDataset("HAR", data=load_har),
+        EvaluationDataset("USPS", data=load_usps),
+        EvaluationDataset("optdigits", data=load_optdigits),
+        EvaluationDataset("pendigits", data=load_pendigits),
+        EvaluationDataset("letterrecognition", data=load_letterrecognition),
+    ]
+    algorithms = [EvaluationAlgorithm("VaDE", VaDE, {"n_clusters": None, "batch_size": 256, "pretrain_epochs": 100,
+                                                      "vade_epochs": 150, "embedding_size": 10})
+                  ]
+    metrics = [EvaluationMetric("NMI", nmi), EvaluationMetric("ARI", ari)]
+    df = evaluate_multiple_datasets(datasets, algorithms, metrics, 10, True, True, False, True,
+                                    save_path="vade_test.csv", save_intermediate_results=True)
     print(df)
