@@ -5,8 +5,7 @@ from sklearn.metrics import normalized_mutual_info_score as nmi, adjusted_rand_s
 from cluspy.deep import DEC, DCN, IDEC, DEDC, VaDE
 from cluspy.deep._utils import detect_device, get_trained_autoencoder, encode_batchwise
 import torch
-from cluspy.data import load_har, load_usps, load_mnist, load_fmnist, load_kmnist, \
-    load_letterrecognition, load_optdigits, load_pendigits
+from cluspy.data import *
 
 
 def preprocess_with_autoencoder(X):
@@ -234,13 +233,13 @@ def full_test():
     datasets = [
         EvaluationDataset("MNIST", data=load_mnist, preprocess_methods=znorm, ignore_algorithms=["DipMeans"]),
         EvaluationDataset("AE+MNIST", data=load_mnist, preprocess_methods=[znorm, preprocess_with_autoencoder],
-                          ignore_algorithms=ignore_deep),
+                          ignore_algorithms=ignore_deep + ["DipMeans"]),
         EvaluationDataset("FMNIST", data=load_fmnist, preprocess_methods=znorm, ignore_algorithms=["DipMeans"]),
         EvaluationDataset("AE+FMNIST", data=load_fmnist, preprocess_methods=[znorm, preprocess_with_autoencoder],
-                          ignore_algorithms=ignore_deep),
+                          ignore_algorithms=ignore_deep + ["DipMeans"]),
         EvaluationDataset("KMNIST", data=load_kmnist, preprocess_methods=znorm, ignore_algorithms=["DipMeans"]),
         EvaluationDataset("AE+KMNIST", data=load_kmnist, preprocess_methods=[znorm, preprocess_with_autoencoder],
-                          ignore_algorithms=ignore_deep),
+                          ignore_algorithms=ignore_deep + ["DipMeans"]),
         EvaluationDataset("HAR", data=load_har),
         EvaluationDataset("AE+HAR", data=load_har, preprocess_methods=preprocess_with_autoencoder,
                           ignore_algorithms=ignore_deep),
@@ -295,8 +294,8 @@ def load_gtsrb():
 def gtsrb_test():
     ignore_deep = ["DEDC", "DEC", "IDEC", "DCN", "VaDE"]
     datasets = [
-        EvaluationDataset("MNIST", data=load_gtsrb),
-        EvaluationDataset("AE+MNIST", data=load_gtsrb, preprocess_methods=[znorm, preprocess_with_autoencoder],
+        EvaluationDataset("GTSRB", data=load_gtsrb),
+        EvaluationDataset("AE+GTSRB", data=load_gtsrb, preprocess_methods=preprocess_with_autoencoder,
                           ignore_algorithms=ignore_deep),
     ]
     algorithms = [EvaluationAlgorithm("DEDC", DEDC, {"n_clusters_start": 35, "batch_size": 256, "pretrain_epochs": 100,
@@ -311,13 +310,13 @@ def gtsrb_test():
                                                      "vade_epochs": 150, "embedding_size": 10}),
                   EvaluationAlgorithm("XMeans", XMeans, {"max_n_clusters": 35}),
                   EvaluationAlgorithm("GMeans", GMeans, {"max_n_clusters": 35}),
-                  EvaluationAlgorithm("PGMeans", PGMeans, {"max_n_clusters": 35}),
+                  # EvaluationAlgorithm("PGMeans", PGMeans, {"max_n_clusters": 35}),
                   EvaluationAlgorithm("DipMeans", DipMeans, {"max_n_clusters": 35}),
                   EvaluationAlgorithm("ProjDipMeans", ProjectedDipMeans, {"max_n_clusters": 35}),
                   ]
     metrics = [EvaluationMetric("NMI", nmi), EvaluationMetric("ARI", ari)]
     df = evaluate_multiple_datasets(datasets, algorithms, metrics, 10, True, True, False, True,
-                                    save_path="full_test.csv", save_intermediate_results=True)
+                                    save_path="gtsrb_test.csv", save_intermediate_results=True)
     print(df)
 
 
@@ -338,4 +337,37 @@ def vade_test():
     metrics = [EvaluationMetric("NMI", nmi), EvaluationMetric("ARI", ari)]
     df = evaluate_multiple_datasets(datasets, algorithms, metrics, 10, True, True, False, True,
                                     save_path="vade_test.csv", save_intermediate_results=True)
+    print(df)
+
+def newsgroup_test():
+    ignore_deep = ["DEDC", "DEC", "IDEC", "DCN", "VaDE"]
+    datasets = [
+        EvaluationDataset("Newsgroup", data=load_newsgroups, preprocess_methods=preprocess_features),
+        EvaluationDataset("AE+Newsgroup", data=load_newsgroups, preprocess_methods=[preprocess_features, preprocess_with_autoencoder],
+                          ignore_algorithms=ignore_deep),
+    ]
+    algorithms = [EvaluationAlgorithm("DEDC", DEDC, {"n_clusters_start": 35, "batch_size": 256, "pretrain_epochs": 100,
+                                                     "dedc_epochs": 50, "embedding_size": 5}),
+                  EvaluationAlgorithm("DEC", DEC, {"n_clusters": None, "batch_size": 256, "pretrain_epochs": 100,
+                                                   "dec_epochs": 150, "embedding_size": 10}),
+                  EvaluationAlgorithm("IDEC", IDEC, {"n_clusters": None, "batch_size": 256, "pretrain_epochs": 100,
+                                                     "dec_epochs": 150, "embedding_size": 10}),
+                  EvaluationAlgorithm("DCN", DCN, {"n_clusters": None, "batch_size": 256, "pretrain_epochs": 100,
+                                                   "dcn_epochs": 150, "embedding_size": 10}),
+                  EvaluationAlgorithm("VaDE", VaDE, {"n_clusters": None, "batch_size": 256, "pretrain_epochs": 100,
+                                                     "vade_epochs": 150, "embedding_size": 10})
+                  ]
+    metrics = [EvaluationMetric("NMI", nmi), EvaluationMetric("ARI", ari)]
+    df = evaluate_multiple_datasets(datasets, algorithms, metrics, 10, True, True, False, True,
+                                    save_path="newsgroup_test1.csv", save_intermediate_results=True)
+    algorithms = [
+                   EvaluationAlgorithm("XMeans", XMeans, {"max_n_clusters": 35}),
+                   EvaluationAlgorithm("GMeans", GMeans, {"max_n_clusters": 35}),
+                   # EvaluationAlgorithm("PGMeans", PGMeans, {"max_n_clusters": 35}),
+                   EvaluationAlgorithm("DipMeans", DipMeans, {"max_n_clusters": 35}),
+                   EvaluationAlgorithm("ProjDipMeans", ProjectedDipMeans, {"max_n_clusters": 35}),
+                   ]
+    metrics = [EvaluationMetric("NMI", nmi), EvaluationMetric("ARI", ari)]
+    df = evaluate_multiple_datasets(datasets, algorithms, metrics, 10, True, True, False, True,
+                                    save_path="newsgroup_test2.csv", save_intermediate_results=True)
     print(df)

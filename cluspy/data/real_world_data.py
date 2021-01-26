@@ -6,6 +6,8 @@ from pathlib import Path
 import ssl
 import numpy as np
 import zipfile
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.datasets import fetch_20newsgroups
 
 # More datasets https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/multiclass.html#usps
 
@@ -159,4 +161,12 @@ def load_har(add_testdata=True):
         test_labels = np.genfromtxt(_get_download_dir() + "/har/UCI HAR Dataset/test/y_test.txt")
         data = np.r_[data, test_data]
         labels = np.r_[labels, test_labels]
+    return data, labels
+
+def load_newsgroups(n_features=2000):
+    newsgroups = fetch_20newsgroups(subset='all', remove=('headers', 'footers', 'quotes'))
+    vectorizer = TfidfVectorizer(max_features=n_features, dtype=np.float64, sublinear_tf=True)
+    data_sparse = vectorizer.fit_transform(newsgroups.data)
+    data = np.asarray(data_sparse.todense())
+    labels = newsgroups.target
     return data, labels
