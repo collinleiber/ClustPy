@@ -56,7 +56,7 @@ def plot_image(img_data, image_shape=None):
     assert img_data.ndim <= 2, "Image data can not be larger than 2."
     if img_data.ndim == 1:
         if image_shape is None:
-            sqrt_of_data = int(math.sqrt(img_data.shape[1]))
+            sqrt_of_data = int(math.sqrt(len(img_data)))
             assert len(img_data) == sqrt_of_data ** 2, "Image shape must be specified or image must be square."
             image_shape = (sqrt_of_data, sqrt_of_data)
         img_data = img_data.reshape(image_shape)
