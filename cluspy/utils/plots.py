@@ -2,10 +2,11 @@ import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
+import math
 
 
-def transformation_plot(X, labels=None, centers=None, plot_dimensionality=2, transformation_class=PCA,
-                        scattersize=10):
+def plot_with_transformation(X, labels=None, centers=None, plot_dimensionality=2, transformation_class=PCA,
+                             scattersize=10):
     assert plot_dimensionality <= X.shape[1], "Plot dimensionality can not be larger than the number of features."
     assert plot_dimensionality > 0 and plot_dimensionality < 4, "Plot dimensionality must be > 0 and < 4."
     # Check if transformation dimensionality is smaller than number of features
@@ -48,4 +49,17 @@ def transformation_plot(X, labels=None, centers=None, plot_dimensionality=2, tra
     else:
         pass
         # Nd Plot -> add scatter matrix plot
+    plt.show()
+
+
+def plot_image(img_data, image_shape=None):
+    assert img_data.ndim <= 2, "Image data can not be larger than 2."
+    if img_data.ndim == 1:
+        if image_shape is None:
+            sqrt_of_data = int(math.sqrt(img_data.shape[1]))
+            assert len(img_data) == sqrt_of_data ** 2, "Image shape must be specified or image must be square."
+            image_shape = (sqrt_of_data, sqrt_of_data)
+        img_data = img_data.reshape(image_shape)
+    plt.imshow(img_data, vmin=0, vmax=1)
+    plt.axis('off')
     plt.show()

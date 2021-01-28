@@ -52,19 +52,19 @@ def _dedc(X, n_clusters_start, dip_merge_threshold, cluster_loss_weight, n_clust
     cluster_labels_cpu, n_clusters_current, centers_cpu, autoencoder = _dedc_training(X, n_clusters_start,
                                                                                   dip_merge_threshold,
                                                                                   cluster_loss_weight, cluster_labels_cpu,
-                                                                                  centers_torch, dip_weights_torch,
-                                                                                  n_clusters_max, n_clusters_min,
-                                                                                  dedc_epochs, update_pause_epochs,
-                                                                                  optimizer, loss_fn,
-                                                                                  autoencoder, device, trainloader,
-                                                                                  testloader, debug)
+                                                                                  centers_torch,
+                                                                                  dip_weights_torch, n_clusters_max,
+                                                                                  n_clusters_min, dedc_epochs,
+                                                                                  update_pause_epochs, optimizer,
+                                                                                  loss_fn, autoencoder, device,
+                                                                                  trainloader, testloader, debug)
     # Return results
     return cluster_labels_cpu, n_clusters_current, centers_cpu, autoencoder
 
 
 def _dedc_training(X, n_clusters_current, dip_merge_threshold, cluster_loss_weight, cluster_labels_cpu, centers_torch,
-                   dip_weights_torch, n_clusters_max, n_clusters_min, dedc_epochs, update_pause_epochs, optimizer,
-                   loss_fn, autoencoder, device, trainloader, testloader, debug):
+                   dip_weights_torch, n_clusters_max, n_clusters_min, dedc_epochs, update_pause_epochs,
+                   optimizer, loss_fn, autoencoder, device, trainloader, testloader, debug):
     i = 0
     while i < dedc_epochs:
         cluster_labels_torch = torch.from_numpy(cluster_labels_cpu).long().to(device)
@@ -99,7 +99,7 @@ def _dedc_training(X, n_clusters_current, dip_merge_threshold, cluster_loss_weig
             masked_center_diffs_std = sqrt_masked_center_diffs.std() if len(sqrt_masked_center_diffs) > 2 else 0
             # Loss function
             cluster_loss = escaped_diffs.mean() * (
-                    1 + masked_center_diffs_std) / sqrt_masked_center_diffs.mean()  # / mean_vector_length
+                    1 + masked_center_diffs_std) / sqrt_masked_center_diffs.mean()
             cluster_loss *= cluster_loss_weight
             loss = ae_loss + cluster_loss
             # Backward pass
