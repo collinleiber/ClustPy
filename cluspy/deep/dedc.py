@@ -67,6 +67,17 @@ def _dedc_training(X, n_clusters_current, dip_merge_threshold, cluster_loss_weig
         cluster_labels_torch = torch.from_numpy(cluster_labels_cpu).long().to(device)
         centers_torch = torch.from_numpy(centers_cpu).float().to(device)
         dip_matrix_torch = torch.from_numpy(dip_matrix_cpu).float().to(device)
+        # Get dip costs matrix
+        dip_matrix_eye = dip_matrix_torch + torch.eye(n_clusters_current, device=device)
+        # dip_matrix_final /= dip_matrix_eye.sum(1).reshape((-1,1))
+
+        tpm_dip_matrix_1 = dip_matrix_eye / dip_matrix_eye.sum(1)
+        tpm_dip_matrix_2 = dip_matrix_eye / dip_matrix_eye.sum(1).reshape((-1,1))
+        dip_matrix_final = (tpm_dip_matrix_1 + tpm_dip_matrix_2) / 2
+
+        # tpm_dip_matrix = dip_matrix_eye.sum(1).unsqueeze(0) + dip_matrix_eye.sum(0).unsqueeze(1)
+        # dip_matrix_final = dip_matrix_eye * 2 / tpm_dip_matrix
+        # Iterate over batches
         for batch, ids in trainloader:
             batch_data = batch.to(device)
             embedded = autoencoder.encode(batch_data)
@@ -84,10 +95,7 @@ def _dedc_training(X, n_clusters_current, dip_merge_threshold, cluster_loss_weig
             else:
                 current_labels = cluster_labels_torch[ids]
             onehot_labels = int_to_one_hot(current_labels, n_clusters_current).float()
-            # Get dip costs
-            dip_matrix_eye = dip_matrix_torch + torch.eye(n_clusters_current, device=device)
-            dip_matrix_eye /= dip_matrix_eye.sum(1).reshape((-1,1))
-            cluster_relationships = torch.matmul(onehot_labels, dip_matrix_eye)
+            cluster_relationships = torch.matmul(onehot_labels, dip_matrix_final)
             escaped_diffs = cluster_relationships * squared_diffs
             # Normalize loss by cluster distances
             squared_center_diffs = squared_euclidean_distance(embedded_centers_torch, embedded_centers_torch)
@@ -222,18 +230,19 @@ def _get_nearest_points_to_optimal_centers(X, optimal_centers, embedded_data):
     return centers_cpu, embedded_centers_cpu
 
 
-def _get_nearest_points(all_points, center, sample_size, min_n_dip_samples):
-    distances = cdist(all_points, [center])
+def _get_nearest_points(points_in_larger_cluster, center, size_smaller_cluster, max_cluster_size_diff_factor,
+                        min_sample_size):
+    distances = cdist(points_in_larger_cluster, [center])
     nearest_points = np.argsort(distances, axis=0)
     # Check if more points should be taken because the other cluster is too small
-    if sample_size < min_n_dip_samples:
-        sample_size = min(min_n_dip_samples, len(all_points))
-    # OLD: n_points = max(number_of_points, min(min_number_of_points, len(all_points)))
-    subset_all_points = all_points[nearest_points[:sample_size, 0]]
+    sample_size = size_smaller_cluster * max_cluster_size_diff_factor
+    if size_smaller_cluster + sample_size < min_sample_size:
+        sample_size = min(min_sample_size - size_smaller_cluster, len(points_in_larger_cluster))
+    subset_all_points = points_in_larger_cluster[nearest_points[:sample_size, 0]]
     return subset_all_points
 
 
-def _get_dip_matrix(data, dip_centers, dip_labels, n_clusters, max_cluster_size_diff_factor=2, min_n_dip_samples=100):
+def _get_dip_matrix(data, dip_centers, dip_labels, n_clusters, max_cluster_size_diff_factor=2, min_sample_size=100):
     dip_matrix = np.zeros((n_clusters, n_clusters))
     # Loop over all combinations of centers
     for i in range(0, n_clusters - 1):
@@ -248,11 +257,11 @@ def _get_dip_matrix(data, dip_centers, dip_labels, n_clusters, max_cluster_size_
             if points_in_i.shape[0] > points_in_j.shape[0] * max_cluster_size_diff_factor or \
                     points_in_j.shape[0] > points_in_i.shape[0] * max_cluster_size_diff_factor:
                 if points_in_i.shape[0] > points_in_j.shape[0] * max_cluster_size_diff_factor:
-                    points_in_i = _get_nearest_points(points_in_i, dip_centers[j], points_in_j.shape[0] *
-                                                      max_cluster_size_diff_factor, min_n_dip_samples)
+                    points_in_i = _get_nearest_points(points_in_i, dip_centers[j], points_in_j.shape[0],
+                                                      max_cluster_size_diff_factor, min_sample_size)
                 elif points_in_j.shape[0] > points_in_i.shape[0] * max_cluster_size_diff_factor:
-                    points_in_j = _get_nearest_points(points_in_j, dip_centers[i], points_in_i.shape[0] *
-                                                      max_cluster_size_diff_factor, min_n_dip_samples)
+                    points_in_j = _get_nearest_points(points_in_j, dip_centers[i], points_in_i.shape[0],
+                                                      max_cluster_size_diff_factor, min_sample_size)
                 points_in_i_or_j = np.append(points_in_i, points_in_j, axis=0)
                 proj_points = np.dot(points_in_i_or_j, center_diff)
                 _, dip_p_value_2 = dip_test(proj_points, pval_strategy=PVAL_BY_FUNCTION)
