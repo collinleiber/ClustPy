@@ -36,6 +36,7 @@ def plot_with_transformation(X, labels=None, centers=None, plot_dimensionality=2
             plt.scatter(centers[:, 0], centers[:, 1], s=scattersize * 1.5, c="red", marker="s")
             for j in range(len(centers)):
                 plt.text(centers[j, 0], centers[j, 1], str(j), weight="bold")
+        plt.axis("equal")
     elif plot_dimensionality == 3:
         # 3d Plot
         fig = plt.figure()
@@ -52,7 +53,7 @@ def plot_with_transformation(X, labels=None, centers=None, plot_dimensionality=2
     plt.show()
 
 
-def plot_image(img_data, image_shape=None):
+def plot_image(img_data, black_and_white=True, image_shape=None):
     assert img_data.ndim <= 2, "Image data can not be larger than 2."
     if img_data.ndim == 1:
         if image_shape is None:
@@ -60,6 +61,9 @@ def plot_image(img_data, image_shape=None):
             assert len(img_data) == sqrt_of_data ** 2, "Image shape must be specified or image must be square."
             image_shape = (sqrt_of_data, sqrt_of_data)
         img_data = img_data.reshape(image_shape)
-    plt.imshow(img_data, vmin=0, vmax=1)
+    if black_and_white:
+        plt.imshow(img_data, cmap="Greys")
+    else:
+        plt.imshow(img_data)
     plt.axis('off')
     plt.show()

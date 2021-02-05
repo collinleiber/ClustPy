@@ -7,7 +7,8 @@ import ssl
 import numpy as np
 import zipfile
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.datasets import fetch_20newsgroups, fetch_rcv1, load_iris, load_wine, load_breast_cancer
+from sklearn.datasets import fetch_20newsgroups, fetch_rcv1, load_iris as sk_load_iris, load_wine as sk_load_wine, \
+    load_breast_cancer as sk_load_breast_cancer
 
 
 # More datasets https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/multiclass.html#usps
@@ -110,15 +111,15 @@ Load Sklearn datasets
 
 
 def load_iris():
-    return load_iris(return_X_y=True)
+    return sk_load_iris(return_X_y=True)
 
 
 def load_wine():
-    return load_wine(return_X_y=True)
+    return sk_load_wine(return_X_y=True)
 
 
 def load_breast_cancer():
-    return load_breast_cancer(return_X_y=True)
+    return sk_load_breast_cancer(return_X_y=True)
 
 
 def load_newsgroups(add_testdata=True, n_features=2000):

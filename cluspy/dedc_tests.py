@@ -142,8 +142,8 @@ def mnist_robustness_tests():
 def k_robustness_tests():
     datasets = [
         # EvaluationDataset("MNIST", data=load_mnist, preprocess_methods=znorm),
-        # EvaluationDataset("F-MNIST", data=load_mnist, preprocess_methods=znorm),
-        # EvaluationDataset("K-MNIST", data=load_mnist, preprocess_methods=znorm),
+        # EvaluationDataset("F-MNIST", data=load_fmnist, preprocess_methods=znorm),
+        # EvaluationDataset("K-MNIST", data=load_kmnist, preprocess_methods=znorm),
         EvaluationDataset("USPS", data=load_usps, preprocess_methods=znorm),
         EvaluationDataset("optdigits", data=load_optdigits, preprocess_methods=znorm),
         EvaluationDataset("pendigits", data=load_pendigits, preprocess_methods=preprocess_features),
@@ -310,7 +310,7 @@ def gtsrb_test():
                                                      "vade_epochs": 150, "embedding_size": 10}),
                   EvaluationAlgorithm("XMeans", XMeans, {"max_n_clusters": 35}),
                   EvaluationAlgorithm("GMeans", GMeans, {"max_n_clusters": 35}),
-                  # EvaluationAlgorithm("PGMeans", PGMeans, {"max_n_clusters": 35}),
+                  EvaluationAlgorithm("PGMeans", PGMeans, {"max_n_clusters": 35}),
                   EvaluationAlgorithm("DipMeans", DipMeans, {"max_n_clusters": 35}),
                   EvaluationAlgorithm("ProjDipMeans", ProjectedDipMeans, {"max_n_clusters": 35}),
                   ]
