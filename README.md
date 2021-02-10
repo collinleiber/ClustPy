@@ -43,7 +43,7 @@ Afterwards, you will be good to go.
     - IDEC
     - DCN
     - VaDE
-    - DEDC
+    - DipDECK
     
 ### Other implementations
 

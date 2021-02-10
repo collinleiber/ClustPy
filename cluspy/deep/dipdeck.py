@@ -7,9 +7,9 @@ from cluspy.deep._utils import detect_device, encode_batchwise, Simple_Autoencod
 from sklearn.cluster import KMeans
 
 
-def _dedc(X, n_clusters_start, dip_merge_threshold, cluster_loss_weight, n_clusters_max, n_clusters_min, batch_size,
-          learning_rate, pretrain_epochs, dedc_epochs, optimizer_class, loss_fn, autoencoder,
-          embedding_size, debug):
+def _dip_deck(X, n_clusters_start, dip_merge_threshold, cluster_loss_weight, n_clusters_max, n_clusters_min, batch_size,
+              pretrain_learning_rate, dipdeck_learning_rate, pretrain_epochs, dipdeck_epochs, optimizer_class, loss_fn,
+              autoencoder, embedding_size, max_cluster_size_diff_factor, debug):
     if n_clusters_max < n_clusters_min:
         raise Exception("n_clusters_max can not be smaller than n_clusters_min")
     if n_clusters_min <= 0:
@@ -30,8 +30,8 @@ def _dedc(X, n_clusters_start, dip_merge_threshold, cluster_loss_weight, n_clust
                                              shuffle=False,
                                              drop_last=False)
     if autoencoder is None:
-        autoencoder = get_trained_autoencoder(trainloader, learning_rate, pretrain_epochs, device,
-                                              optimizer_class, loss_fn, X.shape[1], embedding_size, _DEDC_Autoencoder)
+        autoencoder = get_trained_autoencoder(trainloader, pretrain_learning_rate, pretrain_epochs, device,
+                                              optimizer_class, loss_fn, X.shape[1], embedding_size, _DipDECK_Autoencoder)
     # Execute kmeans in embedded space - initial clustering
     embedded_data = encode_batchwise(testloader, autoencoder, device)
     kmeans = KMeans(n_clusters=n_clusters_start)
@@ -41,29 +41,29 @@ def _dedc(X, n_clusters_start, dip_merge_threshold, cluster_loss_weight, n_clust
     # Get nearest points to optimal centers
     centers_cpu, embedded_centers_cpu = _get_nearest_points_to_optimal_centers(X, init_centers, embedded_data)
     # Initial dip values
-    dip_matrix_cpu = _get_dip_matrix(embedded_data, embedded_centers_cpu, cluster_labels_cpu, n_clusters_start)
-    # Reduce learning_rate from pretraining by a magnitude of 10
-    dedc_learning_rate = learning_rate * 0.1
-    optimizer = optimizer_class(autoencoder.parameters(), lr=dedc_learning_rate)
+    dip_matrix_cpu = _get_dip_matrix(embedded_data, embedded_centers_cpu, cluster_labels_cpu, n_clusters_start,
+                                     max_cluster_size_diff_factor)
+    # Use DipDECK learning_rate (usually pretrain_learning_rate reduced by a magnitude of 10)
+    optimizer = optimizer_class(autoencoder.parameters(), lr=dipdeck_learning_rate)
     # Start training
-    cluster_labels_cpu, n_clusters_current, centers_cpu, autoencoder = _dedc_training(X, n_clusters_start,
-                                                                                      dip_merge_threshold,
-                                                                                      cluster_loss_weight, centers_cpu,
-                                                                                      cluster_labels_cpu,
-                                                                                      dip_matrix_cpu, n_clusters_max,
-                                                                                      n_clusters_min, dedc_epochs,
-                                                                                      optimizer, loss_fn, autoencoder,
-                                                                                      device, trainloader, testloader,
-                                                                                      debug)
+    cluster_labels_cpu, n_clusters_current, centers_cpu, autoencoder = _dip_deck_training(X, n_clusters_start,
+                                                                                          dip_merge_threshold,
+                                                                                          cluster_loss_weight, centers_cpu,
+                                                                                          cluster_labels_cpu,
+                                                                                          dip_matrix_cpu, n_clusters_max,
+                                                                                          n_clusters_min, dipdeck_epochs,
+                                                                                          optimizer, loss_fn, autoencoder,
+                                                                                          device, trainloader, testloader,
+                                                                                          max_cluster_size_diff_factor, debug)
     # Return results
     return cluster_labels_cpu, n_clusters_current, centers_cpu, autoencoder
 
 
-def _dedc_training(X, n_clusters_current, dip_merge_threshold, cluster_loss_weight, centers_cpu, cluster_labels_cpu,
-                   dip_matrix_cpu, n_clusters_max, n_clusters_min, dedc_epochs, optimizer, loss_fn, autoencoder,
-                   device, trainloader, testloader, debug):
+def _dip_deck_training(X, n_clusters_current, dip_merge_threshold, cluster_loss_weight, centers_cpu, cluster_labels_cpu,
+                       dip_matrix_cpu, n_clusters_max, n_clusters_min, dipdeck_epochs, optimizer, loss_fn, autoencoder,
+                       device, trainloader, testloader, max_cluster_size_diff_factor, debug):
     i = 0
-    while i < dedc_epochs:
+    while i < dipdeck_epochs:
         cluster_labels_torch = torch.from_numpy(cluster_labels_cpu).long().to(device)
         centers_torch = torch.from_numpy(centers_cpu).float().to(device)
         dip_matrix_torch = torch.from_numpy(dip_matrix_cpu).float().to(device)
@@ -115,7 +115,8 @@ def _dedc_training(X, n_clusters_current, dip_merge_threshold, cluster_loss_weig
                                     range(n_clusters_current)])
         centers_cpu, embedded_centers_cpu = _get_nearest_points_to_optimal_centers(X, optimal_centers, embedded_data)
         # Update Dips
-        dip_matrix_cpu = _get_dip_matrix(embedded_data, embedded_centers_cpu, cluster_labels_cpu, n_clusters_current)
+        dip_matrix_cpu = _get_dip_matrix(embedded_data, embedded_centers_cpu, cluster_labels_cpu, n_clusters_current,
+                                         max_cluster_size_diff_factor)
 
         if debug:
             print(
@@ -128,21 +129,22 @@ def _dedc_training(X, n_clusters_current, dip_merge_threshold, cluster_loss_weig
         # Start merging procedure
         dip_argmax = np.unravel_index(np.argmax(dip_matrix_cpu, axis=None), dip_matrix_cpu.shape)
         # Is merge possible?
-        while dip_matrix_cpu[dip_argmax] >= dip_merge_threshold and n_clusters_current > n_clusters_min:
-            if debug:
-                print("Start merging in iteration {0}.\nMerging clusters {1} with dip value {2}.".format(i,
-                                                                                                         dip_argmax,
-                                                                                                         dip_matrix_cpu[
-                                                                                                             dip_argmax]))
-            # Reset iteration and reduce number of cluster
-            i = 0
-            n_clusters_current -= 1
-            cluster_labels_cpu, centers_cpu, embedded_centers_cpu, dip_matrix_cpu = \
-                _merge_by_dip_value(X, embedded_data, cluster_labels_cpu, dip_argmax, n_clusters_current, centers_cpu,
-                                    embedded_centers_cpu)
-            dip_argmax = np.unravel_index(np.argmax(dip_matrix_cpu, axis=None), dip_matrix_cpu.shape)
+        if i != 0:
+            while dip_matrix_cpu[dip_argmax] >= dip_merge_threshold and n_clusters_current > n_clusters_min:
+                if debug:
+                    print("Start merging in iteration {0}.\nMerging clusters {1} with dip value {2}.".format(i,
+                                                                                                             dip_argmax,
+                                                                                                             dip_matrix_cpu[
+                                                                                                                 dip_argmax]))
+                # Reset iteration and reduce number of cluster
+                i = 0
+                n_clusters_current -= 1
+                cluster_labels_cpu, centers_cpu, embedded_centers_cpu, dip_matrix_cpu = \
+                    _merge_by_dip_value(X, embedded_data, cluster_labels_cpu, dip_argmax, n_clusters_current, centers_cpu,
+                                        embedded_centers_cpu, max_cluster_size_diff_factor)
+                dip_argmax = np.unravel_index(np.argmax(dip_matrix_cpu, axis=None), dip_matrix_cpu.shape)
         # Optional: Force merging of clusters
-        if i == dedc_epochs and n_clusters_current > n_clusters_max:
+        if i == dipdeck_epochs and n_clusters_current > n_clusters_max:
             # Get smallest cluster
             _, cluster_sizes = np.unique(cluster_labels_cpu, return_counts=True)
             smallest_cluster_id = np.argmin(cluster_sizes)
@@ -167,7 +169,7 @@ def _dedc_training(X, n_clusters_current, dip_merge_threshold, cluster_loss_weig
                                                                                            embedded_data)
                 # Update dip values
                 dip_matrix_cpu = _get_dip_matrix(embedded_data, embedded_centers_cpu, cluster_labels_cpu,
-                                                 n_clusters_current)
+                                                 n_clusters_current, max_cluster_size_diff_factor)
             else:
                 # Else: merge clusters with hightest dip
                 if debug:
@@ -176,8 +178,7 @@ def _dedc_training(X, n_clusters_current, dip_merge_threshold, cluster_loss_weig
 
                 cluster_labels_cpu, centers_cpu, _, dip_matrix_cpu = \
                     _merge_by_dip_value(X, embedded_data, cluster_labels_cpu, dip_argmax, n_clusters_current,
-                                        centers_cpu,
-                                        embedded_centers_cpu)
+                                        centers_cpu, embedded_centers_cpu, max_cluster_size_diff_factor)
         if n_clusters_current == 1:
             if debug:
                 print("Only one cluster left")
@@ -186,7 +187,7 @@ def _dedc_training(X, n_clusters_current, dip_merge_threshold, cluster_loss_weig
 
 
 def _merge_by_dip_value(X, embedded_data, cluster_labels_cpu, dip_argmax, n_clusters_current, centers_cpu,
-                        embedded_centers_cpu):
+                        embedded_centers_cpu, max_cluster_size_diff_factor):
     # Get points in clusters
     points_in_center_1 = len(cluster_labels_cpu[cluster_labels_cpu == dip_argmax[0]])
     points_in_center_2 = len(cluster_labels_cpu[cluster_labels_cpu == dip_argmax[1]])
@@ -213,7 +214,7 @@ def _merge_by_dip_value(X, embedded_data, cluster_labels_cpu, dip_argmax, n_clus
     embedded_centers_cpu = np.append(embedded_centers_cpu_tmp, new_embedded_center_cpu, axis=0)
     # Update dip values
     dip_matrix_cpu = _get_dip_matrix(embedded_data, embedded_centers_cpu, cluster_labels_cpu,
-                                     n_clusters_current)
+                                     n_clusters_current, max_cluster_size_diff_factor)
     return cluster_labels_cpu, centers_cpu, embedded_centers_cpu, dip_matrix_cpu
 
 
@@ -266,7 +267,7 @@ def _get_dip_matrix(data, dip_centers, dip_labels, n_clusters, max_cluster_size_
     return dip_matrix
 
 
-class _DEDC_Autoencoder(Simple_Autoencoder):
+class _DipDECK_Autoencoder(Simple_Autoencoder):
 
     def start_training(self, trainloader, n_epochs, device, optimizer, loss_fn):
         for _ in range(n_epochs):
@@ -283,34 +284,37 @@ class _DEDC_Autoencoder(Simple_Autoencoder):
                 optimizer.step()
 
 
-class DEDC():
+class DipDECK():
 
     def __init__(self, n_clusters_start=35, dip_merge_threshold=0.9, cluster_loss_weight=1, n_clusters_max=np.inf,
-                 n_clusters_min=1, batch_size=256, learning_rate=1e-3, pretrain_epochs=100, dedc_epochs=50,
-                 optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(), autoencoder=None, embedding_size=5,
-                 debug=False):
+                 n_clusters_min=1, batch_size=256, pretrain_learning_rate=1e-3, dipdeck_learning_rate=1e-4,
+                 pretrain_epochs=100, dipdeck_epochs=50, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(),
+                 autoencoder=None, embedding_size=5, max_cluster_size_diff_factor=2, debug=False):
         self.n_clusters_start = n_clusters_start
         self.dip_merge_threshold = dip_merge_threshold
         self.cluster_loss_weight = cluster_loss_weight
         self.n_clusters_max = n_clusters_max
         self.n_clusters_min = n_clusters_min
         self.batch_size = batch_size
-        self.learning_rate = learning_rate
+        self.pretrain_learning_rate = pretrain_learning_rate
+        self.dipdeck_learning_rate = dipdeck_learning_rate
         self.pretrain_epochs = pretrain_epochs
-        self.dedc_epochs = dedc_epochs
+        self.dipdeck_epochs = dipdeck_epochs
         self.optimizer_class = optimizer_class
         self.loss_fn = loss_fn
         self.autoencoder = autoencoder
         self.embedding_size = embedding_size
+        self.max_cluster_size_diff_factor = max_cluster_size_diff_factor
         self.debug = debug
 
     def fit(self, X):
-        labels, n_clusters, centers, autoencoder = _dedc(X, self.n_clusters_start, self.dip_merge_threshold,
-                                                         self.cluster_loss_weight, self.n_clusters_max,
-                                                         self.n_clusters_min, self.batch_size, self.learning_rate,
-                                                         self.pretrain_epochs, self.dedc_epochs, self.optimizer_class,
-                                                         self.loss_fn, self.autoencoder, self.embedding_size,
-                                                         self.debug)
+        labels, n_clusters, centers, autoencoder = _dip_deck(X, self.n_clusters_start, self.dip_merge_threshold,
+                                                             self.cluster_loss_weight, self.n_clusters_max,
+                                                             self.n_clusters_min, self.batch_size,
+                                                             self.pretrain_learning_rate, self.dipdeck_learning_rate,
+                                                             self.pretrain_epochs, self.dipdeck_epochs, self.optimizer_class,
+                                                             self.loss_fn, self.autoencoder, self.embedding_size,
+                                                             self.max_cluster_size_diff_factor, self.debug)
         self.labels_ = labels
         self.n_clusters_ = n_clusters
         self.cluster_centers_ = centers

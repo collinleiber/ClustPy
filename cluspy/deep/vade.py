@@ -12,8 +12,8 @@ import numpy as np
 from sklearn.mixture import GaussianMixture
 
 
-def _vade(X, n_clusters, batch_size, learning_rate, pretrain_epochs, vade_epochs, optimizer_class,
-          loss_fn, autoencoder, embedding_size):
+def _vade(X, n_clusters, batch_size, pretrain_learning_rate, vade_learning_rate, pretrain_epochs, vade_epochs,
+          optimizer_class, loss_fn, autoencoder, embedding_size):
     device = detect_device()
     trainloader = torch.utils.data.DataLoader(torch.from_numpy(X).float(),
                                               batch_size=batch_size,
@@ -27,7 +27,7 @@ def _vade(X, n_clusters, batch_size, learning_rate, pretrain_epochs, vade_epochs
                                              shuffle=False,
                                              drop_last=False)
     if autoencoder is None:
-        autoencoder = get_trained_autoencoder(trainloader, learning_rate, pretrain_epochs, device,
+        autoencoder = get_trained_autoencoder(trainloader, pretrain_learning_rate, pretrain_epochs, device,
                                               optimizer_class, loss_fn, X.shape[1], embedding_size, _Vade_Autoencoder)
     # Execute EM in embedded space
     embedded_data = _vade_encode_batchwise(testloader, autoencoder, device)
@@ -36,8 +36,7 @@ def _vade(X, n_clusters, batch_size, learning_rate, pretrain_epochs, vade_epochs
     # Initialize VaDE
     vade_module = _VaDE_Module(autoencoder, n_clusters=n_clusters, embedding_size=10, pi=gmm.weights_,
                                mean=gmm.means_, var=gmm.covariances_, device=device).to(device)
-    # Reduce learning_rate from pretraining by a magnitude of 10
-    vade_learning_rate = learning_rate * 0.1
+    # Use VaDE learning_rate (usually pretrain_learning_rate reduced by a magnitude of 10)f 10
     optimizer = optimizer_class(vade_module.parameters(), lr=vade_learning_rate)
     # Vade Training loop
     vade_module.start_training(trainloader, vade_epochs, device, optimizer, loss_fn)
@@ -238,12 +237,13 @@ class _VaDE_Module(torch.nn.Module):
 
 
 class VaDE():
-    def __init__(self, n_clusters, batch_size=256, learning_rate=1e-3, pretrain_epochs=100,
-                 vade_epochs=150, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.BCELoss(reduction='sum'),
-                 autoencoder=None, embedding_size=10):
+    def __init__(self, n_clusters, batch_size=256, pretrain_learning_rate=1e-3, vade_learning_rate=1e-4,
+                 pretrain_epochs=100, vade_epochs=150, optimizer_class=torch.optim.Adam,
+                 loss_fn=torch.nn.BCELoss(reduction='sum'), autoencoder=None, embedding_size=10):
         self.n_clusters = n_clusters
         self.batch_size = batch_size
-        self.learning_rate = learning_rate
+        self.pretrain_learning_rate = pretrain_learning_rate
+        self.vade_learning_rate = vade_learning_rate
         self.pretrain_epochs = pretrain_epochs
         self.vade_epochs = vade_epochs
         self.optimizer_class = optimizer_class
@@ -255,7 +255,8 @@ class VaDE():
         gmm_labels, gmm_means, gmm_covariances, vade_labels, vade_centers, vade_covariances, autoencoder = _vade(X,
                                                                                                                  self.n_clusters,
                                                                                                                  self.batch_size,
-                                                                                                                 self.learning_rate,
+                                                                                                                 self.pretrain_learning_rate,
+                                                                                                                 self.vade_learning_rate,
                                                                                                                  self.pretrain_epochs,
                                                                                                                  self.vade_epochs,
                                                                                                                  self.optimizer_class,

@@ -17,8 +17,8 @@ import torch
 from sklearn.cluster import KMeans
 
 
-def _dec(X, n_clusters, alpha, batch_size, learning_rate, pretrain_epochs, dec_epochs, optimizer_class,
-         loss_fn, autoencoder, embedding_size, use_reconstruction_loss, degree_of_space_distortion):
+def _dec(X, n_clusters, alpha, batch_size, pretrain_learning_rate, dec_learning_rate, pretrain_epochs, dec_epochs, 
+         optimizer_class, loss_fn, autoencoder, embedding_size, use_reconstruction_loss, cluster_loss_weight):
     device = detect_device()
     trainloader = torch.utils.data.DataLoader(torch.from_numpy(X).float(),
                                               batch_size=batch_size,
@@ -32,7 +32,7 @@ def _dec(X, n_clusters, alpha, batch_size, learning_rate, pretrain_epochs, dec_e
                                              shuffle=False,
                                              drop_last=False)
     if autoencoder is None:
-        autoencoder = get_trained_autoencoder(trainloader, learning_rate, pretrain_epochs, device,
+        autoencoder = get_trained_autoencoder(trainloader, pretrain_learning_rate, pretrain_epochs, device,
                                               optimizer_class, loss_fn, X.shape[1], embedding_size)
     # Execute kmeans in embedded space - initial clustering
     embedded_data = encode_batchwise(testloader, autoencoder, device)
@@ -41,12 +41,11 @@ def _dec(X, n_clusters, alpha, batch_size, learning_rate, pretrain_epochs, dec_e
     init_centers = kmeans.cluster_centers_
     # Setup DEC Module
     dec_module = _DEC_Module(init_centers, alpha).to(device)
-    # Reduce learning_rate from pretraining by a magnitude of 10
-    dec_learning_rate = learning_rate * 0.1
+    # Use DEC learning_rate (usually pretrain_learning_rate reduced by a magnitude of 10)
     optimizer = optimizer_class(list(autoencoder.parameters()) + list(dec_module.parameters()), lr=dec_learning_rate)
     # DEC Training loop
     dec_module.start_training(autoencoder, trainloader, dec_epochs, device, optimizer, loss_fn, use_reconstruction_loss,
-                              degree_of_space_distortion)
+                              cluster_loss_weight)
     # Get labels
     dec_labels = predict_batchwise(testloader, autoencoder, dec_module, device)
     dec_centers = dec_module.centers.detach().cpu().numpy()
@@ -102,14 +101,14 @@ class _DEC_Module(torch.nn.Module):
         return loss
 
     def start_training(self, autoencoder, trainloader, n_epochs, device, optimizer, loss_fn, use_reconstruction_loss,
-                       degree_of_space_distortion):
+                       cluster_loss_weight):
         for _ in range(n_epochs):
             for batch in trainloader:
                 batch_data = batch.to(device)
                 embedded = autoencoder.encode(batch_data)
 
                 cluster_loss = self.compression_loss(embedded)
-                loss = cluster_loss * degree_of_space_distortion
+                loss = cluster_loss * cluster_loss_weight
                 # Reconstruction loss is not included in DEC
                 if use_reconstruction_loss:
                     reconstruction = autoencoder.decode(embedded)
@@ -124,29 +123,35 @@ class _DEC_Module(torch.nn.Module):
 
 class DEC():
 
-    def __init__(self, n_clusters, alpha=1.0, batch_size=256, learning_rate=1e-3, pretrain_epochs=100,
-                 dec_epochs=150, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(), autoencoder=None,
-                 embedding_size=10):
+    def __init__(self, n_clusters, alpha=1.0, batch_size=256, pretrain_learning_rate=1e-3, dec_learning_rate=1e-4,
+                 pretrain_epochs=100, dec_epochs=150, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(),
+                 autoencoder=None, embedding_size=10, use_reconstruction_loss=False, cluster_loss_weight=1):
         self.n_clusters = n_clusters
         self.alpha = alpha
         self.batch_size = batch_size
-        self.learning_rate = learning_rate
+        self.pretrain_learning_rate = pretrain_learning_rate
+        self.dec_learning_rate = dec_learning_rate
         self.pretrain_epochs = pretrain_epochs
         self.dec_epochs = dec_epochs
         self.optimizer_class = optimizer_class
         self.loss_fn = loss_fn
         self.autoencoder = autoencoder
         self.embedding_size = embedding_size
+        self.use_reconstruction_loss = use_reconstruction_loss
+        self.cluster_loss_weight = cluster_loss_weight
 
     def fit(self, X):
         kmeans_labels, kmeans_centers, dec_labels, dec_centers, autoencoder = _dec(X, self.n_clusters, self.alpha,
-                                                                                   self.batch_size, self.learning_rate,
+                                                                                   self.batch_size,
+                                                                                   self.pretrain_learning_rate,
+                                                                                   self.dec_learning_rate,
                                                                                    self.pretrain_epochs,
                                                                                    self.dec_epochs,
                                                                                    self.optimizer_class, self.loss_fn,
                                                                                    self.autoencoder,
                                                                                    self.embedding_size,
-                                                                                   False, 1)
+                                                                                   self.use_reconstruction_loss, 
+                                                                                   self.cluster_loss_weight)
         self.labels_ = kmeans_labels
         self.cluster_centers_ = kmeans_centers
         self.dec_labels_ = dec_labels
@@ -156,18 +161,8 @@ class DEC():
 
 class IDEC(DEC):
 
-    def fit(self, X):
-        kmeans_labels, kmeans_centers, idec_labels, idec_centers, autoencoder = _dec(X, self.n_clusters, self.alpha,
-                                                                                     self.batch_size,
-                                                                                     self.learning_rate,
-                                                                                     self.pretrain_epochs,
-                                                                                     self.dec_epochs,
-                                                                                     self.optimizer_class,
-                                                                                     self.loss_fn, self.autoencoder,
-                                                                                     self.embedding_size,
-                                                                                     True, 0.1)
-        self.labels_ = kmeans_labels
-        self.cluster_centers_ = kmeans_centers
-        self.idec_labels_ = idec_labels
-        self.idec_cluster_centers_ = idec_centers
-        self.autoencoder = autoencoder
+    def __init__(self, n_clusters, alpha=1.0, batch_size=256, pretrain_learning_rate=1e-3, idec_learning_rate=1e-4,
+                 pretrain_epochs=100, idec_epochs=150, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(),
+                 autoencoder=None, embedding_size=10):
+        super().__init__(n_clusters, alpha, batch_size, pretrain_learning_rate, idec_learning_rate, pretrain_epochs,
+              idec_epochs, optimizer_class, loss_fn, autoencoder, embedding_size, True, 0.1)

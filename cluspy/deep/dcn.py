@@ -12,8 +12,8 @@ import torch
 from sklearn.cluster import KMeans
 
 
-def _dcn(X, n_clusters, batch_size, learning_rate, pretrain_epochs, dcn_epochs, optimizer_class,
-         loss_fn, autoencoder, embedding_size, degree_of_space_distortion, degree_of_space_preservation):
+def _dcn(X, n_clusters, batch_size, pretrain_learning_rate, dcn_learning_rate, pretrain_epochs, dcn_epochs,
+         optimizer_class, loss_fn, autoencoder, embedding_size, degree_of_space_distortion, degree_of_space_preservation):
     device = detect_device()
     trainloader = torch.utils.data.DataLoader(torch.from_numpy(X).float(),
                                               batch_size=batch_size,
@@ -27,7 +27,7 @@ def _dcn(X, n_clusters, batch_size, learning_rate, pretrain_epochs, dcn_epochs, 
                                              shuffle=False,
                                              drop_last=False)
     if autoencoder is None:
-        autoencoder = get_trained_autoencoder(trainloader, learning_rate, pretrain_epochs, device,
+        autoencoder = get_trained_autoencoder(trainloader, pretrain_learning_rate, pretrain_epochs, device,
                                               optimizer_class, loss_fn, X.shape[1], embedding_size)
     # Execute kmeans in embedded space
     embedded_data = encode_batchwise(testloader, autoencoder, device)
@@ -36,8 +36,7 @@ def _dcn(X, n_clusters, batch_size, learning_rate, pretrain_epochs, dcn_epochs, 
     init_centers = kmeans.cluster_centers_
     # Setup DCN Module
     dcn_module = _DCN_Module(init_centers).to_device(device)
-    # Reduce learning_rate from pretraining by a magnitude of 10
-    dcn_learning_rate = learning_rate * 0.1
+    # Use DCN learning_rate (usually pretrain_learning_rate reduced by a magnitude of 10)
     optimizer = optimizer_class(list(autoencoder.parameters()), lr=dcn_learning_rate)
     # DEC Training loop
     dcn_module.start_training(autoencoder, trainloader, dcn_epochs, device, optimizer, loss_fn,
@@ -136,13 +135,14 @@ class _DCN_Module(torch.nn.Module):
 
 class DCN():
 
-    def __init__(self, n_clusters, batch_size=256, learning_rate=1e-3, pretrain_epochs=100,
-                 dcn_epochs=150, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(),
+    def __init__(self, n_clusters, batch_size=256, pretrain_learning_rate=1e-3, dcn_learning_rate=1e-4,
+                 pretrain_epochs=100, dcn_epochs=150, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(),
                  degree_of_space_distortion=0.05, degree_of_space_preservation=1.0, autoencoder=None,
                  embedding_size=10):
         self.n_clusters = n_clusters
         self.batch_size = batch_size
-        self.learning_rate = learning_rate
+        self.pretrain_learning_rate = pretrain_learning_rate
+        self.dcn_learning_rate = dcn_learning_rate
         self.pretrain_epochs = pretrain_epochs
         self.dcn_epochs = dcn_epochs
         self.optimizer_class = optimizer_class
@@ -154,7 +154,8 @@ class DCN():
 
     def fit(self, X):
         kmeans_labels, kmeans_centers, dcn_labels, dcn_centers, autoencoder = _dcn(X, self.n_clusters, self.batch_size,
-                                                                                   self.learning_rate,
+                                                                                   self.pretrain_learning_rate,
+                                                                                   self.dcn_learning_rate,
                                                                                    self.pretrain_epochs,
                                                                                    self.dcn_epochs,
                                                                                    self.optimizer_class, self.loss_fn,

@@ -7,3 +7,5 @@ seaborn
 pyclustering
 torch
 torchvision
+xlrd
+Pillow
