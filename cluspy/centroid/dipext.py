@@ -9,6 +9,7 @@ in Databases 2020
 from cluspy.utils import dip
 import numpy as np
 from sklearn.cluster import KMeans
+from sklearn.base import BaseEstimator, ClusterMixin
 
 
 def _dip_ext(X, n_components, do_dip_scaling, step_size, momentum, dip_threshold, n_starting_points_strategy,
@@ -235,7 +236,7 @@ class DipExt():
         self.dip_values_ = dip_values
         return subspace
 
-class DipInit(DipExt):
+class DipInit(DipExt, BaseEstimator, ClusterMixin):
 
     def __init__(self, n_clusters, n_components=None, do_dip_scaling=True, step_size=0.1, momentum=0.95, dip_threshold=0.5,
                  n_starting_points_strategy=None, check_duplicates=False):
@@ -243,8 +244,9 @@ class DipInit(DipExt):
                          check_duplicates)
         self.n_clusters = n_clusters
 
-    def fit(self, X):
+    def fit(self, X, y=None):
         subspace = self.fit_transform(X)
         labels, centers = _dip_init(subspace, self.dip_values_, self.n_clusters)
         self.labels_ = labels
         self.cluster_centers_ = centers
+        return self

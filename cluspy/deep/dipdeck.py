@@ -5,6 +5,7 @@ import torch
 from cluspy.deep._utils import detect_device, encode_batchwise, Simple_Autoencoder, \
     squared_euclidean_distance, int_to_one_hot, get_trained_autoencoder
 from sklearn.cluster import KMeans
+from sklearn.base import BaseEstimator, ClusterMixin
 
 
 def _dip_deck(X, n_clusters_start, dip_merge_threshold, cluster_loss_weight, n_clusters_max, n_clusters_min, batch_size,
@@ -129,20 +130,19 @@ def _dip_deck_training(X, n_clusters_current, dip_merge_threshold, cluster_loss_
         # Start merging procedure
         dip_argmax = np.unravel_index(np.argmax(dip_matrix_cpu, axis=None), dip_matrix_cpu.shape)
         # Is merge possible?
-        if i != 0:
-            while dip_matrix_cpu[dip_argmax] >= dip_merge_threshold and n_clusters_current > n_clusters_min:
-                if debug:
-                    print("Start merging in iteration {0}.\nMerging clusters {1} with dip value {2}.".format(i,
-                                                                                                             dip_argmax,
-                                                                                                             dip_matrix_cpu[
-                                                                                                                 dip_argmax]))
-                # Reset iteration and reduce number of cluster
-                i = 0
-                n_clusters_current -= 1
-                cluster_labels_cpu, centers_cpu, embedded_centers_cpu, dip_matrix_cpu = \
-                    _merge_by_dip_value(X, embedded_data, cluster_labels_cpu, dip_argmax, n_clusters_current, centers_cpu,
-                                        embedded_centers_cpu, max_cluster_size_diff_factor)
-                dip_argmax = np.unravel_index(np.argmax(dip_matrix_cpu, axis=None), dip_matrix_cpu.shape)
+        while dip_matrix_cpu[dip_argmax] >= dip_merge_threshold and n_clusters_current > n_clusters_min:
+            if debug:
+                print("Start merging in iteration {0}.\nMerging clusters {1} with dip value {2}.".format(i,
+                                                                                                         dip_argmax,
+                                                                                                         dip_matrix_cpu[
+                                                                                                             dip_argmax]))
+            # Reset iteration and reduce number of cluster
+            i = 0
+            n_clusters_current -= 1
+            cluster_labels_cpu, centers_cpu, embedded_centers_cpu, dip_matrix_cpu = \
+                _merge_by_dip_value(X, embedded_data, cluster_labels_cpu, dip_argmax, n_clusters_current, centers_cpu,
+                                    embedded_centers_cpu, max_cluster_size_diff_factor)
+            dip_argmax = np.unravel_index(np.argmax(dip_matrix_cpu, axis=None), dip_matrix_cpu.shape)
         # Optional: Force merging of clusters
         if i == dipdeck_epochs and n_clusters_current > n_clusters_max:
             # Get smallest cluster
@@ -284,7 +284,7 @@ class _DipDECK_Autoencoder(Simple_Autoencoder):
                 optimizer.step()
 
 
-class DipDECK():
+class DipDECK(BaseEstimator, ClusterMixin):
 
     def __init__(self, n_clusters_start=35, dip_merge_threshold=0.9, cluster_loss_weight=1, n_clusters_max=np.inf,
                  n_clusters_min=1, batch_size=256, pretrain_learning_rate=1e-3, dipdeck_learning_rate=1e-4,
@@ -307,7 +307,7 @@ class DipDECK():
         self.max_cluster_size_diff_factor = max_cluster_size_diff_factor
         self.debug = debug
 
-    def fit(self, X):
+    def fit(self, X, y=None):
         labels, n_clusters, centers, autoencoder = _dip_deck(X, self.n_clusters_start, self.dip_merge_threshold,
                                                              self.cluster_loss_weight, self.n_clusters_max,
                                                              self.n_clusters_min, self.batch_size,
@@ -319,3 +319,4 @@ class DipDECK():
         self.n_clusters_ = n_clusters
         self.cluster_centers_ = centers
         self.autoencoder = autoencoder
+        return self

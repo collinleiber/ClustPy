@@ -15,6 +15,7 @@ from cluspy.deep._utils import detect_device, get_trained_autoencoder, encode_ba
     squared_euclidean_distance, predict_batchwise
 import torch
 from sklearn.cluster import KMeans
+from sklearn.base import BaseEstimator, ClusterMixin
 
 
 def _dec(X, n_clusters, alpha, batch_size, pretrain_learning_rate, dec_learning_rate, pretrain_epochs, dec_epochs, 
@@ -121,7 +122,7 @@ class _DEC_Module(torch.nn.Module):
                 optimizer.step()
 
 
-class DEC():
+class DEC(BaseEstimator, ClusterMixin):
 
     def __init__(self, n_clusters, alpha=1.0, batch_size=256, pretrain_learning_rate=1e-3, dec_learning_rate=1e-4,
                  pretrain_epochs=100, dec_epochs=150, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(),
@@ -140,7 +141,7 @@ class DEC():
         self.use_reconstruction_loss = use_reconstruction_loss
         self.cluster_loss_weight = cluster_loss_weight
 
-    def fit(self, X):
+    def fit(self, X, y=None):
         kmeans_labels, kmeans_centers, dec_labels, dec_centers, autoencoder = _dec(X, self.n_clusters, self.alpha,
                                                                                    self.batch_size,
                                                                                    self.pretrain_learning_rate,
@@ -157,6 +158,7 @@ class DEC():
         self.dec_labels_ = dec_labels
         self.dec_cluster_centers_ = dec_centers
         self.autoencoder = autoencoder
+        return self
 
 
 class IDEC(DEC):

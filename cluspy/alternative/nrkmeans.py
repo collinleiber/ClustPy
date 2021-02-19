@@ -14,6 +14,7 @@ from sklearn.cluster._kmeans import _k_init as kpp
 from sklearn.utils.extmath import row_norms
 from sklearn.metrics.pairwise import pairwise_distances_argmin_min
 from sklearn.metrics import normalized_mutual_info_score as nmi
+from sklearn.base import BaseEstimator, ClusterMixin
 import seaborn as sns
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -722,7 +723,7 @@ def _mdl_outlier_costs(n_points, m_subspace):
 """
 
 
-class NrKmeans():
+class NrKmeans(BaseEstimator, ClusterMixin):
     def __init__(self, n_clusters, V=None, m=None, P=None, input_centers=None, mdl_for_noisespace=False, outliers=False,
                  max_iter=300, random_state=None):
         """
@@ -750,7 +751,7 @@ class NrKmeans():
         self.m = m
         self.P = P
 
-    def fit(self, X):
+    def fit(self, X, y=None):
         """
         Cluster the input dataset with the Nr-Kmeans algorithm. Saves the labels, centers, V, m, P and scatter matrices
         in the NrKmeans object.

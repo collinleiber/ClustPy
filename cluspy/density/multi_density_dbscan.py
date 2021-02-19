@@ -8,6 +8,7 @@ Automated Learning. Springer, Berlin, Heidelberg, 2011.
 
 from scipy.spatial.distance import squareform, pdist
 import numpy as np
+from sklearn.base import BaseEstimator, ClusterMixin
 
 
 def _multi_density_dbscan(X, k, var, min_cluster_size, always_sort_densities):
@@ -74,7 +75,7 @@ def _sort_neighbors_by_densities(neighbors, densities):
     return neighbors
 
 
-class MultiDensityDBSCAN():
+class MultiDensityDBSCAN(BaseEstimator, ClusterMixin):
 
     def __init__(self, k, var=2.5, min_cluster_size=2, always_sort_densities=False):
         self.k = k
@@ -82,9 +83,10 @@ class MultiDensityDBSCAN():
         self.min_cluster_size = min_cluster_size
         self.always_sort_densities = always_sort_densities
 
-    def fit(self, X):
+    def fit(self, X, y=None):
         n_clusters, labels, cluster_densities = _multi_density_dbscan(X, self.k, self.var, self.min_cluster_size,
                                                                       self.always_sort_densities)
         self.n_clusters_ = n_clusters
         self.labels_ = labels
         self.cluster_densities_ = cluster_densities
+        return self

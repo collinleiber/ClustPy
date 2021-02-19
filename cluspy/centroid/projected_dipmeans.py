@@ -10,6 +10,7 @@ import numpy as np
 from cluspy.centroid.dipmeans import _execute_bisecting_kmeans
 from sklearn.decomposition import PCA
 from cluspy.utils import dip, dip_pval, PVAL_BY_TABLE
+from sklearn.base import BaseEstimator, ClusterMixin
 
 
 def _proj_dipmeans(X, pval_threshold, n_random_projections, pval_strategy, n_boots, n_new_centers, max_n_clusters):
@@ -63,7 +64,7 @@ def _get_projected_data(X, n_random_projections):
     return projections
 
 
-class ProjectedDipMeans():
+class ProjectedDipMeans(BaseEstimator, ClusterMixin):
 
     def __init__(self, pval_threshold=0, n_random_projections=10, pval_strategy=PVAL_BY_TABLE, n_boots=2000,
                  n_new_centers=10, max_n_clusters=np.inf):
@@ -74,10 +75,11 @@ class ProjectedDipMeans():
         self.n_new_centers = n_new_centers
         self.max_n_clusters = max_n_clusters
 
-    def fit(self, X):
+    def fit(self, X, y=None):
         n_clusters, centers, labels = _proj_dipmeans(X, self.pval_threshold, self.n_random_projections,
                                                      self.pval_strategy, self.n_boots, self.n_new_centers,
                                                      self.max_n_clusters)
         self.n_clusters_ = n_clusters
         self.cluster_centers_ = centers
         self.labels_ = labels
+        return self

@@ -2,6 +2,40 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
+def _rearrange(confusion_matrix):
+    new_order = [-1] * np.min(confusion_matrix.shape)
+    # Find best possible diagonal by using maximum values in the confusion matrix
+    hits_sorted = np.unravel_index(np.argsort(confusion_matrix, axis=None)[::-1], confusion_matrix.shape)
+    i = 0
+    while -1 in new_order:
+        row = hits_sorted[0][i]
+        column = hits_sorted[1][i]
+        # Check if column has already been specified
+        if new_order[row] == -1 and column not in new_order:
+            new_order[row] = column
+        i += 1
+    # If there are more columns than rows, order remaining columns by highest value
+    if confusion_matrix.shape[1] > confusion_matrix.shape[0]:
+        missing_columns = np.array(list(set(range(confusion_matrix.shape[1])) - set(new_order)))
+        missing_order = np.argsort(np.max(confusion_matrix[:, missing_columns], axis=0))[::-1]
+        new_order += missing_columns[missing_order].tolist()
+    # Overwrite confusion matrix
+    new_confusion_matrix = confusion_matrix[:, new_order]
+    return new_confusion_matrix
+
+
+def _plot_confusion_matrix(confusion_matrix, show_text=True, figsize=(10, 10), cmap="YlGn", textcolor="black", vmin=None,
+                           vmax=None):
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.imshow(confusion_matrix, cmap=cmap, vmin=vmin, vmax=vmax)
+    if show_text:
+        for i in range(confusion_matrix.shape[0]):
+            for j in range(confusion_matrix.shape[1]):
+                ax.text(j, i, confusion_matrix[i, j],
+                        ha="center", va="center", color=textcolor)
+    plt.show()
+
+
 class ConfusionMatrix():
 
     def __init__(self, labels_true, labels_pred):
@@ -21,30 +55,8 @@ class ConfusionMatrix():
         return str(self.confusion_matrix)
 
     def rearrange(self):
-        new_order = [-1] * np.min(self.confusion_matrix.shape)
-        # Find best possible diagonal by using maximum values in the confusion matrix
-        hits_sorted = np.unravel_index(np.argsort(self.confusion_matrix, axis=None)[::-1], self.confusion_matrix.shape)
-        i = 0
-        while -1 in new_order:
-            row = hits_sorted[0][i]
-            column = hits_sorted[1][i]
-            # Check if column has already been specified
-            if new_order[row] == -1 and column not in new_order:
-                new_order[row] = column
-            i += 1
-        # If there are more columns than rows, order remaining columns by highest value
-        if self.confusion_matrix.shape[1] > self.confusion_matrix.shape[0]:
-            missing_columns = np.array(list(set(range(self.confusion_matrix.shape[1])) - set(new_order)))
-            missing_order = np.argsort(np.max(self.confusion_matrix[:, missing_columns], axis=0))[::-1]
-            new_order += missing_columns[missing_order].tolist()
-        # Overwrite confusion matrix
-        self.confusion_matrix = self.confusion_matrix[:, new_order]
+        new_confusion_matrix = _rearrange(self.confusion_matrix)
+        self.confusion_matrix = new_confusion_matrix
 
-    def plot(self, figsize=(10, 10), cmap="YlGn", textcolor="black"):
-        fig, ax = plt.subplots(figsize=figsize)
-        ax.imshow(self.confusion_matrix, cmap=cmap)
-        for i in range(len(self.true_clusters)):
-            for j in range(len(self.pred_clusters)):
-                ax.text(j, i, self.confusion_matrix[i, j],
-                        ha="center", va="center", color=textcolor)
-        plt.show()
+    def plot(self, show_text=True, figsize=(10, 10), cmap="YlGn", textcolor="black", vmin=0, vmax=None):
+        _plot_confusion_matrix(self.confusion_matrix, show_text, figsize, cmap, textcolor, vmin, vmax)

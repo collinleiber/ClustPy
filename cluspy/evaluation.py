@@ -4,6 +4,27 @@ import time
 from cluspy.utils._wrapper_methods import _get_n_clusters_from_algo
 
 
+def _preprocess_dataset(X, preprocess_methods, preprocess_params):
+    # Do preprocessing
+    if type(preprocess_methods) is list:
+        # If no parameters for preprocessing are specified all should be None
+        if type(preprocess_params) is dict and not preprocess_params:
+            preprocess_params = [{}] * len(preprocess_methods)
+        # Execute multiple preprocessing steps
+        assert type(preprocess_params) is list and len(preprocess_params) == len(
+            preprocess_methods), \
+            "preprocess_params must be a list of equal length if preprocess_methods is a list"
+        for method_index, method in enumerate(preprocess_methods):
+            local_params = preprocess_params[method_index]
+            assert type(local_params) is dict, "All entries of preprocess_params must be of type dict"
+            assert callable(method), "All entries of preprocess_methods must be methods"
+            X_processed = method(X, **local_params)
+    else:
+        # Execute single preprocessing step
+        X_processed = preprocess_methods(X, **preprocess_params)
+    return X_processed
+
+
 def evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=None, gt=None, repetitions=10, add_average=True,
                      add_std=True, add_runtime=True, add_n_clusters=False, save_path=None, ignore_algorithms=[]):
     assert evaluation_metrics is not None or add_runtime or add_n_clusters, \
@@ -39,13 +60,18 @@ def evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=None, gt=None,
                 else:
                     # In case of hierarchical or nr ground truth
                     eval_algo.params["n_clusters"] = [len(np.unique(gt[gt[:, i] >= 0, i])) for i in range(gt.shape[1])]
+            # Algorithms can preprocess datasets (e.g. PCA + K-means)
+            if eval_algo.preprocess_methods is not None:
+                X_processed = _preprocess_dataset(X, eval_algo.preprocess_methods, eval_algo.preprocess_params)
+            else:
+                X_processed = X
             # Execute the algorithm multiple times
             for rep in range(repetitions):
                 print("- Iteration {0}".format(rep))
                 start_time = time.time()
                 algo_obj = eval_algo.obj(**eval_algo.params)
                 try:
-                    algo_obj.fit(X)
+                    algo_obj.fit(X_processed)
                 except Exception as e:
                     print("Execution of {0} raised an exception in iteration {1}".format(eval_algo.name, rep))
                     print(e)
@@ -154,23 +180,7 @@ def evaluate_multiple_datasets(evaluation_datasets, evaluation_algorithms, evalu
                 gt = eval_data.gt_columns
             print("=== (Data shape: {0} / Ground truth shape: {1}) ===".format(X.shape, gt if gt is None else gt.shape))
             if eval_data.preprocess_methods is not None:
-                # Do preprocessing
-                if type(eval_data.preprocess_methods) is list:
-                    # If no parameters for preprocessing are specified all should be None
-                    if type(eval_data.preprocess_params) is dict and not eval_data.preprocess_params:
-                        eval_data.preprocess_params = [{}] * len(eval_data.preprocess_methods)
-                    # Execute multiple preprocessing steps
-                    assert type(eval_data.preprocess_params) is list and len(eval_data.preprocess_params) == len(
-                        eval_data.preprocess_methods), \
-                        "preprocess_params must be a list of equal length if preprocess_methods is a list"
-                    for method_index, preprocess_method in enumerate(eval_data.preprocess_methods):
-                        local_params = eval_data.preprocess_params[method_index]
-                        assert type(local_params) is dict, "All entries of preprocess_params must be of type dict"
-                        assert callable(preprocess_method), "All entries of preprocess_methods must be methods"
-                        X = preprocess_method(X, **local_params)
-                else:
-                    # Execute single preprocessing step
-                    X = eval_data.preprocess_methods(X, **eval_data.preprocess_params)
+                X = _preprocess_dataset(X, eval_data.preprocess_methods, eval_data.preprocess_params)
             inner_save_path = None if not save_intermediate_results else "{0}_{1}.{2}".format(save_path.split(".")[0],
                                                                                               eval_data.name,
                                                                                               save_path.split(".")[1])
@@ -228,7 +238,7 @@ class EvaluationMetric():
 
 class EvaluationAlgorithm():
 
-    def __init__(self, name, obj, params={}, label_column=None):
+    def __init__(self, name, obj, params={}, label_column=None, preprocess_methods=None, preprocess_params={}):
         assert type(name) is str, "name must be a string"
         self.name = name
         assert type(obj) is type, "name must be Algorithm class"
@@ -237,3 +247,9 @@ class EvaluationAlgorithm():
         self.params = params
         assert label_column is None or type(label_column) is int, "label_column must be None or int"
         self.label_column = label_column
+        assert callable(preprocess_methods) or type(
+            preprocess_methods) is list or preprocess_methods is None, "preprocess_methods must be a method, a list of methods or None"
+        self.preprocess_methods = preprocess_methods
+        assert type(preprocess_params) is dict or type(
+            preprocess_methods) is list, "preprocess_params must be a dict or a list of dicts"
+        self.preprocess_params = preprocess_params

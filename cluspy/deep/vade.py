@@ -10,6 +10,7 @@ import torch
 from cluspy.deep._utils import detect_device, get_trained_autoencoder
 import numpy as np
 from sklearn.mixture import GaussianMixture
+from sklearn.base import BaseEstimator, ClusterMixin
 
 
 def _vade(X, n_clusters, batch_size, pretrain_learning_rate, vade_learning_rate, pretrain_epochs, vade_epochs,
@@ -236,7 +237,7 @@ class _VaDE_Module(torch.nn.Module):
                 optimizer.step()
 
 
-class VaDE():
+class VaDE(BaseEstimator, ClusterMixin):
     def __init__(self, n_clusters, batch_size=256, pretrain_learning_rate=1e-3, vade_learning_rate=1e-4,
                  pretrain_epochs=100, vade_epochs=150, optimizer_class=torch.optim.Adam,
                  loss_fn=torch.nn.BCELoss(reduction='sum'), autoencoder=None, embedding_size=10):
@@ -251,7 +252,7 @@ class VaDE():
         self.autoencoder = autoencoder
         self.embedding_size = embedding_size
 
-    def fit(self, X):
+    def fit(self, X, y=None):
         gmm_labels, gmm_means, gmm_covariances, vade_labels, vade_centers, vade_covariances, autoencoder = _vade(X,
                                                                                                                  self.n_clusters,
                                                                                                                  self.batch_size,
@@ -270,3 +271,4 @@ class VaDE():
         self.vade_cluster_centers_ = vade_centers
         self.vade_covariances_ = vade_covariances
         self.autoencoder = autoencoder
+        return self

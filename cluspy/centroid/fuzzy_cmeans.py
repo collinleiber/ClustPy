@@ -7,6 +7,7 @@ from pyclustering.cluster.fcm import fcm
 from cluspy.utils._wrapper_methods import pyclustering_adjust_labels
 from sklearn.utils.extmath import row_norms
 from sklearn.utils import check_random_state
+from sklearn.base import BaseEstimator, ClusterMixin
 import numpy as np
 try:
     # Old sklearn versions
@@ -16,7 +17,7 @@ except:
     from sklearn.cluster._kmeans import _kmeans_plusplus as kpp
 
 
-class FuzzyCMeans():
+class FuzzyCMeans(BaseEstimator, ClusterMixin):
 
     def __init__(self, n_cluster, initial_centers=None, tolerance=0.025, itermax=200, m=2):
         self.n_clusters = n_cluster
@@ -25,7 +26,7 @@ class FuzzyCMeans():
         self.itermax = itermax
         self.m = m
 
-    def fit(self, X):
+    def fit(self, X, y=None):
         if self.initial_centers is None:
             self.initial_centers = kpp(X, self.n_clusters, row_norms(X, squared=True),
                                        random_state=check_random_state(None))
@@ -35,3 +36,4 @@ class FuzzyCMeans():
         self.labels_ = pyclustering_adjust_labels(X.shape[0], fuzzycmeans_obj.get_clusters())
         self.cluster_centers_ = np.array((fuzzycmeans_obj.get_centers()))
         self.membership_ = np.array((fuzzycmeans_obj.get_membership()))
+        return self

@@ -11,6 +11,7 @@ from sklearn.cluster import KMeans
 import numpy as np
 from scipy.spatial.distance import pdist, squareform
 from cluspy.utils import dip, dip_pval, PVAL_BY_TABLE, PVAL_BY_BOOT, dip_boot_samples
+from sklearn.base import BaseEstimator, ClusterMixin
 
 
 def _dipmeans(X, pval_threshold, split_viewers_threshold, pval_strategy, n_boots, n_new_centers, max_n_clusters):
@@ -84,7 +85,7 @@ def _execute_bisecting_kmeans(X, ids_in_each_cluster, cluster_id_to_split, cente
     return best_kmeans
 
 
-class DipMeans():
+class DipMeans(BaseEstimator, ClusterMixin):
 
     def __init__(self, pval_threshold=0, split_viewers_threshold=0.01, pval_strategy=PVAL_BY_TABLE, n_boots=2000,
                  n_new_centers=10, max_n_clusters=np.inf):
@@ -95,10 +96,11 @@ class DipMeans():
         self.n_new_centers = n_new_centers
         self.max_n_clusters = max_n_clusters
 
-    def fit(self, X):
+    def fit(self, X, y=None):
         n_clusters, centers, labels = _dipmeans(X, self.pval_threshold, self.split_viewers_threshold,
                                                 self.pval_strategy, self.n_boots, self.n_new_centers,
                                                 self.max_n_clusters)
         self.n_clusters_ = n_clusters
         self.cluster_centers_ = centers
         self.labels_ = labels
+        return self

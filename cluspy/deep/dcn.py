@@ -10,10 +10,12 @@ from cluspy.deep._utils import detect_device, get_trained_autoencoder, encode_ba
     squared_euclidean_distance, predict_batchwise
 import torch
 from sklearn.cluster import KMeans
+from sklearn.base import BaseEstimator, ClusterMixin
 
 
 def _dcn(X, n_clusters, batch_size, pretrain_learning_rate, dcn_learning_rate, pretrain_epochs, dcn_epochs,
-         optimizer_class, loss_fn, autoencoder, embedding_size, degree_of_space_distortion, degree_of_space_preservation):
+         optimizer_class, loss_fn, autoencoder, embedding_size, degree_of_space_distortion,
+         degree_of_space_preservation):
     device = detect_device()
     trainloader = torch.utils.data.DataLoader(torch.from_numpy(X).float(),
                                               batch_size=batch_size,
@@ -133,7 +135,7 @@ class _DCN_Module(torch.nn.Module):
                     self.centers = self.centers.to(device)
 
 
-class DCN():
+class DCN(BaseEstimator, ClusterMixin):
 
     def __init__(self, n_clusters, batch_size=256, pretrain_learning_rate=1e-3, dcn_learning_rate=1e-4,
                  pretrain_epochs=100, dcn_epochs=150, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(),
@@ -152,7 +154,7 @@ class DCN():
         self.autoencoder = autoencoder
         self.embedding_size = embedding_size
 
-    def fit(self, X):
+    def fit(self, X, y=None):
         kmeans_labels, kmeans_centers, dcn_labels, dcn_centers, autoencoder = _dcn(X, self.n_clusters, self.batch_size,
                                                                                    self.pretrain_learning_rate,
                                                                                    self.dcn_learning_rate,
@@ -168,3 +170,4 @@ class DCN():
         self.dcn_labels_ = dcn_labels
         self.dcn_cluster_centers_ = dcn_centers
         self.autoencoder = autoencoder
+        return self

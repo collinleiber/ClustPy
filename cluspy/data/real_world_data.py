@@ -97,7 +97,8 @@ def load_kmnist(add_testdata=True, normalize_channels=False, downloads_path=None
 
 
 def load_fmnist(add_testdata=True, normalize_channels=False, downloads_path=None):
-    data, labels = _load_torch_image_data(torchvision.datasets.FashionMNIST, add_testdata, normalize_channels, downloads_path)
+    data, labels = _load_torch_image_data(torchvision.datasets.FashionMNIST, add_testdata, normalize_channels,
+                                          downloads_path)
     return data, labels
 
 
@@ -162,13 +163,6 @@ def load_reuters(add_testdata=True, n_features=2000):
     sorted_frequencies = np.argsort(frequencies)[::-1]
     selected_features = sorted_frequencies[:n_features]
     data = np.asarray(reuters_data[:, selected_features].todense())
-    return data, labels
-
-
-def load_reuters_10k(add_testdata=True, n_features=2000):
-    data, labels = load_reuters(add_testdata, n_features)
-    data = data[:10000]
-    labels = labels[:10000]
     return data, labels
 
 
@@ -328,14 +322,14 @@ def load_cmu_faces(downloads_path=None):
     expressions = np.array(["neutral", "happy", "sad", "angry"])
     eyes = np.array(["open", "sunglasses"])
     data_list = []
-    label_list =[]
+    label_list = []
     for name in names:
         path_images = directory + "/faces_4/" + name
         for image in os.listdir(path_images):
             if not image.endswith("_4.pgm"):
                 continue
             # get image data
-            image_data = Image.open(path_images+ "/" + image)
+            image_data = Image.open(path_images + "/" + image)
             image_data_vector = np.array(image_data).reshape(image_data.size[0] * image_data.size[1])
             # Get labels
             name_parts = image.split("_")
@@ -344,6 +338,7 @@ def load_cmu_faces(downloads_path=None):
             expression = np.argwhere(expressions == name_parts[2])[0][0]
             eye = np.argwhere(eyes == name_parts[3])[0][0]
             label_data = np.array([user_id, position, expression, eye])
+            # Save data and labels
             data_list.append(image_data_vector)
             label_list.append(label_data)
     labels = np.array(label_list)

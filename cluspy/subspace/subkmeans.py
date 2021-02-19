@@ -9,6 +9,7 @@ Conference on Knowledge Discovery and Data Mining. 2017.
 from cluspy.alternative.nrkmeans import NrKmeans
 import numpy as np
 from cluspy.alternative.nrkmeans import _mdl_costs
+from sklearn.base import BaseEstimator, ClusterMixin
 
 
 def _get_n_clusters(X, max_n_clusters, repetitions, mdl_for_noisespace,
@@ -33,7 +34,7 @@ def _get_n_clusters(X, max_n_clusters, repetitions, mdl_for_noisespace,
     return best_subkmeans
 
 
-class SubKmeans():
+class SubKmeans(BaseEstimator, ClusterMixin):
 
     def __init__(self, n_clusters, mdl_for_noisespace=False, outliers=False, max_iter=300, random_state=None):
         self.n_clusters = [n_clusters, 1]
@@ -42,7 +43,7 @@ class SubKmeans():
         self.max_iter = max_iter
         self.random_state = random_state
 
-    def fit(self, X):
+    def fit(self, X, y=None):
         nrkmeans = NrKmeans(self.n_clusters, mdl_for_noisespace=self.mdl_for_noisespace, outliers=self.outliers,
                             max_iter=self.max_iter, random_state=self.random_state)
         nrkmeans.fit(X)
@@ -56,9 +57,10 @@ class SubKmeans():
         self.m = nrkmeans.m[0]
         self.scatter_matrices_ = nrkmeans.scatter_matrices_[0]
         self.n_clusters = nrkmeans.n_clusters[0]
+        return self
 
 
-class MDLSubKmeans():
+class MDLSubKmeans(BaseEstimator, ClusterMixin):
 
     def __init__(self, max_n_clusters=np.inf, repetitions=10, mdl_for_noisespace=True,
                  outliers=False, max_iter=300, random_state=None):
@@ -69,7 +71,7 @@ class MDLSubKmeans():
         self.max_iter = max_iter
         self.random_state = random_state
 
-    def fit(self, X):
+    def fit(self, X, y=None):
         subkmeans = _get_n_clusters(X, self.max_n_clusters, self.repetitions, self.mdl_for_noisespace, self.outliers,
                                     self.max_iter, self.random_state)
         self.labels_ = subkmeans.labels_
@@ -79,3 +81,4 @@ class MDLSubKmeans():
         self.P = subkmeans.P
         self.m = subkmeans.m
         self.scatter_matrices_ = subkmeans.scatter_matrices_
+        return self

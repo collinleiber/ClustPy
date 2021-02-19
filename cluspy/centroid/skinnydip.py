@@ -12,6 +12,7 @@ https://github.com/samhelmholtz/skinny-dip
 
 import numpy as np
 from cluspy.utils import dip, dip_pval
+from sklearn.base import BaseEstimator, ClusterMixin
 
 
 def _skinnydip_clustering_full_space(X, significance, debug=False):
@@ -308,12 +309,13 @@ def _consolidate_clusters(ordered_data, clusters, index, significance, debug):
         return _consolidate_clusters(ordered_data, clusters, index, significance, debug)
 
 
-class SkinnyDip():
+class SkinnyDip(BaseEstimator, ClusterMixin):
 
     def __init__(self, significance=0.05):
         self.significance = significance
 
-    def fit(self, X):
+    def fit(self, X, y=None):
         labels, n_clusters = _skinnydip_clustering_full_space(X, self.significance)
         self.labels_ = labels
         self.n_clusters_ = n_clusters
+        return self

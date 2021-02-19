@@ -10,6 +10,7 @@ import numpy as np
 from sklearn.mixture import GaussianMixture as GMM
 from scipy.stats import ks_2samp
 from scipy.spatial.distance import cdist
+from sklearn.base import BaseEstimator, ClusterMixin
 import math
 
 
@@ -96,7 +97,7 @@ def _add_non_random_centers(X, centers, n_non_random_centers):
     return new_centers
 
 
-class PGMeans():
+class PGMeans(BaseEstimator, ClusterMixin):
     
     def __init__(self, confidence=0.01, n_projections=None, n_samples=None, n_new_centers=10, random_centers=0.5,
                  max_n_clusters=np.inf):
@@ -111,9 +112,10 @@ class PGMeans():
         self.max_n_clusters = max_n_clusters
         self.random_centers = random_centers
 
-    def fit(self, X):
+    def fit(self, X, y=None):
         n_clusters, centers, labels = _pgmeans(X, self.confidence, self.n_projections, self.n_samples,
                                                self.n_new_centers, self.random_centers, self.max_n_clusters)
         self.n_clusters_ = n_clusters
         self.cluster_centers_ = centers
         self.labels_ = labels
+        return self
