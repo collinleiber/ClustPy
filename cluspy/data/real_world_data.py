@@ -301,6 +301,8 @@ def load_mice_protein(return_multiple_labels=False, downloads_path=None):
         LE = LabelEncoder()
         genotype_labels = LE.fit_transform(genotypes_raw)
         labels = np.c_[labels, id_labels, bahaviors_labels, treatment_labels, genotype_labels]
+    # Remove rows also from labels (3 cases)
+    labels = labels[n_of_nans_per_row < 43]
     return data, labels
 
 

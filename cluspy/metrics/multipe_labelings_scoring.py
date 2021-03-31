@@ -159,6 +159,8 @@ class MultipleLabelingsConfusionMatrix(ConfusionMatrix):
 
     def __init__(self, labels_true, labels_pred, metric=nmi, remove_noise_spaces=True, metric_params={}):
         _check_number_of_points(labels_true, labels_pred)
+        if labels_true.ndim == 1:
+            labels_true = labels_true.reshape((-1, 1))
         if remove_noise_spaces:
             labels_true = remove_noise_spaces_from_labels(labels_true)
             labels_pred = remove_noise_spaces_from_labels(labels_pred)
@@ -184,6 +186,8 @@ def calculate_multi_labelings_score(labels_true, labels_pred, metric=multiple_la
                                     remove_noise_spaces=True, aggregation="max", confusion_matrix_obj=None,
                                     metric_params={}):
     _check_number_of_points(labels_true, labels_pred)
+    if labels_true.ndim == 1:
+        labels_true = labels_true.reshape((-1,1))
     assert confusion_matrix_obj is None or type(confusion_matrix_obj) is MultipleLabelingsConfusionMatrix, \
         "confusion_matrix must be None or of type MultipleLabelingsConfusionMatrix"
     if remove_noise_spaces:
@@ -233,8 +237,10 @@ def calculate_average_redundancy(labelings, metric=vi, remove_noise_spaces=True,
     return score
 
 
-def is_multi_labelings_n_clusters_correct(labels_true, labels_pred, check_subset=False, remove_noise_spaces=True):
+def is_multi_labelings_n_clusters_correct(labels_true, labels_pred, check_subset=True, remove_noise_spaces=True):
     _check_number_of_points(labels_true, labels_pred)
+    if labels_true.ndim == 1:
+        labels_true = labels_true.reshape((-1,1))
     if remove_noise_spaces:
         labels_true = remove_noise_spaces_from_labels(labels_true)
         labels_pred = remove_noise_spaces_from_labels(labels_pred)
@@ -242,8 +248,10 @@ def is_multi_labelings_n_clusters_correct(labels_true, labels_pred, check_subset
     if labels_true.shape[1] > labels_pred.shape[1] or (
             not check_subset and labels_pred.shape[1] > labels_true.shape[1]):
         return False
-    unique_labels_true = np.sort([len(np.unique(labels_true[:, i])) for i in range(labels_true.shape[1])])
-    unique_labels_pred = np.sort([len(np.unique(labels_pred[:, i])) for i in range(labels_pred.shape[1])])
+    unique_labels_true = [np.unique(labels_true[:, i]) for i in range(labels_true.shape[1])]
+    unique_labels_true = np.sort([len(u[u >= 0]) for u in unique_labels_true])
+    unique_labels_pred = [np.unique(labels_pred[:, i]) for i in range(labels_pred.shape[1])]
+    unique_labels_pred = np.sort([len(u[u >= 0]) for u in unique_labels_pred])
     if check_subset:
         is_equal = all([gt in unique_labels_pred for gt in unique_labels_true])
     else:

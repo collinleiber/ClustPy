@@ -5,7 +5,7 @@ def _check_number_of_points(labels_true, labels_pred):
     if labels_pred.shape[0] != labels_true.shape[0]:
         raise Exception(
             "Number of objects of the prediction and ground truth are not equal.\nNumber of prediction objects: " + str(
-                len(labels_pred.shape[0])) + "\nNumber of ground truth objects: " + str(labels_true.shape[0]))
+                labels_pred.shape[0]) + "\nNumber of ground truth objects: " + str(labels_true.shape[0]))
 
 """
 Meilă, Marina. "Comparing clusterings by the variation of

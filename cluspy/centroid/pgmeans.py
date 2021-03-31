@@ -26,7 +26,7 @@ def _pgmeans(X, confidence, n_projections, n_samples, n_new_centers, random_cent
         n_clusters += 1
         best_gmm = None
         best_log_likelihood = -np.inf
-        # Try different center possibilities
+        # Try different center probability
         for center in input_centers:
             gmm = GMM(n_components=n_clusters, n_init=1, means_init=center)
             gmm.fit(X)

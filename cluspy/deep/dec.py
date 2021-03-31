@@ -35,6 +35,8 @@ def _dec(X, n_clusters, alpha, batch_size, pretrain_learning_rate, dec_learning_
     if autoencoder is None:
         autoencoder = get_trained_autoencoder(trainloader, pretrain_learning_rate, pretrain_epochs, device,
                                               optimizer_class, loss_fn, X.shape[1], embedding_size)
+    else:
+        autoencoder.to(device)
     # Execute kmeans in embedded space - initial clustering
     embedded_data = encode_batchwise(testloader, autoencoder, device)
     kmeans = KMeans(n_clusters=n_clusters)

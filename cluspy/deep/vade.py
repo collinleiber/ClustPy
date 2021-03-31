@@ -30,6 +30,8 @@ def _vade(X, n_clusters, batch_size, pretrain_learning_rate, vade_learning_rate,
     if autoencoder is None:
         autoencoder = get_trained_autoencoder(trainloader, pretrain_learning_rate, pretrain_epochs, device,
                                               optimizer_class, loss_fn, X.shape[1], embedding_size, _Vade_Autoencoder)
+    else:
+        autoencoder.to(device)
     # Execute EM in embedded space
     embedded_data = _vade_encode_batchwise(testloader, autoencoder, device)
     gmm = GaussianMixture(n_components=n_clusters, covariance_type='diag', n_init=100)

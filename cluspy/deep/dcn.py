@@ -31,6 +31,8 @@ def _dcn(X, n_clusters, batch_size, pretrain_learning_rate, dcn_learning_rate, p
     if autoencoder is None:
         autoencoder = get_trained_autoencoder(trainloader, pretrain_learning_rate, pretrain_epochs, device,
                                               optimizer_class, loss_fn, X.shape[1], embedding_size)
+    else:
+        autoencoder.to(device)
     # Execute kmeans in embedded space
     embedded_data = encode_batchwise(testloader, autoencoder, device)
     kmeans = KMeans(n_clusters=n_clusters)

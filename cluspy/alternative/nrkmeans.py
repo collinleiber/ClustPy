@@ -15,9 +15,7 @@ from sklearn.utils.extmath import row_norms
 from sklearn.metrics.pairwise import pairwise_distances_argmin_min
 from sklearn.metrics import normalized_mutual_info_score as nmi
 from sklearn.base import BaseEstimator, ClusterMixin
-import seaborn as sns
-import matplotlib.pyplot as plt
-import pandas as pd
+from cluspy.utils.plots import plot_scatter_matrix
 import cluspy.utils._mdlcosts as mdl
 
 _ACCEPTED_NUMERICAL_ERROR = 1e-6
@@ -41,7 +39,7 @@ def _nrkmeans(X, n_clusters, V, m, P, centers, mdl_for_noisespace, outliers, max
     :param random_state: use a fixed random state to get a repeatable solution
     :return: labels, centers, V, m, P, n_clusters (can get lost), scatter_matrices
     """
-    V, m, P, centers, random_state, subspaces, labels, scatter_matrices = _initialize_nrkmeans_parameters(
+    V, m, P, centers, random_state, subspaces, labels, scatter_matrices, uniform_max_min_coding = _initialize_nrkmeans_parameters(
         X, n_clusters, V, m, P, centers, mdl_for_noisespace, outliers, max_iter, random_state)
     # Check if labels stay the same (break condition)
     old_labels = None
@@ -62,7 +60,8 @@ def _nrkmeans(X, n_clusters, V, m, P, centers, mdl_for_noisespace, outliers, max
             # (Optional) Check for outliers
             if outliers:
                 labels[:, i], scatter_matrices[i], n_outliers[i] = _check_for_outliers(X, V, centers[i], labels[:, i],
-                                                                                       scatter_matrices[i], m[i], P[i])
+                                                                                       scatter_matrices[i], m[i], P[i],
+                                                                                       uniform_max_min_coding)
         # Check if labels have not changed
         if _are_labels_equal(labels, old_labels):
             break
@@ -73,7 +72,7 @@ def _nrkmeans(X, n_clusters, V, m, P, centers, mdl_for_noisespace, outliers, max
             for j in range(i + 1, subspaces):
                 # Do rotation calculations
                 P_1_new, P_2_new, V_new = _update_rotation(X, V, i, j, n_clusters, P, scatter_matrices, labels,
-                                                           mdl_for_noisespace, outliers, n_outliers)
+                                                           mdl_for_noisespace, outliers, n_outliers, uniform_max_min_coding)
                 # Update V, m, P
                 m[i] = len(P_1_new)
                 m[j] = len(P_2_new)
@@ -87,6 +86,10 @@ def _nrkmeans(X, n_clusters, V, m, P, centers, mdl_for_noisespace, outliers, max
                                                                                                 centers,
                                                                                                 labels,
                                                                                                 scatter_matrices)
+        if outliers and not mdl_for_noisespace:
+            # Update uniform_max_min_coding
+            rotated_X = np.matmul(X, V)
+            uniform_max_min_coding = -np.log2(1 / (np.max(rotated_X, axis=0) - np.min(rotated_X, axis=0)))
     # print("[NrKmeans] Converged in iteration " + str(iteration + 1))
     # Return relevant values
     return labels, centers, V, m, P, n_clusters, scatter_matrices
@@ -107,7 +110,7 @@ def _initialize_nrkmeans_parameters(X, n_clusters, V, m, P, centers, mdl_for_noi
     :param outliers: boolean defining if outliers should be identified
     :param max_iter: maximum number of iterations for the algorithm
     :param random_state: use a fixed random state to get a repeatable solution
-    :return: checked V, m, P, centers, random_state, number of subspaces, labels, scatter_matrices
+    :return: checked V, m, P, centers, random_state, number of subspaces, labels, scatter_matrices, uniform_max_min_coding
     """
     data_dimensionality = X.shape[1]
     random_state = check_random_state(random_state)
@@ -207,7 +210,12 @@ def _initialize_nrkmeans_parameters(X, n_clusters, V, m, P, centers, mdl_for_noi
     # Initial labels and scatter matrices
     labels = np.zeros((X.shape[0], subspaces), dtype=np.int32)
     scatter_matrices = [None] * subspaces
-    return V, m, P, centers, random_state, subspaces, labels, scatter_matrices
+    if outliers or mdl_for_noisespace:
+        rotated_X = np.matmul(X, V)
+        uniform_max_min_coding = -np.log2(1 / (np.max(rotated_X, axis=0) - np.min(rotated_X, axis=0)))
+    else:
+        uniform_max_min_coding = None
+    return V, m, P, centers, random_state, subspaces, labels, scatter_matrices, uniform_max_min_coding
 
 
 def _assign_labels(X, V, centers_subspace, P_subspace):
@@ -286,7 +294,7 @@ def _remove_empty_cluster(n_clusters_subspace, centers_subspace, scatter_matrice
 
 
 def _update_rotation(X, V, first_index, second_index, n_clusters, P, scatter_matrices, labels, mdl_for_noisespace,
-                     outliers, n_outliers):
+                     outliers, n_outliers, uniform_max_min_coding):
     """
     Update the rotation of the subspaces. Updates V and m and P for the input subspaces.
     :param X: input data
@@ -342,7 +350,7 @@ def _update_rotation(X, V, first_index, second_index, n_clusters, P, scatter_mat
         if mdl_for_noisespace:
             P_1_new, P_2_new = _compare_possible_splits(X, V_new, first_index, second_index,
                                                         n_negative_e, P_combined, n_clusters,
-                                                        scatter_matrices, labels, outliers, n_outliers)
+                                                        scatter_matrices, labels, outliers, n_outliers, uniform_max_min_coding)
         else:
             n_negative_e = len(e[e < _NOISE_SPACE_THRESHOLD])
             P_1_new, P_2_new = _update_projections(P_combined, n_negative_e)
@@ -466,7 +474,7 @@ def _are_labels_equal(labels_new, labels_old):
 
 
 def _compare_possible_splits(X, V, cluster_index, noise_index, n_negative_e, P_combined,
-                             n_clusters, scatter_matrices, labels, outliers, n_outliers):
+                             n_clusters, scatter_matrices, labels, outliers, n_outliers, uniform_max_min_coding):
     """
     Use MDL to find the cheapest combination of cluster and noise dimensionality. Try raising number of cluster space
     dimensionality until costs increase.
@@ -482,6 +490,10 @@ def _compare_possible_splits(X, V, cluster_index, noise_index, n_negative_e, P_c
     :param n_outliers: number of outliers
     :return: P_cluster, P_noise - projections for cluster and noise space
     """
+    # Update uniform_max_min_coding
+    rotated_X = np.matmul(X, V[:, P_combined])
+    uniform_max_min_coding[P_combined] = -np.log2(1 / (np.max(rotated_X, axis=0) - np.min(rotated_X, axis=0)))
+    # Find best split of dimensions
     best_costs = np.inf
     best_P_cluster, best_P_noise = _update_projections(P_combined, 0)
     # Try raising number of dimensionalities in the cluster space until costs raise
@@ -490,8 +502,8 @@ def _compare_possible_splits(X, V, cluster_index, noise_index, n_negative_e, P_c
         P_cluster, P_noise = _update_projections(P_combined, m_cluster)
         # Get costs for this combination of dimensionalities
         costs = _mdl_m_dependant_subspace_costs(X, V, cluster_index, noise_index, m_cluster,
-                                               m_noise, P_cluster, P_noise,
-                                               scatter_matrices, n_clusters, labels, outliers, n_outliers)
+                                                m_noise, P_cluster, P_noise,
+                                                scatter_matrices, n_clusters, labels, outliers, n_outliers, uniform_max_min_coding)
         # If costs are lower, next try. Else break
         if costs < best_costs:
             best_costs = costs
@@ -502,7 +514,8 @@ def _compare_possible_splits(X, V, cluster_index, noise_index, n_negative_e, P_c
     return best_P_cluster, best_P_noise
 
 
-def _check_for_outliers(X, V, centers_subspace, labels_subspace, scatter_matrices_subspace, m_subspace, P_subspace):
+def _check_for_outliers(X, V, centers_subspace, labels_subspace, scatter_matrices_subspace, m_subspace, P_subspace,
+                        uniform_max_min_coding):
     """
     Check for each point if it should be interpreted as an outlier in this subspace. Outliers are defined by the changing
     cluster costs if point is removed from cluster. If it is cheaper to encode the point separately it is an outlier.
@@ -525,10 +538,10 @@ def _check_for_outliers(X, V, centers_subspace, labels_subspace, scatter_matrice
     cropped_V = V[:, P_subspace]
     # Get original costs encoding the points
     sum_scatter_matrices = np.sum(scatter_matrices_subspace, 0)
-    cluster_costs = mdl.mdl_costs_gaussian_single_variance(cropped_V, n_points,
-                                                           sum_scatter_matrices, m_subspace)
+    cluster_costs = mdl.mdl_costs_gaussian_single_variance(n_points,
+                                                           sum_scatter_matrices, m_subspace, cropped_V)
     # Get costs for single outlier in this subspace
-    outlier_coding_cost = _mdl_outlier_costs(n_points, m_subspace)
+    outlier_coding_cost = _mdl_reference_vector(n_points, uniform_max_min_coding, P_subspace)
     # Save the most distant non-outlier and nearest outlier (Important for runtime speedup!)
     farthest_non_outliers = 0
     neareast_outliers = np.inf
@@ -593,9 +606,9 @@ def _is_point_outlier(x, n_points, cluster_costs, outlier_coding_cost, cropped_V
     # Remove squared difference from point to center from scatter matrix
     scatter_matrix_cluster_tmp = scatter_matrix - outer
     # Calculate new pdf costs for cluster
-    new_cluster_costs = mdl.mdl_costs_gaussian_single_variance(cropped_V, n_points - 1,
+    new_cluster_costs = mdl.mdl_costs_gaussian_single_variance(n_points - 1,
                                                                scatter_matrix_cluster_tmp,
-                                                               m_subspace)
+                                                               m_subspace, cropped_V)
     # Check if coding costs would be lower than before
     if new_cluster_costs + outlier_coding_cost < cluster_costs:
         neareast_outliers = distance_squared
@@ -606,7 +619,8 @@ def _is_point_outlier(x, n_points, cluster_costs, outlier_coding_cost, cropped_V
 
 
 def _mdl_m_dependant_subspace_costs(X, V, cluster_index, noise_index, m_cluster, m_noise,
-                               P_cluster, P_noise, scatter_matrices, n_clusters, labels, outliers, n_outliers):
+                                    P_cluster, P_noise, scatter_matrices, n_clusters, labels, outliers, n_outliers,
+                                    uniform_max_min_coding):
     """
     Get the total costs depending on the subspace dimensionality for one cluster space and the noise space.
     Method can be used to determine the best possible number do dimensionalities to swap from cluster into the noise
@@ -630,28 +644,41 @@ def _mdl_m_dependant_subspace_costs(X, V, cluster_index, noise_index, m_cluster,
     # Costs for cluster dimensionality
     cluster_costs = mdl.mdl_costs_integer_value(m_cluster)
     # Costs for centers
-    cluster_costs += n_clusters[cluster_index] * m_cluster * mdl.mdl_costs_float_value(n_points)
-    # Costs for point encoding
+    # cluster_costs += n_clusters[cluster_index] * m_cluster * mdl.mdl_costs_precision(n_points)
+    cluster_costs += n_clusters[cluster_index] * _mdl_reference_vector(n_points, uniform_max_min_coding, P_cluster)
+    # Costs of variance
     cropped_V_cluster = V[:, P_cluster]
-    cluster_costs += mdl.mdl_costs_gmm_single_covariance(cropped_V_cluster, m_cluster,
+    # sum_scatter_matrices_cluster = np.sum(scatter_matrices[cluster_index], 0)
+    # trace = np.trace(np.matmul(np.matmul(cropped_V_cluster.transpose(), sum_scatter_matrices_cluster), cropped_V_cluster))
+    # variance = trace / (m_cluster * (n_points - n_outliers[cluster_index]))
+    # cluster_costs += mdl.mdl_costs_integer_value(int(variance)) + mdl.mdl_costs_precision(n_points)
+    # Costs for point encoding
+    cluster_costs += mdl.mdl_costs_gmm_single_covariance(m_cluster,
                                                          scatter_matrices[cluster_index],
-                                                         n_points - n_outliers[cluster_index])
+                                                         n_points - n_outliers[cluster_index], cropped_V_cluster)
     # Costs for outliers
     if outliers:
-        cluster_costs += _mdl_outlier_costs(n_points, m_cluster) * n_outliers[cluster_index]
+        cluster_costs += n_outliers[cluster_index] * _mdl_reference_vector(n_points, uniform_max_min_coding, P_cluster)
     # ==== Costs of noise space ====
     # Costs for noise dimensionality
     noise_costs = mdl.mdl_costs_integer_value(m_noise)
     # Costs for centers
-    noise_costs += n_clusters[noise_index] * m_noise * mdl.mdl_costs_float_value(n_points)
-    # Costs for point encoding
+    # noise_costs += n_clusters[noise_index] * m_noise * mdl.mdl_costs_precision(n_points)
+    noise_costs += n_clusters[noise_index] * _mdl_reference_vector(n_points, uniform_max_min_coding, P_noise)
+    # Costs of variance
     cropped_V_noise = V[:, P_noise]
-    noise_costs += mdl.mdl_costs_gmm_single_covariance(cropped_V_noise, m_noise,
+    # sum_scatter_matrices_noise = np.sum(scatter_matrices[noise_index], 0)
+    # trace = np.trace(np.matmul(np.matmul(cropped_V_noise.transpose(), sum_scatter_matrices_noise), cropped_V_noise))
+    # variance = trace / (m_noise * (n_points - n_outliers[noise_index]))
+    # cluster_costs += mdl.mdl_costs_integer_value(int(variance)) + mdl.mdl_costs_precision(n_points)
+    # cluster_costs += mdl.mdl_costs_precision(n_points)
+    # Costs for point encoding
+    noise_costs += mdl.mdl_costs_gmm_single_covariance(m_noise,
                                                        scatter_matrices[noise_index],
-                                                       n_points - n_outliers[noise_index])
+                                                       n_points - n_outliers[noise_index], cropped_V_noise)
     # Costs for outliers
     if outliers:
-        noise_costs += _mdl_outlier_costs(n_points, m_noise) * n_outliers[noise_index]
+        noise_costs += n_outliers[noise_index] * _mdl_reference_vector(n_points, uniform_max_min_coding, P_noise)
     # Return costs
     return cluster_costs + noise_costs
 
@@ -676,46 +703,62 @@ def _mdl_costs(X, nrkmeans):
     n_points = X.shape[0]
     n_outliers = 0
     subspaces = len(nrkmeans.m)
+    rotated_X = np.matmul(X, nrkmeans.V)
+    uniform_max_min_coding = -np.log2(1 / (np.max(rotated_X, axis=0) - np.min(rotated_X, axis=0)))
     # Calculate costs
     global_costs = 0
+    # Costs of matrix V
+    # global_costs += mdl.mdl_costs_orthogonal_matrix(n_points, mdl.mdl_costs_float_value(n_points))
     # Costs of number of subspaces
     global_costs += mdl.mdl_costs_integer_value(subspaces)
-    # Costs of matrix V
-    global_costs += mdl.mdl_costs_orthogonal_matrix(n_points, mdl.mdl_costs_float_value(n_points))
     # Costs for each subspace
     all_subspace_costs = []
     for subspace_nr in range(subspaces):
+        cropped_V = nrkmeans.V[:, nrkmeans.P[subspace_nr]]
+        # sum_scatter_matrices = np.sum(nrkmeans.scatter_matrices_[subspace_nr], 0)
+        # trace = np.trace(np.matmul(np.matmul(cropped_V.transpose(), sum_scatter_matrices), cropped_V))
+        # Calculate costs
         model_costs = 0
         # Costs for dimensionality
         model_costs += mdl.mdl_costs_integer_value(nrkmeans.m[subspace_nr])
         # Number of clusters in subspace
         model_costs += mdl.mdl_costs_integer_value(nrkmeans.n_clusters[subspace_nr])
         # Costs for cluster centers
-        model_costs += nrkmeans.n_clusters[subspace_nr] * nrkmeans.m[subspace_nr] * mdl.mdl_costs_float_value(n_points)
-        # Subspace Variance costs
-        model_costs += mdl.mdl_costs_float_value(n_points)
+        model_costs += nrkmeans.n_clusters[subspace_nr] * \
+                       _mdl_reference_vector(n_points, uniform_max_min_coding, nrkmeans.P[subspace_nr])
+        # model_costs += nrkmeans.n_clusters[subspace_nr] * nrkmeans.m[subspace_nr] * mdl.mdl_costs_float_value(n_points)
         # Coding costs for outliers
-        cropped_V = nrkmeans.V[:, nrkmeans.P[subspace_nr]]
         outlier_costs = 0
         if nrkmeans.outliers:
             # Encode number of outliers
             n_outliers = len(nrkmeans.labels_[:, subspace_nr][nrkmeans.labels_[:, subspace_nr] == -1])
             model_costs += mdl.mdl_costs_integer_value(n_outliers)
             # Encode coding costs of outliers
-            outlier_costs += _mdl_outlier_costs(n_points, nrkmeans.m[subspace_nr]) * n_outliers
+            outlier_costs += n_outliers * _mdl_reference_vector(n_points, uniform_max_min_coding,
+                                                                nrkmeans.P[subspace_nr])
+        # Subspace Variance costs
+        # variance = trace / (nrkmeans.m[subspace_nr] * (n_points - n_outliers))
+        # model_costs +=  mdl.mdl_costs_integer_value(int(variance)) + mdl.mdl_costs_precision(n_points)
+        model_costs += mdl.mdl_costs_precision(n_points)
         # Cluster assignment (is 0 for noise space)
-        assignment_costs = (n_points - n_outliers) * mdl.mdl_costs_uniform_distribution(nrkmeans.n_clusters[subspace_nr])
+        assignment_costs = (n_points - n_outliers) * mdl.mdl_costs_discrete_uniform_distribution(
+            nrkmeans.n_clusters[subspace_nr])
         # Coding costs for each point
         coding_costs = mdl.mdl_costs_gmm_single_covariance(cropped_V, nrkmeans.m[subspace_nr],
-                                                           nrkmeans.scatter_matrices_[subspace_nr], n_points - n_outliers)
+                                                           nrkmeans.scatter_matrices_[subspace_nr],
+                                                           n_points - n_outliers)
+        coding_costs += (n_points - n_outliers) * mdl.mdl_costs_precision(n_points)
         # Save this subspace costs
         all_subspace_costs.append(model_costs + outlier_costs + assignment_costs + coding_costs)
     # return full and single subspace costs
     total_costs = global_costs + sum(all_subspace_costs)
     return total_costs, global_costs, all_subspace_costs
 
-def _mdl_outlier_costs(n_points, m_subspace):
-    return mdl.mdl_costs_float_value(n_points) * m_subspace
+
+def _mdl_reference_vector(n_points, uniform_max_min_coding, P_subspace):
+    costs_reference_vector = np.sum(uniform_max_min_coding[P_subspace]) + len(P_subspace) * mdl.mdl_costs_precision(
+        n_points)
+    return costs_reference_vector
 
 
 """
@@ -773,7 +816,6 @@ class NrKmeans(BaseEstimator, ClusterMixin):
         self.scatter_matrices_ = scatter_matrices
         return self
 
-
     # def predict(self, X):
     #     """
     #     Predict the labels of an input dataset. For this method the results from the NrKmeans fit() method will be used.
@@ -793,13 +835,13 @@ class NrKmeans(BaseEstimator, ClusterMixin):
     #         if self.outliers:
     #             n_points = X.shape[0]
     #             # Get basic cluster parameters for this subspace
-    #             cropped_V = self.V[:, self.P[sub]]
+    #             rotation = self.V[:, self.P[sub]]
     #             # Get original costs encoding the points
     #             sum_scatter_matrices = np.sum(self.scatter_matrices[sub], 0)
-    #             cluster_costs = mdl._calculate_single_cluster_costs_single_variance(cropped_V, n_points,
+    #             cluster_costs = mdl._calculate_single_cluster_costs_single_variance(rotation, n_points,
     #                                                                                 sum_scatter_matrices, self.m[sub])
     #             # Get costs for single outlier in this subspace
-    #             outlier_coding_cost = mdl.single_outlier_costs(X, cropped_V)
+    #             outlier_coding_cost = mdl.single_outlier_costs(X, rotation)
     #             # Check each point separately if it is an outlier
     #             for i, x in enumerate(X):
     #                 # Get costs for additional point in this cluster
@@ -810,7 +852,7 @@ class NrKmeans(BaseEstimator, ClusterMixin):
     #                 # Add outer product to original scatter matrix
     #                 scatter_matrix_cluster_tmp = self.scatter_matrices[sub][old_label] + outer
     #                 # Calculate new costs
-    #                 new_pdf_costs = mdl._calculate_single_cluster_costs_single_variance(cropped_V, n_points + 1,
+    #                 new_pdf_costs = mdl._calculate_single_cluster_costs_single_variance(rotation, n_points + 1,
     #                                                                                     scatter_matrix_cluster_tmp,
     #                                                                                     self.m[sub])
     #                 # Check if coding costs would be lower
@@ -864,7 +906,7 @@ class NrKmeans(BaseEstimator, ClusterMixin):
                 changed_subspace.remove(x)
         return changed_subspace
 
-    def plot_subspace(self, X, subspace_index, labels=None, title=None):
+    def plot_subspace(self, X, subspace_index, labels=None, title=None, gt=None):
         """
         Plot the specified subspace as scatter matrix plot.
         :param X: input data
@@ -881,20 +923,9 @@ class NrKmeans(BaseEstimator, ClusterMixin):
         if self.m[subspace_index] > 10:
             print("[NrKmeans] Info: Subspace has a dimensionality > 10 and will not be plotted.")
             return
-        sns.set(style="ticks")
-        plot_data = pd.DataFrame(self.transform_subspace(X, subspace_index))
-        columns = plot_data.columns.values
-        plot_data["labels"] = labels
-        # If group contains only one element KDE Plot will not work -> Use histrogram instead
-        diag = "auto"
-        if 1 in np.unique(labels, return_counts=True)[1]:
-            diag = "hist"
-        g = sns.pairplot(plot_data, hue="labels", vars=columns, diag_kind=diag)
-        # Add title
-        my_title = "Subspace {0}".format(subspace_index) if title is None else "{0} / Subspace {1}".format(title,
-                                                                                                           subspace_index)
-        g.fig.suptitle(my_title)
-        plt.show()
+        plot_scatter_matrix(self.transform_subspace(X, subspace_index), labels,
+                            self.transform_subspace(self.cluster_centers_[subspace_index], subspace_index),
+                            true_labels=gt)
 
     # TODO
     # def calculate_mdl_costs(self, X):
