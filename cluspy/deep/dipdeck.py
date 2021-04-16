@@ -36,7 +36,7 @@ def _dip_deck(X, n_clusters_start, dip_merge_threshold, cluster_loss_weight, n_c
                                              drop_last=False)
     if autoencoder is None:
         autoencoder = get_trained_autoencoder(trainloader, pretrain_learning_rate, pretrain_epochs, device,
-                                              optimizer_class, loss_fn, X.shape[1], embedding_size, _DipDECK_Autoencoder)
+                                              optimizer_class, loss_fn, X.shape[1], embedding_size, _DipDECK_Autoencoder) # hier muss man vielleicht die class Stacked_Autoencoder übergeben? 
     else:
         autoencoder.to(device)
     # Execute kmeans in embedded space - initial clustering
