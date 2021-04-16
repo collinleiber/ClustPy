@@ -162,9 +162,26 @@ def get_trained_autoencoder(trainloader, learning_rate, n_epochs, device, optimi
             input_dim)
         embedding_size = input_dim
     # Pretrain Autoencoder
-    autoencoder = autoencoder_class(input_dim=input_dim, embedding_size=embedding_size).to(device)
-    optimizer = optimizer_class(autoencoder.parameters(), lr=learning_rate)
-    autoencoder.start_training(trainloader, n_epochs, device, optimizer, loss_fn)
+    # adjusted here
+    if autoencoder_class is Simple_Autoencoder:
+        autoencoder = autoencoder_class(input_dim=input_dim, embedding_size=embedding_size).to(device)
+        optimizer = optimizer_class(autoencoder.parameters(), lr=learning_rate)
+        autoencoder.start_training(trainloader, n_epochs, device, optimizer, loss_fn)
+    else: ### added this
+        #n_features = data.shape[1]
+        ### die eventuell mal als Parameter
+        ae_layout = [500, 500, 2000, embedded_size]
+        steps_per_layer = 25000
+        refine_training_steps = 50000
+        ###
+        autoencoder = autoencoder_class(input_dim, ae_layout, weight_initalizer=torch.nn.init.xavier_normal_,
+        activation_fn=lambda x: F.relu(x), loss_fn=loss_fn, optimizer_fn=lambda parameters: torch.optim.Adam(parameters, lr=learning_rate))
+        # train and testloader
+        #trainloader, testloader = get_train_and_testloader(data, gt_labels, batch_size)
+        autoencoder.pretrain(trainloader, rounds_per_layer=steps_per_layer, dropout_rate=0.2, corruption_fn=add_noise)
+        autoencoder.refine_training(trainloader, refine_training_steps, corruption_fn=add_noise)
+        #total_loss = get_total_loss(autoencoder,trainloader) <--- Hat mir einen Fehler geschmissen
+        #print(total_loss)
     return autoencoder
 
 
