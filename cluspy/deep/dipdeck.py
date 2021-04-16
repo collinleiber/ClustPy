@@ -7,7 +7,7 @@ from cluspy.deep._utils import detect_device, encode_batchwise, Simple_Autoencod
 from sklearn.cluster import KMeans
 from sklearn.base import BaseEstimator, ClusterMixin
 ### added
-from cluspy.deep.stacked_ae_L import Stacked_Autoencoder, window
+from cluspy.deep.stacked_ae_L import Stacked_Autoencoder, window, add_noise
 import torch.nn.functional as F
 from itertools import islice
 
