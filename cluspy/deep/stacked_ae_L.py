@@ -1,6 +1,6 @@
 import torch
-import torch.nn.functional as F
-from itertools import islice
+#import torch.nn.functional as F
+#from itertools import islice
 
 class stacked_Autoencoder(torch.nn.Module):
     'stacked AE'
