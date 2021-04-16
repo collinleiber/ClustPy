@@ -2,7 +2,7 @@ import torch
 #import torch.nn.functional as F
 #from itertools import islice
 
-class stacked_Autoencoder(torch.nn.Module):
+class Stacked_Autoencoder(torch.nn.Module):
     'stacked AE'
     def __init__(self, feature_dim, layer_dims, weight_initalizer,
                  loss_fn=lambda x, y: torch.mean((x - y) ** 2),
