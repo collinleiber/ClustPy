@@ -1,19 +1,12 @@
 import torch
 import torch.nn.functional as F
-from ourUtils.funct_band_aids import window
+from itertools import islice
 
-
-# Based on: https://gist.github.com/InnovArul/500e0c57e88300651f8005f9bd0d12bc
-class stacked_ae(torch.nn.Module):
-    """
-    Represents a to some degree flexible stacked autoencoder. It is inspired by the pre-training proposed in:
-        Xie, Junyuan, Ross Girshick, and Ali Farhadi. "Unsupervised deep embedding for clustering analysis." International conference on machine learning. 2016.
-    """
-
+class stacked_Autoencoder(torch.nn.Module):
+    'stacked AE'
     def __init__(self, feature_dim, layer_dims, weight_initalizer,
                  loss_fn=lambda x, y: torch.mean((x - y) ** 2),
-                 optimizer_fn=lambda parameters: torch.optim.Adam(
-                     parameters, lr = 0.001),
+                 optimizer_fn=lambda parameters: torch.optim.Adam(parameters, lr=0.001),
                  tied_weights=False, activation_fn=None, bias_init=0.0, linear_embedded=True, linear_decoder_last=True
                  ):
         """
@@ -28,7 +21,8 @@ class stacked_ae(torch.nn.Module):
         :param bias_init:
         :param linear_decoder_last: If True the last layer does not have the activation function
         """
-
+    
+        #super(Autoencoder, self).__init__()
         super().__init__()
         self.tied_weights = tied_weights
         self.loss_fn = loss_fn
@@ -56,8 +50,7 @@ class stacked_ae(torch.nn.Module):
             feature_dim, node_dim = layer_params[l]
             encoder_weight = torch.empty(node_dim, feature_dim)
             weight_initalizer(encoder_weight)
-            encoder_weight = torch.nn.Parameter(
-                encoder_weight, requires_grad=True)
+            encoder_weight = torch.nn.Parameter(encoder_weight, requires_grad=True)
             self.register_parameter(f"encoder_weight_{l}", encoder_weight)
             self.param_weights_encoder.append(encoder_weight)
             encoder_bias = torch.empty(node_dim)
@@ -69,8 +62,7 @@ class stacked_ae(torch.nn.Module):
             if not tied_weights:
                 decoder_weight = torch.empty(feature_dim, node_dim)
                 weight_initalizer(decoder_weight)
-                decoder_weight = torch.nn.Parameter(
-                    decoder_weight, requires_grad=True)
+                decoder_weight = torch.nn.Parameter(decoder_weight, requires_grad=True)
                 self.register_parameter(f"decoder_weight_{l}", decoder_weight)
                 self.param_weights_decoder.append(decoder_weight)
             decoder_bias = torch.empty(feature_dim)
@@ -82,7 +74,8 @@ class stacked_ae(torch.nn.Module):
             self.param_weights_decoder.reverse()
         self.param_bias_decoder.reverse()
         self.activation_fn = activation_fn
-
+        
+    
     def forward_pretrain(self, input_data, stack, use_dropout=True, dropout_rate=0.2,
                          dropout_is_training=True):
         encoded_data = input_data
@@ -196,7 +189,7 @@ class stacked_ae(torch.nn.Module):
 
                     batch_data = batch_data[0]
 
-                    batch_data = batch_data.cuda()
+                    #batch_data = batch_data.cuda()
                     if corruption_fn is not None:
                         corrupted_batch = corruption_fn(batch_data)
                         _, reconstruced_data = self.forward_pretrain(corrupted_batch, layer, use_dropout=True,
@@ -231,7 +224,7 @@ class stacked_ae(torch.nn.Module):
                     break
                 batch_data = batch_data[0]
 
-                batch_data = batch_data.cuda()
+                #batch_data = batch_data.cuda()
 
                 # Forward pass
                 if corruption_fn is not None:
@@ -252,3 +245,23 @@ class stacked_ae(torch.nn.Module):
             else:  # For else is being executed if break did not occur, we continue the while true loop otherwise we break it too
                 continue
             break  # Break while loop here
+
+def window(seq, n):
+    "Returns a sliding window (of width n) over data from the iterable"
+    "   s -> (s0,s1,...s[n-1]), (s1,s2,...,sn), ...                   "
+    it = iter(seq)
+    result = tuple(islice(it, n))
+    if len(result) == n:
+        yield result
+    for elem in it:
+        result = result[1:] + (elem,)
+        yield result
+
+#def count_values_in_sequence(seq):
+#    from collections import defaultdict
+#    res = defaultdict(lambda : 0)
+#    for key in seq:
+#        res[key] += 1
+#    return dict(res)
+######
+    
