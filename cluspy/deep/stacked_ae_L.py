@@ -256,6 +256,12 @@ def window(seq, n):
     for elem in it:
         result = result[1:] + (elem,)
         yield result
+        
+def add_noise(batch):
+    mask = torch.empty(
+        batch.shape, device=batch.device).bernoulli_(0.8)
+    return batch * mask        
+        
 
 #def count_values_in_sequence(seq):
 #    from collections import defaultdict
