@@ -170,7 +170,7 @@ def get_trained_autoencoder(trainloader, learning_rate, n_epochs, device, optimi
     else: ### added this
         #n_features = data.shape[1]
         ### die eventuell mal als Parameter
-        ae_layout = [500, 500, 2000, embedded_size]
+        ae_layout = [500, 500, 2000, embedding_size]
         steps_per_layer = 25000
         refine_training_steps = 50000
         ###
