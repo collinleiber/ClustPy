@@ -3,9 +3,11 @@ import matplotlib.pyplot as plt
 
 
 def _rearrange(confusion_matrix):
-    new_order = [-1] * np.min(confusion_matrix.shape)
+    min_cm_shape = np.min(confusion_matrix.shape)
+    new_order = [-1] * min_cm_shape
     # Find best possible diagonal by using maximum values in the confusion matrix
-    hits_sorted = np.unravel_index(np.argsort(confusion_matrix, axis=None)[::-1], confusion_matrix.shape)
+    hits_sorted = np.unravel_index(np.argsort(confusion_matrix[:min_cm_shape,:], axis=None)[::-1],
+                                   (min_cm_shape, confusion_matrix.shape[1]))
     i = 0
     while -1 in new_order:
         row = hits_sorted[0][i]
@@ -38,7 +40,7 @@ def _plot_confusion_matrix(confusion_matrix, show_text=True, figsize=(10, 10), c
 
 class ConfusionMatrix():
 
-    def __init__(self, labels_true, labels_pred):
+    def __init__(self, labels_true, labels_pred, auto_rearrange=False):
         self.true_clusters = np.unique(labels_true)
         self.pred_clusters = np.unique(labels_pred)
         conf_matrix = np.zeros((len(self.true_clusters), len(self.pred_clusters)), dtype=int)
@@ -50,6 +52,8 @@ class ConfusionMatrix():
             for j, pred_label in enumerate(labels):
                 conf_matrix[i, np.argwhere(self.pred_clusters == pred_label)[0][0]] = cluster_sizes[j]
         self.confusion_matrix = conf_matrix
+        if auto_rearrange:
+            self.rearrange()
 
     def __str__(self):
         return str(self.confusion_matrix)

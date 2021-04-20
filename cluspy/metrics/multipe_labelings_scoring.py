@@ -157,7 +157,8 @@ Multiple Labelings Confusion Matrix
 
 class MultipleLabelingsConfusionMatrix(ConfusionMatrix):
 
-    def __init__(self, labels_true, labels_pred, metric=nmi, remove_noise_spaces=True, metric_params={}):
+    def __init__(self, labels_true, labels_pred, metric=nmi, remove_noise_spaces=True, metric_params={},
+                 auto_rearrange=False):
         _check_number_of_points(labels_true, labels_pred)
         if labels_true.ndim == 1:
             labels_true = labels_true.reshape((-1, 1))
@@ -173,6 +174,8 @@ class MultipleLabelingsConfusionMatrix(ConfusionMatrix):
             for j in range(labels_pred.shape[1]):
                 confusion_matrix[i, j] = metric(labels_true[:, i], labels_pred[:, j], **metric_params)
         self.confusion_matrix = confusion_matrix
+        if auto_rearrange:
+            self.rearrange()
 
     def plot(self, show_text=True, figsize=(10, 10), cmap="YlGn", textcolor="black", vmin=0, vmax=1):
         _plot_confusion_matrix(self.confusion_matrix, show_text, figsize, cmap, textcolor, vmin=vmin, vmax=vmax)
@@ -198,9 +201,9 @@ def calculate_multi_labelings_score(labels_true, labels_pred, metric=multiple_la
                                        multiple_labelings_pc_rand_score, multiple_labelings_pc_precision_score,
                                        multiple_labelings_pc_jaccard_score]
     if metric in multi_labelings_scoring_metrics:
-        if confusion_matrix_obj is None:
+        if confusion_matrix_obj is not None:
             print(
-                "[WARNING] Input confusion matrix is not used because the metric is a multiple labelings pair counitng score.")
+                "[WARNING] Input confusion matrix is not used because the metric is a multiple labelings pair counting score.")
         return metric(labels_true, labels_pred)
     # Calculate scores using confusion matrix scores
     if confusion_matrix_obj is None:

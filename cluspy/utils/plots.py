@@ -99,7 +99,7 @@ def plot_image(img_data, black_and_white=True, image_shape=None):
     plt.show()
 
 
-def plot_histogram(X, labels=None, density=True, n_bins=10, show_legend=True):
+def plot_histogram(X, labels=None, density=True, n_bins=100, show_legend=True):
     if labels is not None:
         unique_labels = np.unique(labels)
         # Manage colormap
@@ -109,7 +109,7 @@ def plot_histogram(X, labels=None, density=True, n_bins=10, show_legend=True):
     if labels is not None:
         for lab in unique_labels:
             hist_color = cmap(norm(lab))
-            plt.hist(X[labels == lab], alpha=0.5, bins=n_bins, color=hist_color)
+            plt.hist(X[labels == lab], alpha=0.5, bins=n_bins, color=hist_color, range=(np.min(X), np.max(X)))
     else:
         plt.hist(X, alpha=0.5, bins=n_bins)
     # Plot densities
@@ -133,7 +133,7 @@ def plot_histogram(X, labels=None, density=True, n_bins=10, show_legend=True):
     plt.show()
 
 
-def plot_scatter_matrix(X, labels=None, centers=None, true_labels=None, density=True, n_bins=10, show_legend=True,
+def plot_scatter_matrix(X, labels=None, centers=None, true_labels=None, density=True, n_bins=100, show_legend=True,
                         scattersize=10, equal_axis=False):
     if X.shape[1] > 10:
         print(
@@ -173,7 +173,7 @@ def plot_scatter_matrix(X, labels=None, centers=None, true_labels=None, density=
                         for lab in unique_labels:
                             hist_color = cmap(norm(lab))
                             twin_axis.hist(X[labels == lab, i], alpha=0.5, bins=n_bins,
-                                           color=hist_color)
+                                           color=hist_color, range=(np.min(X[:, i]), np.max(X[:, i])))
                     else:
                         twin_axis.hist(X[:, i], alpha=0.5, bins=n_bins)
                     # Plot densities

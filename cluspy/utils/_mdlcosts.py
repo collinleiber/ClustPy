@@ -14,7 +14,7 @@ def mdl_costs_orthogonal_matrix(dimensionality, costs_for_element):
     return cost
 
 
-def mdl_costs_precision(n_points):
+def mdl_costs_bic(n_points):
     assert n_points > 1, "The number of points must be larger than 0 to calculate the mdl costs of the precision. Your input:\n{0}".format(
         n_points)
     return 0.5 * np.log2(n_points)
@@ -30,8 +30,9 @@ def mdl_costs_integer_value(integer):
     :return: the mdl coding costs of the integer
     """
     assert type(integer) is int or type(
-        integer) is np.int32, "The input to calculate the mdl costs of must be an integer. Your input:\n{0}".format(
-        integer)
+        integer) is np.int32 or type(
+        integer) is np.int64, "The input to calculate the mdl costs of must be an integer. Your input:\n{0} (type: {1})".format(
+        integer, type(integer))
     cost = 0
     if integer != 0:
         last_interim_result = np.log2(integer)
@@ -47,10 +48,10 @@ Uniform Distribution
 """
 
 
-def mdl_costs_discrete_uniform_distribution(possibilities):
-    if possibilities == 0:
+def mdl_costs_discrete_probability(probability):
+    if probability == 0:
         return 0
-    return -np.log2(1 / possibilities)
+    return -np.log2(probability)
 
 
 """
@@ -61,14 +62,14 @@ Gaussian Mixtrure Models
 def mdl_costs_gmm_multiple_covariances(dimensionality, scatter_matrices, labels, rotation=None,
                                        covariance_type="single"):
     """
-    Calculate the coding costs of all points within a subspace. Calculates log(pdf(X)) with help of the scatter matrices
+    Calculate the coding costs of all points within a subspace_nr. Calculates log(pdf(X)) with help of the scatter matrices
     of the clusters.
     Method calls calculate_single_cluster_costs for each cluster
     :param rotation: cropped orthogonal rotation matrix
     :param dimensionality:
-    :param scatter_matrices: scatter matrices of the subspace
-    :param labels: labels of the cluster assingments for the subspace. -1 equals outlier
-    :return: coding costs for all points for this subspace
+    :param scatter_matrices: scatter matrices of the subspace_nr
+    :param labels: labels of the cluster assingments for the subspace_nr. -1 equals outlier
+    :return: coding costs for all points for this subspace_nr
     """
     assert covariance_type in ["single", "diagonal",
                                "full"], "covariance_type must equal 'single', 'diagonal' or 'full'"
@@ -107,18 +108,20 @@ Single Gaussian
 def _mdl_costs_gaussian(dimensionality, scatter_matrix_cluster, n_points_in_cluster, rotation=None,
                         covariance_type="single"):
     if covariance_type == "single":
-        full_pdf_costs = mdl_costs_gaussian_single_variance(n_points_in_cluster, scatter_matrix_cluster,
-                                                            dimensionality, rotation)
+        full_pdf_costs = mdl_costs_gaussian_single_variance(dimensionality, scatter_matrix_cluster,
+                                                            n_points_in_cluster, rotation)
     elif covariance_type == "diagonal":
-        full_pdf_costs = mdl_costs_gaussian_diagonal_covariance(n_points_in_cluster, scatter_matrix_cluster,
-                                                                dimensionality, rotation)
+        full_pdf_costs = mdl_costs_gaussian_diagonal_covariance(dimensionality, scatter_matrix_cluster,
+                                                                n_points_in_cluster, rotation)
     elif covariance_type == "full":
-        full_pdf_costs = mdl_costs_gaussian_full_covariance(n_points_in_cluster, scatter_matrix_cluster,
-                                                            dimensionality, rotation)
+        full_pdf_costs = mdl_costs_gaussian_full_covariance(dimensionality, scatter_matrix_cluster,
+                                                            n_points_in_cluster, rotation)
+    else:
+        raise Exception("covariance_type must be 'signle', 'diagonal' or 'full'")
     return full_pdf_costs
 
 
-def mdl_costs_gaussian_single_variance(n_points_in_cluster, scatter_matrix_cluster, dimensionality, rotation=None):
+def mdl_costs_gaussian_single_variance(dimensionality, scatter_matrix_cluster, n_points_in_cluster, rotation=None):
     # If only one point is in this cluster it is already encoded with the center
     if n_points_in_cluster <= 1 or dimensionality == 0:
         return 0
@@ -126,16 +129,16 @@ def mdl_costs_gaussian_single_variance(n_points_in_cluster, scatter_matrix_clust
         rotation = np.identity(scatter_matrix_cluster.shape[0])
     # Calculate the actual costs
     trace = np.trace(np.matmul(np.matmul(rotation.transpose(), scatter_matrix_cluster), rotation))
-    assert trace >= -1e-20, "Trace can not be negative!"
+    assert trace >= -1e-20, "Trace can not be negative! Trace is {0}".format(trace)
     # Can occur if all points in this cluster lie on the same position
     if trace <= 1e-20:
         return 0
-    pdf_costs = 1 + _LOG_2_PI + np.log(trace / dimensionality / n_points_in_cluster)
-    pdf_costs *= n_points_in_cluster * dimensionality / 2 / _LOG_2
+    pdf_costs = 1 + _LOG_2_PI - np.log(dimensionality * n_points_in_cluster) + np.log(trace)
+    pdf_costs *= n_points_in_cluster * dimensionality / (2 * _LOG_2)
     return pdf_costs
 
 
-def mdl_costs_gaussian_diagonal_covariance(n_points_in_cluster, scatter_matrix_cluster, dimensionality, rotation=None):
+def mdl_costs_gaussian_diagonal_covariance(dimensionality, scatter_matrix_cluster, n_points_in_cluster, rotation=None):
     # If only one point is in this cluster it is already encoded with the center
     if n_points_in_cluster <= 1 or dimensionality == 0:
         return 0
@@ -144,11 +147,11 @@ def mdl_costs_gaussian_diagonal_covariance(n_points_in_cluster, scatter_matrix_c
     cropped_scatter = np.matmul(np.matmul(rotation.transpose(), scatter_matrix_cluster), rotation)
     pdf_costs = dimensionality + dimensionality * _LOG_2_PI - dimensionality * np.log(n_points_in_cluster) + np.sum(
         np.log(cropped_scatter.diagonal()))
-    pdf_costs *= n_points_in_cluster / 2 / _LOG_2
+    pdf_costs *= n_points_in_cluster / (2 * _LOG_2)
     return pdf_costs
 
 
-def mdl_costs_gaussian_full_covariance(n_points_in_cluster, scatter_matrix_cluster, dimensionality, rotation=None):
+def mdl_costs_gaussian_full_covariance(dimensionality, scatter_matrix_cluster, n_points_in_cluster, rotation=None):
     # If only one point is in this cluster it is already encoded with the center
     if n_points_in_cluster <= 1 or dimensionality == 0:
         return 0
@@ -157,6 +160,8 @@ def mdl_costs_gaussian_full_covariance(n_points_in_cluster, scatter_matrix_clust
     cropped_scatter = np.matmul(np.matmul(rotation.transpose(), scatter_matrix_cluster), rotation)
     inv = np.linalg.inv(cropped_scatter)
     det = np.linalg.det(cropped_scatter)
+    if det <= 0:
+        det = 1e-20
     # calculate sum
     pdf_costs = 0
     for row, _ in enumerate(cropped_scatter):
@@ -166,5 +171,5 @@ def mdl_costs_gaussian_full_covariance(n_points_in_cluster, scatter_matrix_clust
             else:
                 pdf_costs += 2 * cropped_scatter[row, col] * inv[row, col]
     pdf_costs += dimensionality * _LOG_2_PI - dimensionality * np.log(n_points_in_cluster) + np.log(det)
-    pdf_costs *= n_points_in_cluster / 2 / _LOG_2
+    pdf_costs *= n_points_in_cluster / (2 * _LOG_2)
     return pdf_costs

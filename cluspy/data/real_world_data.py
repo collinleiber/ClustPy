@@ -374,3 +374,36 @@ def load_motestrain(add_testdata=True, downloads_path=None):
         labels = np.r_[labels, test_dataset[:, 0]]
     labels -= 1
     return data, labels
+
+
+"""
+Load WebKD
+"""
+
+def load_webkb(downloads_path=None):
+    directory = _get_download_dir(downloads_path) + "/WebKB/"
+    filename = directory + "webkb-data.gtar.gz"
+    if not os.path.isfile(filename) or True:
+        if not os.path.isdir(directory):
+            os.mkdir(directory)
+        # _download_file("http://www.cs.cmu.edu/afs/cs.cmu.edu/project/theo-20/www/data/webkb-data.gtar.gz",
+        #                filename)
+        # Unpack zipfile
+        with tarfile.open(filename, "r:gz") as tar:
+            # tar.extractall(directory)
+            for obj in tar.getmembers():
+                try:
+                    tar.extract(obj, directory, set_attrs=not obj.isdir())
+                    print("Successfully extraced:", obj)
+                except:
+                    print("Error extracting:", obj)
+            #     if "^" in obj.name:
+            #         # new_name = obj.name.replace("~", "").replace(".", "").replace("^", "").replace(":", "")
+            #         print(obj)
+            #         print(new_name)
+            #         tar.extract(obj, new_name)
+            #     else:
+
+
+if __name__ == "__main__":
+    load_webkb()
