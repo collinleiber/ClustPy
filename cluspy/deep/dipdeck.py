@@ -6,6 +6,10 @@ from cluspy.deep._utils import detect_device, encode_batchwise, Simple_Autoencod
     squared_euclidean_distance, int_to_one_hot, get_trained_autoencoder
 from sklearn.cluster import KMeans
 from sklearn.base import BaseEstimator, ClusterMixin
+### added
+from cluspy.deep.stacked_ae_L import Stacked_Autoencoder, window, add_noise
+import torch.nn.functional as F
+from itertools import islice
 
 
 def _dip_deck(X, n_clusters_start, dip_merge_threshold, cluster_loss_weight, n_clusters_max, n_clusters_min, batch_size,
@@ -32,7 +36,7 @@ def _dip_deck(X, n_clusters_start, dip_merge_threshold, cluster_loss_weight, n_c
                                              drop_last=False)
     if autoencoder is None:
         autoencoder = get_trained_autoencoder(trainloader, pretrain_learning_rate, pretrain_epochs, device,
-                                              optimizer_class, loss_fn, X.shape[1], embedding_size, _DipDECK_Autoencoder)
+                                              optimizer_class, loss_fn, X.shape[1], embedding_size, _DipDECK_Autoencoder) # hier muss man vielleicht die class Stacked_Autoencoder übergeben? 
     else:
         autoencoder.to(device)
     # Execute kmeans in embedded space - initial clustering
