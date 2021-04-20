@@ -380,29 +380,30 @@ def load_motestrain(add_testdata=True, downloads_path=None):
 Load WebKD
 """
 
-def load_webkb(downloads_path=None):
+def load_webkb(fulll_data=False, downloads_path=None):
     directory = _get_download_dir(downloads_path) + "/WebKB/"
     filename = directory + "webkb-data.gtar.gz"
-    if not os.path.isfile(filename) or True:
+    if not os.path.isfile(filename):
         if not os.path.isdir(directory):
             os.mkdir(directory)
-        # _download_file("http://www.cs.cmu.edu/afs/cs.cmu.edu/project/theo-20/www/data/webkb-data.gtar.gz",
-        #                filename)
+        _download_file("http://www.cs.cmu.edu/afs/cs.cmu.edu/project/theo-20/www/data/webkb-data.gtar.gz",
+                       filename)
         # Unpack zipfile
         with tarfile.open(filename, "r:gz") as tar:
-            # tar.extractall(directory)
             for obj in tar.getmembers():
-                try:
-                    tar.extract(obj, directory, set_attrs=not obj.isdir())
-                    print("Successfully extraced:", obj)
-                except:
-                    print("Error extracting:", obj)
-            #     if "^" in obj.name:
-            #         # new_name = obj.name.replace("~", "").replace(".", "").replace("^", "").replace(":", "")
-            #         print(obj)
-            #         print(new_name)
-            #         tar.extract(obj, new_name)
-            #     else:
+                if obj.isdir():
+                    # Create Directory
+                    tar.extract(obj, directory)
+                else:
+                    # Can not handle filenames with special characters. Therefore, rename files
+                    new_name = obj.name.replace("~", "_").replace(".", "_").replace("^", "_").replace(":", "_").replace("\r", "")
+                    # Get file content
+                    f = tar.extractfile(obj)
+                    lines = f.readlines()
+                    # Write file
+                    with open(directory + new_name, "wb") as output:
+                        for line in lines:
+                            output.write(line)
 
 
 if __name__ == "__main__":
