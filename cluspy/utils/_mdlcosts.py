@@ -55,7 +55,7 @@ def mdl_costs_discrete_probability(probability):
 
 
 """
-Gaussian Mixtrure Models
+Gaussian Mixture Models
 """
 
 
@@ -68,7 +68,7 @@ def mdl_costs_gmm_multiple_covariances(dimensionality, scatter_matrices, labels,
     :param rotation: cropped orthogonal rotation matrix
     :param dimensionality:
     :param scatter_matrices: scatter matrices of the subspace_nr
-    :param labels: labels of the cluster assingments for the subspace_nr. -1 equals outlier
+    :param labels: labels of the cluster assignments for the subspace_nr. -1 equals outlier
     :return: coding costs for all points for this subspace_nr
     """
     assert covariance_type in ["single", "diagonal",
