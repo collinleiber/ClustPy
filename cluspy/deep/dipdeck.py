@@ -2,19 +2,15 @@ from scipy.spatial.distance import cdist
 import numpy as np
 from cluspy.utils import dip_test, PVAL_BY_FUNCTION
 import torch
-from cluspy.deep._utils import detect_device, encode_batchwise, Simple_Autoencoder, \
-    squared_euclidean_distance, int_to_one_hot, get_trained_autoencoder
+from cluspy.deep._utils import detect_device, encode_batchwise, Simple_Autoencoder, Stacked_Autoencoder, \
+    squared_euclidean_distance, window, add_noise, int_to_one_hot, get_trained_autoencoder
 from sklearn.cluster import KMeans
 from sklearn.base import BaseEstimator, ClusterMixin
-### added
-from cluspy.deep.stacked_ae_L import Stacked_Autoencoder, window, add_noise
-import torch.nn.functional as F
-from itertools import islice
 
 
 def _dip_deck(X, n_clusters_start, dip_merge_threshold, cluster_loss_weight, n_clusters_max, n_clusters_min, batch_size,
               pretrain_learning_rate, dipdeck_learning_rate, pretrain_epochs, dipdeck_epochs, optimizer_class, loss_fn,
-              autoencoder, embedding_size, max_cluster_size_diff_factor, debug):
+              autoencoder, ae_stacked, embedding_size, max_cluster_size_diff_factor, debug):
     if n_clusters_max < n_clusters_min:
         raise Exception("n_clusters_max can not be smaller than n_clusters_min")
     if n_clusters_min <= 0:
@@ -35,8 +31,10 @@ def _dip_deck(X, n_clusters_start, dip_merge_threshold, cluster_loss_weight, n_c
                                              shuffle=False,
                                              drop_last=False)
     if autoencoder is None:
-        autoencoder = get_trained_autoencoder(trainloader, pretrain_learning_rate, pretrain_epochs, device,
-                                              optimizer_class, loss_fn, X.shape[1], embedding_size, _DipDECK_Autoencoder) # hier muss man vielleicht die class Stacked_Autoencoder übergeben? 
+        if ae_stacked is True:
+            autoencoder = get_trained_autoencoder(trainloader, pretrain_learning_rate, pretrain_epochs, device, optimizer_class, loss_fn, X.shape[1], embedding_size, ae_stacked, _DipDECK_Stacked_Autoencoder)
+        else:
+            autoencoder = get_trained_autoencoder(trainloader, pretrain_learning_rate, pretrain_epochs, device, optimizer_class, loss_fn, X.shape[1], embedding_size,ae_stacked, _DipDECK_Simple_Autoencoder)
     else:
         autoencoder.to(device)
     # Execute kmeans in embedded space - initial clustering
@@ -273,7 +271,7 @@ def _get_dip_matrix(data, dip_centers, dip_labels, n_clusters, max_cluster_size_
     return dip_matrix
 
 
-class _DipDECK_Autoencoder(Simple_Autoencoder):
+class _DipDECK_Simple_Autoencoder(Simple_Autoencoder):
 
     def start_training(self, trainloader, n_epochs, device, optimizer, loss_fn):
         for _ in range(n_epochs):
@@ -288,6 +286,86 @@ class _DipDECK_Autoencoder(Simple_Autoencoder):
                 loss.backward()
                 # update the internal params (weights, etc.)
                 optimizer.step()
+                
+class _DipDECK_Stacked_Autoencoder(Stacked_Autoencoder):
+
+    def pretrain(self, dataset, device, rounds_per_layer=1000, dropout_rate=0.2, corruption_fn=None):
+        """
+        Uses Adam to pretrain the model layer by layer
+        :param rounds_per_layer:
+        :param corruption_fn: Can be used to corrupt the input data for an denoising autoencoder
+        :return:
+        """
+
+        for layer in range(1, self.n_layers + 1):
+            print(f"Pretrain layer {layer}")
+            optimizer = self.optimizer_fn(self.parameters_pretrain(layer))
+            round = 0
+            while True:  # each iteration is equal to an epoch
+                for batch_data in dataset:
+
+                    round += 1
+                    if round > rounds_per_layer:
+                        break
+
+                    batch_data = batch_data[0]
+
+                    batch_data = batch_data.to(device) #cuda()
+                    if corruption_fn is not None:
+                        corrupted_batch = corruption_fn(batch_data)
+                        _, reconstruced_data = self.forward_pretrain(corrupted_batch, layer, use_dropout=True,
+                                                                     dropout_rate=dropout_rate,
+                                                                     dropout_is_training=True)
+                    else:
+                        _, reconstruced_data = self.forward_pretrain(batch_data, layer, use_dropout=True,
+                                                                     dropout_rate=dropout_rate,
+                                                                     dropout_is_training=True)
+                    loss = self.loss_fn(batch_data, reconstruced_data)
+                    optimizer.zero_grad()
+                    loss.backward()
+                    optimizer.step()
+                    if round % 100 == 0:
+                        print(f"Round {round} current loss: {loss.item()}")
+                else:  # For else is being executed if break did not occur, we continue the while true loop otherwise we break it too
+                    continue
+                break  # Break while loop here
+
+    def refine_training(self, dataset, rounds, device, corruption_fn=None, optimizer_fn=None):
+        print(f"Refine training")
+        if optimizer_fn is None:
+            optimizer = self.optimizer_fn(self.parameters())
+        else:
+            optimizer = optimizer_fn(self.parameters())
+
+        index = 0
+        while True:  # each iteration is equal to an epoch
+            for batch_data in dataset:
+                index += 1
+                if index > rounds:
+                    break
+                batch_data = batch_data[0]
+
+                batch_data = batch_data.to(device) #cuda()
+
+                # Forward pass
+                if corruption_fn is not None:
+                    embeded_data, reconstruced_data = self.forward(
+                        corruption_fn(batch_data))
+                else:
+                    embeded_data, reconstruced_data = self.forward(batch_data)
+
+                loss = self.loss_fn(reconstruced_data, batch_data)
+
+                # Backward pass
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                if index % 100 == 0:
+                    print(f"Round {index} current loss: {loss.item()}")
+
+            else:  # For else is being executed if break did not occur, we continue the while true loop otherwise we break it too
+                continue
+            break  # Break while loop here        
 
 
 class DipDECK(BaseEstimator, ClusterMixin):
@@ -295,7 +373,7 @@ class DipDECK(BaseEstimator, ClusterMixin):
     def __init__(self, n_clusters_start=35, dip_merge_threshold=0.9, cluster_loss_weight=1, n_clusters_max=np.inf,
                  n_clusters_min=1, batch_size=256, pretrain_learning_rate=1e-3, dipdeck_learning_rate=1e-4,
                  pretrain_epochs=100, dipdeck_epochs=50, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(),
-                 autoencoder=None, embedding_size=5, max_cluster_size_diff_factor=2, debug=False):
+                 autoencoder=None, ae_stacked=False, embedding_size=5, max_cluster_size_diff_factor=2, debug=False):
         self.n_clusters_start = n_clusters_start
         self.dip_merge_threshold = dip_merge_threshold
         self.cluster_loss_weight = cluster_loss_weight
@@ -309,6 +387,7 @@ class DipDECK(BaseEstimator, ClusterMixin):
         self.optimizer_class = optimizer_class
         self.loss_fn = loss_fn
         self.autoencoder = autoencoder
+        self.ae_stacked =  ae_stacked
         self.embedding_size = embedding_size
         self.max_cluster_size_diff_factor = max_cluster_size_diff_factor
         self.debug = debug
@@ -319,7 +398,7 @@ class DipDECK(BaseEstimator, ClusterMixin):
                                                              self.n_clusters_min, self.batch_size,
                                                              self.pretrain_learning_rate, self.dipdeck_learning_rate,
                                                              self.pretrain_epochs, self.dipdeck_epochs, self.optimizer_class,
-                                                             self.loss_fn, self.autoencoder, self.embedding_size,
+                                                             self.loss_fn, self.autoencoder, self.ae_stacked, self.embedding_size,
                                                              self.max_cluster_size_diff_factor, self.debug)
         self.labels_ = labels
         self.n_clusters_ = n_clusters

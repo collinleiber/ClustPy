@@ -1,4 +1,4 @@
-from .evaluation import evaluate_dataset, evaluate_multiple_datasets, EvaluationMetric, EvaluationAlgorithm, EvaluationDataset
+from cluspy.evaluation import evaluate_dataset, evaluate_multiple_datasets, EvaluationMetric, EvaluationAlgorithm, EvaluationDataset
 
 __all__ = ['evaluate_dataset',
            'evaluate_multiple_datasets',
