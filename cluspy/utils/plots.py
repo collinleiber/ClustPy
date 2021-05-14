@@ -84,7 +84,7 @@ def plot_with_transformation(X, labels=None, centers=None, true_labels=None, plo
 
 
 def plot_image(img_data, black_and_white=True, image_shape=None):
-    assert img_data.ndim <= 2, "Image data can not be larger than 2."
+    assert img_data.ndim <= 3, "Image data can have more than 3 dimensions."
     if img_data.ndim == 1:
         if image_shape is None:
             sqrt_of_data = int(math.sqrt(len(img_data)))

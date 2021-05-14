@@ -109,6 +109,11 @@ def multiple_labelings_pc_f1_score(labels_true, labels_pred, remove_noise_spaces
 
 
 def _get_multiple_labelings_pair_counting_categories(labels_true, labels_pred, remove_noise_spaces):
+    _check_number_of_points(labels_true, labels_pred)
+    if labels_true.ndim == 1:
+        labels_true = labels_true.reshape((-1, 1))
+    if labels_pred.ndim == 1:
+        labels_pred = labels_pred.reshape((-1, 1))
     if remove_noise_spaces:
         labels_true = remove_noise_spaces_from_labels(labels_true)
         labels_pred = remove_noise_spaces_from_labels(labels_pred)
@@ -141,7 +146,6 @@ def _anywhere_same_cluster(labels, i, j):
 class MultipleLabelingsPairCountingScores(PairCountingScores):
 
     def __init__(self, labels_true, labels_pred, remove_noise_spaces=True):
-        _check_number_of_points(labels_true, labels_pred)
         n_tp, n_fp, n_fn, n_tn = _get_multiple_labelings_pair_counting_categories(labels_true, labels_pred,
                                                                                   remove_noise_spaces)
         self.n_tp = n_tp
@@ -162,6 +166,8 @@ class MultipleLabelingsConfusionMatrix(ConfusionMatrix):
         _check_number_of_points(labels_true, labels_pred)
         if labels_true.ndim == 1:
             labels_true = labels_true.reshape((-1, 1))
+        if labels_pred.ndim == 1:
+            labels_pred = labels_pred.reshape((-1, 1))
         if remove_noise_spaces:
             labels_true = remove_noise_spaces_from_labels(labels_true)
             labels_pred = remove_noise_spaces_from_labels(labels_pred)
@@ -191,6 +197,8 @@ def calculate_multi_labelings_score(labels_true, labels_pred, metric=multiple_la
     _check_number_of_points(labels_true, labels_pred)
     if labels_true.ndim == 1:
         labels_true = labels_true.reshape((-1,1))
+    if labels_pred.ndim == 1:
+        labels_pred = labels_pred.reshape((-1, 1))
     assert confusion_matrix_obj is None or type(confusion_matrix_obj) is MultipleLabelingsConfusionMatrix, \
         "confusion_matrix must be None or of type MultipleLabelingsConfusionMatrix"
     if remove_noise_spaces:
@@ -224,6 +232,7 @@ def calculate_average_redundancy(labelings, metric=vi, remove_noise_spaces=True,
                                  metric_params={}):
     assert confusion_matrix_obj is None or type(confusion_matrix_obj) is MultipleLabelingsConfusionMatrix, \
         "confusion_matrix must be None or of type MultipleLabelingsConfusionMatrix"
+    assert labelings.ndim > 1, "Labelings has only a single column. Redundancy can not be calculated"
     if remove_noise_spaces:
         labelings = remove_noise_spaces_from_labels(labelings)
     # Calculate average confusion matrix scores
@@ -244,6 +253,8 @@ def is_multi_labelings_n_clusters_correct(labels_true, labels_pred, check_subset
     _check_number_of_points(labels_true, labels_pred)
     if labels_true.ndim == 1:
         labels_true = labels_true.reshape((-1,1))
+    if labels_pred.ndim == 1:
+        labels_pred = labels_pred.reshape((-1, 1))
     if remove_noise_spaces:
         labels_true = remove_noise_spaces_from_labels(labels_true)
         labels_pred = remove_noise_spaces_from_labels(labels_pred)

@@ -117,7 +117,7 @@ def _mdl_costs_gaussian(dimensionality, scatter_matrix_cluster, n_points_in_clus
         full_pdf_costs = mdl_costs_gaussian_full_covariance(dimensionality, scatter_matrix_cluster,
                                                             n_points_in_cluster, rotation)
     else:
-        raise Exception("covariance_type must be 'signle', 'diagonal' or 'full'")
+        raise Exception("covariance_type must be 'single', 'diagonal' or 'full'")
     return full_pdf_costs
 
 
