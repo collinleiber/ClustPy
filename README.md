@@ -32,13 +32,15 @@ Afterwards, you will be good to go.
 - Density-based clustering
     - Multi Density DBSCAN
 - Subspace clustering
-    - SubKmeans & MDL extension
+    - SubKmeans
 - Hierarchical clustering
     - Diana
 - Alternative clustering (Non-redundant clustering)
     - NR-Kmeans
+    - AutoNR
 - Deep clustering
     - Simple Autoencoder
+    - Stacked Autoencoder
     - DEC
     - IDEC
     - DCN
