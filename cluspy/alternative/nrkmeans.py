@@ -11,6 +11,7 @@ import numpy as np
 from scipy.stats import ortho_group
 from sklearn.utils import check_random_state
 from scipy.spatial.distance import cdist
+
 try:
     # Old sklearn versions
     from sklearn.cluster._kmeans import _k_init as kpp
@@ -29,7 +30,7 @@ _NOISE_SPACE_THRESHOLD = -1e-7
 
 
 def _nrkmeans(X, n_clusters, V, m, P, centers, mdl_for_noisespace, outliers, max_iter, max_distance, precision,
-              random_state):
+              random_state, debug):
     """
     Execute the nrkmeans algorithm. The algorithm will search for the optimal cluster subspaces and assignments
     depending on the input number of clusters and subspaces. The number of subspaces will automatically be traced by the
@@ -48,7 +49,8 @@ def _nrkmeans(X, n_clusters, V, m, P, centers, mdl_for_noisespace, outliers, max
     """
     V, m, P, centers, random_state, subspaces, labels, scatter_matrices, max_distance, precision = \
         _initialize_nrkmeans_parameters(
-            X, n_clusters, V, m, P, centers, mdl_for_noisespace, outliers, max_iter, max_distance, precision, random_state)
+            X, n_clusters, V, m, P, centers, mdl_for_noisespace, outliers, max_iter, max_distance, precision,
+            random_state)
     # Check if labels stay the same (break condition)
     old_labels = None
     n_outliers = np.zeros(subspaces, dtype=int)
@@ -64,12 +66,12 @@ def _nrkmeans(X, n_clusters, V, m, P, centers, mdl_for_noisespace, outliers, max
             n_clusters[i], centers[i], scatter_matrices[i], labels[:, i] = _remove_empty_cluster(n_clusters[i],
                                                                                                  centers[i],
                                                                                                  scatter_matrices[i],
-                                                                                                 labels[:, i])
+                                                                                                 labels[:, i], debug)
             # (Optional) Check for outliers
             if outliers:
                 labels[:, i], n_outliers[i] = _check_for_outliers(X, V, centers[i], labels[:, i],
-                                                                                       scatter_matrices[i], m[i], P[i],
-                                                                                       max_distance)
+                                                                  scatter_matrices[i], m[i], P[i],
+                                                                  max_distance)
                 # Again update centers and scatter matrices
                 centers[i], scatter_matrices[i] = _update_centers_and_scatter_matrices(X, n_clusters[i], labels[:, i])
         # Check if labels have not changed
@@ -96,8 +98,9 @@ def _nrkmeans(X, n_clusters, V, m, P, centers, mdl_for_noisespace, outliers, max
                                                                                                 m, P,
                                                                                                 centers,
                                                                                                 labels,
-                                                                                                scatter_matrices)
-    # print("[NrKmeans] Converged in iteration " + str(iteration + 1))
+                                                                                                scatter_matrices, debug)
+    if debug:
+        print("[NrKmeans] Converged in iteration " + str(iteration + 1))
     # Return relevant values
     return labels, centers, V, m, P, n_clusters, scatter_matrices
 
@@ -271,7 +274,7 @@ def _update_centers_and_scatter_matrices(X, n_clusters_subspace, labels_subspace
     return centers, scatter_matrices
 
 
-def _remove_empty_cluster(n_clusters_subspace, centers_subspace, scatter_matrices_subspace, labels_subspace):
+def _remove_empty_cluster(n_clusters_subspace, centers_subspace, scatter_matrices_subspace, labels_subspace, debug):
     """
     Check if after label assignemnt and center update a cluster got lost. Empty clusters will be
     removed for the following rotation und iterations. Therefore all necessary lists will be updated.
@@ -285,10 +288,11 @@ def _remove_empty_cluster(n_clusters_subspace, centers_subspace, scatter_matrice
     if np.any(np.isnan(centers_subspace)):
         # Get ids of lost clusters
         empty_clusters = np.where(np.any(np.isnan(centers_subspace), axis=1))[0]
-        print(
-            "[NrKmeans] ATTENTION: Clusters were lost! Number of lost clusters: " + str(
-                len(empty_clusters)) + " out of " + str(
-                len(centers_subspace)))
+        if debug:
+            print(
+                "[NrKmeans] ATTENTION: Clusters were lost! Number of lost clusters: " + str(
+                    len(empty_clusters)) + " out of " + str(
+                    len(centers_subspace)))
         # Update necessary lists
         n_clusters_subspace -= len(empty_clusters)
         for cluster_id in reversed(empty_clusters):
@@ -407,7 +411,7 @@ def _update_projections(P_combined, n_negative_e):
     return P_1_new, P_2_new
 
 
-def _remove_empty_subspace(subspaces, n_clusters, m, P, centers, labels, scatter_matrices):
+def _remove_empty_subspace(subspaces, n_clusters, m, P, centers, labels, scatter_matrices, debug):
     """
     Check if after rotation and rearranging the dimensionalities a empty subspaces occurs. Empty subspaces will be
     removed for the next iteration. Therefore all necessary lists will be updated.
@@ -423,10 +427,11 @@ def _remove_empty_subspace(subspaces, n_clusters, m, P, centers, labels, scatter
     if 0 in m:
         np_m = np.array(m)
         empty_spaces = np.where(np_m == 0)[0]
-        print(
-            "[NrKmeans] ATTENTION: Subspaces were lost! Number of lost subspaces: " + str(
-                len(empty_spaces)) + " out of " + str(
-                len(m)))
+        if debug:
+            print(
+                "[NrKmeans] ATTENTION: Subspaces were lost! Number of lost subspaces: " + str(
+                    len(empty_spaces)) + " out of " + str(
+                    len(m)))
         subspaces -= len(empty_spaces)
         n_clusters = [x for i, x in enumerate(n_clusters) if i not in empty_spaces]
         m = [x for i, x in enumerate(m) if i not in empty_spaces]
@@ -515,7 +520,6 @@ def _compare_possible_splits(X, V, cluster_index, noise_index, n_negative_e, P_c
             best_P_noise = P_noise.copy()
         else:
             break
-    # print("best", len(best_P_cluster))
     return best_P_cluster, best_P_noise
 
 
@@ -552,7 +556,9 @@ def _check_for_outliers(X, V, centers_subspace, labels_subspace, scatter_matrice
     # Get trace of cropped scatter matrix
     original_trace = np.trace(cropped_scatter_matrix)
     # Threshold of outlier costs
-    outlier_threshold = original_trace * ( 1 - (n_points - 1)/n_points * np.exp(-1/(n_points-1)*(2*np.log(2)*outlier_coding_cost/m_subspace - 1 - np.log(2*np.pi / m_subspace / n_points) - np.log(original_trace))))
+    outlier_threshold = original_trace * (1 - (n_points - 1) / n_points * np.exp(-1 / (n_points - 1) * (
+            2 * np.log(2) * outlier_coding_cost / m_subspace - 1 - np.log(
+        2 * np.pi / m_subspace / n_points) - np.log(original_trace))))
     # Get outliers
     is_outlier = differences_sum > outlier_threshold
     # Get number of outliers and change labels
@@ -715,8 +721,8 @@ def _get_precision(X):
         dist_gt_0 = dist[dist > 0]
         if dist_gt_0.size != 0:
             precision_list.append(np.min(dist_gt_0))
-    # print(np.min(precision_list), np.sqrt(np.sum([[p**2 for p in precision_list]]) / X.shape[1]), np.mean(precision_list), np.min(cdist(X, X)[dist > 0]) / np.sqrt(X.shape[1]))
     return np.mean(precision_list)
+
 
 """
 ==================== NrKmeans Object ====================
@@ -725,7 +731,7 @@ def _get_precision(X):
 
 class NrKmeans(BaseEstimator, ClusterMixin):
     def __init__(self, n_clusters, V=None, m=None, P=None, input_centers=None, mdl_for_noisespace=False, outliers=False,
-                 max_iter=300, max_distance=None, precision=None, random_state=None):
+                 max_iter=300, max_distance=None, precision=None, random_state=None, debug=False):
         """
         Create new NrKmeans instance. Gives the opportunity to use the fit() method to cluster a dataset.
         :param n_clusters: list containing number of clusters for each subspace_nr
@@ -746,6 +752,7 @@ class NrKmeans(BaseEstimator, ClusterMixin):
         self.outliers = outliers
         self.max_distance = max_distance
         self.precision = precision
+        self.debug = debug
         # Variables
         self.n_clusters = n_clusters
         self.input_centers = input_centers
@@ -765,7 +772,7 @@ class NrKmeans(BaseEstimator, ClusterMixin):
                                                                            self.mdl_for_noisespace,
                                                                            self.outliers, self.max_iter,
                                                                            self.max_distance, self.precision,
-                                                                           self.random_state)
+                                                                           self.random_state, self.debug)
         # Update class variables
         self.labels_ = labels
         self.cluster_centers_ = centers
