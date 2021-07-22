@@ -9,20 +9,11 @@ apply_dipext(rotdata, np.array(clusters), 'synrot')
 
 
 # %%
-from PIL import Image
-import numpy as np
-import os
-from test import apply_dipext
+from cluspy.data import real_world_data
+from cluspy.test import apply_dipext
 
-directory = './faces_4/'
-
-images = np.empty((624,30*32))
-clusters = np.empty((624,4), dtype='<U10')
-filenames = os.listdir(directory)
-for i in range(len(filenames)):
-    images[i:i+1,:] = np.array(Image.open(directory + filenames[i])).flatten()
-    clusters[i:i+1,:] = np.array(filenames[i].split('_'))[:4]
-apply_dipext(images, clusters, 'faces')
+data, clusters = real_world_data.load_cmu_faces()
+apply_dipext(data, clusters, 'faces')
 
 # %%
 import numpy as np
