@@ -26,8 +26,8 @@ def generate_syndata(centroids, scales, sizes):
     return alldata, rotdata, allclusters
 
 def apply_dipext(data, clusters, name):
-    for i in range(clusters.shape[1]):
-        draw_scatter(data, clusters[:,i:i+1], name + '_origin_' + str(i))
+    # for i in range(clusters.shape[1]):
+    #     draw_scatter(data, clusters[:,i:i+1], name + '_origin_' + str(i))
     dipExt = DipExt()
     subspace = dipExt.fit_transform(data)
     tmp_data = np.empty((subspace.shape[0], subspace.shape[1] + clusters.shape[1]), dtype=object)
