@@ -28,7 +28,7 @@ Afterwards, you will be good to go.
     - Dip-Means
     - Projected Dip-Means
     - DipExt & DipInit
-    - Skinnydip
+    - UniDip & Skinnydip
 - Density-based clustering
     - Multi Density DBSCAN
 - Subspace clustering
