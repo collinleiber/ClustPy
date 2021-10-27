@@ -476,7 +476,7 @@ def _are_labels_equal(labels_new, labels_old):
     """
     if labels_new is None or labels_old is None or labels_new.shape[1] != labels_old.shape[1]:
         return False
-    return all([nmi(labels_new[:, i], labels_old[:, i], "arithmetic") == 1 for i in range(labels_new.shape[1])])
+    return all([nmi(labels_new[:, i], labels_old[:, i], average_method="arithmetic") == 1 for i in range(labels_new.shape[1])])
 
 
 """
