@@ -311,11 +311,12 @@ def _consolidate_clusters(ordered_data, clusters, index, significance, debug):
 
 class SkinnyDip(BaseEstimator, ClusterMixin):
 
-    def __init__(self, significance=0.05):
+    def __init__(self, significance=0.05, debug=False):
         self.significance = significance
+        self.debug = debug
 
     def fit(self, X, y=None):
-        labels, n_clusters = _skinnydip_clustering_full_space(X, self.significance)
+        labels, n_clusters = _skinnydip_clustering_full_space(X, self.significance, debug=self.debug)
         self.labels_ = labels
         self.n_clusters_ = n_clusters
         return self

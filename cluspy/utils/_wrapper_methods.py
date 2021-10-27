@@ -1,5 +1,14 @@
 import numpy as np
-
+try:
+    # Sklearn version >= 0.24.X
+    from sklearn.cluster import kmeans_plusplus as kpp
+except:
+    try:
+        # Old sklearn versions
+        from sklearn.cluster._kmeans import _kmeans_plusplus as kpp
+    except:
+        # Very old sklearn versions
+        from sklearn.cluster._kmeans import _k_init as kpp
 
 def pyclustering_adjust_labels(n_points, pyclus_labels):
     labels = np.zeros(n_points)
@@ -16,3 +25,9 @@ def _get_n_clusters_from_algo(algo_obj):
     else:
         n_clusters = np.unique(algo_obj.labels_).shape[0]
     return n_clusters
+
+def _kmeans_plus_plus(X, n_clusters, x_squared_norms, random_state, n_local_trials):
+    result = kpp(X, n_clusters, x_squared_norms, random_state, n_local_trials)
+    if len(result) > 1:
+        result = result[0]
+    return result

@@ -37,7 +37,7 @@ def dip(X, just_dip=False, is_data_sorted=False, use_c=True, debug=False):
         X = np.sort(X)
     if N < 4 or X[0] == X[-1]:
         d = 0.0
-        return d if just_dip else (d, None, None)
+        return d if just_dip else (d, (0, N-1, 0, N-1), None)
     if use_c and load_c_dip_file():
         # Prepare data to match C data types
         X = np.asarray(X, dtype=np.float64)

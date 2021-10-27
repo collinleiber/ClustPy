@@ -13,33 +13,26 @@ MARKERS = ["o", "s", "D", "P", "X", "v", "*", "p", "^", ">", "<", "h"]
 
 _MIN_OBJECTS_FOR_DENS_PLOT = 3
 
+
 def plot_with_transformation(X, labels=None, centers=None, true_labels=None, plot_dimensionality=2,
                              transformation_class=PCA,
                              scattersize=10, equal_axis=False):
-    assert plot_dimensionality <= X.shape[1], "Plot dimensionality can not be larger than the number of features."
     assert plot_dimensionality > 0, "Plot dimensionality must be > 0"
+    if X.ndim == 1:
+        plot_dimensionality = 1
+    elif plot_dimensionality > X.shape[1]:
+        plot_dimensionality = X.shape[1]
+    elif plot_dimensionality < X.shape[1]:
+        # Check if transformation dimensionality is smaller than number of features
+        trans = transformation_class(n_components=plot_dimensionality)
+        X = trans.fit_transform(X)
+        if centers is not None:
+            centers = trans.transform(centers)
     if true_labels is not None:
         unique_true_labels = np.unique(true_labels)
-    # Check if transformation dimensionality is smaller than number of features
-    trans = transformation_class(n_components=plot_dimensionality)
-    X = trans.fit_transform(X)
-    if centers is not None:
-        centers = trans.transform(centers)
     if plot_dimensionality == 1:
         # 1d Plot
-        # fig, ax = plt.subplots(figsize=figsize)
-        plt.hlines(1, np.min(X), np.max(X))  # Draw a horizontal line
-        y = np.ones(len(X))
-        plt.scatter(X, y, marker='|', s=500, c=labels)  # Plot a line at each location specified in X
-        if centers is not None:
-            yc = np.ones(len(centers))
-            plt.scatter(centers[:, 0], yc, s=300, color="red", marker="x")
-            # plot one center text above line and next below ...
-            centers_order = np.argsort(centers[:, 0])
-            centers_order = np.argsort(centers_order)
-            for j in range(len(centers)):
-                yt = 1.0005 if centers_order[j] % 2 == 0 else 0.9994
-                plt.text(centers[j, 0], yt, str(j), weight="bold")
+        plot_1d_data(X, labels=labels, centers=centers)
     elif plot_dimensionality == 2:
         # 2d Plot
         if true_labels is None:
@@ -57,6 +50,7 @@ def plot_with_transformation(X, labels=None, centers=None, true_labels=None, plo
                 plt.text(centers[j, 0], centers[j, 1], str(j), weight="bold")
         if equal_axis:
             plt.axis("equal")
+        plt.show()
     elif plot_dimensionality == 3:
         # 3d Plot
         fig = plt.figure()
@@ -76,11 +70,35 @@ def plot_with_transformation(X, labels=None, centers=None, true_labels=None, plo
                        marker="s")
             for j in range(len(centers)):
                 ax.text(centers[j, 0], centers[j, 1], centers[j, 2], str(j), weight="bold")
+        plt.show()
     else:
         plot_scatter_matrix(X, labels=labels, centers=centers, true_labels=true_labels, scattersize=scattersize,
                             equal_axis=equal_axis)
-    if plot_dimensionality <= 3:
-        plt.show()
+
+
+def plot_1d_data(X, labels=None, centers=None):
+    assert X.ndim == 1 or X.shape[1] == 1, "Data must be 1-dimensional"
+    assert centers is None or centers.ndim == 1 or centers.shape[1] == 1, "Centers must be 1-dimensional"
+    # Optional: Get first column of data
+    if X.ndim == 2:
+        X = X[:,0]
+    # fig, ax = plt.subplots(figsize=figsize)
+    plt.hlines(1, np.min(X), np.max(X))  # Draw a horizontal line
+    y = np.ones(len(X))
+    plt.scatter(X, y, marker='|', s=500, c=labels)  # Plot a line at each location specified in X
+    if centers is not None:
+        # Optional: Get first column of centers
+        if centers.ndim == 2:
+            centers = centers[:, 0]
+        yc = np.ones(len(centers))
+        plt.scatter(centers, yc, s=300, color="red", marker="x")
+        # plot one center text above line and next below ...
+        centers_order = np.argsort(centers)
+        centers_order = np.argsort(centers_order)
+        for j in range(len(centers)):
+            yt = 1.0005 if centers_order[j] % 2 == 0 else 0.9994
+            plt.text(centers[j], yt, str(j), weight="bold")
+    plt.show()
 
 
 def plot_image(img_data, black_and_white=True, image_shape=None):
@@ -100,6 +118,7 @@ def plot_image(img_data, black_and_white=True, image_shape=None):
 
 
 def plot_histogram(X, labels=None, density=True, n_bins=100, show_legend=True):
+    assert X.ndim == 1, "Data must be 1-dimensional"
     if labels is not None:
         unique_labels = np.unique(labels)
         # Manage colormap

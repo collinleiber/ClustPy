@@ -1,5 +1,4 @@
-from .subkmeans import SubKmeans
-from .mdl_subkmeans import MDLSubKmeans
+from .subkmeans import SubKmeans, MDLSubKmeans
 
 __all__ = ['SubKmeans',
            'MDLSubKmeans']

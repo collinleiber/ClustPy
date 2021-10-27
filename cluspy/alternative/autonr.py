@@ -17,7 +17,7 @@ SIMILARITY_THRESHOLD = 1e-5
 def _autonr(X, nrkmeans_repetitions, outliers, max_subspaces, max_n_clusters, mdl_for_noisespace,
             max_distance, precision, random_state, debug):
     """
-    Execute the Mdl NrKmeans algorithm. The algorithm will try different parametrizations of the NrKmeans algorithm
+    Execute the AutoNR algorithm. The algorithm will try different parametrizations of the NrKmeans algorithm
     and rate them by their Minimum Description Length. It will terminate if the parameters with the lowest MDL costs are
     found.
     :param X: input data
@@ -154,7 +154,7 @@ def _autonr(X, nrkmeans_repetitions, outliers, max_subspaces, max_n_clusters, md
 def _check_input_parameters(X, nrkmeans_repetitions, max_subspaces, max_n_clusters, max_distance,  precision,
                             random_state):
     """
-    Check the input parameters for MdlNrKmeans. This means that all input values which are None must be defined.
+    Check the input parameters for AutoNR. This means that all input values which are None must be defined.
     :param X: input data
     :param nrkmeans_repetitions: number of NrKmeans executions to find the best local minimum
     :param max_subspaces: maximum number of subspaces
@@ -219,7 +219,7 @@ def _execute_nrkmeans(X, n_clusters, nrkmeans_repetitions=10, random_state=None,
     if debug:
         print("--------------------------------------------------")
         print(
-            "[MdlNrKmeans] Next try with n_clusters = {0} ( {1} repetitions )".format(n_clusters, nrkmeans_repetitions))
+            "[AutoNR] Next try with n_clusters = {0} ( {1} repetitions )".format(n_clusters, nrkmeans_repetitions))
     # Prepare parameters
     random_state = check_random_state(random_state)
     randoms = random_state.randint(0, 2 ** 31 - 1, nrkmeans_repetitions)
@@ -259,8 +259,8 @@ def _execute_nrkmeans(X, n_clusters, nrkmeans_repetitions=10, random_state=None,
             best_subspace_costs = all_subspace_costs
             best_nrkmeans = nrkmeans
     if debug:
-        print("[MdlNrKmeans] Output n_clusters = {0} / m = {1}".format(best_nrkmeans.n_clusters, best_nrkmeans.m))
-        print("[MdlNrKmeans] {0} ({1})".format(best_total_mdl_costs, best_subspace_costs))
+        print("[AutoNR] Output n_clusters = {0} / m = {1}".format(best_nrkmeans.n_clusters, best_nrkmeans.m))
+        print("[AutoNR] {0} ({1})".format(best_total_mdl_costs, best_subspace_costs))
         # for i in range(len(best_nrkmeans.n_clusters)): # TODO
         #     if best_nrkmeans.n_clusters[i] <= 15:# and best_nrkmeans.n_clusters[i] > 1:
         #         best_nrkmeans.plot_subspace(X, i, title=n_clusters, plot_centers=False, equal_axis=False)
@@ -443,7 +443,7 @@ def _split_cluster_space(X_subspace, subspace_nr, best_nrkmeans, best_mdl_overal
                 mdl_threshold_split = sum_subspace_costs
                 mdl_total_split = mdl_cost
                 subspace_costs_split = subspace_costs
-            else:
+            elif single_change_index is not None:
                 n_clusters = [1,1]
                 continue
         # Prepare values for next iteration
@@ -809,11 +809,11 @@ class AutoNR(BaseEstimator, ClusterMixin):
 
     def fit(self, X, y=None):
         """
-                Cluster the input dataset with the MdlNrKmeans algorithm. This means the best number of subspaces and clusters
+                Cluster the input dataset with the AutoNR algorithm. This means the best number of subspaces and clusters
                 is searched as input for the NrKmeans algorithm. Saves the best NrKmeans result and its MDL costs.
-                in the MdlNrKmeans object.
+                in the AutoNR object.
                 :param X: input data
-                :return: the MdlNrKmeans object
+                :return: the AutoNR object
                 """
         nrkmeans, mdl_costs, all_mdl_costs = _autonr(X, self.nrkmeans_repetitions, self.outliers,
                                                      self.max_subspaces,
@@ -828,14 +828,14 @@ class AutoNR(BaseEstimator, ClusterMixin):
 
     def plot_mdl_progress(self):
         """
-        Plot the progress of the MDL costs during MdlNrKmeans. Dots represent full space NrKmeans executions.
+        Plot the progress of the MDL costs during AutoNR. Dots represent full space NrKmeans executions.
         Best found result is displayed as a green dot.
         BEWARE: If the green dot is not the lowest point of the curve, the estimated cost of a split/merge was lower
         than the final costs of a full space NrKmeans execution!
         :return:
         """
         if self.nrkmeans is None:
-            raise Exception("The MdlNrKmeans algorithm has not run yet. Use the fit() function first.")
+            raise Exception("The AutoNR algorithm has not run yet. Use the fit() function first.")
         # Plot line with all costs
         mdl_costs = np.array([nrkmeans_mdl.costs for nrkmeans_mdl in self.all_mdl_costs])
         fig, ax = plt.subplots()
@@ -867,108 +867,3 @@ class AutoNR(BaseEstimator, ClusterMixin):
                            Line2D([0], [0], marker="o", color="green", markersize=7, label="Best result")]
         ax.legend(handles=legend_elements, loc="upper right")
         plt.show()
-
-
-if __name__ == "__main__":
-    from cluspy.metrics import calculate_multi_labelings_score, is_multi_labelings_n_clusters_correct, \
-        MultipleLabelingsConfusionMatrix, pc_f1_score
-    from cluspy.data import *
-    from sklearn.decomposition import PCA
-    from sklearn.metrics import adjusted_mutual_info_score as ami, normalized_mutual_info_score as nmi
-    from sklearn.preprocessing import scale
-
-    # dataset = np.genfromtxt("../data/J5.csv", delimiter=";")
-    # data = dataset[:, 7:]
-    # labels = dataset[:, :7]
-
-    # dataset = np.genfromtxt("../data/nrLetters2.csv", delimiter=",")
-    # data = dataset[:, :-3]
-    # labels = dataset[:, -3:]
-    # pca = PCA(0.9)
-    # data = pca.fit_transform(data)
-
-    # dataset = np.genfromtxt("../data/aloiIntro.data", delimiter=";")
-    # data = dataset[:,2:]
-    # labels = dataset[:,:2]
-    # pca = PCA(0.9)
-    # data = pca.fit_transform(data)
-
-    # dataset = np.genfromtxt("../data/dancing_stickfigures.data", delimiter=";")
-    # data = dataset[:,3:]
-    # labels = dataset[:,:2]
-    # pca = PCA(100, svd_solver="full")
-    # data = pca.fit_transform(data)
-
-    # dataset = np.genfromtxt("../data/fruit.data", delimiter=",")
-    # data = dataset[:,2:]
-    # labels = dataset[:,:2]
-
-    # data, labels = load_cmu_faces()
-    # data_plot = data
-    # labels = labels[:,:2]
-    # pca = PCA(0.9)
-    # data = pca.fit_transform(data)
-
-    dataset = np.genfromtxt("C:\\Users\\c_lei\\LRZ Sync+Share\\Ausarbeitungen\\MdlNrKmeansPaper\\Datasets\\runtime/J5.csv", delimiter=",")
-    data = dataset[:,5:]
-    labels = dataset[:,:5]
-
-    # dataset = np.genfromtxt("../data/syn4.csv", delimiter=",")
-    # data = dataset[:,3:]
-    # labels = dataset[:,:3]
-    # np.savetxt("C:\\Users\\c_lei\\LRZ Sync+Share\\Ausarbeitungen\\MdlNrKmeansPaper\\Datasets\\syn4.csv", np.c_[labels, data], delimiter=",")
-    # np.savetxt("C:\\Users\\c_lei\\LRZ Sync+Share\\Ausarbeitungen\\MdlNrKmeansPaper\\Datasets\\syn4_o_labels.csv", data, delimiter=";")
-    # scipy.io.savemat("C:\\Users\\c_lei\\LRZ Sync+Share\\Ausarbeitungen\\MdlNrKmeansPaper\\Datasets\\syn4.mat", {"points":data, "labels":[0.]*data.shape[0]})
-
-    # data, labels = load_mice_protein(return_multiple_labels=True)
-    # pca = PCA(0.9)
-    # data = pca.fit_transform(data)
-    # labels = labels[:,:]
-
-    # data, labels = load_wine()
-    # data = scale(data, axis=0)
-    # np.savetxt("wine_s.csv", np.c_[labels, data], delimiter=",")
-
-    # data, labels = load_pendigits(False)
-    # data = scale(data, axis=0)
-
-    # data, labels = load_iris()
-    # data = scale(data, axis=0)
-
-    # data, labels = load_optdigits()
-    # pca = PCA(0.9)
-    # data = pca.fit_transform(data)
-
-    # data, labels = load_webkb()
-    # pca = PCA(0.9)
-    # data = pca.fit_transform(data)
-
-    print("Data shape:", data.shape)
-    if labels.ndim > 1:
-        print("n_clusters true:", [len(np.unique(labels[:,i])) for i in range(labels.shape[1])])
-    else:
-        print("n_clusters true:", len(np.unique(labels)))
-
-    result = AutoNR(nrkmeans_repetitions=15, outliers=True, max_n_clusters=90, debug=True,
-                    mdl_for_noisespace=True)
-    result.fit(data)
-
-    print("Best mdl cost: " + str(result.mdl_costs))
-    print("Best n_clusters: " + str(result.nrkmeans.n_clusters))
-
-    # print("pc-f1", calculate_multi_labelings_score(labels, result.nrkmeans.labels_))
-    # print("nmi", calculate_multi_labelings_score(labels, result.nrkmeans.labels_, nmi, aggregation="max"))
-    # print("ami", calculate_multi_labelings_score(labels, result.nrkmeans.labels_, ami, aggregation="max"))
-    # print("Correkt k: ", is_multi_labelings_n_clusters_correct(labels, result.nrkmeans.labels_))
-
-    # result.plot_mdl_progress()
-
-    mc_nmi = MultipleLabelingsConfusionMatrix(labels, result.nrkmeans.labels_, nmi)
-    print("- NMI\n", np.max(mc_nmi.confusion_matrix, axis=1))
-    mc_f1 = MultipleLabelingsConfusionMatrix(labels, result.nrkmeans.labels_, pc_f1_score)
-    print("- F1\n", np.max(mc_f1.confusion_matrix, axis=1))
-
-    for cluster_index in range(len(result.nrkmeans.n_clusters)):
-        if result.nrkmeans.n_clusters[cluster_index] == 1:
-            continue
-        result.nrkmeans.plot_subspace(data, cluster_index)
