@@ -14,7 +14,10 @@ try:
     from sklearn.cluster._kmeans import _k_init as kpp
 except:
     # New sklearn versions
-    from sklearn.cluster._kmeans import _kmeans_plusplus as kpp
+    from sklearn.cluster._kmeans import _kmeans_plusplus
+    def kpp(*args, **kwarg):
+        # _kmeans_plusplus returns a tuple of (centers, indices)
+        return _kmeans_plusplus(*args, **kwarg)[0]
 
 
 class FuzzyCMeans(BaseEstimator, ClusterMixin):

@@ -17,7 +17,9 @@ try:
     from sklearn.cluster._kmeans import _k_init as kpp
 except:
     # New sklearn versions
-    from sklearn.cluster._kmeans import _kmeans_plusplus as kpp
+    from sklearn.cluster._kmeans import _kmeans_plusplus
+    def kpp(*args, **kwarg):
+        return _kmeans_plusplus(*args, **kwarg)[0]
 from sklearn.utils.extmath import row_norms
 from sklearn.metrics.pairwise import pairwise_distances_argmin_min
 from sklearn.metrics import normalized_mutual_info_score as nmi
