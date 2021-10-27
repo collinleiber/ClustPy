@@ -1,14 +1,15 @@
 import torch
-#import torch.nn.functional as F
-#from itertools import islice
+import torch.nn.functional as F
+from cluspy.deep._utils import window
+
 
 class Stacked_Autoencoder(torch.nn.Module):
-    'stacked AE'
-    def __init__(self, feature_dim, layer_dims, weight_initalizer,
-                 loss_fn=lambda x, y: torch.mean((x - y) ** 2),
+
+    def __init__(self, feature_dim, embedding_size, layer_dims=[500, 500, 2000],
+                 weight_initalizer=torch.nn.init.xavier_normal_,
+                 activation_fn=lambda x: F.relu(x), loss_fn=lambda x, y: torch.mean((x - y) ** 2),
                  optimizer_fn=lambda parameters: torch.optim.Adam(parameters, lr=0.001),
-                 tied_weights=False, activation_fn=None, bias_init=0.0, linear_embedded=True, linear_decoder_last=True
-                 ):
+                 tied_weights=False, bias_init=0.0, linear_embedded=True, linear_decoder_last=True):
         """
         :param feature_dim:
         :param layer_dims:
@@ -21,8 +22,8 @@ class Stacked_Autoencoder(torch.nn.Module):
         :param bias_init:
         :param linear_decoder_last: If True the last layer does not have the activation function
         """
-    
-        #super(Autoencoder, self).__init__()
+
+        # super(Autoencoder, self).__init__()
         super().__init__()
         self.tied_weights = tied_weights
         self.loss_fn = loss_fn
@@ -33,7 +34,7 @@ class Stacked_Autoencoder(torch.nn.Module):
 
         # [torch.nn.Parameter(, requires_grad=True) for
         #                               feature_dim, node_dim in ]
-
+        layer_dims.append(embedding_size)
         self.n_layers = len(layer_dims)
 
         self.param_bias_encoder = []
@@ -74,8 +75,7 @@ class Stacked_Autoencoder(torch.nn.Module):
             self.param_weights_decoder.reverse()
         self.param_bias_decoder.reverse()
         self.activation_fn = activation_fn
-        
-    
+
     def forward_pretrain(self, input_data, stack, use_dropout=True, dropout_rate=0.2,
                          dropout_is_training=True):
         encoded_data = input_data
@@ -168,7 +168,7 @@ class Stacked_Autoencoder(torch.nn.Module):
             parameters.append(self.param_bias_decoder[l])
         return parameters
 
-    def pretrain(self, dataset, rounds_per_layer=1000, dropout_rate=0.2, corruption_fn=None):
+    def pretrain(self, dataset, device, rounds_per_layer=1000, dropout_rate=0.2, corruption_fn=None):
         """
         Uses Adam to pretrain the model layer by layer
         :param rounds_per_layer:
@@ -187,9 +187,7 @@ class Stacked_Autoencoder(torch.nn.Module):
                     if round > rounds_per_layer:
                         break
 
-                    batch_data = batch_data[0]
-
-                    #batch_data = batch_data.cuda()
+                    batch_data = batch_data.to(device)  # cuda()
                     if corruption_fn is not None:
                         corrupted_batch = corruption_fn(batch_data)
                         _, reconstruced_data = self.forward_pretrain(corrupted_batch, layer, use_dropout=True,
@@ -209,7 +207,7 @@ class Stacked_Autoencoder(torch.nn.Module):
                     continue
                 break  # Break while loop here
 
-    def refine_training(self, dataset, rounds, corruption_fn=None, optimizer_fn=None):
+    def refine_training(self, dataset, rounds, device, corruption_fn=None, optimizer_fn=None):
         print(f"Refine training")
         if optimizer_fn is None:
             optimizer = self.optimizer_fn(self.parameters())
@@ -222,9 +220,7 @@ class Stacked_Autoencoder(torch.nn.Module):
                 index += 1
                 if index > rounds:
                     break
-                batch_data = batch_data[0]
-
-                #batch_data = batch_data.cuda()
+                batch_data = batch_data.to(device)  # cuda()
 
                 # Forward pass
                 if corruption_fn is not None:
@@ -246,28 +242,8 @@ class Stacked_Autoencoder(torch.nn.Module):
                 continue
             break  # Break while loop here
 
-def window(seq, n):
-    "Returns a sliding window (of width n) over data from the iterable"
-    "   s -> (s0,s1,...s[n-1]), (s1,s2,...,sn), ...                   "
-    it = iter(seq)
-    result = tuple(islice(it, n))
-    if len(result) == n:
-        yield result
-    for elem in it:
-        result = result[1:] + (elem,)
-        yield result
-        
-def add_noise(batch):
-    mask = torch.empty(
-        batch.shape, device=batch.device).bernoulli_(0.8)
-    return batch * mask        
-        
 
-#def count_values_in_sequence(seq):
-#    from collections import defaultdict
-#    res = defaultdict(lambda : 0)
-#    for key in seq:
-#        res[key] += 1
-#    return dict(res)
-######
-    
+    def start_training(self, trainloader, device, steps_per_layer = 10000, refine_training_steps=20000, dropout_rate=0.2):
+        self.pretrain(trainloader, device=device, rounds_per_layer=steps_per_layer, dropout_rate=dropout_rate)
+        self.refine_training(trainloader, rouns=refine_training_steps, device=device)
+        return self

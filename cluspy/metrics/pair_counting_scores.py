@@ -4,6 +4,7 @@ support." 2012 IEEE 28th International Conference on Data
 Engineering. IEEE, 2012.
 """
 from cluspy.metrics.clustering_metrics import _check_number_of_points
+import numpy as np
 
 """
 Internal functions
@@ -71,17 +72,10 @@ def _get_pair_counting_categories(labels_true, labels_pred):
     n_fn = 0
     n_tn = 0
     for i in range(labels_pred.shape[0] - 1):
-        for j in range(i + 1, labels_pred.shape[0]):
-            if labels_pred[i] == labels_pred[j]:
-                if labels_true[i] == labels_true[j]:
-                    n_tp += 1
-                else:
-                    n_fp += 1
-            else:
-                if labels_true[i] == labels_true[j]:
-                    n_fn += 1
-                else:
-                    n_tn += 1
+        n_tp += np.sum((labels_pred[i] == labels_pred[i+1:]) & (labels_true[i] == labels_true[i+1:]))
+        n_fp += np.sum((labels_pred[i] == labels_pred[i+1:]) & (labels_true[i] != labels_true[i+1:]))
+        n_fn += np.sum((labels_pred[i] != labels_pred[i+1:]) & (labels_true[i] == labels_true[i+1:]))
+        n_tn += np.sum((labels_pred[i] != labels_pred[i+1:]) & (labels_true[i] != labels_true[i+1:]))
     return n_tp, n_fp, n_fn, n_tn
 
 """

@@ -231,7 +231,7 @@ class DipExt():
 
     def fit_transform(self, X):
         subspace, dip_values = _dip_ext(X, self.n_components, self.do_dip_scaling, self.step_size, self.momentum,
-                                        self.dip_threshold, self.check_duplicates)
+                                        self.dip_threshold, self.n_starting_points_strategy, self.check_duplicates)
         self.n_components = len(dip_values)
         self.dip_values_ = dip_values
         return subspace

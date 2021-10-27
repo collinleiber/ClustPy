@@ -14,10 +14,10 @@ CLUSTER_SPACE_MERGE = 2
 SIMILARITY_THRESHOLD = 1e-5
 
 
-def _mdlnrkmeans(X, nrkmeans_repetitions, outliers, max_subspaces, max_n_clusters, mdl_for_noisespace,
-                 max_distance, precision, random_state, debug):
+def _autonr(X, nrkmeans_repetitions, outliers, max_subspaces, max_n_clusters, mdl_for_noisespace,
+            max_distance, precision, random_state, debug):
     """
-    Execute the Mdl NrKmeans algorithm. The algorithm will try different parametrizations of the NrKmeans algorithm
+    Execute the AutoNR algorithm. The algorithm will try different parametrizations of the NrKmeans algorithm
     and rate them by their Minimum Description Length. It will terminate if the parameters with the lowest MDL costs are
     found.
     :param X: input data
@@ -32,7 +32,6 @@ def _mdlnrkmeans(X, nrkmeans_repetitions, outliers, max_subspaces, max_n_cluster
     max_subspaces, max_n_clusters, max_distance, precision, random_state = _check_input_parameters(X, nrkmeans_repetitions,
                                                                           max_subspaces, max_n_clusters, max_distance,
                                                                             precision, random_state)
-    print("max:", max_distance, "   prec:", precision)
     all_mdl_costs = []
     # Default number of clusters
     n_clusters = [1]
@@ -43,6 +42,7 @@ def _mdlnrkmeans(X, nrkmeans_repetitions, outliers, max_subspaces, max_n_cluster
                                                                              mdl_for_noisespace=mdl_for_noisespace,
                                                                              max_distance=max_distance, precision=precision)
     all_mdl_costs.append(_Nrkmeans_Mdl_Costs(True, best_mdl_overall, NOISE_SPACE_SPLIT))
+    better_found_since_merging = False
     # Begin algorithm. Repeat until no enhancement is found
     while len(n_clusters) < max_subspaces:
         if debug:
@@ -53,7 +53,7 @@ def _mdlnrkmeans(X, nrkmeans_repetitions, outliers, max_subspaces, max_n_cluster
         # Save if a better solution has been found in this iteration
         better_solution_found = False
         # Swap noise space to last position
-        if best_nrkmeans.n_clusters[-1] == 1 and False:#TODO
+        if best_nrkmeans.n_clusters[-1] == 1:
             order = list(reversed(np.argsort(best_subspace_costs[:-1])))
             order.append(len(best_nrkmeans.n_clusters) - 1)
         else:
@@ -115,6 +115,7 @@ def _mdlnrkmeans(X, nrkmeans_repetitions, outliers, max_subspaces, max_n_cluster
                     best_subspace_costs = subspace_costs
                     best_mdl_overall = mdl_cost
                     better_solution_found = True
+                    better_found_since_merging = True
                     # Continue with next iteration
                     break
             # If number of subspaces was 1, check if total mdl split was smaller than best mdl overall
@@ -125,25 +126,27 @@ def _mdlnrkmeans(X, nrkmeans_repetitions, outliers, max_subspaces, max_n_cluster
                 best_subspace_costs = subspace_costs_split
                 best_mdl_overall = mdl_total_split
                 better_solution_found = True
+                better_found_since_merging = True
                 # Continue with next iteration
                 break
         # If better solution has been found, try to merge found subspaces
-        if not better_solution_found or len(best_nrkmeans.n_clusters) == max_subspaces: # TODO Must add or len(best_nrkmeans.n_clusters) == max_subspaces
-            best_nrkmeans, best_subspace_costs, best_mdl_overall, better_found_merge = _merge_spaces(X, best_nrkmeans,
-                                                                                               best_mdl_overall,
-                                                                                               best_subspace_costs,
-                                                                                               all_mdl_costs,
-                                                                                               max_n_clusters, outliers,
-                                                                                               random_state,
-                                                                                               mdl_for_noisespace,
-                                                                                               max_distance, precision,
-                                                                                               debug)
-            # If max number of subspaces is reached, end program
-            if len(best_nrkmeans.n_clusters) == max_subspaces or not better_found_merge:
-                break
-            # If no better solution was found, end program
-        # else:
-        #     break
+        if better_found_since_merging:
+            if not better_solution_found or len(best_nrkmeans.n_clusters) == max_subspaces:
+                best_nrkmeans, best_subspace_costs, best_mdl_overall, better_found_merge = _merge_spaces(X, best_nrkmeans,
+                                                                                                   best_mdl_overall,
+                                                                                                   best_subspace_costs,
+                                                                                                   all_mdl_costs,
+                                                                                                   max_n_clusters, outliers,
+                                                                                                   random_state,
+                                                                                                   mdl_for_noisespace,
+                                                                                                   max_distance, precision,
+                                                                                                   debug)
+                better_found_since_merging = False
+                # If merging did not improve the result or max number of subspaces is reached, end program
+                if len(best_nrkmeans.n_clusters) == max_subspaces or not better_found_merge:
+                    break
+        else:
+            break
     # Return best found nrkmeans, its mdl costs and list with all mdl costs
     return best_nrkmeans, best_mdl_overall, all_mdl_costs
 
@@ -151,7 +154,7 @@ def _mdlnrkmeans(X, nrkmeans_repetitions, outliers, max_subspaces, max_n_cluster
 def _check_input_parameters(X, nrkmeans_repetitions, max_subspaces, max_n_clusters, max_distance,  precision,
                             random_state):
     """
-    Check the input parameters for MdlNrKmeans. This means that all input values which are None must be defined.
+    Check the input parameters for AutoNR. This means that all input values which are None must be defined.
     :param X: input data
     :param nrkmeans_repetitions: number of NrKmeans executions to find the best local minimum
     :param max_subspaces: maximum number of subspaces
@@ -193,15 +196,7 @@ def _check_input_parameters(X, nrkmeans_repetitions, max_subspaces, max_n_cluste
     if max_distance is None:
         max_distance = np.max(cdist(X, X))
     if precision is None:
-        dist = cdist(X, X)
-        precision = np.min(dist[dist > 0]) / np.sqrt(X.shape[1])
-        # precision2 = 0
-        # precision3 = np.inf
-        # for i in range(X.shape[1]):
-        #     dist = cdist(X[:, i].reshape((-1, 1)), X[:, i].reshape((-1, 1)))
-        #     precision2 += np.min(dist[dist > 0])
-        #     precision3 = min(np.min(dist[dist > 0]), precision3)
-        # print("precision: ", precision, " / ", precision2 / X.shape[1], " / ", precision3)
+        precision = nrkm._get_precision(X)
     return max_subspaces, max_n_clusters, max_distance, precision, random_state
 
 
@@ -224,7 +219,8 @@ def _execute_nrkmeans(X, n_clusters, nrkmeans_repetitions=10, random_state=None,
     if debug:
         print("--------------------------------------------------")
         print(
-            "[MdlNrKmeans] Next try with n_clusters = {0} ( {1} repetitions )".format(n_clusters, nrkmeans_repetitions))
+            "[AutoNR] Next try with n_clusters = {0} ( {1} repetitions )".format(n_clusters, nrkmeans_repetitions))
+    # Prepare parameters
     random_state = check_random_state(random_state)
     randoms = random_state.randint(0, 2 ** 31 - 1, nrkmeans_repetitions)
     best_nrkmeans = None
@@ -263,11 +259,11 @@ def _execute_nrkmeans(X, n_clusters, nrkmeans_repetitions=10, random_state=None,
             best_subspace_costs = all_subspace_costs
             best_nrkmeans = nrkmeans
     if debug:
-        print("[MdlNrKmeans] Output n_clusters = {0} / m = {1}".format(best_nrkmeans.n_clusters, best_nrkmeans.m))
-        print("[MdlNrKmeans] {0} ({1})".format(best_total_mdl_costs, best_subspace_costs))
+        print("[AutoNR] Output n_clusters = {0} / m = {1}".format(best_nrkmeans.n_clusters, best_nrkmeans.m))
+        print("[AutoNR] {0} ({1})".format(best_total_mdl_costs, best_subspace_costs))
         # for i in range(len(best_nrkmeans.n_clusters)): # TODO
         #     if best_nrkmeans.n_clusters[i] <= 15:# and best_nrkmeans.n_clusters[i] > 1:
-        #         best_nrkmeans.plot_subspace(X, i, title=n_clusters, plot_centers=True, equal_axis=True)
+        #         best_nrkmeans.plot_subspace(X, i, title=n_clusters, plot_centers=False, equal_axis=False)
     return best_nrkmeans, best_total_mdl_costs, best_subspace_costs
 
 
@@ -280,7 +276,6 @@ def _split_noise_space(X_subspace, subspace_nr, best_nrkmeans, best_mdl_overall,
     subspace_costs_split = None
     nrkmeans_split = None
     centers = None
-    since_last_result = 0
     # If noise space stays the same, change strategy: only run once with the largest cluster splitted
     noise_stays_similar = False
     if best_nrkmeans.m[subspace_nr] > 1:
@@ -303,7 +298,6 @@ def _split_noise_space(X_subspace, subspace_nr, best_nrkmeans, best_mdl_overall,
                                                  best_mdl_overall - best_subspace_costs[
                                                      subspace_nr] + sum_subspace_costs,
                                                  NOISE_SPACE_SPLIT))
-        since_last_result += 1
         if sum_subspace_costs < mdl_threshold_split:
             # Check if noise space stays nearly the same
             if nrkmeans_split is not None and abs(
@@ -315,8 +309,7 @@ def _split_noise_space(X_subspace, subspace_nr, best_nrkmeans, best_mdl_overall,
             mdl_threshold_split = sum_subspace_costs
             mdl_total_split = mdl_cost
             subspace_costs_split = subspace_costs
-            since_last_result = 0
-        elif since_last_result > 1:
+        else:
             break
         # Copy n_clusters from nrkmeans result in case cluster has been lost
         if nrkmeans.have_clusters_been_lost():
@@ -352,7 +345,6 @@ def _split_cluster_space(X_subspace, subspace_nr, best_nrkmeans, best_mdl_overal
     # Default parameters for the split
     mdl_threshold_split = np.inf
     nrkmeans_split = None
-    # nrkmeans_split_tmp = None
     mdl_total_split = None
     n_clusters = [split_cluster_count, split_cluster_count]
     single_change_index = None
@@ -431,18 +423,6 @@ def _split_cluster_space(X_subspace, subspace_nr, best_nrkmeans, best_mdl_overal
                         subspace_costs_split = subspace_costs_2
                 # Set number of clusters
                 n_clusters[single_change_index] -= 1
-        # if n_clusters[0] * n_clusters[1] < split_cluster_count or 1 in n_clusters:
-        #     if single_change_index == 1 or nrkmeans_split.have_subspaces_been_lost():
-        #         break
-        #     elif single_change_index == 0:
-        #         single_change_index = 1
-        #         nrkmeans = nrkmeans_split_tmp
-        #         n_clusters = nrkmeans_split_tmp.n_clusters.copy()
-        #     else:
-        #         single_change_index = 0
-        #         nrkmeans_split_tmp = nrkmeans_split
-        #         nrkmeans = nrkmeans_split_tmp
-        #         n_clusters = nrkmeans_split_tmp.n_clusters.copy()
         else:
             nrkmeans, mdl_cost, subspace_costs = _execute_nrkmeans(X_subspace, n_clusters,
                                                                    nrkmeans_repetitions if centers is None else 1,
@@ -463,6 +443,9 @@ def _split_cluster_space(X_subspace, subspace_nr, best_nrkmeans, best_mdl_overal
                 mdl_threshold_split = sum_subspace_costs
                 mdl_total_split = mdl_cost
                 subspace_costs_split = subspace_costs
+            elif single_change_index is not None:
+                n_clusters = [1,1]
+                continue
         # Prepare values for next iteration
         if nrkmeans.have_clusters_been_lost() or nrkmeans.have_subspaces_been_lost():
             centers = None
@@ -717,8 +700,6 @@ def _get_full_space_parameters_split(X, best_nrkmeans, nrkmeans_split, subspace)
     centers_from_subspace = [
         [np.mean(X[nrkmeans_split.labels_[:, i] == j], axis=0) for j in range(nrkmeans_split.n_clusters[i])] for i in
         range(nrkmeans_split.labels_.shape[1])]
-    # cropped_V_T = best_nrkmeans.V[:, best_nrkmeans.P[subspace_nr]].T
-    # centers_from_subspace = [np.matmul(c, cropped_V_T) for c in nrkmeans_split.centers]
     centers_new += centers_from_subspace
     centers_new = np.array(centers_new)
     # Update the rotation matrix with the rotation from the splitted subspace_nr
@@ -770,8 +751,6 @@ def _get_full_space_parameters_merge(X, best_nrkmeans, nrkmeans_merge, subspace_
     centers_from_subspace = [
         [np.mean(X[nrkmeans_merge.labels_[:, i] == j], axis=0) for j in range(nrkmeans_merge.n_clusters[i])] for i in
         range(nrkmeans_merge.labels_.shape[1])]
-    # cropped_V_T = best_nrkmeans.V[:, P_from_subspace[0]].T
-    # centers_from_subspace = [np.matmul(c, cropped_V_T) for c in nrkmeans_merge.centers]
     centers_new += centers_from_subspace
     centers_new = np.array(centers_new)
     # Order the subspaces with the one with the most clusters first
@@ -812,9 +791,9 @@ class _Nrkmeans_Mdl_Costs():
             return "magenta"
 
 
-class MdlNrKmeans(BaseEstimator, ClusterMixin):
+class AutoNR(BaseEstimator, ClusterMixin):
 
-    def __init__(self, nrkmeans_repetitions=20, outliers=False, max_subspaces=None,
+    def __init__(self, nrkmeans_repetitions=15, outliers=True, max_subspaces=None,
                  max_n_clusters=None, mdl_for_noisespace=True, max_distance=None, precision=None,
                  random_state=None, debug=True):
         # Fixed attributes
@@ -830,17 +809,17 @@ class MdlNrKmeans(BaseEstimator, ClusterMixin):
 
     def fit(self, X, y=None):
         """
-                Cluster the input dataset with the MdlNrKmeans algorithm. This means the best number of subspaces and clusters
+                Cluster the input dataset with the AutoNR algorithm. This means the best number of subspaces and clusters
                 is searched as input for the NrKmeans algorithm. Saves the best NrKmeans result and its MDL costs.
-                in the MdlNrKmeans object.
+                in the AutoNR object.
                 :param X: input data
-                :return: the MdlNrKmeans object
+                :return: the AutoNR object
                 """
-        nrkmeans, mdl_costs, all_mdl_costs = _mdlnrkmeans(X, self.nrkmeans_repetitions, self.outliers,
-                                                          self.max_subspaces,
-                                                          self.max_n_clusters, self.mdl_for_noisespace,
-                                                          self.max_distance, self.precision,
-                                                          self.random_state, self.debug)
+        nrkmeans, mdl_costs, all_mdl_costs = _autonr(X, self.nrkmeans_repetitions, self.outliers,
+                                                     self.max_subspaces,
+                                                     self.max_n_clusters, self.mdl_for_noisespace,
+                                                     self.max_distance, self.precision,
+                                                     self.random_state, self.debug)
         # Output
         self.nrkmeans = nrkmeans
         self.mdl_costs = mdl_costs
@@ -849,14 +828,14 @@ class MdlNrKmeans(BaseEstimator, ClusterMixin):
 
     def plot_mdl_progress(self):
         """
-        Plot the progress of the MDL costs during MdlNrKmeans. Dots represent full space NrKmeans executions.
+        Plot the progress of the MDL costs during AutoNR. Dots represent full space NrKmeans executions.
         Best found result is displayed as a green dot.
         BEWARE: If the green dot is not the lowest point of the curve, the estimated cost of a split/merge was lower
         than the final costs of a full space NrKmeans execution!
         :return:
         """
         if self.nrkmeans is None:
-            raise Exception("The MdlNrKmeans algorithm has not run yet. Use the fit() function first.")
+            raise Exception("The AutoNR algorithm has not run yet. Use the fit() function first.")
         # Plot line with all costs
         mdl_costs = np.array([nrkmeans_mdl.costs for nrkmeans_mdl in self.all_mdl_costs])
         fig, ax = plt.subplots()
@@ -888,90 +867,3 @@ class MdlNrKmeans(BaseEstimator, ClusterMixin):
                            Line2D([0], [0], marker="o", color="green", markersize=7, label="Best result")]
         ax.legend(handles=legend_elements, loc="upper right")
         plt.show()
-
-
-if __name__ == "__main__":
-    from cluspy.metrics import calculate_multi_labelings_score, is_multi_labelings_n_clusters_correct, \
-        MultipleLabelingsConfusionMatrix
-    from cluspy.data import *
-    from sklearn.decomposition import PCA
-    from sklearn.metrics import adjusted_mutual_info_score as ami
-    from sklearn.preprocessing import scale
-
-    # dataset = np.genfromtxt("../data/J5.csv", delimiter=";")
-    # data = dataset[:, 7:]
-    # labels = dataset[:, :7]
-
-    # dataset = np.genfromtxt("../data/nrLetters2.csv", delimiter=",")
-    # data = dataset[:, :-3]
-    # labels = dataset[:, -3:]
-    # pca = PCA(0.9)
-    # data = pca.fit_transform(data)
-
-    # dataset = np.genfromtxt("../data/aloiIntro.data", delimiter=";")
-    # data = dataset[:,2:]
-    # labels = dataset[:,:2]
-    # pca = PCA(0.9)
-    # data = pca.fit_transform(data)
-
-    # dataset = np.genfromtxt("../data/dancing_stickfigures.data", delimiter=";")
-    # data = dataset[:,3:]
-    # labels = dataset[:,:2]
-    # pca = PCA(0.9)
-    # data = pca.fit_transform(data)
-
-    # dataset = np.genfromtxt("../data/fruit.data", delimiter=",")
-    # data = dataset[:,2:]
-    # labels = dataset[:,:2]
-
-    data, labels = load_cmu_faces()
-    labels = labels[:,:2]
-    pca = PCA(0.9)
-    data = pca.fit_transform(data)
-
-    # data, labels = load_mice_protein(return_multiple_labels=True)
-    # pca = PCA(0.9)
-    # data = pca.fit_transform(data)
-    # labels = labels[:,:]
-
-    # data, labels = load_wine()
-    # data = scale(data, axis=0)
-
-    # data, labels = load_iris()
-    # data = scale(data, axis=0)
-
-    print("Data shape:", data.shape)
-    if labels.ndim > 1:
-        print("n_clusters true:", [len(np.unique(labels[:,i])) for i in range(labels.shape[1])])
-    else:
-        print("n_clusters true:", len(np.unique(labels)))
-
-    result = MdlNrKmeans(nrkmeans_repetitions=30, outliers=True, max_n_clusters=90, debug=True,
-                         mdl_for_noisespace=True)
-    result.fit(data)
-
-    print("Best mdl cost: " + str(result.mdl_costs))
-    print("Best n_clusters: " + str(result.nrkmeans.n_clusters))
-
-    print("pc-f1", calculate_multi_labelings_score(labels, result.nrkmeans.labels_))
-    print("ami", calculate_multi_labelings_score(labels, result.nrkmeans.labels_, ami, aggregation="max"))
-    print("Correkt k: ", is_multi_labelings_n_clusters_correct(labels, result.nrkmeans.labels_))
-
-    result.plot_mdl_progress()
-
-    mc = MultipleLabelingsConfusionMatrix(labels, result.nrkmeans.labels_, ami)
-    mc.plot()
-    print(mc)
-
-    # for i in range(len(result.nrkmeans.n_clusters) - 1):
-    #     for j in range(i +1 , len(result.nrkmeans.n_clusters)):
-    #         new_labels = 10* result.nrkmeans.labels_[:,i] + result.nrkmeans.labels_[:,j]
-    #         a=ami(new_labels, labels[:,0])
-    #         print("Evaluate labeling {0} and {1} with gt1: {2}".format(i,j,a))
-    #         a = ami(new_labels, labels[:, 1])
-    #         print("Evaluate labeling {0} and {1} with gt2: {2}".format(i, j, a))
-
-    for cluster_index in range(len(result.nrkmeans.n_clusters)):
-        if result.nrkmeans.n_clusters[cluster_index] == 1:
-            continue
-        result.nrkmeans.plot_subspace(data, cluster_index)

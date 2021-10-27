@@ -6,17 +6,7 @@ from cluspy.metrics.pair_counting_scores import PairCountingScores, _pc_f1_score
 from sklearn.metrics import normalized_mutual_info_score as nmi
 from cluspy.metrics.confusion_matrix import ConfusionMatrix, _plot_confusion_matrix
 
-"""
-CHECKS
-"""
-
-_AGGREGATIONS = ["max", "min", "permut-max", "permut-min", "avg"]
-
-
-def _check_valid_aggregation(input):
-    if input not in _AGGREGATIONS:
-        raise Exception("Your input '", input, "' is not supported. Possibilities are: ", _AGGREGATIONS)
-
+_CONFUSION_AGGREGATIONS = ["max", "min", "permut-max", "permut-min", "avg"]
 
 """
 HELPERS
@@ -33,46 +23,6 @@ def remove_noise_spaces_from_labels(labels):
             no_noise_spaces[c] = False
     labels_new = labels[:, no_noise_spaces]
     return labels_new
-
-
-def _get_score_from_confusion_matrix(confusion_matrix, aggregation):
-    _check_valid_aggregation(aggregation)
-    # Permutation strategy
-    if aggregation == "permut-max" or aggregation == "permut-min":
-        best_score = -np.inf if aggregation == "permut-max" else np.inf
-        max_sub = max(confusion_matrix.shape)
-        min_sub = min(confusion_matrix.shape)
-        for permut in permutations(range(max_sub)):
-            score_sum = 0
-            for m in range(min_sub):
-                if confusion_matrix.shape[0] >= confusion_matrix.shape[1]:
-                    i = permut[m]
-                    j = m
-                else:
-                    i = m
-                    j = permut[m]
-                score_sum += confusion_matrix[i, j]
-            if aggregation == "permut-max" and score_sum > best_score:
-                best_score = score_sum
-            if aggregation == "permut-min" and score_sum < best_score:
-                best_score = score_sum
-        best_score /= confusion_matrix.shape[0]
-    # Maximum score strategy
-    elif aggregation == "max":
-        best_score = 0
-        for row in confusion_matrix:
-            best_score += np.max(row)
-        best_score /= confusion_matrix.shape[0]
-    # Minimum score strategy
-    elif aggregation == "min":
-        best_score = 0
-        for row in confusion_matrix:
-            best_score += np.min(row)
-        best_score /= confusion_matrix.shape[0]
-    # Average score strategy
-    elif aggregation == "avg":
-        best_score = np.avg(confusion_matrix)
-    return best_score
 
 
 """
@@ -109,6 +59,11 @@ def multiple_labelings_pc_f1_score(labels_true, labels_pred, remove_noise_spaces
 
 
 def _get_multiple_labelings_pair_counting_categories(labels_true, labels_pred, remove_noise_spaces):
+    _check_number_of_points(labels_true, labels_pred)
+    if labels_true.ndim == 1:
+        labels_true = labels_true.reshape((-1, 1))
+    if labels_pred.ndim == 1:
+        labels_pred = labels_pred.reshape((-1, 1))
     if remove_noise_spaces:
         labels_true = remove_noise_spaces_from_labels(labels_true)
         labels_pred = remove_noise_spaces_from_labels(labels_pred)
@@ -141,7 +96,6 @@ def _anywhere_same_cluster(labels, i, j):
 class MultipleLabelingsPairCountingScores(PairCountingScores):
 
     def __init__(self, labels_true, labels_pred, remove_noise_spaces=True):
-        _check_number_of_points(labels_true, labels_pred)
         n_tp, n_fp, n_fn, n_tn = _get_multiple_labelings_pair_counting_categories(labels_true, labels_pred,
                                                                                   remove_noise_spaces)
         self.n_tp = n_tp
@@ -162,6 +116,8 @@ class MultipleLabelingsConfusionMatrix(ConfusionMatrix):
         _check_number_of_points(labels_true, labels_pred)
         if labels_true.ndim == 1:
             labels_true = labels_true.reshape((-1, 1))
+        if labels_pred.ndim == 1:
+            labels_pred = labels_pred.reshape((-1, 1))
         if remove_noise_spaces:
             labels_true = remove_noise_spaces_from_labels(labels_true)
             labels_pred = remove_noise_spaces_from_labels(labels_pred)
@@ -180,50 +136,54 @@ class MultipleLabelingsConfusionMatrix(ConfusionMatrix):
     def plot(self, show_text=True, figsize=(10, 10), cmap="YlGn", textcolor="black", vmin=0, vmax=1):
         _plot_confusion_matrix(self.confusion_matrix, show_text, figsize, cmap, textcolor, vmin=vmin, vmax=vmax)
 
+    def aggregate(self, aggregation):
+        if aggregation not in _CONFUSION_AGGREGATIONS:
+            raise Exception("Your input '", aggregation, "' is not supported. Possibilities are: ",
+                            _CONFUSION_AGGREGATIONS)
+        # Permutation strategy
+        if aggregation == "permut-max" or aggregation == "permut-min":
+            best_score = -np.inf if aggregation == "permut-max" else np.inf
+            max_sub = max(self.confusion_matrix.shape)
+            min_sub = min(self.confusion_matrix.shape)
+            for permut in permutations(range(max_sub)):
+                score_sum = 0
+                for m in range(min_sub):
+                    if self.confusion_matrix.shape[0] >= self.confusion_matrix.shape[1]:
+                        i = permut[m]
+                        j = m
+                    else:
+                        i = m
+                        j = permut[m]
+                    score_sum += self.confusion_matrix[i, j]
+                if aggregation == "permut-max" and score_sum > best_score:
+                    best_score = score_sum
+                if aggregation == "permut-min" and score_sum < best_score:
+                    best_score = score_sum
+            best_score /= self.confusion_matrix.shape[0]
+        # Maximum score strategy
+        elif aggregation == "max":
+            best_score = np.sum(np.max(self.confusion_matrix, axis=1))
+            best_score /= self.confusion_matrix.shape[0]
+        # Minimum score strategy
+        elif aggregation == "min":
+            best_score = np.sum(np.min(self.confusion_matrix, axis=1))
+            best_score /= self.confusion_matrix.shape[0]
+        # Average score strategy
+        elif aggregation == "avg":
+            best_score = np.avg(self.confusion_matrix)
+        return best_score
+
+
 """
 Multiple Labelings Scoring
 """
-
-
-def calculate_multi_labelings_score(labels_true, labels_pred, metric=multiple_labelings_pc_f1_score,
-                                    remove_noise_spaces=True, aggregation="max", confusion_matrix_obj=None,
-                                    metric_params={}):
-    _check_number_of_points(labels_true, labels_pred)
-    if labels_true.ndim == 1:
-        labels_true = labels_true.reshape((-1,1))
-    assert confusion_matrix_obj is None or type(confusion_matrix_obj) is MultipleLabelingsConfusionMatrix, \
-        "confusion_matrix must be None or of type MultipleLabelingsConfusionMatrix"
-    if remove_noise_spaces:
-        labels_true = remove_noise_spaces_from_labels(labels_true)
-        labels_pred = remove_noise_spaces_from_labels(labels_pred)
-    # Calculate score using special multiple labelings scores
-    multi_labelings_scoring_metrics = [multiple_labelings_pc_recall_score, multiple_labelings_pc_f1_score,
-                                       multiple_labelings_pc_rand_score, multiple_labelings_pc_precision_score,
-                                       multiple_labelings_pc_jaccard_score]
-    if metric in multi_labelings_scoring_metrics:
-        if confusion_matrix_obj is not None:
-            print(
-                "[WARNING] Input confusion matrix is not used because the metric is a multiple labelings pair counting score.")
-        return metric(labels_true, labels_pred)
-    # Calculate scores using confusion matrix scores
-    if confusion_matrix_obj is None:
-        confusion_matrix_obj = MultipleLabelingsConfusionMatrix(labels_true, labels_pred, metric, metric_params)
-    confusion_matrix = confusion_matrix_obj.confusion_matrix
-    if confusion_matrix.shape != (labels_true.shape[1], labels_pred.shape[1]):
-        raise Exception(
-            "Shape of the confusion matrix is wrong! Must be (|ground truth labelings| x |prediction labelings|). In this case: ",
-            (labels_true.shape[1], labels_pred.shape[1]))
-    # Return best found score
-    if confusion_matrix.shape[0] == 0 or confusion_matrix.shape[1] == 0:
-        return 0
-    score = _get_score_from_confusion_matrix(confusion_matrix, aggregation)
-    return score
 
 
 def calculate_average_redundancy(labelings, metric=vi, remove_noise_spaces=True, confusion_matrix_obj=None,
                                  metric_params={}):
     assert confusion_matrix_obj is None or type(confusion_matrix_obj) is MultipleLabelingsConfusionMatrix, \
         "confusion_matrix must be None or of type MultipleLabelingsConfusionMatrix"
+    assert labelings.ndim > 1, "Labelings has only a single column. Redundancy can not be calculated"
     if remove_noise_spaces:
         labelings = remove_noise_spaces_from_labels(labelings)
     # Calculate average confusion matrix scores
@@ -243,7 +203,9 @@ def calculate_average_redundancy(labelings, metric=vi, remove_noise_spaces=True,
 def is_multi_labelings_n_clusters_correct(labels_true, labels_pred, check_subset=True, remove_noise_spaces=True):
     _check_number_of_points(labels_true, labels_pred)
     if labels_true.ndim == 1:
-        labels_true = labels_true.reshape((-1,1))
+        labels_true = labels_true.reshape((-1, 1))
+    if labels_pred.ndim == 1:
+        labels_pred = labels_pred.reshape((-1, 1))
     if remove_noise_spaces:
         labels_true = remove_noise_spaces_from_labels(labels_true)
         labels_pred = remove_noise_spaces_from_labels(labels_pred)
