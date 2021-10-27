@@ -17,18 +17,22 @@ _MIN_OBJECTS_FOR_DENS_PLOT = 3
 def plot_with_transformation(X, labels=None, centers=None, true_labels=None, plot_dimensionality=2,
                              transformation_class=PCA,
                              scattersize=10, equal_axis=False):
-    assert plot_dimensionality <= X.shape[1], "Plot dimensionality can not be larger than the number of features."
     assert plot_dimensionality > 0, "Plot dimensionality must be > 0"
+    if X.ndim == 1:
+        plot_dimensionality = 1
+    elif plot_dimensionality > X.shape[1]:
+        plot_dimensionality = X.shape[1]
+    elif plot_dimensionality < X.shape[1]:
+        # Check if transformation dimensionality is smaller than number of features
+        trans = transformation_class(n_components=plot_dimensionality)
+        X = trans.fit_transform(X)
+        if centers is not None:
+            centers = trans.transform(centers)
     if true_labels is not None:
         unique_true_labels = np.unique(true_labels)
-    # Check if transformation dimensionality is smaller than number of features
-    trans = transformation_class(n_components=plot_dimensionality)
-    X = trans.fit_transform(X)
-    if centers is not None:
-        centers = trans.transform(centers)
     if plot_dimensionality == 1:
         # 1d Plot
-        plot_1d_data(X, labels=labels, centers=centers[:, 0])
+        plot_1d_data(X, labels=labels, centers=centers)
     elif plot_dimensionality == 2:
         # 2d Plot
         if true_labels is None:
@@ -73,12 +77,19 @@ def plot_with_transformation(X, labels=None, centers=None, true_labels=None, plo
 
 
 def plot_1d_data(X, labels=None, centers=None):
-    assert X.ndim == 1, "Data must be 1-dimensional"
+    assert X.ndim == 1 or X.shape[1] == 1, "Data must be 1-dimensional"
+    assert centers is None or centers.ndim == 1 or centers.shape[1] == 1, "Centers must be 1-dimensional"
+    # Optional: Get first column of data
+    if X.ndim == 2:
+        X = X[:,0]
     # fig, ax = plt.subplots(figsize=figsize)
     plt.hlines(1, np.min(X), np.max(X))  # Draw a horizontal line
     y = np.ones(len(X))
     plt.scatter(X, y, marker='|', s=500, c=labels)  # Plot a line at each location specified in X
     if centers is not None:
+        # Optional: Get first column of centers
+        if centers.ndim == 2:
+            centers = centers[:, 0]
         yc = np.ones(len(centers))
         plt.scatter(centers, yc, s=300, color="red", marker="x")
         # plot one center text above line and next below ...

@@ -11,21 +11,13 @@ import numpy as np
 from scipy.stats import ortho_group
 from sklearn.utils import check_random_state
 from scipy.spatial.distance import cdist
-
-try:
-    # Old sklearn versions
-    from sklearn.cluster._kmeans import _k_init as kpp
-except:
-    # New sklearn versions
-    from sklearn.cluster._kmeans import _kmeans_plusplus
-    def kpp(*args, **kwarg):
-        return _kmeans_plusplus(*args, **kwarg)[0]
 from sklearn.utils.extmath import row_norms
 from sklearn.metrics.pairwise import pairwise_distances_argmin_min
 from sklearn.metrics import normalized_mutual_info_score as nmi
 from sklearn.base import BaseEstimator, ClusterMixin
 from cluspy.utils.plots import plot_scatter_matrix
 import cluspy.utils._mdlcosts as mdl
+from cluspy.utils._wrapper_methods import _kmeans_plus_plus as kpp
 
 _ACCEPTED_NUMERICAL_ERROR = 1e-6
 _NOISE_SPACE_THRESHOLD = -1e-7

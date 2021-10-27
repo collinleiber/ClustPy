@@ -4,20 +4,11 @@ Advances in neural information processing systems. 2004.
 """
 
 from pyclustering.cluster.fcm import fcm
-from cluspy.utils._wrapper_methods import pyclustering_adjust_labels
+from cluspy.utils._wrapper_methods import pyclustering_adjust_labels, _kmeans_plus_plus as kpp
 from sklearn.utils.extmath import row_norms
 from sklearn.utils import check_random_state
 from sklearn.base import BaseEstimator, ClusterMixin
 import numpy as np
-try:
-    # Old sklearn versions
-    from sklearn.cluster._kmeans import _k_init as kpp
-except:
-    # New sklearn versions
-    from sklearn.cluster._kmeans import _kmeans_plusplus
-    def kpp(*args, **kwarg):
-        # _kmeans_plusplus returns a tuple of (centers, indices)
-        return _kmeans_plusplus(*args, **kwarg)[0]
 
 
 class FuzzyCMeans(BaseEstimator, ClusterMixin):

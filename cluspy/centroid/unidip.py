@@ -12,8 +12,9 @@ import numpy as np
 from sklearn.base import BaseEstimator, ClusterMixin
 
 
-def _unidip(X_1d, significance, outliers):
+def _unidip(X_1d, significance, outliers, gap_size):
     assert X_1d.ndim == 1, "Data must be 1-dimensional"
+    assert gap_size >= 0, "gap_size must not be negative"
     # Create labels array (everything is noise)
     labels = -np.ones(X_1d.shape[0])
     cluster_id = 0
@@ -40,6 +41,9 @@ def _unidip(X_1d, significance, outliers):
                 dip_pvalue = dip_pval(dip_value, n_points=right_X_1d.shape[0])
                 if dip_pvalue < significance:
                     tmp_borders.insert(0, (start + high + 1, end, False))
+                elif not outliers:
+                    # Model should reach end
+                    high = end - start - 1
             # Other clusters to the left?
             if 0 != low:
                 left_X_1d = sorted_X_1d[start:start + high + 1]
@@ -47,12 +51,15 @@ def _unidip(X_1d, significance, outliers):
                 dip_pvalue = dip_pval(dip_value, n_points=left_X_1d.shape[0])
                 if dip_pvalue < significance:
                     tmp_borders.insert(0, (start, start + low, False))
+                elif not outliers:
+                    # Model should reach start
+                    low = 0
             if low != high:
                 tmp_borders.insert(0, (start + low, start + high + 1, True))
         else:
             # If no modal (and outliers should be identified) mirror data
             if outliers and not is_modal:
-                low, high = _dip_mirrored_data(sorted_X_1d[start:end], (low, high))
+                low, high = _dip_mirrored_data(sorted_X_1d[start:end], (low, high), gap_size)
                 cluster_start = start + low
                 cluster_end = start + high + 1
             else:
@@ -64,21 +71,21 @@ def _unidip(X_1d, significance, outliers):
     return labels, cluster_id
 
 
-def _dip_mirrored_data(X_1d, orig_low_high):
+def _dip_mirrored_data(X_1d, orig_low_high, gap_size):
     """
     Mirror data to get the correct interval
     :return:
     """
-    data_range = np.max(X_1d) - np.min(X_1d)
+    data_range = np.max(X_1d) - np.min(X_1d) # Needed to create gap with correct scaling
     # Left mirror
-    mirrored_addition_left = X_1d[0] - np.flip(X_1d - X_1d[0]) - 0.5 * data_range
+    mirrored_addition_left = X_1d[0] - np.flip(X_1d - X_1d[0]) - gap_size * data_range
     X_1d_left_mirrored = np.append(mirrored_addition_left, X_1d)
     dip_value_left, low_high_left, _ = dip(X_1d_left_mirrored, just_dip=False, is_data_sorted=True)
     # Right mirror
-    mirrored_addition_right = X_1d[-1] + np.flip(X_1d[-1] - X_1d) + 0.5 * data_range
+    mirrored_addition_right = X_1d[-1] + np.flip(X_1d[-1] - X_1d) + gap_size * data_range
     X_1d_right_mirrored = np.append(X_1d, mirrored_addition_right)
     dip_value_right, low_high_right, _ = dip(X_1d_right_mirrored, just_dip=False, is_data_sorted=True)
-    # Get inveral of larger dip
+    # Get interval of larger dip
     if dip_value_left > dip_value_right:
         low = low_high_left[2]
         high = low_high_left[3]
@@ -101,12 +108,13 @@ def _dip_mirrored_data(X_1d, orig_low_high):
 
 class UniDip(BaseEstimator, ClusterMixin):
 
-    def __init__(self, significance=0.05, outliers=True):
+    def __init__(self, significance=0.05, outliers=True, gap_size=0.1):
         self.significance = significance
         self.outliers = outliers
+        self.gap_size = gap_size
 
     def fit(self, X, y=None):
-        labels, n_clusters = _unidip(X, self.significance, self.outliers)
+        labels, n_clusters = _unidip(X, self.significance, self.outliers, self.gap_size)
         self.labels_ = labels
         self.n_clusters_ = n_clusters
         return self
