@@ -20,7 +20,7 @@ Afterwards, you will be good to go.
 
 ### Algorithms
 
-- Centroid-based clustering
+- Partition-based clustering
     - X-Means (from [pyclustering](https://pyclustering.github.io/docs/0.10.0/html/d2/d8b/namespacepyclustering_1_1cluster_1_1xmeans.html))
     - G-Means (from [pyclustering](https://pyclustering.github.io/docs/0.10.0/html/dc/d86/namespacepyclustering_1_1cluster_1_1gmeans.html))
     - PG-Means
@@ -87,8 +87,8 @@ Afterwards, you will be good to go.
 In this simple example, the XMeans algorithm is run on the optdigits dataset.
 Afterwards, the normalized mutual information is calculated and printed.
 
-```python 
-from cluspy.centroid import XMeans
+```python
+from cluspy.partition import XMeans
 from cluspy.data import load_optdigits
 from sklearn.metrics import normalized_mutual_info_score as nmi
 
@@ -104,7 +104,7 @@ print(my_nmi)
 In this simple example, the SubKmeans algorithm is run on a synthetic subspace dataset.
 Then the normalized mutual information is calculated and printed again.
 
-```python 
+```python
 from cluspy.subspace import SubKmeans
 from cluspy.data import create_subspace_data
 from sklearn.metrics import normalized_mutual_info_score as nmi

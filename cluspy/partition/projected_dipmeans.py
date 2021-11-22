@@ -7,7 +7,7 @@ Conference on Artificial Intelligence. 2018.
 """
 
 import numpy as np
-from cluspy.centroid.dipmeans import _execute_bisecting_kmeans
+from cluspy.partition.dipmeans import _execute_bisecting_kmeans
 from sklearn.decomposition import PCA
 from cluspy.utils import dip, dip_pval, PVAL_BY_TABLE
 from sklearn.base import BaseEstimator, ClusterMixin
