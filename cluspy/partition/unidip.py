@@ -190,7 +190,7 @@ def _unidip_plus(X_1d, significance, gap_size):
             # If only useless noise clusters have been found -> terminate
             break
     if len(noise_clusters) != 0:
-        labels[labels == -2] = -2
+        labels[labels == -2] = -1
     return labels, n_clusters
 
 
