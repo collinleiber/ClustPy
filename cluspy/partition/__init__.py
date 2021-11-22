@@ -6,7 +6,7 @@ from .dipmeans import DipMeans
 from .projected_dipmeans import ProjectedDipMeans
 from .dipext import DipExt, DipInit
 from .skinnydip import SkinnyDip
-from .unidip import UniDip
+from .unidip import UniDip, UniDipPlus
 
 __all__ = ['GMeans',
            'PGMeans',
@@ -17,4 +17,5 @@ __all__ = ['GMeans',
            'DipExt',
            'DipInit',
            'SkinnyDip',
-           'UniDip']
+           'UniDip',
+           'UniDipPlus']
