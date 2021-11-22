@@ -795,7 +795,7 @@ class AutoNR(BaseEstimator, ClusterMixin):
 
     def __init__(self, nrkmeans_repetitions=15, outliers=True, max_subspaces=None,
                  max_n_clusters=None, mdl_for_noisespace=True, max_distance=None, precision=None,
-                 random_state=None, debug=True):
+                 random_state=None, debug=False):
         # Fixed attributes
         self.nrkmeans_repetitions = nrkmeans_repetitions
         self.outliers = outliers

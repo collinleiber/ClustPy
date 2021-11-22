@@ -36,6 +36,7 @@ def _dipmeans(X, pval_threshold, split_viewers_threshold, pval_strategy, n_boots
                                      range(ids_in_cluster.shape[0])])
             # Calculate p-values
             if pval_strategy == PVAL_BY_BOOT:
+                # Bootstrap values here so it is not needed for each pval separately
                 boot_dips = dip_boot_samples(ids_in_cluster.shape[0], n_boots)
                 cluster_pvals = np.array([np.mean(point_dip <= boot_dips) for point_dip in cluster_dips])
             else:

@@ -53,8 +53,7 @@ def _dip_scaling(X, dip_values):
     return X
 
 
-def _dip_init(subspace, dip_values, n_clusters):
-    assert len(dip_values) == subspace.shape[1], "Number of features of the subspace must match number of dip values."
+def _dip_init(subspace, n_clusters):
     how_many = int(subspace.shape[0] / n_clusters)
     # Get the first initialisation by frequency-binning the primary feature
     centers = np.zeros((n_clusters, 1))
@@ -84,7 +83,7 @@ def _dip_gradient(X, projection_vector, check_duplicates):
     sortedIndices = np.argsort(projected_data, kind="stable")
     sorted_projected_data = projected_data[sortedIndices]
     ## Run the dip algorithm, capturing the output which we need for touching-triangle calculations
-    dip_value, _, modal_triangle = dip(sorted_projected_data, just_dip=False, is_data_sorted=True)
+    dip_value, _, modal_triangle, _ = dip(sorted_projected_data, just_dip=False, is_data_sorted=True)
     triangles = [[modal_triangle[0]], [modal_triangle[1]], [modal_triangle[2]]]
     gradients = []
     # Add indices with same value to triangle
@@ -246,7 +245,7 @@ class DipInit(DipExt, BaseEstimator, ClusterMixin):
 
     def fit(self, X, y=None):
         subspace = self.fit_transform(X)
-        labels, centers = _dip_init(subspace, self.dip_values_, self.n_clusters)
+        labels, centers = _dip_init(subspace, self.n_clusters)
         self.labels_ = labels
         self.cluster_centers_ = centers
         return self

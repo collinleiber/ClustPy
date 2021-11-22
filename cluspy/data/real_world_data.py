@@ -416,7 +416,7 @@ Load WebKB
 
 
 def load_webkb(remove_headers=True, use_categories=["course", "faculty", "project", "student"],
-               use_universities=["cornell", "texas", "washington", "wisconsin"], n_features=350, downloads_path=None):
+               use_universities=["cornell", "texas", "washington", "wisconsin"], downloads_path=None):
     directory = _get_download_dir(downloads_path) + "/WebKB/"
     filename = directory + "webkb-data.gtar.gz"
     if not os.path.isfile(filename):

@@ -47,7 +47,10 @@ class SubKmeans(BaseEstimator, ClusterMixin):
         nrkmeans = NrKmeans(self.n_clusters, mdl_for_noisespace=self.mdl_for_noisespace, outliers=self.outliers,
                             max_iter=self.max_iter, random_state=self.random_state)
         nrkmeans.fit(X)
-        self.V = nrkmeans.V[:, np.r_[nrkmeans.P[0], nrkmeans.P[1]]]
+        if len(nrkmeans.P) == 2:
+            self.V = nrkmeans.V[:, np.r_[nrkmeans.P[0], nrkmeans.P[1]]]
+        else:
+            self.V = nrkmeans.V[:, np.r_[nrkmeans.P[0]]]
         if nrkmeans.labels_.ndim == 1:
             self.labels_ = nrkmeans.labels_
         else:
