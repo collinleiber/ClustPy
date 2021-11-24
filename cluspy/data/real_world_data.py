@@ -50,6 +50,37 @@ def _load_data_file(filename, download_path, delimiter=",", last_column_are_labe
     return data, labels
 
 
+def _load_timeseries_classification_data(name, add_testdata, downloads_path):
+    directory = _get_download_dir(downloads_path) + "/" + name + "/"
+    filename = directory + name + ".zip"
+    if not os.path.isfile(filename):
+        if not os.path.isdir(directory):
+            os.mkdir(directory)
+        _download_file("http://www.timeseriesclassification.com/Downloads/" + name + ".zip",
+                       filename)
+        # Unpack zipfile
+        with zipfile.ZipFile(filename, 'r') as zipf:
+            zipf.extractall(directory)
+    # Load data and labels
+    dataset = np.genfromtxt(directory + name + "_TRAIN.txt")
+    data = dataset[:, 1:]
+    labels = dataset[:, 0]
+    if add_testdata:
+        test_dataset = np.genfromtxt(directory + name + "_TEST.txt")
+        data = np.r_[data, test_dataset[:, 1:]]
+        labels = np.r_[labels, test_dataset[:, 0]]
+    return data, labels
+
+
+def _decompress_z_file(filename, directory):
+    os.system("7z x {0} -o{1}".format(filename.replace("\\", "/"), directory.replace("\\", "/")))
+    if os.path.isfile(filename[:-2]):
+         return True
+    else:
+        print("[WARNING] 7Zip is needed to uncompress *.Z files!")
+        return False
+
+
 """
 Load torichvision datasets
 """
@@ -187,12 +218,67 @@ def load_spambase(downloads_path=None):
                                    "https://archive.ics.uci.edu/ml/machine-learning-databases/spambase/spambase.data")
     return data, labels
 
+
 def load_seeds(downloads_path=None):
     filename = _get_download_dir(downloads_path) + "/seeds_dataset.txt"
     data, labels = _load_data_file(filename,
                                    "https://archive.ics.uci.edu/ml/machine-learning-databases/00236/seeds_dataset.txt",
                                    delimiter=None)
     return data, labels
+
+
+def load_skin(downloads_path=None):
+    filename = _get_download_dir(downloads_path) + "/Skin_NonSkin.txt"
+    data, labels = _load_data_file(filename,
+                                   "https://archive.ics.uci.edu/ml/machine-learning-databases/00229/Skin_NonSkin.txt",
+                                   delimiter=None)
+    labels -= 1
+    return data, labels
+
+
+def load_soybean_small(downloads_path=None):
+    filename = _get_download_dir(downloads_path) + "/soybean-small.data"
+    if not os.path.isfile(filename):
+        _download_file(
+            "https://archive.ics.uci.edu/ml/machine-learning-databases/soybean/soybean-small.data",
+            filename)
+    # Load data and labels
+    df = pd.read_csv(filename, delimiter=",", header=None)
+    labels_raw = df.iloc[:, -1]
+    data = df.iloc[:, :-1].values
+    LE = LabelEncoder()
+    labels = LE.fit_transform(labels_raw)
+    return data, labels
+
+
+def load_soybean_large(add_testdata=True, downloads_path=None):
+    filename = _get_download_dir(downloads_path) + "/soybean-large.data"
+    if not os.path.isfile(filename):
+        _download_file(
+            "https://archive.ics.uci.edu/ml/machine-learning-databases/soybean/soybean-large.data",
+            filename)
+    # Load data and labels
+    df_train = pd.read_csv(filename, delimiter=",", header=None)
+    df_train = df_train[(df_train != '?').all(axis=1)]
+    labels_raw = df_train.pop(0)
+    data = df_train.values
+    if add_testdata:
+        filename = _get_download_dir(downloads_path) + "/soybean-large.test"
+        if not os.path.isfile(filename):
+            _download_file(
+                "https://archive.ics.uci.edu/ml/machine-learning-databases/soybean/soybean-large.test",
+                filename)
+        df_test = pd.read_csv(filename, delimiter=",", header=None)
+        df_test = df_test[(df_test != '?').all(axis=1)]
+        labels_test = df_test.pop(0)
+        data = np.r_[data, df_test.values]
+        labels_raw = np.r_[labels_raw, labels_test]
+    # Transform data to numerical array
+    data = np.array(data, dtype=np.int)
+    LE = LabelEncoder()
+    labels = LE.fit_transform(labels_raw)
+    return data, labels
+
 
 def load_optdigits(add_testdata=True, downloads_path=None):
     filename = _get_download_dir(downloads_path) + "/optdigits.tra"
@@ -301,12 +387,45 @@ def load_har(add_testdata=True, downloads_path=None):
     return data, labels
 
 
+def load_shuttle(add_testdata=True, downloads_path=None):
+    directory = _get_download_dir(downloads_path) + "/shuttle/"
+    filename = directory + "shuttle.trn.Z"
+    if not os.path.isfile(filename):
+        if not os.path.isdir(directory):
+            os.mkdir(directory)
+        _download_file("https://archive.ics.uci.edu/ml/machine-learning-databases/statlog/shuttle/shuttle.trn.Z",
+                       filename)
+        # Unpack z-file
+        success = _decompress_z_file(filename, directory)
+        if not success:
+            # os.remove(filename)
+            return None, None
+    # Load data and labels
+    dataset = np.genfromtxt(directory + "shuttle.trn")
+    data = dataset[:,:-1]
+    labels = dataset[:,-1]
+    if add_testdata:
+        filename = directory + "shuttle.tst"
+        if not os.path.isfile(filename):
+            _download_file(
+                "https://archive.ics.uci.edu/ml/machine-learning-databases/statlog/shuttle/shuttle.tst",
+                filename)
+        test_dataset = np.genfromtxt(directory + "shuttle.tst")
+        test_data = test_dataset[:,:-1]
+        test_labels = test_dataset[:,-1]
+        data = np.r_[data, test_data]
+        labels = np.r_[labels, test_labels]
+    labels -= 1
+    return data, labels
+
+
 def load_mice_protein(return_multiple_labels=False, downloads_path=None):
     filename = _get_download_dir(downloads_path) + "/Data_Cortex_Nuclear.xls"
     if not os.path.isfile(filename):
         _download_file("https://archive.ics.uci.edu/ml/machine-learning-databases/00342/Data_Cortex_Nuclear.xls",
                        filename)
     xls = pd.ExcelFile(filename)
+    # Load first page
     sheet = xls.parse(0)
     # Remove special columns
     classes_raw = sheet.pop("class")
@@ -337,6 +456,49 @@ def load_mice_protein(return_multiple_labels=False, downloads_path=None):
         labels = np.c_[labels, id_labels, bahaviors_labels, treatment_labels, genotype_labels]
     # Remove rows also from labels (3 cases)
     labels = labels[n_of_nans_per_row < 43]
+    return data, labels
+
+
+def load_user_knowledge(add_testdata=True, downloads_path=None):
+    filename = _get_download_dir(downloads_path) + "/Data_User_Modeling_Dataset_Hamdi Tolga KAHRAMAN.xls"
+    if not os.path.isfile(filename):
+        _download_file(
+            "https://archive.ics.uci.edu/ml/machine-learning-databases/00257/Data_User_Modeling_Dataset_Hamdi%20Tolga%20KAHRAMAN.xls",
+            filename)
+    xls = pd.ExcelFile(filename)
+    # Load second page
+    sheet_train = xls.parse(1)
+    # Get data and label columns
+    labels_raw = sheet_train.pop(" UNS")
+    data = sheet_train.values[:, :5]
+    # Transform labels
+    if add_testdata:
+        # Load third page
+        sheet_test = xls.parse(2)
+        # Get data and label columns
+        test_data = sheet_test.values[:, :5]
+        uns_test = sheet_test.pop(" UNS")
+        data = np.r_[data, test_data]
+        labels_raw = np.r_[labels_raw, uns_test]
+    LE = LabelEncoder()
+    labels = LE.fit_transform(labels_raw)
+    return data, labels
+
+
+def load_breast_tissue(downloads_path=None):
+    filename = _get_download_dir(downloads_path) + "/BreastTissue.xls"
+    if not os.path.isfile(filename):
+        _download_file("http://archive.ics.uci.edu/ml/machine-learning-databases/00192/BreastTissue.xls",
+                       filename)
+    xls = pd.ExcelFile(filename)
+    # Load second page
+    sheet = xls.parse(1)
+    # Get data and label columns
+    class_column = sheet.pop("Class")
+    data = sheet.values[:, 1:]
+    # Transform labels
+    LE = LabelEncoder()
+    labels = LE.fit_transform(class_column)
     return data, labels
 
 
@@ -382,30 +544,67 @@ def load_cmu_faces(downloads_path=None):
     return data, labels
 
 
+def load_forest_types(add_testdata=True, downloads_path=None):
+    directory = _get_download_dir(downloads_path) + "/ForestTypes/"
+    filename = directory + "ForestTypes.zip"
+    if not os.path.isfile(filename):
+        if not os.path.isdir(directory):
+            os.mkdir(directory)
+        _download_file("https://archive.ics.uci.edu/ml/machine-learning-databases/00333/ForestTypes.zip",
+                       filename)
+        # Unpack zipfile
+        with zipfile.ZipFile(filename, 'r') as zipf:
+            zipf.extractall(directory)
+    # Load data and labels
+    df_train = pd.read_csv(directory + "/training.csv", delimiter=",")
+    labels_raw = df_train.pop("class")
+    data = df_train.values
+    if add_testdata:
+        df_test = pd.read_csv(directory + "/testing.csv", delimiter=",")
+        labels_test = df_test.pop("class")
+        data = np.r_[data, df_test.values]
+        labels_raw = np.r_[labels_raw, labels_test]
+    LE = LabelEncoder()
+    labels = LE.fit_transform(labels_raw)
+    return data, labels
+
+
 """
 Load timeseries classification data
 """
 
 
 def load_motestrain(add_testdata=True, downloads_path=None):
-    directory = _get_download_dir(downloads_path) + "/MoteStrain/"
-    filename = directory + "MoteStrain.zip"
-    if not os.path.isfile(filename):
-        if not os.path.isdir(directory):
-            os.mkdir(directory)
-        _download_file("http://www.timeseriesclassification.com/Downloads/MoteStrain.zip",
-                       filename)
-        # Unpack zipfile
-        with zipfile.ZipFile(filename, 'r') as zipf:
-            zipf.extractall(directory)
-    # Load data and labels
-    dataset = np.genfromtxt(directory + "/MoteStrain_TRAIN.txt")
-    data = dataset[:, 1:]
-    labels = dataset[:, 0]
-    if add_testdata:
-        test_dataset = np.genfromtxt(directory + "/MoteStrain_TEST.txt")
-        data = np.r_[data, test_dataset[:, 1:]]
-        labels = np.r_[labels, test_dataset[:, 0]]
+    data, labels = _load_timeseries_classification_data("MoteStrain", add_testdata, downloads_path)
+    labels -= 1
+    return data, labels
+
+
+def load_proximal_phalanx_outline(add_testdata=True, downloads_path=None):
+    data, labels = _load_timeseries_classification_data("DistalPhalanxOutlineCorrect", add_testdata, downloads_path)
+    return data, labels
+
+
+def load_diatom_size_reduction(add_testdata=True, downloads_path=None):
+    data, labels = _load_timeseries_classification_data("DiatomSizeReduction", add_testdata, downloads_path)
+    labels -= 1
+    return data, labels
+
+
+def load_symbols(add_testdata=True, downloads_path=None):
+    data, labels = _load_timeseries_classification_data("Symbols", add_testdata, downloads_path)
+    labels -= 1
+    return data, labels
+
+
+def load_olive_oil(add_testdata=True, downloads_path=None):
+    data, labels = _load_timeseries_classification_data("OliveOil", add_testdata, downloads_path)
+    labels -= 1
+    return data, labels
+
+
+def load_plane(add_testdata=True, downloads_path=None):
+    data, labels = _load_timeseries_classification_data("Plane", add_testdata, downloads_path)
     labels -= 1
     return data, labels
 
@@ -465,7 +664,7 @@ def load_webkb(remove_headers=True, use_categories=["course", "faculty", "projec
     # Execute TF-IDF and remove stop-words
     vectorizer = _StemmedCountVectorizer(dtype=np.float64, stop_words="english", min_df=0.01)
     data_sparse = vectorizer.fit_transform(texts)
-    selector = VarianceThreshold(0.25) # 0.25 ohne min_df
+    selector = VarianceThreshold(0.25)  # 0.25 ohne min_df
     data_sparse = selector.fit_transform(data_sparse)
     tfidf = TfidfTransformer(sublinear_tf=True)
     data_sparse = tfidf.fit_transform(data_sparse)

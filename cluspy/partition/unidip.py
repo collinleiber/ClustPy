@@ -66,9 +66,11 @@ def _unidip(X_1d, significance, gap_size):
             labels[argsorted[cluster_start:cluster_end]] = cluster_id
             cluster_boundaries.append((cluster_start, cluster_end))
             cluster_id += 1
+    n_clusters = cluster_id
     # Merge nearby clusters
-    labels, cluster_boundaries = _merge_clusters(sorted_X_1d, argsorted, labels, cluster_boundaries, significance)
-    return labels, cluster_id, sorted_X_1d, argsorted, cluster_boundaries
+    labels, n_clusters, cluster_boundaries = _merge_clusters(sorted_X_1d, argsorted, labels, n_clusters,
+                                                             cluster_boundaries, significance)
+    return labels, n_clusters, sorted_X_1d, argsorted, cluster_boundaries
 
 
 def _dip_mirrored_data(X_1d, orig_low_high, gap_size):
@@ -110,7 +112,7 @@ def _dip_mirrored_data(X_1d, orig_low_high, gap_size):
             return dip_value_right, 2 * (X_1d.shape[0] - 1) - high, 2 * (X_1d.shape[0] - 1) - low
 
 
-def _merge_clusters(sorted_X_1d, argsorted, labels, cluster_boundaries, significance):
+def _merge_clusters(sorted_X_1d, argsorted, labels, n_clusters, cluster_boundaries, significance):
     # For each cluster check left and right partner -> first and last cluster are handled by neighbors
     i = 1
     while i < len(cluster_boundaries) - 1:
@@ -128,15 +130,17 @@ def _merge_clusters(sorted_X_1d, argsorted, labels, cluster_boundaries, signific
             labels[labels > i] -= 1
             cluster_boundaries[i - 1] = (cluster_boundaries[i - 1][0], cluster_boundaries[i][1])
             del cluster_boundaries[i]
+            n_clusters -= 1
         elif dip_pvalue_right > dip_pvalue_left and dip_pvalue_right >= significance:
             # Merge i and i + 1. Overwrite labels (beware, outliers can be in between)
             labels[argsorted[cluster_boundaries[i][1]:cluster_boundaries[i + 1][1]]] = i
             labels[labels > i + 1] -= 1
             cluster_boundaries[i] = (cluster_boundaries[i][0], cluster_boundaries[i + 1][1])
             del cluster_boundaries[i + 1]
+            n_clusters -= 1
         else:
             i += 1
-    return labels, cluster_boundaries
+    return labels, n_clusters, cluster_boundaries
 
 
 """
@@ -166,23 +170,25 @@ def _unidip_plus(X_1d, significance, gap_size):
             # If structure is multimodal execute UniDip on outliers
             _, _, _, _, cluster_boundaries_new = _unidip(X_rest, significance, gap_size)
             # Add new clusters to existing clusters
-            labels, cluster_boundaries_orig, noise_clusters, only_noise_clusters = _add_points_to_existing_cluster(sorted_X_1d,
-                                                                                                          argsorted,
-                                                                                                          cluster_boundaries_new,
-                                                                                                          argwhere_outliers,
-                                                                                                          cluster_boundaries_orig,
-                                                                                                          noise_clusters,
-                                                                                                          labels,
-                                                                                                          dip_pvalue)
+            labels, cluster_boundaries_orig, noise_clusters, only_noise_clusters = _add_points_to_existing_cluster(
+                sorted_X_1d,
+                argsorted,
+                cluster_boundaries_new,
+                argwhere_outliers,
+                cluster_boundaries_orig,
+                noise_clusters,
+                labels,
+                dip_pvalue)
         else:
             # If strucure is unimodal, mirror data to see if a reasonable peak exists
-            dip_value_mirror, _, _ = _dip_mirrored_data(X_rest, low_high, 0)
+            dip_value_mirror, low_mirror, high_mirror = _dip_mirrored_data(X_rest, low_high, 0)
             dip_pvalue_mirror = dip_pval(dip_value_mirror, n_points=(X_rest.shape[0] * 2 - 1))
+            low_high = (low_mirror, high_mirror)
             if dip_pvalue_mirror < significance:
                 # Add peak to existing clusters
                 labels, cluster_boundaries_orig, noise_clusters, only_noise_clusters = _add_points_to_existing_cluster(
-                    sorted_X_1d, argsorted, [low_high], argwhere_outliers, cluster_boundaries_orig, noise_clusters, labels,
-                    dip_pvalue)
+                    sorted_X_1d, argsorted, [low_high], argwhere_outliers, cluster_boundaries_orig, noise_clusters,
+                    labels, dip_pvalue)
             else:
                 # If distribution is still unimodal -> terminate
                 break
@@ -229,7 +235,8 @@ def _add_points_to_existing_cluster(sorted_X_1d, argsorted, cluster_boundaries_n
                     max_dip_pval = np.max(best_probs[current_start - start_new:start_orig - start_new])
                     if dip_pvalue > max_dip_pval:
                         if max_dip_pval > 0:
-                            cluster_boundaries_orig_copy[i - 1] = (cluster_boundaries_orig_copy[i - 1][0], cluster_boundaries_orig[i - 1][1])
+                            cluster_boundaries_orig_copy[i - 1] = (
+                            cluster_boundaries_orig_copy[i - 1][0], cluster_boundaries_orig[i - 1][1])
                         labels[argsorted[current_start:start_orig]] = i
                         best_probs[current_start - start_new:start_orig - start_new] = dip_pvalue
                         cluster_boundaries_orig_copy[i] = (current_start, cluster_boundaries_orig_copy[i][1])
