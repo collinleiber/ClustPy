@@ -407,7 +407,7 @@ def _update_projections(P_combined, n_negative_e):
 
 def _remove_empty_subspace(subspaces, n_clusters, m, P, centers, labels, scatter_matrices, debug):
     """
-    Check if after rotating and rearranging dimensionalities any empty subspaces occurred. Empty subspaces will be
+    Check if after rotating and rearranging the dimensionalities any empty subspaces occurred. Empty subspaces will be
     removed for the next iteration. Therefore all necessary lists will be updated.
     :param subspaces: number of subspaces
     :param n_clusters: list containing number of clusters for each subspace_nr

@@ -51,18 +51,16 @@ def dip(X, just_dip=True, is_data_sorted=False, use_c=True, debug=False):
         lcm = np.zeros(N).ctypes.data_as(ctypes.POINTER(ctypes.c_int))
         mn = np.zeros(N).ctypes.data_as(ctypes.POINTER(ctypes.c_int))
         mj = np.zeros(N).ctypes.data_as(ctypes.POINTER(ctypes.c_int))
-        is_from_lcm = np.array([0]).ctypes.data_as(ctypes.POINTER(ctypes.c_int))
         debug_c = np.array([1 if debug else 0]).ctypes.data_as(ctypes.POINTER(ctypes.c_int))
         # Execute C dip test
-        _ = C_DIP_FILE.diptst(X_c, N_c, dip_value, low_high, modal_triangle, gcm, lcm, mn, mj, is_from_lcm, debug_c)
+        _ = C_DIP_FILE.diptst(X_c, N_c, dip_value, low_high, modal_triangle, gcm, lcm, mn, mj, debug_c)
         dip_value = dip_value[0]
-        is_from_lcm = is_from_lcm[0]
         if just_dip:
             return dip_value
         else:
             low_high = (low_high[2], low_high[3])
             modal_triangle = (modal_triangle[0], modal_triangle[1], modal_triangle[2])
-            return dip_value, low_high, modal_triangle, is_from_lcm
+            return dip_value, low_high, modal_triangle
     else:
         return dip_python_port(X, just_dip, debug)
 
@@ -84,7 +82,6 @@ def load_c_dip_file():
                 C_DIP_FILE.diptst.argtypes = [ctypes.POINTER(ctypes.c_double),
                                          ctypes.POINTER(ctypes.c_int),
                                          ctypes.POINTER(ctypes.c_double),
-                                         ctypes.POINTER(ctypes.c_int),
                                          ctypes.POINTER(ctypes.c_int),
                                          ctypes.POINTER(ctypes.c_int),
                                          ctypes.POINTER(ctypes.c_int),
@@ -126,7 +123,6 @@ def dip_python_port(X, just_dip=False, is_data_sorted=False, debug=False):
     modaltriangle_i3 = None
     best_low = None
     best_high = None
-    is_from_lcm = None
 
     # Establish the indices mn[1..n] over which combination is necessary for the convex MINORANT (GCM) fit.
     mn = np.zeros(N, dtype=int)
@@ -292,12 +288,10 @@ def dip_python_port(X, just_dip=False, is_data_sorted=False, debug=False):
                 modaltriangle_i1 = lcm_modalTriangle_i1
                 modaltriangle_i2 = j_best
                 modaltriangle_i3 = lcm_modalTriangle_i3
-                is_from_lcm = 1
             else:
                 modaltriangle_i1 = gcm_modalTriangle_i1
                 modaltriangle_i2 = j_best
                 modaltriangle_i3 = gcm_modalTriangle_i3
-                is_from_lcm = 0
 
         if low == gcm[ig] and high == lcm[ih]:
             if debug:
@@ -308,7 +302,7 @@ def dip_python_port(X, just_dip=False, is_data_sorted=False, debug=False):
     dip_value /= (2 * N)
     # TODO: Better with best low best high?
     return dip_value if just_dip else (
-        dip_value, (best_low, best_high), (modaltriangle_i1, modaltriangle_i2, modaltriangle_i3), is_from_lcm)
+        dip_value, (best_low, best_high), (modaltriangle_i1, modaltriangle_i2, modaltriangle_i3))
 
 
 def dip_test(X, is_data_sorted=False, pval_strategy=PVAL_BY_TABLE, n_boots=2000, use_c=True, debug=False):

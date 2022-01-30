@@ -261,9 +261,6 @@ def _execute_nrkmeans(X, n_clusters, nrkmeans_repetitions=10, random_state=None,
     if debug:
         print("[AutoNR] Output n_clusters = {0} / m = {1}".format(best_nrkmeans.n_clusters, best_nrkmeans.m))
         print("[AutoNR] {0} ({1})".format(best_total_mdl_costs, best_subspace_costs))
-        # for i in range(len(best_nrkmeans.n_clusters)): # TODO
-        #     if best_nrkmeans.n_clusters[i] <= 15:# and best_nrkmeans.n_clusters[i] > 1:
-        #         best_nrkmeans.plot_subspace(X, i, title=n_clusters, plot_centers=False, equal_axis=False)
     return best_nrkmeans, best_total_mdl_costs, best_subspace_costs
 
 

@@ -50,7 +50,7 @@ Compile Linux: cc -fPIC -shared -o dip.so dip.c
 /* Subroutine */
 void diptst(const double x[], const int *n_,
         double *dip, int *lo_hi, int *modaltriangle,
-        int *gcm, int *lcm, int *mn, int *mj, int *is_from_lcm, const int *debug)
+        int *gcm, int *lcm, int *mn, int *mj, const int *debug)
 {
 #define low   lo_hi[0]
 #define high  lo_hi[1]
@@ -82,7 +82,6 @@ void diptst(const double x[], const int *n_,
     modaltriangle_i1 = -1;
     modaltriangle_i2 = -1;
     modaltriangle_i3 = -1;
-    *is_from_lcm = 0;
 
 /* M.Maechler -- speedup: it saves many divisions by n when we just work with
  * (2n * dip) everywhere but the very end! */
@@ -273,7 +272,6 @@ LOOP_Start:
         modaltriangle_i1 = lcm_modalTriangle_i1;
         modaltriangle_i2 = j_best;
         modaltriangle_i3 = lcm_modalTriangle_i3;
-        *is_from_lcm = 1;
         if (*debug == 1) printf(" -> new larger dip %-8.5g (j_best = %d) gcm-centred triple (%d,%d,%d)\n",dipnew, j_best,
                                                                                                       lcm_modalTriangle_i1,
                                                                                                       j_best,
@@ -282,7 +280,6 @@ LOOP_Start:
         modaltriangle_i1 = gcm_modalTriangle_i1;
         modaltriangle_i2 = j_best;
         modaltriangle_i3 = gcm_modalTriangle_i3;
-        *is_from_lcm = 0;
         if (*debug == 1) printf(" -> new larger dip %-8.5g (j_best = %d) lcm-centred triple (%d,%d,%d)\n",dipnew, j_best,
                                                                                                       gcm_modalTriangle_i1,
                                                                                                       j_best,
