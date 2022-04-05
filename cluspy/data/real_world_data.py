@@ -139,8 +139,8 @@ def load_fmnist(add_testdata=True, normalize_channels=False, downloads_path=None
 def load_usps(add_testdata=True, downloads_path=None):
     ssl._create_default_https_context = ssl._create_unverified_context
     dataset = torchvision.datasets.USPS(root=_get_download_dir(downloads_path), train=True, download=True)
-    data = dataset.data
-    labels = dataset.targets
+    data = np.array(dataset.data)
+    labels = np.array(dataset.targets)
     if add_testdata:
         test_dataset = torchvision.datasets.USPS(root=_get_download_dir(downloads_path), train=False, download=True)
         data = np.r_[data, test_dataset.data]
@@ -384,6 +384,7 @@ def load_har(add_testdata=True, downloads_path=None):
         test_labels = np.genfromtxt(directory + "UCI HAR Dataset/test/y_test.txt")
         data = np.r_[data, test_data]
         labels = np.r_[labels, test_labels]
+    labels = labels - 1
     return data, labels
 
 

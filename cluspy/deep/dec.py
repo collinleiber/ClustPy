@@ -1,14 +1,5 @@
 """
-Xie, Junyuan, Ross Girshick, and Ali Farhadi. "Unsupervised
-deep embedding for clustering analysis." International
-conference on machine learning. 2016.
-
-and
-
-Guo, Xifeng, et al. "Improved deep embedded clustering with
-local structure preservation." IJCAI. 2017.
-
-@authors Lukas Miklautz, Dominik Mautz
+@authors Lukas Miklautz, Dominik Mautz, Collin leiber
 """
 
 from cluspy.deep._utils import detect_device, get_trained_autoencoder, encode_batchwise, \
@@ -125,10 +116,36 @@ class _DEC_Module(torch.nn.Module):
 
 
 class DEC(BaseEstimator, ClusterMixin):
+    """
+    Deep Embedded Clustering
+    """
 
     def __init__(self, n_clusters, alpha=1.0, batch_size=256, pretrain_learning_rate=1e-3, dec_learning_rate=1e-4,
                  pretrain_epochs=100, dec_epochs=150, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(),
                  autoencoder=None, embedding_size=10, use_reconstruction_loss=False, cluster_loss_weight=1):
+        """
+        Create an instance of the DEC algorithm.
+        Based on:
+        Xie, Junyuan, Ross Girshick, and Ali Farhadi. "Unsupervised
+        deep embedding for clustering analysis." International
+        conference on machine learning. 2016.
+
+        Parameters
+        ----------
+        n_clusters : number of clusters
+        alpha : alpha for the prediction
+        batch_size : size of the data batches
+        pretrain_learning_rate : learning rate for the pretraining of the autoencoder
+        dec_learning_rate : learning rate of the actual clustering procedure
+        pretrain_epochs : number of epochs for the pretraining of the autoencoder
+        dec_epochs : number of epochs for the actual clustering procedure
+        optimizer_class : Optimizer (default: ADAM)
+        loss_fn : loss function for the reconstruction (default: MSELoss)
+        autoencoder : the input autoencoder. If None a new autoencoder will be created
+        embedding_size : size of the embedding within the autoencoder
+        use_reconstruction_loss : should the reconstruction loss be used during clustering training
+        cluster_loss_weight : weight of the clustering loss compared to the reconstruction loss
+        """
         self.n_clusters = n_clusters
         self.alpha = alpha
         self.batch_size = batch_size
@@ -164,7 +181,26 @@ class DEC(BaseEstimator, ClusterMixin):
 
 
 class IDEC(DEC):
+    """
+    Create an instance of the IDEC algorithm.
+    Based on:
+    Guo, Xifeng, et al. "Improved deep embedded clustering with
+    local structure preservation." IJCAI. 2017.
 
+    Parameters
+    ----------
+    n_clusters : number of clusters
+    alpha : alpha for the prediction
+    batch_size : size of the data batches
+    pretrain_learning_rate : learning rate for the pretraining of the autoencoder
+    idec_learning_rate : learning rate of the actual clustering procedure
+    pretrain_epochs : number of epochs for the pretraining of the autoencoder
+    idec_epochs : number of epochs for the actual clustering procedure
+    optimizer_class : Optimizer (default: ADAM)
+    loss_fn : loss function for the reconstruction (default: MSELoss)
+    autoencoder : the input autoencoder. If None a new autoencoder will be created
+    embedding_size : size of the embedding within the autoencoder
+    """
     def __init__(self, n_clusters, alpha=1.0, batch_size=256, pretrain_learning_rate=1e-3, idec_learning_rate=1e-4,
                  pretrain_epochs=100, idec_epochs=150, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(),
                  autoencoder=None, embedding_size=10):

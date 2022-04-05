@@ -85,7 +85,7 @@ def _get_clusters_in_interval(X, index_start, index_end, prefix, testing_modal_i
     data_subset = X[index_start:index_end + 1]
 
     # Run the dip test on the data subset
-    dip_value, low_high, _, _ = dip(data_subset, just_dip=False, is_data_sorted=True)
+    dip_value, low_high, _ = dip(data_subset, just_dip=False, is_data_sorted=True)
     dip_pvalue = dip_pval(dip_value, data_subset.shape[0])
     modal_interval_left = index_start + low_high[0]
     modal_interval_right = index_start + low_high[1]
@@ -110,10 +110,10 @@ def _get_clusters_in_interval(X, index_start, index_end, prefix, testing_modal_i
 
             ## Get left and right-mirrored results
             left_mirrored_dataset = _mirror_dataset(data_subset, True)
-            left_mirrored_dip_value, left_mirrored_low_high, _, _ = \
+            left_mirrored_dip_value, left_mirrored_low_high, _ = \
                 dip(left_mirrored_dataset, is_data_sorted=True, just_dip=False)
             right_mirrored_dataset = _mirror_dataset(data_subset, False)
-            right_mirrored_dip_value, right_mirrored_low_high, _, _ = \
+            right_mirrored_dip_value, right_mirrored_low_high, _ = \
                 dip(right_mirrored_dataset, is_data_sorted=True, just_dip=False)
             if left_mirrored_dip_value > right_mirrored_dip_value:
                 cluster_range = _map_index_range_to_ordered_mirrored_data_index_range_in_original_ordered_data(

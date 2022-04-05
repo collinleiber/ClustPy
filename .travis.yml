@@ -1,0 +1,17 @@
+# Disable sudo to speed up the build
+sudo: false
+# Set the build language to Python
+language: python
+python:
+  - "3.10"
+  - "3.9"
+# command to install dependencies
+install:
+  - pip install -r requirements.txt
+  - pip install codecov
+# command to run tests
+script:
+  - pytest --cov=ClusPy
+# Codecov
+after_success:
+    - codecov

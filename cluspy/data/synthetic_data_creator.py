@@ -6,15 +6,16 @@ from sklearn.utils import check_random_state
 
 
 def create_subspace_data(n_samples=1000, n_clusters=3, subspace_features=[2, 2], n_outliers=[0, 0], std=1,
-                         box=(-10, 10), random_state=None):
+                         box=(-10, 10), rotate_space=True, random_state=None):
     assert type(n_clusters) is int, "n_clusters must be of type int"
     X, L = create_nr_data(n_samples=n_samples, n_clusters=[n_clusters, 1], subspace_features=subspace_features,
-                          n_outliers=n_outliers, std=std, box=box, random_state=random_state)
+                          n_outliers=n_outliers, std=std, box=box, rotate_space=rotate_space,
+                          random_state=random_state)
     return X, L[:,0]
 
 
 def create_nr_data(n_samples=1000, n_clusters=[3, 3, 1], subspace_features=[2, 2, 2], n_outliers=[0, 0, 0], std=1,
-                   box=(-10, 10), random_state=None):
+                   box=(-10, 10), rotate_space=True, random_state=None):
     random_state = check_random_state(random_state)
     # Transform n_clusters to list
     if type(n_clusters) is not list:
@@ -56,6 +57,7 @@ def create_nr_data(n_samples=1000, n_clusters=[3, 3, 1], subspace_features=[2, 2
         X = np.c_[X, X_tmp]
         L = np.c_[L, L_tmp]
     # Rotate space
-    V = special_ortho_group.rvs(dim=sum(subspace_features))
-    X_transformed = np.matmul(X, V)
-    return X_transformed, L
+    if rotate_space:
+        V = special_ortho_group.rvs(dim=sum(subspace_features))
+        X = np.matmul(X, V)
+    return X, L

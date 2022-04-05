@@ -1,15 +1,22 @@
 # ClusPy
 
-The package offers an easy way to cluster data in python.
-It can be combined with all algorithms from [sklearn clustering](https://scikit-learn.org/stable/modules/clustering.html) 
-and other packages.
-Furthermore, it contains wrappers for [pyclustering](https://pyclustering.github.io/) implementations.
+[![Build Status](https://app.travis-ci.com/collinleiber/ClusPy.svg?branch=master)](https://app.travis-ci.com/collinleiber/ClusPy)
+[![codecov](https://codecov.io/github/collinleiber/ClusPy/branch/master/graphs/badge.svg)](https://codecov.io/github/collinleiber/ClusPy) 
 
-The main focus of this package is not efficiency but being able to try out a wide range of methods.
+The package provides a simple way to cluster data in Python.
+It provides a variety of algorithms for this purpose. 
+Furthermore, methods that are often needed for research purposes, such as loading frequently used data sets 
+(e.g. from the [UCI repository](https://archive.ics.uci.edu/ml/index.php)), are largely automated. 
+Here the focus is not on efficiency (here we recommend e.g. [pyclustering](https://pyclustering.github.io/)), 
+but on the possibility to try out a wide range of modern scientific methods.
 In particular, this should also make lesser-known methods accessible in a simple and convenient way.
 
-## Installation
+It can be combined with all algorithms from [sklearn clustering](https://scikit-learn.org/stable/modules/clustering.html) 
+and other packages (see below).
+Furthermore, it contains wrappers for [pyclustering](https://pyclustering.github.io/) implementations.
 
+## Installation
+https://app.travis-ci.com/collinleiber/ClusPy.svg?token=DfXVQ2JPWpzEdBz7tDgg&branch=main&status=unknown
 Just clone the repository, go to the directory and execute:
 
 `pip install -r requirements.txt`
@@ -21,14 +28,14 @@ Afterwards, you will be good to go.
 ### Algorithms
 
 - Partition-based clustering
-    - X-Means (from [pyclustering](https://pyclustering.github.io/docs/0.10.0/html/d2/d8b/namespacepyclustering_1_1cluster_1_1xmeans.html))
-    - G-Means (from [pyclustering](https://pyclustering.github.io/docs/0.10.0/html/dc/d86/namespacepyclustering_1_1cluster_1_1gmeans.html))
     - PG-Means
-    - Fuzzy-C-Means (from [pyclustering](https://pyclustering.github.io/docs/0.10.0/html/de/df0/namespacepyclustering_1_1cluster_1_1fcm.html))
     - Dip-Means
     - Projected Dip-Means
     - DipExt & DipInit
     - UniDip & Skinnydip
+    - Fuzzy-C-Means (from [pyclustering](https://pyclustering.github.io/docs/0.10.0/html/de/df0/namespacepyclustering_1_1cluster_1_1fcm.html))
+    - X-Means (from [pyclustering](https://pyclustering.github.io/docs/0.10.0/html/d2/d8b/namespacepyclustering_1_1cluster_1_1xmeans.html))
+    - G-Means (from [pyclustering](https://pyclustering.github.io/docs/0.10.0/html/dc/d86/namespacepyclustering_1_1cluster_1_1gmeans.html))
 - Density-based clustering
     - Multi Density DBSCAN
 - Subspace clustering
@@ -50,13 +57,14 @@ Afterwards, you will be good to go.
 ### Other implementations
 
 - Metrics
+    - Confusion Matrix
     - Variation of information
     - Unsupervised Clustering Accuracy
     - Pair Counting Scores (f1, rand, jaccard, recall, precision)
     - Scores for multiple labelings
-    - Confusion Matrix
 - Utils
     - Hartigans Dip-test
+    - Various Plots
     
 ## Compatible packages
 
@@ -109,7 +117,7 @@ from cluspy.subspace import SubKmeans
 from cluspy.data import create_subspace_data
 from sklearn.metrics import normalized_mutual_info_score as nmi
 
-data, labels = create_subspace_data(1000, n_clusters=4, cluster_features=2, total_features = 5)
+data, labels = create_subspace_data(1000, n_clusters=4)
 sk = SubKmeans(4)
 sk.fit(data)
 my_nmi = nmi(labels, sk.labels_)
@@ -117,6 +125,24 @@ print(my_nmi)
 ```
 
 ### 3)
+
+One advantage of ClusPy is the ability to run various modern deep clustering algorithms out of the box. 
+For example, the following code runs the DEC algorithm on the well-known MNIST dataset. 
+To evaluate the result, we compute the adjusted RAND index.
+
+```python
+from cluspy.deep import DEC
+from cluspy.data import load_mnist
+from sklearn.metrics import adjusted_rand_score as ari
+
+data, labels = load_mnist()
+dec = DEC(10)
+dec.fit(data)
+my_ari = ari(labels, dec.labels_)
+print(my_ari)
+```
+
+### 4)
 
 In this more complex example, we use ClusPy's evaluation functions, 
 which automatically run the specified algorithms multiple times on previously defined data sets.

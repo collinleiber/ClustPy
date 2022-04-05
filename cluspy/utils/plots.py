@@ -15,8 +15,7 @@ _MIN_OBJECTS_FOR_DENS_PLOT = 3
 
 
 def plot_with_transformation(X, labels=None, centers=None, true_labels=None, plot_dimensionality=2,
-                             transformation_class=PCA,
-                             scattersize=10, equal_axis=False):
+                             transformation_class=PCA, scattersize=10, equal_axis=False):
     assert plot_dimensionality > 0, "Plot dimensionality must be > 0"
     if X.ndim == 1:
         plot_dimensionality = 1
