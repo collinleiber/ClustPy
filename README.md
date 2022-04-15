@@ -4,10 +4,11 @@
 [![codecov](https://codecov.io/github/collinleiber/ClusPy/branch/master/graphs/badge.svg)](https://codecov.io/github/collinleiber/ClusPy) 
 
 The package provides a simple way to cluster data in Python.
-It provides a variety of algorithms for this purpose. 
-Furthermore, methods that are often needed for research purposes, such as loading frequently used data sets 
+For this purpose it provides a variety of algorithms. 
+Additionally, methods that are often needed for research purposes, such as loading frequently used data sets 
 (e.g. from the [UCI repository](https://archive.ics.uci.edu/ml/index.php)), are largely automated. 
-Here the focus is not on efficiency (here we recommend e.g. [pyclustering](https://pyclustering.github.io/)), 
+
+The focus of the ClusPy package is not on efficiency (here we recommend e.g. [pyclustering](https://pyclustering.github.io/)), 
 but on the possibility to try out a wide range of modern scientific methods.
 In particular, this should also make lesser-known methods accessible in a simple and convenient way.
 
@@ -16,7 +17,6 @@ and other packages (see below).
 Furthermore, it contains wrappers for [pyclustering](https://pyclustering.github.io/) implementations.
 
 ## Installation
-https://app.travis-ci.com/collinleiber/ClusPy.svg?token=DfXVQ2JPWpzEdBz7tDgg&branch=main&status=unknown
 Just clone the repository, go to the directory and execute:
 
 `pip install -r requirements.txt`
@@ -61,10 +61,10 @@ Afterwards, you will be good to go.
     - Variation of information
     - Unsupervised Clustering Accuracy
     - Pair Counting Scores (f1, rand, jaccard, recall, precision)
-    - Scores for multiple labelings
+    - Scores for multiple labelings (see alternative clustering algorithms)
 - Utils
     - Hartigans Dip-test
-    - Various Plots
+    - Various useful Plots
     
 ## Compatible packages
 

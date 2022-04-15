@@ -125,10 +125,6 @@ class DEC(BaseEstimator, ClusterMixin):
                  autoencoder=None, embedding_size=10, use_reconstruction_loss=False, cluster_loss_weight=1):
         """
         Create an instance of the DEC algorithm.
-        Based on:
-        Xie, Junyuan, Ross Girshick, and Ali Farhadi. "Unsupervised
-        deep embedding for clustering analysis." International
-        conference on machine learning. 2016.
 
         Parameters
         ----------
@@ -145,6 +141,19 @@ class DEC(BaseEstimator, ClusterMixin):
         embedding_size : size of the embedding within the autoencoder
         use_reconstruction_loss : should the reconstruction loss be used during clustering training
         cluster_loss_weight : weight of the clustering loss compared to the reconstruction loss
+
+        Examples
+        ----------
+        from cluspy.data import load_mnist
+        data, labels = load_mnist
+        idec = DEC(n_clusters=10)
+        dec.fit(data)
+
+        References
+         ----------
+        Xie, Junyuan, Ross Girshick, and Ali Farhadi. "Unsupervised
+        deep embedding for clustering analysis." International
+        conference on machine learning. 2016.
         """
         self.n_clusters = n_clusters
         self.alpha = alpha
@@ -161,6 +170,18 @@ class DEC(BaseEstimator, ClusterMixin):
         self.cluster_loss_weight = cluster_loss_weight
 
     def fit(self, X, y=None):
+        """
+        Initiate the actual clustering process on the input data set.
+
+        Parameters
+        ----------
+        X : the given data set.
+        y : the labels (can be ignored)
+
+        Returns
+        -------
+        returns the clustering object
+        """
         kmeans_labels, kmeans_centers, dec_labels, dec_centers, autoencoder = _dec(X, self.n_clusters, self.alpha,
                                                                                    self.batch_size,
                                                                                    self.pretrain_learning_rate,
@@ -183,9 +204,6 @@ class DEC(BaseEstimator, ClusterMixin):
 class IDEC(DEC):
     """
     Create an instance of the IDEC algorithm.
-    Based on:
-    Guo, Xifeng, et al. "Improved deep embedded clustering with
-    local structure preservation." IJCAI. 2017.
 
     Parameters
     ----------
@@ -200,6 +218,18 @@ class IDEC(DEC):
     loss_fn : loss function for the reconstruction (default: MSELoss)
     autoencoder : the input autoencoder. If None a new autoencoder will be created
     embedding_size : size of the embedding within the autoencoder
+
+    Examples
+    ----------
+    from cluspy.data import load_mnist
+    data, labels = load_mnist
+    idec = IDEC(n_clusters=10)
+    idec.fit(data)
+
+    References
+    ----------
+    Guo, Xifeng, et al. "Improved deep embedded clustering with
+    local structure preservation." IJCAI. 2017.
     """
     def __init__(self, n_clusters, alpha=1.0, batch_size=256, pretrain_learning_rate=1e-3, idec_learning_rate=1e-4,
                  pretrain_epochs=100, idec_epochs=150, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(),

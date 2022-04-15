@@ -152,8 +152,8 @@ def plot_histogram(X, labels=None, density=True, n_bins=100, show_legend=True):
 
 
 def plot_scatter_matrix(X, labels=None, centers=None, true_labels=None, density=True, n_bins=100, show_legend=True,
-                        scattersize=10, equal_axis=False):
-    if X.shape[1] > 10:
+                        scattersize=10, equal_axis=False, max_dimensions=10):
+    if X.shape[1] > max_dimensions:
         print(
             "[WARNING] Dimensionality of the dataset is larger than 10. Creation of scatter matrix plot will be aborted.")
         return
