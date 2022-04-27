@@ -131,3 +131,6 @@ dmypy.json
 
 # Pycharm
 .idea
+
+# Shell scripts
+*.sh

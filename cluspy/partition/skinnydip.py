@@ -11,7 +11,7 @@ https://github.com/samhelmholtz/skinny-dip
 """
 
 import numpy as np
-from cluspy.utils import dip, dip_pval
+from cluspy.utils import dip_test, dip_pval
 from sklearn.base import BaseEstimator, ClusterMixin
 
 
@@ -85,7 +85,7 @@ def _get_clusters_in_interval(X, index_start, index_end, prefix, testing_modal_i
     data_subset = X[index_start:index_end + 1]
 
     # Run the dip test on the data subset
-    dip_value, low_high, _ = dip(data_subset, just_dip=False, is_data_sorted=True)
+    dip_value, low_high, _ = dip_test(data_subset, just_dip=False, is_data_sorted=True)
     dip_pvalue = dip_pval(dip_value, data_subset.shape[0])
     modal_interval_left = index_start + low_high[0]
     modal_interval_right = index_start + low_high[1]
@@ -111,10 +111,10 @@ def _get_clusters_in_interval(X, index_start, index_end, prefix, testing_modal_i
             ## Get left and right-mirrored results
             left_mirrored_dataset = _mirror_dataset(data_subset, True)
             left_mirrored_dip_value, left_mirrored_low_high, _ = \
-                dip(left_mirrored_dataset, is_data_sorted=True, just_dip=False)
+                dip_test(left_mirrored_dataset, is_data_sorted=True, just_dip=False)
             right_mirrored_dataset = _mirror_dataset(data_subset, False)
             right_mirrored_dip_value, right_mirrored_low_high, _ = \
-                dip(right_mirrored_dataset, is_data_sorted=True, just_dip=False)
+                dip_test(right_mirrored_dataset, is_data_sorted=True, just_dip=False)
             if left_mirrored_dip_value > right_mirrored_dip_value:
                 cluster_range = _map_index_range_to_ordered_mirrored_data_index_range_in_original_ordered_data(
                     left_mirrored_low_high, modal_interval_left, modal_interval_right, data_subset.shape[0], True,
@@ -293,7 +293,7 @@ def _consolidate_clusters(ordered_data, clusters, index, significance, debug):
     ending_index = (index + 1) * 2 + 1
     starting_point_index = clusters[starting_index]
     ending_point_index = clusters[ending_index]
-    dip_value = dip(ordered_data[starting_point_index:ending_point_index], just_dip=True, is_data_sorted=True)
+    dip_value = dip_test(ordered_data[starting_point_index:ending_point_index], just_dip=True, is_data_sorted=True)
     dip_p_value = dip_pval(dip_value, ending_point_index - starting_point_index)
     if dip_p_value < significance:
         if debug:

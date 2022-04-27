@@ -9,7 +9,7 @@ Conference on Artificial Intelligence. 2018.
 import numpy as np
 from cluspy.partition.dipmeans import _execute_bisecting_kmeans
 from sklearn.decomposition import PCA
-from cluspy.utils import dip, dip_pval, PVAL_BY_TABLE
+from cluspy.utils import dip_test, dip_pval
 from sklearn.base import BaseEstimator, ClusterMixin
 
 
@@ -29,7 +29,7 @@ def _proj_dipmeans(X, pval_threshold, n_random_projections, pval_strategy, n_boo
             # Get projections
             projections = _get_projected_data(X[ids_in_cluster], n_random_projections)
             # Calculate dip values for the distances of each point
-            cluster_dips = np.array([dip(projections[:, p], just_dip=True, is_data_sorted=False) for p in
+            cluster_dips = np.array([dip_test(projections[:, p], just_dip=True, is_data_sorted=False) for p in
                                      range(projections.shape[1])])
             # Calculate p-values of maximum dip
             pval = dip_pval(np.max(cluster_dips), ids_in_cluster.shape[0], pval_strategy=pval_strategy, n_boots=n_boots)
@@ -66,7 +66,7 @@ def _get_projected_data(X, n_random_projections):
 
 class ProjectedDipMeans(BaseEstimator, ClusterMixin):
 
-    def __init__(self, pval_threshold=0, n_random_projections=10, pval_strategy=PVAL_BY_TABLE, n_boots=2000,
+    def __init__(self, pval_threshold=0, n_random_projections=10, pval_strategy="table", n_boots=2000,
                  n_new_centers=10, max_n_clusters=np.inf):
         self.pval_threshold = pval_threshold
         self.n_random_projections = n_random_projections

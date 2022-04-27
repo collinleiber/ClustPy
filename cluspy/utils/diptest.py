@@ -18,19 +18,10 @@ Dario Ringach <dario@wotan.cns.nyu.edu>, Martin Maechler <maechler@stat.math.eth
 """
 
 import numpy as np
-import os
-import platform
-import ctypes
+from cluspy.utils.dipModule import c_diptest # noqa - Import from C file (could be marked as unresolved)
 
-PVAL_BY_TABLE = 0
-PVAL_BY_BOOT = 1
-PVAL_BY_FUNCTION = 2
 
-CAN_C_BE_USED = True
-C_DIP_FILE = None
-
-def dip(X, just_dip=True, is_data_sorted=False, use_c=True, debug=False):
-    global CAN_C_BE_USED
+def dip_test(X, just_dip=True, is_data_sorted=False, use_c=True, debug=False):
     assert X.ndim == 1, "Data must be 1-dimensional for the dip-test. Your shape:{0}".format(X.shape)
     assert just_dip or is_data_sorted == True, "Data must be sorted if low-high tuple and/or modal triangle should be returned (else indices will not match)"
     N = len(X)
@@ -38,81 +29,43 @@ def dip(X, just_dip=True, is_data_sorted=False, use_c=True, debug=False):
         X = np.sort(X)
     if N < 4 or X[0] == X[-1]:
         d = 0.0
-        return d if just_dip else (d, (0, N-1), None, True)
-    if use_c and load_c_dip_file():
-        # Prepare data to match C data types
-        X = np.asarray(X, dtype=np.float64)
-        X_c = X.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
-        N_c = np.array([N]).ctypes.data_as(ctypes.POINTER(ctypes.c_int))
-        dip_value = np.zeros(1, dtype=np.float).ctypes.data_as(ctypes.POINTER(ctypes.c_double))
-        low_high = np.zeros(4).ctypes.data_as(ctypes.POINTER(ctypes.c_int))
-        modal_triangle = np.zeros(3).ctypes.data_as(ctypes.POINTER(ctypes.c_int))
-        gcm = np.zeros(N).ctypes.data_as(ctypes.POINTER(ctypes.c_int))
-        lcm = np.zeros(N).ctypes.data_as(ctypes.POINTER(ctypes.c_int))
-        mn = np.zeros(N).ctypes.data_as(ctypes.POINTER(ctypes.c_int))
-        mj = np.zeros(N).ctypes.data_as(ctypes.POINTER(ctypes.c_int))
-        debug_c = np.array([1 if debug else 0]).ctypes.data_as(ctypes.POINTER(ctypes.c_int))
-        # Execute C dip test
-        _ = C_DIP_FILE.diptst(X_c, N_c, dip_value, low_high, modal_triangle, gcm, lcm, mn, mj, debug_c)
-        dip_value = dip_value[0]
-        if just_dip:
-            return dip_value
-        else:
-            low_high = (low_high[2], low_high[3])
-            modal_triangle = (modal_triangle[0], modal_triangle[1], modal_triangle[2])
-            return dip_value, low_high, modal_triangle
-    else:
-        return dip_python_port(X, just_dip, debug)
-
-
-def load_c_dip_file():
-    global C_DIP_FILE
-    global CAN_C_BE_USED
-    if CAN_C_BE_USED and C_DIP_FILE is None:
-        files_path = os.path.dirname(__file__)
-        if platform.system() == "Windows":
-            dip_compiled = files_path + "/dip.dll"
-        else:
-            dip_compiled = files_path + "/dip.so"
-        if os.path.isfile(dip_compiled):
-            # load c file
-            try:
-                C_DIP_FILE = ctypes.CDLL(dip_compiled)
-                C_DIP_FILE.diptst.restype = None
-                C_DIP_FILE.diptst.argtypes = [ctypes.POINTER(ctypes.c_double),
-                                         ctypes.POINTER(ctypes.c_int),
-                                         ctypes.POINTER(ctypes.c_double),
-                                         ctypes.POINTER(ctypes.c_int),
-                                         ctypes.POINTER(ctypes.c_int),
-                                         ctypes.POINTER(ctypes.c_int),
-                                         ctypes.POINTER(ctypes.c_int),
-                                         ctypes.POINTER(ctypes.c_int),
-                                         ctypes.POINTER(ctypes.c_int),
-                                         ctypes.POINTER(ctypes.c_int)]
-                return True
-            except Exception as e:
-                print("[WARNING] C implementation can not be used for dip calculation.")
-                print(e)
-                CAN_C_BE_USED = False
-                return False
-        else:
+        return d if just_dip else (d, (0, N - 1), None)
+    if use_c:
+        try:
+            dip_value, low_high, modal_triangle = _dip_c_port(X, debug)
+        except Exception as e:
             print("[WARNING] C implementation can not be used for dip calculation.")
-            CAN_C_BE_USED = False
-            return False
-    elif CAN_C_BE_USED:
-        return True
+            print(e)
+            dip_value, low_high, modal_triangle = _dip_python_port(X, True, debug)
     else:
-        return False
+        dip_value, low_high, modal_triangle = _dip_python_port(X, True, debug)
+    if just_dip:
+        return dip_value
+    else:
+        return dip_value, low_high, modal_triangle
 
 
-def dip_python_port(X, just_dip=False, is_data_sorted=False, debug=False):
+def _dip_c_port(X, debug):
+    # Create reference numpy arrays
+    low_high = np.zeros(2, dtype=np.int)
+    modal_triangle = np.zeros(3, dtype=np.int)
+    gcm = np.zeros(X.shape, dtype=np.int)
+    lcm = np.zeros(X.shape, dtype=np.int)
+    mj = np.zeros(X.shape, dtype=np.int)
+    mn = np.zeros(X.shape, dtype=np.int)
+    # Execute C function
+    dip_value = c_diptest(X, low_high, modal_triangle, gcm, lcm, mn, mj, X.shape[0], 1 if debug else 0)
+    return dip_value, (low_high[0], low_high[1]), (modal_triangle[0], modal_triangle[1], modal_triangle[2])
+
+
+def _dip_python_port(X, is_data_sorted=False, debug=False):
     assert X.ndim == 1, "Data must be 1-dimensional for the dip-test. Your shape:{0}".format(X.shape)
     N = len(X)
     if not is_data_sorted:
         X = np.sort(X)
     if N < 4 or X[0] == X[-1]:
         d = 0.0
-        return d if just_dip else (d, None, None)
+        return d, None, None
 
     low = 0
     high = N - 1
@@ -121,8 +74,6 @@ def dip_python_port(X, just_dip=False, is_data_sorted=False, debug=False):
     modaltriangle_i1 = None
     modaltriangle_i2 = None
     modaltriangle_i3 = None
-    best_low = None
-    best_high = None
 
     # Establish the indices mn[1..n] over which combination is necessary for the convex MINORANT (GCM) fit.
     mn = np.zeros(N, dtype=int)
@@ -282,8 +233,6 @@ def dip_python_port(X, just_dip=False, is_data_sorted=False, debug=False):
                                                                                                       gcm_modalTriangle_i3))
         if dip_value < dip_new:
             dip_value = dip_new
-            best_low = gcm[ig]
-            best_high = lcm[ih]
             if dip_u > dip_l:
                 modaltriangle_i1 = lcm_modalTriangle_i1
                 modaltriangle_i2 = j_best
@@ -300,53 +249,21 @@ def dip_python_port(X, just_dip=False, is_data_sorted=False, debug=False):
         low = gcm[ig]
         high = lcm[ih]
     dip_value /= (2 * N)
-    # TODO: Better with best low best high?
-    return dip_value if just_dip else (
-        dip_value, (best_low, best_high), (modaltriangle_i1, modaltriangle_i2, modaltriangle_i3))
+    return dip_value, (low, high), (modaltriangle_i1, modaltriangle_i2, modaltriangle_i3)
 
 
-def dip_test(X, is_data_sorted=False, pval_strategy=PVAL_BY_TABLE, n_boots=2000, use_c=True, debug=False):
-    """
-    Hartigan & Hartigan's dip test for unimodality.
-    For X ~ F i.i.d., the null hypothesis is that F is a unimodal distribution.
-    The alternative hypothesis is that F is multimodal (i.e. at least bimodal).
-    Other than unimodality, the dip test does not assume any particular null
-    distribution.
-    Arguments:
-    -----------
-    X:          [n,] array  containing the input data
-    data_is_sorted:   boolean
-    pval_calculation:  0: p-value is computed via linear interpolation of the tabulated critical values.
-                1: p-value is computed using bootstrap samples from a
-                uniform distribution.
-                2: p-value is computed using an approximated sigmoid function
-    n_boots:    if pval_calculation="boot", this sets the number of bootstrap samples to
-                use for computing the p-value.
-    Returns:
-    -----------
-    dip:    double, the dip statistic
-    pval:   double, the p-value for the test
-    Reference:
-    -----------
-        Hartigan, J. A., & Hartigan, P. M. (1985). The Dip Test of Unimodality.
-        The Annals of Statistics.
-    """
-    n_points = X.shape[0]
-    data_dip = dip(X, just_dip=True, is_data_sorted=is_data_sorted, use_c=use_c, debug=debug)
-    pval = dip_pval(data_dip, n_points, pval_strategy, n_boots)
-    return data_dip, pval
-
-
-def dip_pval(data_dip, n_points, pval_strategy=PVAL_BY_TABLE, n_boots=2000):
+def dip_pval(dip_value, n_points, pval_strategy="table", n_boots=2000):
+    assert pval_strategy in ["bootstrap", "table",
+                             "function"], "pval_strategy must match 'bootstrap', 'table' or 'function'"
     if n_points <= 4:
         pval = 1.0
-    elif pval_strategy == PVAL_BY_BOOT:
+    elif pval_strategy == "bootstrap":
         boot_dips = dip_boot_samples(n_points, n_boots)
-        pval = np.mean(data_dip <= boot_dips)
-    elif pval_strategy == PVAL_BY_TABLE:
-        pval = _dip_pval_table(data_dip, n_points)
-    elif pval_strategy == PVAL_BY_FUNCTION:
-        pval = _dip_pval_function(data_dip, n_points)
+        pval = np.mean(dip_value <= boot_dips)
+    elif pval_strategy == "table":
+        pval = _dip_pval_table(dip_value, n_points)
+    elif pval_strategy == "function":
+        pval = _dip_pval_function(dip_value, n_points)
     else:
         raise ValueError(
             "pval_strategy must be 0 (table), 1 (boot) or 2 (function). Your input: {0}".format(pval_strategy))
@@ -356,9 +273,49 @@ def dip_pval(data_dip, n_points, pval_strategy=PVAL_BY_TABLE, n_boots=2000):
 def dip_boot_samples(n_points, n_boots):
     # random uniform vectors
     boot_samples = np.random.rand(n_boots, n_points)
-    # faster to pre-sort
-    boot_dips = np.array([dip(boot_s, just_dip=True, is_data_sorted=False) for boot_s in boot_samples])
+    boot_dips = np.array([dip_test(boot_s, just_dip=True, is_data_sorted=False) for boot_s in boot_samples])
     return boot_dips
+
+
+"""
+Dip Gradient
+"""
+
+
+def dip_gradient(X, x_proj, sorted_indices, modal_triangle):
+    if modal_triangle is None:
+        return np.zeros(X.shape[1])
+    data_index_i1 = sorted_indices[modal_triangle[0]]
+    data_index_i2 = sorted_indices[modal_triangle[1]]
+    data_index_i3 = sorted_indices[modal_triangle[2]]
+    # Get A and c
+    A = modal_triangle[0] - modal_triangle[1] + \
+        (modal_triangle[2] - modal_triangle[0]) * (x_proj[data_index_i2] - x_proj[data_index_i1]) / (
+                x_proj[data_index_i3] - x_proj[data_index_i1])
+    constant = (modal_triangle[2] - modal_triangle[0]) / (2 * X.shape[0])
+    # Check A
+    if A < 0:
+        constant = -constant
+    # Calculate gradient
+    quotient = (x_proj[data_index_i3] - x_proj[data_index_i1])
+    gradient = (X[data_index_i2] - X[data_index_i1]) / quotient - \
+               (X[data_index_i3] - X[data_index_i1]) * (
+                       x_proj[data_index_i2] - x_proj[data_index_i1]) / quotient ** 2
+    gradient = gradient * constant
+    return gradient
+
+
+def dip_pval_gradient(X, x_proj, sorted_indices, modal_triangle, dip_value):
+    if modal_triangle is None:
+        return np.zeros(X.shape[1])
+    # b = 17.30784022 * np.sqrt(X.shape[0]) + 12.04917889
+    b = 17.31 * np.sqrt(X.shape[0]) + 12.05
+    exponent = np.exp(-b * dip_value + 6.5)
+    dip_grad = dip_gradient(X, x_proj, sorted_indices, modal_triangle)
+    quotient = (0.6 * (1 + 1.6 * exponent) ** (1 / 1.6) + 0.4 * (1 + 0.2 * exponent) ** 5) ** 2
+    pval_grad = (0.6 * (1 + 1.6 * exponent) ** (-0.6 / 1.6) + 0.4 * (1 + 0.2 * exponent) ** 4) / quotient
+    pval_grad *= exponent * (-b) * dip_grad
+    return pval_grad
 
 
 """
@@ -366,7 +323,7 @@ Dip p-value methods
 """
 
 
-def _dip_pval_table(data_dip, n_points):
+def _dip_pval_table(dip_value, n_points):
     N, SIG, CV = _dip_table_values()
     if n_points > max(N):
         return np.nan
@@ -382,23 +339,15 @@ def _dip_pval_table(data_dip, n_points):
     fn = float(n_points - n0) / (n1 - n0)
     y0 = np.sqrt(n0) * CV[i0]
     y1 = np.sqrt(n1) * CV[i1]
-    sD = np.sqrt(n_points) * data_dip
+    sD = np.sqrt(n_points) * dip_value
     pval = 1. - np.interp(sD, y0 + fn * (y1 - y0), SIG)
     return pval
 
 
-def _dip_pval_function(data_dip, n_points):
-    a = 1.0
-    d = 0.0
-    # Polynom fitting
-    n = np.log(n_points)
-    b = 7.63466648e+00 + (3.75363863e-01 * n) + (-5.91013944e-02 * n ** 2) + (4.70521924e-03 * n ** 3) + (
-            -1.46365776e-04 * n ** 4)
-    c = 2.44547986e-01 + (-8.91268608e-02 * n) + (1.30656578e-02 * n ** 2) + (-8.94635688e-04 * n ** 3) + (
-            2.37116900e-05 * n ** 4)
-    g = 1.44028297e+00 + (-3.14378648e-01 * n) + (6.10595736e-02 * n ** 2) + (-5.22384667e-03 * n ** 3) + (
-            1.63970372e-04 * n ** 4)
-    pval = d + (a - d) / (1 + (data_dip / c) ** b) ** g
+def _dip_pval_function(dip_value, n_points):
+    b = 17.31 * np.sqrt(n_points) + 12.05
+    exponent = np.e ** (-b * dip_value + 6.5)
+    pval = 1 - 1 / (0.6 * (1 + 1.6 * exponent) ** (1 / 1.6) + 0.4 * (1 + 0.2 * exponent) ** 5)
     return pval
 
 

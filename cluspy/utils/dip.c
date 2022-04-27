@@ -45,29 +45,19 @@ Compile Windows: cc -fPIC -shared -std=c99 -o dip.dll dip.c
 Compile Linux: cc -fPIC -shared -o dip.so dip.c
 */
 
-#include <stdio.h>
+#include <Python.h>
+#include <numpy/arrayobject.h>
 
 /* Subroutine */
-void diptst(const double x[], const int *n_,
-        double *dip, int *lo_hi, int *modaltriangle,
-        int *gcm, int *lcm, int *mn, int *mj, const int *debug)
-{
-#define low   lo_hi[0]
-#define high  lo_hi[1]
-#define best_low   lo_hi[2]
-#define best_high  lo_hi[3]
-#define modaltriangle_i1  modaltriangle[0]
-#define modaltriangle_i2  modaltriangle[1]
-#define modaltriangle_i3  modaltriangle[2]
-
-    const int n = *n_;
+double fast_diptest(const double x[], int *low_high, int *modaltriangle,
+        int *gcm, int *lcm, int *mn, int *mj, const int n, const int debug) {
     int mnj, mnmnj, mjk, mjmjk, ig, ih, iv, ix,  i, j, k, l_lcm, l_gcm;
     double dip_l, dip_u, dipnew;
 
 /*-------- Function Body ------------------------------ */
 
 /* Check that X is sorted --- if not, return with  ifault = 2*/
-    for (k = 1; k <= (n - 1); ++k) if (x[k] < x[k - 1]) return;
+ //   for (k = 1; k <= (n - 1); ++k) if (x[k] < x[k - 1]) return NULL;
 
 /* Check for all values of X identical, */
 /*     and for 1 <= n < 4. */
@@ -75,21 +65,17 @@ void diptst(const double x[], const int *n_,
 /* LOW contains the index of the current estimate  of the lower end
    of the modal interval, HIGH contains the index for the upper end.
 */
-    low = 0;    high = n - 1; /*-- IDEA:  *xl = x[low];    *xu = x[high]; --*/
+    int low = 0;
+    int high = n - 1; /*-- IDEA:  *xl = x[low];    *xu = x[high]; --*/
 
-    best_low = -1;
-    best_high = -1;
-    modaltriangle_i1 = -1;
-    modaltriangle_i2 = -1;
-    modaltriangle_i3 = -1;
+    modaltriangle[0] = -1;
+    modaltriangle[1] = -1;
+    modaltriangle[2] = -1;
 
 /* M.Maechler -- speedup: it saves many divisions by n when we just work with
  * (2n * dip) everywhere but the very end! */
-    *dip = 0.;
+    double dipvalue = 0.;
     if (n < 4 || x[n - 1] == x[0])      goto L_END;
- //    if(*debug == 1)
-    // printf("dip() in C: n = %d; starting with  2N*dip = %g.\n",
-    //  n, *dip);
 
 /* Establish the indices   mn[1..n]  over which combination is necessary
    for the convex MINORANT (GCM) fit.
@@ -141,8 +127,8 @@ LOOP_Start:
     ih = l_lcm = i; // l_lcm == relevant_length(LCM)
     iv = 1; //  iv, ih  are counters for the concave majorant.
 
-    if(*debug == 1) {
-    printf("'dip': LOOP-BEGIN: 2n*D= %-8.5g  [low,high] = [%3d,%3d]", *dip, low,high);
+    if(debug == 1) {
+    printf("'dip': LOOP-BEGIN: 2n*D= %-8.5g  [low,high] = [%3d,%3d]", dipvalue, low,high);
     printf(" :\n gcm[0:%d] = ", l_gcm);
     for(i = 0; i <= l_gcm; i++) printf("%d%s", gcm[i], (i < l_gcm)? ", " : "\n");
     printf(" lcm[0:%d] = ", l_lcm);
@@ -155,7 +141,7 @@ LOOP_Start:
     // FIXME: <Rconfig.h>  should provide LDOUBLE or something like it
     long double d = 0.;// <<-- see if this makes 32-bit/64-bit difference go..
     if (l_gcm != 1 || l_lcm != 1) {
-    if(*debug == 1) printf("  while(gcm[ix] != lcm[iv]) :\n");
+    if(debug == 1) printf("  while(gcm[ix] != lcm[iv]) :\n");
       do { /* gcm[ix] != lcm[iv]  (after first loop) */
       long double dx;
       int gcmix = gcm[ix],
@@ -171,7 +157,7 @@ LOOP_Start:
           d = dx;
           ig = ix + 1;
           ih = iv - 1;
-          if(*debug == 1) printf(" L(%d,%d)", ig,ih);
+          if(debug == 1) printf(" L(%d,%d)", ig,ih);
           }
       }
       else {
@@ -186,27 +172,27 @@ LOOP_Start:
           d = dx;
           ig = ix + 1;
           ih = iv;
-          if(*debug == 1) printf(" G(%d,%d)", ig,ih);
+          if(debug == 1) printf(" G(%d,%d)", ig,ih);
           }
       }
       if (ix < 0)   ix = 0;
       if (iv > l_lcm)   iv = l_lcm;
-      if(*debug == 1) {
+      if(debug == 1) {
           printf(" --> ix = %d, iv = %d\n", ix,iv);
       }
       } while (gcm[ix] != lcm[iv]);
     }
     else { /* l_gcm or l_lcm == 2 */
     d = 0.;
-    if(*debug == 1)
+    if(debug == 1)
         printf("  ** (l_lcm,l_gcm) = (%d,%d) ==> d := %g\n", l_lcm, l_gcm, (double)d);
     }
 
 
-    if (d < *dip)   goto L_END;
+    if (d < dipvalue)   goto L_END;
 
 /*     Calculate the DIPs for the current LOW and HIGH. */
-    if(*debug == 1) printf("  calculating dip ..");
+    if(debug == 1) printf("  calculating dip ..");
 
     int j_best, j_l = -1, j_u = -1;
     int lcm_modalTriangle_i1 = -1;
@@ -256,7 +242,7 @@ LOOP_Start:
     }
     }
 
-    if(*debug == 1) printf(" (dip_l, dip_u) = (%g, %g)", dip_l, dip_u);
+    if(debug == 1) printf(" (dip_l, dip_u) = (%g, %g)", dip_l, dip_u);
 
     /* Determine the current maximum. */
     if(dip_u > dip_l) {
@@ -264,34 +250,32 @@ LOOP_Start:
     } else {
     dipnew = dip_l; j_best = j_l;
     }
-    if (*dip < dipnew) {
-    *dip = dipnew;
-    best_low = gcm[ig];
-    best_high = lcm[ih];
+    if (dipvalue < dipnew) {
+    dipvalue = dipnew;
     if (dip_u > dip_l) {
-        modaltriangle_i1 = lcm_modalTriangle_i1;
-        modaltriangle_i2 = j_best;
-        modaltriangle_i3 = lcm_modalTriangle_i3;
-        if (*debug == 1) printf(" -> new larger dip %-8.5g (j_best = %d) gcm-centred triple (%d,%d,%d)\n",dipnew, j_best,
+        modaltriangle[0] = lcm_modalTriangle_i1;
+        modaltriangle[1] = j_best;
+        modaltriangle[2] = lcm_modalTriangle_i3;
+        if (debug == 1) printf(" -> new larger dip %-8.5g (j_best = %d) gcm-centred triple (%d,%d,%d)\n",dipnew, j_best,
                                                                                                       lcm_modalTriangle_i1,
                                                                                                       j_best,
                                                                                                       lcm_modalTriangle_i3);
     } else {
-        modaltriangle_i1 = gcm_modalTriangle_i1;
-        modaltriangle_i2 = j_best;
-        modaltriangle_i3 = gcm_modalTriangle_i3;
-        if (*debug == 1) printf(" -> new larger dip %-8.5g (j_best = %d) lcm-centred triple (%d,%d,%d)\n",dipnew, j_best,
+        modaltriangle[0] = gcm_modalTriangle_i1;
+        modaltriangle[1] = j_best;
+        modaltriangle[2] = gcm_modalTriangle_i3;
+        if (debug == 1) printf(" -> new larger dip %-8.5g (j_best = %d) lcm-centred triple (%d,%d,%d)\n",dipnew, j_best,
                                                                                                       gcm_modalTriangle_i1,
                                                                                                       j_best,
                                                                                                       gcm_modalTriangle_i3);
     }
     }
-    else if(*debug == 1) printf("\n");
+    else if(debug == 1) printf("\n");
 
     /*--- The following if-clause is NECESSARY  (may loop infinitely otherwise)!
       --- Martin Maechler, Statistics, ETH Zurich, July 30 1994 ---------- */
     if (low == gcm[ig] && high == lcm[ih]) {
-      if(*debug == 1)
+      if(debug == 1)
     printf("No improvement in  low = %d  nor  high = %d --> END\n",
         low, high);
     } else {
@@ -301,16 +285,58 @@ LOOP_Start:
 /*---------------------------------------------------------------------------*/
 
 L_END:
-    /* do this in the caller :
-     *   *xl = x[low];  *xu = x[high];
-     * rather return the (low, high) indices -- automagically via lo_hi[]  */
-    *dip /= (2*n);
-    return;
-} /* diptst */
-#undef low
-#undef high
-#undef best_low
-#undef best_high
-#undef modaltriangle_i1
-#undef modaltriangle_i2
-#undef modaltriangle_i3
+    dipvalue /= (2*n);
+    low_high[0] = low;
+    low_high[1] = high;
+    return dipvalue;
+}
+
+/*
+Python - C - Link:
+https://docs.python.org/3/extending/extending.html
+https://scipy.github.io/old-wiki/pages/Cookbook/C_Extensions/NumPy_arrays.html
+https://scipy-lectures.org/advanced/interfacing_with_c/interfacing_with_c.html
+*/
+
+static PyObject *method_c_diptest(PyObject *self, PyObject *args) {
+  // Needed variables
+  PyArrayObject *py_x;
+  double *c_x;
+  PyArrayObject *py_low_high, *py_modaltriangle, *py_gcm, *py_lcm, *py_mn, *py_mj;
+  int *c_low_high, *c_modaltriangle, *c_gcm, *c_lcm, *c_mn, *c_mj;
+  int n, debug;
+  // Convert input parameters to C PyObejects
+  if (!PyArg_ParseTuple(args, "O!O!O!O!O!O!O!ii", &PyArray_Type, &py_x, &PyArray_Type, &py_low_high, &PyArray_Type, &py_modaltriangle, &PyArray_Type, &py_gcm, &PyArray_Type, &py_lcm, &PyArray_Type, &py_mn, &PyArray_Type, &py_mj, &n, &debug)) {
+    return NULL;
+  }
+  // Convert PyObjects to C arrays
+  c_x = (double*)py_x->data;
+  c_low_high = (int*)py_low_high->data;
+  c_modaltriangle = (int*)py_modaltriangle->data;
+  c_gcm = (int*)py_gcm->data;
+  c_lcm = (int*)py_lcm->data;
+  c_mn = (int*)py_mn->data;
+  c_mj = (int*)py_mj->data;
+  // Execute C diptest method
+  double dip_value = fast_diptest(c_x, c_low_high, c_modaltriangle, c_gcm, c_lcm, c_mn, c_mj, n, debug);
+  // Return dip value
+  return PyFloat_FromDouble(dip_value);
+}
+
+static PyMethodDef diptestMethods[] = {
+  {"c_diptest", method_c_diptest, METH_VARARGS, "Function for calculating the dip value in c"},
+  {NULL, NULL, 0, NULL}
+};
+
+static struct PyModuleDef diptestModule = {
+  PyModuleDef_HEAD_INIT,
+  "c_diptest",
+  "C library for calculating the dip value",
+  -1,
+  diptestMethods
+};
+
+PyMODINIT_FUNC PyInit_dipModule(void) {
+  import_array();
+  return PyModule_Create(&diptestModule);
+};

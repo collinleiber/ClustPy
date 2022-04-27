@@ -7,7 +7,7 @@ mining. 2016.
 @authors Collin Leiber
 """
 
-from cluspy.utils import dip, dip_pval
+from cluspy.utils import dip_test, dip_pval
 import numpy as np
 from sklearn.base import BaseEstimator, ClusterMixin
 from cluspy.utils import plot_histogram, plot_with_transformation, plot_1d_data
@@ -30,7 +30,7 @@ def _unidip(X_1d, significance, already_sorted):
         start, end, is_modal = tmp_borders.pop(0)
         # Get part of data
         tmp_X_1d = X_1d[start:end]
-        dip_value, low_high, _ = dip(tmp_X_1d, just_dip=False, is_data_sorted=True)
+        dip_value, low_high, _ = dip_test(tmp_X_1d, just_dip=False, is_data_sorted=True)
         dip_pvalue = dip_pval(dip_value, n_points=tmp_X_1d.shape[0])
         low = low_high[0]
         high = low_high[1]
@@ -39,7 +39,7 @@ def _unidip(X_1d, significance, already_sorted):
             # Other clusters to the right?
             if high + 1 != end - start:
                 right_X_1d = X_1d[start + low:end]
-                dip_value = dip(right_X_1d, just_dip=True, is_data_sorted=True)
+                dip_value = dip_test(right_X_1d, just_dip=True, is_data_sorted=True)
                 dip_pvalue = dip_pval(dip_value, n_points=right_X_1d.shape[0])
                 if dip_pvalue < significance:
                     tmp_borders.insert(0, (start + high + 1, end, False))
@@ -49,7 +49,7 @@ def _unidip(X_1d, significance, already_sorted):
             # Other clusters to the left?
             if low != 0:
                 left_X_1d = X_1d[start:start + high + 1]
-                dip_value = dip(left_X_1d, just_dip=True, is_data_sorted=True)
+                dip_value = dip_test(left_X_1d, just_dip=True, is_data_sorted=True)
                 dip_pvalue = dip_pval(dip_value, n_points=left_X_1d.shape[0])
                 if dip_pvalue < significance:
                     tmp_borders.insert(0, (start, start + low, False))
@@ -82,11 +82,11 @@ def _dip_mirrored_data(X_1d, orig_low_high):
     # Left mirror
     mirrored_addition_left = X_1d[0] - np.flip(X_1d[1:] - X_1d[0])
     X_1d_left_mirrored = np.append(mirrored_addition_left, X_1d)
-    dip_value_left, low_high_left, _ = dip(X_1d_left_mirrored, just_dip=False, is_data_sorted=True)
+    dip_value_left, low_high_left, _ = dip_test(X_1d_left_mirrored, just_dip=False, is_data_sorted=True)
     # Right mirror
     mirrored_addition_right = X_1d[-1] + np.flip(X_1d[-1] - X_1d[:-1])
     X_1d_right_mirrored = np.append(X_1d, mirrored_addition_right)
-    dip_value_right, low_high_right, _ = dip(X_1d_right_mirrored, just_dip=False, is_data_sorted=True)
+    dip_value_right, low_high_right, _ = dip_test(X_1d_right_mirrored, just_dip=False, is_data_sorted=True)
     # Get interval of larger dip
     if dip_value_left > dip_value_right:
         low = low_high_left[0]
@@ -119,7 +119,7 @@ def _merge_clusters(X_1d, argsorted, labels, n_clusters, cluster_boundaries, sig
         end_left = min(cluster_boundaries[i][1], cluster_boundaries[i][0] + 2 * cluster_size_left)
         tmp_X_1d = X_1d[start_left:end_left]
         # tmp_X_1d = X_1d[cluster_boundaries[i - 1][0]:cluster_boundaries[i][1]]
-        dip_value = dip(tmp_X_1d, just_dip=True, is_data_sorted=True)
+        dip_value = dip_test(tmp_X_1d, just_dip=True, is_data_sorted=True)
         dip_pvalue_left = dip_pval(dip_value, n_points=tmp_X_1d.shape[0])
         # Dip of i combined with right (i + 1)
         cluster_size_right = cluster_boundaries[i+1][1] - cluster_boundaries[i+1][0]
@@ -127,7 +127,7 @@ def _merge_clusters(X_1d, argsorted, labels, n_clusters, cluster_boundaries, sig
         end_right = min(cluster_boundaries[i + 1][1], cluster_boundaries[i + 1][0] + 2 * cluster_size_center)
         tmp_X_1d = X_1d[start_right:end_right]
         # tmp_X_1d = X_1d[cluster_boundaries[i][0]:cluster_boundaries[i + 1][1]]
-        dip_value = dip(tmp_X_1d, just_dip=True, is_data_sorted=True)
+        dip_value = dip_test(tmp_X_1d, just_dip=True, is_data_sorted=True)
         dip_pvalue_right = dip_pval(dip_value, n_points=tmp_X_1d.shape[0])
         if dip_pvalue_left >= dip_pvalue_right and dip_pvalue_left >= significance:
             # Merge i - 1 and i. Overwrite labels (beware, outliers can be in between)
@@ -188,7 +188,7 @@ def _unidip_plus(X_1d, significance):
                     # Use a maximum of cluster_range points of left cluster to see if transition is unimodal
                     start_left = max(cluster_boundaries_orig[i - 1][0], cluster_boundaries_orig[i - 1][1] - 2 * cluster_range)
                     end_left = start + cluster_boundaries_new[0][1]
-                    dip_value_left = dip(sorted_X_1d[start_left:end_left], just_dip=True, is_data_sorted=True)
+                    dip_value_left = dip_test(sorted_X_1d[start_left:end_left], just_dip=True, is_data_sorted=True)
                     dip_pvalue_left = dip_pval(dip_value_left, n_points=end_left-start_left)
                 # Append last found structure to cluster after
                 # Calculate dip of last found structure with cluster after
@@ -198,7 +198,7 @@ def _unidip_plus(X_1d, significance):
                     start_right = start + cluster_boundaries_new[-1][0]
                     # Use a maximum of cluster_range points of right cluster to see if transition is unimodal
                     end_right = min(cluster_boundaries_orig[i][1], cluster_boundaries_orig[i][0] + 2 * cluster_range)
-                    dip_value_right = dip(sorted_X_1d[start_right:end_right], just_dip=True, is_data_sorted=True)
+                    dip_value_right = dip_test(sorted_X_1d[start_right:end_right], just_dip=True, is_data_sorted=True)
                     dip_pvalue_right = dip_pval(dip_value_right, n_points=end_right-start_right)
                 # --- Extend clusters; Beware the order in which entries are added as boundaries! right -> center -> left
                 # Does last found structure fit the cluster after? If so, extend cluster

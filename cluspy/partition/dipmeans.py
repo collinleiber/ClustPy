@@ -10,7 +10,7 @@ clusters." Advances in neural information processing systems.
 from sklearn.cluster import KMeans
 import numpy as np
 from scipy.spatial.distance import pdist, squareform
-from cluspy.utils import dip, dip_pval, PVAL_BY_TABLE, PVAL_BY_BOOT, dip_boot_samples
+from cluspy.utils import dip_test, dip_pval, dip_boot_samples
 from sklearn.base import BaseEstimator, ClusterMixin
 
 
@@ -32,16 +32,16 @@ def _dipmeans(X, pval_threshold, split_viewers_threshold, pval_strategy, n_boots
             # Get pairwise distances of points in cluster
             cluster_dist_matrix = data_dist_matrix[np.ix_(ids_in_cluster, ids_in_cluster)]
             # Calculate dip values for the distances of each point
-            cluster_dips = np.array([dip(cluster_dist_matrix[p, :], just_dip=True, is_data_sorted=False) for p in
+            cluster_dips = np.array([dip_test(cluster_dist_matrix[p, :], just_dip=True, is_data_sorted=False) for p in
                                      range(ids_in_cluster.shape[0])])
             # Calculate p-values
-            if pval_strategy == PVAL_BY_BOOT:
+            if pval_strategy == "bootstrap":
                 # Bootstrap values here so it is not needed for each pval separately
                 boot_dips = dip_boot_samples(ids_in_cluster.shape[0], n_boots)
                 cluster_pvals = np.array([np.mean(point_dip <= boot_dips) for point_dip in cluster_dips])
             else:
-                cluster_pvals = np.array([dip_pval(point_dip, ids_in_cluster.shape[0], pval_strategy=pval_strategy,
-                                                   n_boots=n_boots) for point_dip in cluster_dips])
+                cluster_pvals = np.array([dip_pval(point_dip, ids_in_cluster.shape[0], pval_strategy=pval_strategy)
+                                          for point_dip in cluster_dips])
             # Get split viewers (points with dip of distances <= threshold)
             split_viewers = cluster_dips[cluster_pvals <= pval_threshold]
             # Check if percentage share of split viewers in cluster is larger than threshold
@@ -88,7 +88,7 @@ def _execute_bisecting_kmeans(X, ids_in_each_cluster, cluster_id_to_split, cente
 
 class DipMeans(BaseEstimator, ClusterMixin):
 
-    def __init__(self, pval_threshold=0, split_viewers_threshold=0.01, pval_strategy=PVAL_BY_TABLE, n_boots=2000,
+    def __init__(self, pval_threshold=0, split_viewers_threshold=0.01, pval_strategy="table", n_boots=2000,
                  n_new_centers=10, max_n_clusters=np.inf):
         self.pval_threshold = pval_threshold
         self.split_viewers_threshold = split_viewers_threshold

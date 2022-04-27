@@ -1,15 +1,19 @@
-from .diptest import dip, dip_test, dip_pval, dip_boot_samples, PVAL_BY_BOOT, PVAL_BY_TABLE, PVAL_BY_FUNCTION
+from .evaluation import evaluate_dataset, evaluate_multiple_datasets, EvaluationDataset, EvaluationAlgorithm, EvaluationMetric
+from .diptest import dip_test, dip_pval, dip_boot_samples, dip_gradient, dip_pval_gradient
 from .plots import plot_with_transformation, plot_image, plot_scatter_matrix, plot_histogram, plot_1d_data
 
-__all__ = ['dip',
+__all__ = ['evaluate_dataset',
+           'evaluate_multiple_datasets',
+           'EvaluationMetric',
+           'EvaluationAlgorithm',
+           'EvaluationDataset',
            'dip_test',
            'dip_pval',
            'dip_boot_samples',
-           'PVAL_BY_TABLE',
-           'PVAL_BY_FUNCTION',
-           'PVAL_BY_BOOT',
            'plot_with_transformation',
            'plot_image',
            'plot_scatter_matrix',
            'plot_histogram',
-           'plot_1d_data']
+           'plot_1d_data',
+           'dip_gradient',
+           'dip_pval_gradient']

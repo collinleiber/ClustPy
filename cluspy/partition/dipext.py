@@ -6,7 +6,7 @@ in Databases 2020
 @authors: Benjamin Schelling and Sam Maurus (original R implementation), Collin Leiber (Python implementation)
 """
 
-from cluspy.utils import dip
+from cluspy.utils import dip_test, dip_gradient
 import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.base import BaseEstimator, ClusterMixin
@@ -83,7 +83,9 @@ def _dip_gradient(X, projection_vector, check_duplicates):
     sortedIndices = np.argsort(projected_data, kind="stable")
     sorted_projected_data = projected_data[sortedIndices]
     ## Run the dip algorithm, capturing the output which we need for touching-triangle calculations
-    dip_value, _, modal_triangle, _ = dip(sorted_projected_data, just_dip=False, is_data_sorted=True)
+    dip_value, _, modal_triangle = dip_test(sorted_projected_data, just_dip=False, is_data_sorted=True)
+    if modal_triangle is None:
+        return [np.zeros(X.shape[1])], dip_value, projected_data
     triangles = [[modal_triangle[0]], [modal_triangle[1]], [modal_triangle[2]]]
     gradients = []
     # Add indices with same value to triangle
@@ -105,15 +107,7 @@ def _dip_gradient(X, projection_vector, check_duplicates):
                 if i1 == i2 or i2 == i3:
                     continue
                 # Calculate the partial derivative for all dimensions
-                data_index_i1 = sortedIndices[i1]
-                data_index_i2 = sortedIndices[i2]
-                data_index_i3 = sortedIndices[i3]
-
-                beta = X[data_index_i2, :] - X[data_index_i1, :]
-                gamma = X[data_index_i3, :] - X[data_index_i1, :]
-                gradient = np.array(
-                    [_calculate_partial_derivative(projection_vector, dim, i1, i2, i3, beta, gamma, X.shape[0]) for dim
-                     in range(X.shape[1])])
+                gradient = dip_gradient(X, projected_data, sortedIndices, modal_triangle)
                 gradients.append(gradient)
     return gradients, dip_value, projected_data
 
@@ -142,7 +136,7 @@ def _calculate_partial_derivative(projection_vector, dim, i1, i2, i3, beta, gamm
 
 # Find the axes with log(dim) highest dip values and start the search from there
 def _find_max_dip_by_sgd(X, step_size, momentum, n_starting_points_strategy, check_duplicates):
-    axis_dips = [dip(X[:, i], just_dip=True, is_data_sorted=False) for i in range(X.shape[1])]
+    axis_dips = [dip_test(X[:, i], just_dip=True, is_data_sorted=False) for i in range(X.shape[1])]
     dips_argsorted = np.argsort(axis_dips)[::-1]
     max_dip = axis_dips[dips_argsorted[0]]
     best_projection = np.zeros(X.shape[1])
@@ -168,7 +162,7 @@ def _find_max_dip_by_sgd(X, step_size, momentum, n_starting_points_strategy, che
 def _find_max_dip_by_sgd_with_start(X, start_projection, step_size, momentum, check_duplicates):
     # Values for GD. Can be changed
     if X.shape[1] == 1:
-        dip_value = dip(X[:, 0], just_dip=True, is_data_sorted=False)
+        dip_value = dip_test(X[:, 0], just_dip=True, is_data_sorted=False)
         return dip_value, np.array([1]), X
     # Paramters
     total_angle = 0
@@ -191,7 +185,7 @@ def _find_max_dip_by_sgd_with_start(X, start_projection, step_size, momentum, ch
                 tmp_direction = momentum * direction + step_size * tmp_gradient
                 tmp_projection = projection + tmp_direction
                 projected_data = np.matmul(X, tmp_projection)
-                tmp_dip_value = dip(projected_data, just_dip=True, is_data_sorted=False)
+                tmp_dip_value = dip_test(projected_data, just_dip=True, is_data_sorted=False)
                 if tmp_dip_value > tmp_max_dip:
                     tmp_max_dip = tmp_dip_value
                     gradient = tmp_gradient

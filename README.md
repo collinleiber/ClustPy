@@ -17,11 +17,13 @@ and other packages (see below).
 Furthermore, it contains wrappers for [pyclustering](https://pyclustering.github.io/) implementations.
 
 ## Installation
-Just clone the repository, go to the directory and execute:
+The package can be installed directly from git by executing:
 
-`pip install -r requirements.txt`
+`sudo pip3 install git+git://github.com/collinleiber/ClusPy.git`
 
-Afterwards, you will be good to go.
+Alternatively, clone the repository, go to the directory and execute:
+
+`sudo python setup.py install`
 
 ## Components
 
@@ -149,7 +151,8 @@ which automatically run the specified algorithms multiple times on previously de
 All results of the given metrics are stored in a Pandas dataframe.
 
 ```python
-from cluspy.evaluation import *
+import numpy as np
+from cluspy.utils import *
 from cluspy.deep import DEC, IDEC, DCN, VaDE
 from sklearn.metrics import normalized_mutual_info_score as nmi, adjusted_rand_score as ari
 from cluspy.data import load_usps, load_mnist

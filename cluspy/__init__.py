@@ -1,7 +1,1 @@
-from cluspy.evaluation import evaluate_dataset, evaluate_multiple_datasets, EvaluationMetric, EvaluationAlgorithm, EvaluationDataset
-
-__all__ = ['evaluate_dataset',
-           'evaluate_multiple_datasets',
-           'EvaluationDataset',
-           'EvaluationMetric',
-           'EvaluationAlgorithm']
+__version__ = "0.0.1"

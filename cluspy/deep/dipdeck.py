@@ -1,6 +1,6 @@
 from scipy.spatial.distance import cdist
 import numpy as np
-from cluspy.utils import dip_test, PVAL_BY_FUNCTION
+from cluspy.utils import dip_test, dip_pval
 import torch
 from cluspy.deep._utils import detect_device, encode_batchwise, \
     squared_euclidean_distance, int_to_one_hot, get_trained_autoencoder
@@ -257,7 +257,8 @@ def _get_dip_matrix(data, dip_centers, dip_labels, n_clusters, max_cluster_size_
             points_in_j = data[dip_labels == j]
             points_in_i_or_j = np.append(points_in_i, points_in_j, axis=0)
             proj_points = np.dot(points_in_i_or_j, center_diff)
-            _, dip_p_value = dip_test(proj_points, pval_strategy=PVAL_BY_FUNCTION)
+            dip_value = dip_test(proj_points)
+            dip_p_value = dip_pval(dip_value, proj_points.shape[0], pval_strategy="table")
             # Check if clusters sizes differ heavily
             if points_in_i.shape[0] > points_in_j.shape[0] * max_cluster_size_diff_factor or \
                     points_in_j.shape[0] > points_in_i.shape[0] * max_cluster_size_diff_factor:
@@ -269,7 +270,8 @@ def _get_dip_matrix(data, dip_centers, dip_labels, n_clusters, max_cluster_size_
                                                       max_cluster_size_diff_factor, min_sample_size)
                 points_in_i_or_j = np.append(points_in_i, points_in_j, axis=0)
                 proj_points = np.dot(points_in_i_or_j, center_diff)
-                _, dip_p_value_2 = dip_test(proj_points, pval_strategy=PVAL_BY_FUNCTION)
+                dip_value_2 = dip_test(proj_points)
+                dip_p_value_2 = dip_pval(dip_value_2, proj_points.shape[0], pval_strategy="table")
                 dip_p_value = min(dip_p_value, dip_p_value_2)
             # Add pval to dip matrix
             dip_matrix[i][j] = dip_p_value
