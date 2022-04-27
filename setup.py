@@ -14,9 +14,10 @@ dip_extension = Extension('cluspy.utils.dipModule',
                           sources=['cluspy/utils/dip.c'])
 
 setup(
-    name='ClusPy',
+    name='cluspy',
     version=cluspy.__version__,
     packages=find_packages(),
+    package_data={'cluspy': ['data/datasets/*.data']},
     url='https://github.com/collinleiber/ClusPy',
     license='GPL-3.0 License ',
     author='Collin Leiber',

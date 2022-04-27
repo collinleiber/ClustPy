@@ -75,7 +75,7 @@ def _load_timeseries_classification_data(name, add_testdata, downloads_path):
 def _decompress_z_file(filename, directory):
     os.system("7z x {0} -o{1}".format(filename.replace("\\", "/"), directory.replace("\\", "/")))
     if os.path.isfile(filename[:-2]):
-         return True
+        return True
     else:
         print("[WARNING] 7Zip is needed to uncompress *.Z files!")
         return False
@@ -403,8 +403,8 @@ def load_shuttle(add_testdata=True, downloads_path=None):
             return None, None
     # Load data and labels
     dataset = np.genfromtxt(directory + "shuttle.trn")
-    data = dataset[:,:-1]
-    labels = dataset[:,-1]
+    data = dataset[:, :-1]
+    labels = dataset[:, -1]
     if add_testdata:
         filename = directory + "shuttle.tst"
         if not os.path.isfile(filename):
@@ -412,8 +412,8 @@ def load_shuttle(add_testdata=True, downloads_path=None):
                 "https://archive.ics.uci.edu/ml/machine-learning-databases/statlog/shuttle/shuttle.tst",
                 filename)
         test_dataset = np.genfromtxt(directory + "shuttle.tst")
-        test_data = test_dataset[:,:-1]
-        test_labels = test_dataset[:,-1]
+        test_data = test_dataset[:, :-1]
+        test_labels = test_dataset[:, -1]
         data = np.r_[data, test_data]
         labels = np.r_[labels, test_labels]
     labels -= 1
