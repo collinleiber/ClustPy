@@ -19,7 +19,7 @@ Furthermore, it contains wrappers for [pyclustering](https://pyclustering.github
 ## Installation
 The package can be installed directly from git by executing:
 
-`sudo pip3 install git+git://github.com/collinleiber/ClusPy.git`
+`sudo pip3 install git+https://github.com/collinleiber/ClusPy.git`
 
 Alternatively, clone the repository, go to the directory and execute:
 
