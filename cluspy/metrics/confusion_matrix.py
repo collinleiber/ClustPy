@@ -40,7 +40,7 @@ def _plot_confusion_matrix(confusion_matrix, show_text=True, figsize=(10, 10), c
 
 class ConfusionMatrix():
 
-    def __init__(self, labels_true, labels_pred, auto_rearrange=False):
+    def __init__(self, labels_true, labels_pred):
         self.true_clusters = np.unique(labels_true)
         self.pred_clusters = np.unique(labels_pred)
         conf_matrix = np.zeros((len(self.true_clusters), len(self.pred_clusters)), dtype=int)
@@ -52,8 +52,6 @@ class ConfusionMatrix():
             for j, pred_label in enumerate(labels):
                 conf_matrix[i, np.argwhere(self.pred_clusters == pred_label)[0][0]] = cluster_sizes[j]
         self.confusion_matrix = conf_matrix
-        if auto_rearrange:
-            self.rearrange()
 
     def __str__(self):
         return str(self.confusion_matrix)

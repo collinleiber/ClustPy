@@ -68,10 +68,6 @@ double fast_diptest(const double x[], int *low_high, int *modaltriangle,
     int low = 0;
     int high = n - 1; /*-- IDEA:  *xl = x[low];    *xu = x[high]; --*/
 
-    modaltriangle[0] = -1;
-    modaltriangle[1] = -1;
-    modaltriangle[2] = -1;
-
 /* M.Maechler -- speedup: it saves many divisions by n when we just work with
  * (2n * dip) everywhere but the very end! */
     double dipvalue = 0.;

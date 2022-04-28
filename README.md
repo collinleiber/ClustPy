@@ -59,14 +59,15 @@ Alternatively, clone the repository, go to the directory and execute:
 ### Other implementations
 
 - Metrics
-    - Confusion Matrix
-    - Variation of information
     - Unsupervised Clustering Accuracy
+    - Variation of information
+    - Confusion Matrix
     - Pair Counting Scores (f1, rand, jaccard, recall, precision)
     - Scores for multiple labelings (see alternative clustering algorithms)
 - Utils
     - Hartigans Dip-test
-    - Various useful Plots
+    - Various plots
+    - Evaluation methods
     
 ## Compatible packages
 
@@ -94,43 +95,49 @@ Alternatively, clone the repository, go to the directory and execute:
 
 ### 1)
 
-In this simple example, the XMeans algorithm is run on the optdigits dataset.
-Afterwards, the normalized mutual information is calculated and printed.
-
-```python
-from cluspy.partition import XMeans
-from cluspy.data import load_optdigits
-from sklearn.metrics import normalized_mutual_info_score as nmi
-
-data, labels = load_optdigits()
-xm = XMeans()
-xm.fit(data)
-my_nmi = nmi(labels, xm.labels_)
-print(my_nmi)
-```
-
-### 2)
-
-In this simple example, the SubKmeans algorithm is run on a synthetic subspace dataset.
-Then the normalized mutual information is calculated and printed again.
+In this first example, the subspace algorithm SubKmeans is run on a synthetic subspace dataset.
+Afterwards, the clustering accuracy is calculated to evaluate the result.
 
 ```python
 from cluspy.subspace import SubKmeans
 from cluspy.data import create_subspace_data
-from sklearn.metrics import normalized_mutual_info_score as nmi
+from cluspy.metrics import unsupervised_clustering_accuracy as acc
 
-data, labels = create_subspace_data(1000, n_clusters=4)
+data, labels = create_subspace_data(1000, n_clusters=4, subspace_features=[2,5])
 sk = SubKmeans(4)
 sk.fit(data)
-my_nmi = nmi(labels, sk.labels_)
-print(my_nmi)
+acc_res = acc(labels, sk.labels_)
+print("Clustering accuracy:", acc_res)
+```
+
+### 2)
+
+In this more complex example, the NrKmeans algorithm is run on the CMUfaces dataset.
+Beware that NrKmeans as a non-redundant clustering algorithm returns multiple labelings.
+Therefore, we calculate the confusion matrix by comparing each combination of labels using the normalized mutual information (nmi).
+The confusion matrix will be plotted and finally the best matching nmi will be stated for each set of labels.
+
+```python
+from cluspy.alternative import NrKmeans
+from cluspy.data import load_cmu_faces
+from cluspy.metrics import MultipleLabelingsConfusionMatrix
+from sklearn.metrics import normalized_mutual_info_score as nmi
+import numpy as np
+
+data, labels = load_cmu_faces()
+nk = NrKmeans([20, 4, 4, 2])
+nk.fit(data)
+mlcm = MultipleLabelingsConfusionMatrix(labels, nk.labels_, nmi)
+mlcm.rearrange()
+mlcm.plot()
+print(np.max(mlcm.confusion_matrix, axis=1))
 ```
 
 ### 3)
 
-One advantage of ClusPy is the ability to run various modern deep clustering algorithms out of the box. 
+One feature of the ClusPy package is the ability to run various modern deep clustering algorithms out of the box. 
 For example, the following code runs the DEC algorithm on the well-known MNIST dataset. 
-To evaluate the result, we compute the adjusted RAND index.
+To evaluate the result, we compute the adjusted RAND index (ari).
 
 ```python
 from cluspy.deep import DEC
@@ -151,36 +158,45 @@ which automatically run the specified algorithms multiple times on previously de
 All results of the given metrics are stored in a Pandas dataframe.
 
 ```python
+from cluspy.utils import EvaluationDataset, EvaluationAlgorithm, EvaluationMetric, evaluate_multiple_datasets
+from cluspy.partition import ProjectedDipMeans
+from cluspy.subspace import SubKmeans
+from sklearn.metrics import normalized_mutual_info_score as nmi, silhouette_score 
+from sklearn.cluster import KMeans, DBSCAN
+from cluspy.data import load_optdigits, load_pendigits, load_wine
+from cluspy.metrics import unsupervised_clustering_accuracy as acc
+from sklearn.decomposition import PCA
 import numpy as np
-from cluspy.utils import *
-from cluspy.deep import DEC, IDEC, DCN, VaDE
-from sklearn.metrics import normalized_mutual_info_score as nmi, adjusted_rand_score as ari
-from cluspy.data import load_usps, load_mnist
+
+def reduce_dimensionality(X, dims):
+    pca = PCA(dims)
+    X_new = pca.fit_transform(X)
+    return X_new
 
 def znorm(X):
     return (X - np.mean(X)) / np.std(X)
 
-def identity_plus(X):
-    return X + 1
+def minmax(X):
+    return (X - np.min(X)) / (np.max(X) - np.min(X))
 
-to_ignore = ["VaDE", "IDEC"]
 datasets = [
-    EvaluationDataset("MNIST", data=load_mnist, preprocess_methods=znorm, ignore_algorithms=["DEC"]),
-    EvaluationDataset("USPS", data=load_usps, preprocess_methods=znorm),
-    EvaluationDataset("USPS+1", data=load_usps, preprocess_methods=[znorm, identity_plus],
-                          ignore_algorithms=to_ignore)
-    ]
+    EvaluationDataset("Optdigits_pca_znorm", data=load_optdigits, preprocess_methods=[reduce_dimensionality, znorm], 
+    preprocess_params=[{"dims":0.9}, {}],ignore_algorithms=["pdipmeans"]),
+    EvaluationDataset("Pendigits_pca", data=load_pendigits, preprocess_methods=reduce_dimensionality, preprocess_params={"dims":0.9}),
+    EvaluationDataset("Wine", data=load_wine),
+    EvaluationDataset("Wine_znorn", data=load_wine, preprocess_methods=znorm)]
+
 algorithms = [
-    EvaluationAlgorithm("DEC", DEC, {"n_clusters": None, "batch_size": 256, "pretrain_epochs": 100,
-                                                   "dec_epochs": 150, "embedding_size": 10}),
-    EvaluationAlgorithm("IDEC", IDEC, {"n_clusters": None, "batch_size": 256, "pretrain_epochs": 100,
-                                                     "dec_epochs": 150, "embedding_size": 10}),
-    EvaluationAlgorithm("DCN", DCN, {"n_clusters": None, "batch_size": 256, "pretrain_epochs": 100,
-                                                   "dcn_epochs": 150, "embedding_size": 10}),
-    EvaluationAlgorithm("VaDE", VaDE, {"n_clusters": None, "batch_size": 256, "pretrain_epochs": 100,
-                                                     "vade_epochs": 150, "embedding_size": 10})]
-metrics = [EvaluationMetric("NMI", nmi), EvaluationMetric("ARI", ari)]
-df = evaluate_multiple_datasets(datasets, algorithms, metrics, 10, True, True, False, True,
-                                    save_path="valuation.csv", save_intermediate_results=True)
+    EvaluationAlgorithm("SubKmeans", SubKmeans, {"n_clusters": None}),
+    EvaluationAlgorithm("pdipmeans", ProjectedDipMeans, {}), # Determines n_clusters automatically
+    EvaluationAlgorithm("dbscan", DBSCAN, {"eps":0.01, "min_samples":5}, preprocess_methods=minmax, deterministic=True),
+    EvaluationAlgorithm("kmeans", KMeans, {"n_clusters": None}),
+    EvaluationAlgorithm("kmeans_minmax", KMeans, {"n_clusters": None}, preprocess_methods=minmax)]
+
+metrics = [EvaluationMetric("NMI", nmi), EvaluationMetric("ACC", acc), 
+EvaluationMetric("Silhouette", silhouette_score, use_gt=False)]
+
+df = evaluate_multiple_datasets(datasets, algorithms, metrics, repetitions=5, add_average=True, add_std=True, 
+    add_runtime=True, add_n_clusters=True, save_path="evaluation.csv", save_intermediate_results=False)
 print(df)
 ```

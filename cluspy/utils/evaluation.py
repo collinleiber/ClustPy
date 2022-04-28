@@ -105,6 +105,16 @@ def evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=None, gt=None,
                         except Exception as e:
                             print("Metric {0} raised an exception and will be skipped".format(eval_metric.name))
                             print(e)
+                if eval_algo.deterministic:
+                    if add_runtime:
+                        df.at[np.arange(1, repetitions), (eval_algo.name, "runtime")] = df.at[
+                            0, (eval_algo.name, "runtime")]
+                    if add_n_clusters:
+                        df.at[np.arange(1, repetitions), (eval_algo.name, "n_clusters")] = df.at[
+                            0, (eval_algo.name, "n_clusters")]
+                    for eval_metric in evaluation_metrics:
+                        df.at[np.arange(1,repetitions), (eval_algo.name, eval_metric.name)] = df.at[0, (eval_algo.name, eval_metric.name)]
+                    break
         except Exception as e:
             print("Algorithm {0} raised an exception and will be skipped".format(eval_algo.name))
             print(e)
@@ -238,18 +248,20 @@ class EvaluationMetric():
 
 class EvaluationAlgorithm():
 
-    def __init__(self, name, obj, params={}, label_column=None, preprocess_methods=None, preprocess_params={}):
+    def __init__(self, name, obj, params={}, deterministic=False, preprocess_methods=None, preprocess_params={}, label_column=None):
         assert type(name) is str, "name must be a string"
         self.name = name
         assert type(obj) is type, "name must be Algorithm class"
         self.obj = obj
         assert type(params) is dict, "params must be a dict"
         self.params = params
-        assert label_column is None or type(label_column) is int, "label_column must be None or int"
-        self.label_column = label_column
+        assert type(deterministic) is bool, "deterministic must be bool"
+        self.deterministic = deterministic
         assert callable(preprocess_methods) or type(
             preprocess_methods) is list or preprocess_methods is None, "preprocess_methods must be a method, a list of methods or None"
         self.preprocess_methods = preprocess_methods
         assert type(preprocess_params) is dict or type(
             preprocess_methods) is list, "preprocess_params must be a dict or a list of dicts"
         self.preprocess_params = preprocess_params
+        assert label_column is None or type(label_column) is int, "label_column must be None or int"
+        self.label_column = label_column

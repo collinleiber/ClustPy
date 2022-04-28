@@ -38,7 +38,7 @@ def create_nr_data(n_samples=1000, n_clusters=[3, 3, 1], subspace_features=[2, 2
         box = [box] * len(n_clusters)
     assert len(n_clusters) == len(box), "inconsistent number of subspaces between n_clusters and box"
     # Create empty dataset
-    X, L = np.empty((n_samples, 0)), np.empty((n_samples, 0))
+    X, L = np.empty((n_samples, 0)), np.empty((n_samples, 0), dtype=np.int)
     for i in range(len(n_clusters)):
         # Create Clusters
         X_tmp, L_tmp = make_blobs(n_samples - n_outliers[i], subspace_features[i], centers=n_clusters[i],

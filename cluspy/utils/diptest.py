@@ -48,13 +48,13 @@ def dip_test(X, just_dip=True, is_data_sorted=False, use_c=True, debug=False):
 def _dip_c_port(X, debug):
     # Create reference numpy arrays
     low_high = np.zeros(2, dtype=np.int)
-    modal_triangle = np.zeros(3, dtype=np.int)
+    modal_triangle = -np.ones(3, dtype=np.int)
     gcm = np.zeros(X.shape, dtype=np.int)
     lcm = np.zeros(X.shape, dtype=np.int)
     mj = np.zeros(X.shape, dtype=np.int)
     mn = np.zeros(X.shape, dtype=np.int)
     # Execute C function
-    dip_value = c_diptest(X, low_high, modal_triangle, gcm, lcm, mn, mj, X.shape[0], 1 if debug else 0)
+    dip_value = c_diptest(X.astype(np.float64), low_high, modal_triangle, gcm, lcm, mn, mj, X.shape[0], 1 if debug else 0)
     return dip_value, (low_high[0], low_high[1]), (modal_triangle[0], modal_triangle[1], modal_triangle[2])
 
 

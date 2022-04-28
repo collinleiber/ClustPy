@@ -87,6 +87,6 @@ def unsupervised_clustering_accuracy(labels_true, labels_pred):
     max_label = max(labels_pred.max(), labels_true.max()) + 1
     match_matrix = np.zeros((max_label, max_label), dtype=np.int64)
     for i in range(labels_true.shape[0]):
-        match_matrix[labels_pred[i], labels_true[i]] -= 1
+        match_matrix[int(labels_true[i]), int(labels_pred[i])] -= 1
     indices = linear_sum_assignment(match_matrix)
     return -np.sum(match_matrix[indices]) / labels_pred.size

@@ -111,8 +111,7 @@ Multiple Labelings Confusion Matrix
 
 class MultipleLabelingsConfusionMatrix(ConfusionMatrix):
 
-    def __init__(self, labels_true, labels_pred, metric=nmi, remove_noise_spaces=True, metric_params={},
-                 auto_rearrange=False):
+    def __init__(self, labels_true, labels_pred, metric=nmi, remove_noise_spaces=True, metric_params={}):
         _check_number_of_points(labels_true, labels_pred)
         if labels_true.ndim == 1:
             labels_true = labels_true.reshape((-1, 1))
@@ -130,8 +129,6 @@ class MultipleLabelingsConfusionMatrix(ConfusionMatrix):
             for j in range(labels_pred.shape[1]):
                 confusion_matrix[i, j] = metric(labels_true[:, i], labels_pred[:, j], **metric_params)
         self.confusion_matrix = confusion_matrix
-        if auto_rearrange:
-            self.rearrange()
 
     def plot(self, show_text=True, figsize=(10, 10), cmap="YlGn", textcolor="black", vmin=0, vmax=1):
         _plot_confusion_matrix(self.confusion_matrix, show_text, figsize, cmap, textcolor, vmin=vmin, vmax=vmax)
