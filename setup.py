@@ -19,7 +19,7 @@ setup(
     packages=find_packages(),
     package_data={'cluspy': ['data/datasets/*.data']},
     url='https://github.com/collinleiber/ClusPy',
-    license='GPL-3.0 License ',
+    license='BSD-3-Clause License',
     author='Collin Leiber',
     author_email='leiber@dbs.ifi.lmu.de',
     description='Clustering in python',
