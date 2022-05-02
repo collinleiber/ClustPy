@@ -11,7 +11,6 @@ import numpy as np
 from scipy.stats import ortho_group
 from sklearn.utils import check_random_state
 from scipy.spatial.distance import cdist
-from sklearn.utils.extmath import row_norms
 from sklearn.metrics.pairwise import pairwise_distances_argmin_min
 from sklearn.metrics import normalized_mutual_info_score as nmi
 from sklearn.base import BaseEstimator, ClusterMixin
@@ -179,7 +178,7 @@ def _initialize_nrkmeans_parameters(X, n_clusters, V, m, P, centers, mdl_for_noi
                 used_dimensionalities))
     # Define initial cluster centers with kmeans++ for each subspace_nr
     if centers is None:
-        centers = [kpp(X, k, row_norms(X, squared=True), random_state) for k in n_clusters]
+        centers = [kpp(X, k, random_state=random_state) for k in n_clusters]
     if not type(centers) is list or not len(centers) is subspaces:
         raise ValueError("Cluster centers must be specified for each subspace_nr.\nYour input:\n" + str(centers))
     else:

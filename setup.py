@@ -9,6 +9,12 @@ def _load_requirements():
     return requirements
 
 
+def _load_readme():
+    with open("README.md", "r") as file:
+        readme = file.read()
+    return readme
+
+
 dip_extension = Extension('cluspy.utils.dipModule',
                           include_dirs=[np.get_include()],
                           sources=['cluspy/utils/dip.c'])
@@ -23,6 +29,8 @@ setup(
     author='Collin Leiber',
     author_email='leiber@dbs.ifi.lmu.de',
     description='Clustering in python',
+    long_description=_load_readme(),
+    long_description_content_type="text/markdown",
     python_requires='>=3.7',
     install_requires=[_load_requirements()],
     ext_modules=[dip_extension]
