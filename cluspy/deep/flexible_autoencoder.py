@@ -122,13 +122,13 @@ class FlexibleAutoencoder(torch.nn.Module):
         reconstruction = self.decode(embedded)
         return reconstruction
     
-    def evaluate(self, dataloader, loss_fn=torch.nn.MSELoss, device=torch.device("cpu")):
+    def evaluate(self, dataloader, loss_fn, device=torch.device("cpu")):
         """Evaluates the autoencoder.
         
         Parameters
         ----------
-        dataloader : torch.utils.data.DataLoader, default=None, dataloader to be used for training
-        loss_fn : torch.nn, default=torch.nn.MSELoss, loss function to be used for reconstruction
+        dataloader : torch.utils.data.DataLoader, dataloader to be used for training
+        loss_fn : torch.nn, loss function to be used for reconstruction
         device : torch.device, default=torch.device('cpu'), device to be trained on
         
         Returns
@@ -153,12 +153,12 @@ class FlexibleAutoencoder(torch.nn.Module):
         n_epochs : int, number of epochs for training
         lr : float, learning rate to be used for the optimizer_fn
         batch_size : int, default=128
-        data : np.ndarray, default=None, train data set
-        data_eval : np.ndarray, default=None, evaluation data set
+        data : np.ndarray, default=None, train data set. If data is passed then dataloader can remain empty
+        data_eval : np.ndarray, default=None, evaluation data set. If data_eval is passed then evalloader can remain empty.
         dataloader : torch.utils.data.DataLoader, default=None, dataloader to be used for training
-        evalloader : torch.utils.data.DataLoader, default=None, dataloader to be used for validation, early stopping and learning rate scheduling
+        evalloader : torch.utils.data.DataLoader, default=None, dataloader to be used for evaluation, early stopping and learning rate scheduling
         optimizer_fn : torch.optim, default=torch.optim.Adam, optimizer to be used
-        loss_fn : torch.nn, default=torch.nn.MSELoss, loss function to be used for reconstruction
+        loss_fn : torch.nn, default=torch.nn.MSELoss(), loss function to be used for reconstruction
         patience : int, default=5, patience parameter for learning rate scheduler and early stopping
         lr_reduction_factor : float, default=0.5, factor for reducing the learning rate if loss plateu is reached, if None or 0 than learning rate scheduler is not used. Based on torch.optim.lr_scheduler.ReduceLROnPlateau.
         device : torch.device, default=torch.device('cpu'), device to be trained on
@@ -175,6 +175,7 @@ class FlexibleAutoencoder(torch.nn.Module):
             dataloader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(torch.from_numpy(data).float()),
                                                     batch_size=batch_size,
                                                     shuffle=True)
+        # evalloader has priority
         if evalloader is None:
             if data_eval is not None:
                 evalloader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(torch.from_numpy(data_eval).float()),
