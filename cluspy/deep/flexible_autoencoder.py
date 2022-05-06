@@ -169,7 +169,7 @@ class FlexibleAutoencoder(torch.nn.Module):
         evalloader : torch.utils.data.DataLoader, default=None, dataloader to be used for evaluation, early stopping and learning rate scheduling if scheduler=torch.optim.lr_scheduler.ReduceLROnPlateau
         optimizer_fn : torch.optim, default=torch.optim.Adam, optimizer to be used
         loss_fn : torch.nn, default=torch.nn.MSELoss(), loss function to be used for reconstruction
-        patience : int, default=5, patience parameter for learning rate scheduler
+        patience : int, default=5, patience parameter for EarlyStopping
         scheduler : torch.optim.lr_scheduler, default=None, learning rate scheduler that should be used. 
                     If torch.optim.lr_scheduler.ReduceLROnPlateau is used then the behaviour is matched by providing the validation_loss calculated based on samples from evalloader.
         scheduler_params : dict, default=None, dictionary of the parameters of the scheduler object
@@ -230,7 +230,7 @@ class FlexibleAutoencoder(torch.nn.Module):
             if evalloader is not None:
                 # self.evaluate calls self.eval()
                 val_loss = self.evaluate(dataloader=evalloader, loss_fn=loss_fn, device=device)
-                if (epoch_i-1) % print_step == 0 or epoch_i == n_epochs:
+                if (epoch_i-1) % print_step == 0 or epoch_i == (n_epochs - 1):
                     print(f"Epoch {epoch_i} EVAL loss total: {val_loss.item():.6f}")
                 early_stopping(val_loss)
                 if val_loss < best_loss:
