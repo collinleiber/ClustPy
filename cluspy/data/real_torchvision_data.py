@@ -5,37 +5,94 @@ import ssl
 from cluspy.data.real_world_data import _get_download_dir
 
 """
-Load torichvision datasets
+Load torchvision datasets
 """
 
 
-def _load_torch_image_data(data_source, add_testdata, normalize_channels, downloads_path):
+def _load_torch_image_data(data_source, subset, normalize_channels, uses_train_param, downloads_path):
+    """
+    Helper function to load a data set from the torchvision package.
+
+    Parameters
+    ----------
+    data_source: the data source from torchvision.datasets
+    subset: can be 'all', 'test' or 'train'. 'all' combines test and train data
+    normalize_channels: normalize each color-channel of the images
+    uses_train_param: does the data loader use 'test' or 'split' parameter
+    downloads_path: path to the directory where the data is stored
+
+    Returns
+    -------
+    data: the data numpy array
+    labels: the labels numpy array
+    """
+    assert subset in ["all", "train",
+                          "test"], "subset must match 'all', 'train' or 'test' Your input {0}".format(subset)
     # Get data from source
     ssl._create_default_https_context = ssl._create_unverified_context
-    dataset = data_source(root=_get_download_dir(downloads_path), train=True, download=True)
-    data = dataset.data
-    labels = dataset.targets
-    if add_testdata:
-        testset = data_source(root=_get_download_dir(downloads_path), train=False, download=True)
-        data = torch.cat([data, testset.data], dim=0)
-        labels = torch.cat([labels, testset.targets], dim=0)
+    if subset == "all" or subset == "train":
+        # Load training data
+        if uses_train_param:
+            trainset = data_source(root=_get_download_dir(downloads_path), train=True, download=True)
+        else:
+            trainset = data_source(root=_get_download_dir(downloads_path), split="train", download=True)
+        data = trainset.data
+        if hasattr(trainset, "targets"):
+            # USPS, MNIST, ... use targets
+            labels = trainset.targets
+        else:
+            # SVHN, STL10, ... use labels
+            labels = trainset.labels
+        if type(data) is np.ndarray:
+            # Transform numpy arrays to torch tensors. Needs to be done for eg USPS
+            data = torch.from_numpy(data)
+            labels = torch.from_numpy(np.array(labels))
+    if subset == "all" or subset == "test":
+        # Load test data
+        if uses_train_param:
+            testset = data_source(root=_get_download_dir(downloads_path), train=False, download=True)
+        else:
+            testset = data_source(root=_get_download_dir(downloads_path), split="test", download=True)
+        data_test = testset.data
+        if hasattr(testset, "targets"):
+            # USPS, MNIST, ... use targets
+            labels_test = testset.targets
+        else:
+            # SVHN, STL10, ... use labels
+            labels_test = testset.labels
+        if type(data_test) is np.ndarray:
+            # Transform numpy arrays to torch tensors. Needs to be done for eg USPS
+            data_test = torch.from_numpy(data_test)
+            labels_test = torch.from_numpy(np.array(labels_test))
+        if subset == "all":
+            # Add to train data
+            data = torch.cat([data, data_test], dim=0)
+            labels = torch.cat([labels, labels_test], dim=0)
+        else:
+            data = data_test
+            labels = labels_test
     ssl._create_default_https_context = ssl._create_default_https_context
     if normalize_channels:
         if data.dim() == 3:
+            # grayscale images
             data_mean = [data.mean()]
             data_std = [data.std()]
-        else:
+        elif data.dim() == 4:
+            # color images
             data_mean = []
             data_std = []
             for i in range(data.dim()):
                 data_mean.append(data[:, i, :, :].mean())
                 data_std.append(data[:, i, :, :].std())
+        else:
+            raise Exception(
+                "Number of dimensions for torchvision data sets should be 3 or 4. Here dim={0}".format(data.dim()))
         normalize = torchvision.transforms.Normalize(data_mean, data_std)
         data = normalize(data)
     # Flatten shape
     if data.dim() == 3:
         data = data.reshape(-1, data.shape[1] * data.shape[2])
-    else:
+    elif data.dim() == 4:
         data = data.reshape(-1, data.shape[1] * data.shape[2] * data.shape[3])
     # Move data to CPU
     data_cpu = data.detach().cpu().numpy()
@@ -43,31 +100,187 @@ def _load_torch_image_data(data_source, add_testdata, normalize_channels, downlo
     return data_cpu, labels_cpu
 
 
-def load_mnist(add_testdata=True, normalize_channels=False, downloads_path=None):
-    data, labels = _load_torch_image_data(torchvision.datasets.MNIST, add_testdata, normalize_channels, downloads_path)
-    return data, labels
+def load_mnist(subset="all", normalize_channels=False, downloads_path=None):
+    """
+    Load the MNIST data set. It consists of 70000 28x28 grayscale images showing handwritten digits (0 to 9).
+    The data set is composed of 60000 training and 10000 test images.
+    N=70000, d=784, k=10.
 
+    Parameters
+    ----------
+    subset: can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
+    normalize_channels: normalize each color-channel of the images (default: False)
+    downloads_path: path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
 
-def load_kmnist(add_testdata=True, normalize_channels=False, downloads_path=None):
-    data, labels = _load_torch_image_data(torchvision.datasets.KMNIST, add_testdata, normalize_channels, downloads_path)
-    return data, labels
+    Returns
+    -------
+    data: the data numpy array (70000 x 784)
+    labels: the labels numpy array (70000)
 
-
-def load_fmnist(add_testdata=True, normalize_channels=False, downloads_path=None):
-    data, labels = _load_torch_image_data(torchvision.datasets.FashionMNIST, add_testdata, normalize_channels,
+    References
+    -------
+    https://pytorch.org/vision/stable/generated/torchvision.datasets.MNIST.html#torchvision.datasets.MNIST
+    """
+    data, labels = _load_torch_image_data(torchvision.datasets.MNIST, subset, normalize_channels, True,
                                           downloads_path)
     return data, labels
 
 
-def load_usps(add_testdata=True, downloads_path=None):
-    ssl._create_default_https_context = ssl._create_unverified_context
-    dataset = torchvision.datasets.USPS(root=_get_download_dir(downloads_path), train=True, download=True)
-    data = np.array(dataset.data)
-    labels = np.array(dataset.targets)
-    if add_testdata:
-        test_dataset = torchvision.datasets.USPS(root=_get_download_dir(downloads_path), train=False, download=True)
-        data = np.r_[data, test_dataset.data]
-        labels = np.r_[labels, test_dataset.targets]
-    ssl._create_default_https_context = ssl._create_default_https_context
-    data = data.reshape(-1, 256)
+def load_kmnist(subset="all", normalize_channels=False, downloads_path=None):
+    """
+    Load the Kuzushiji-MNIST data set. It consists of 70000 28x28 grayscale images showing Kanji characters.
+    It is composed of 10 different characters, each representing one column of hiragana.
+    The data set is composed of 60000 training and 10000 test images.
+    N=70000, d=784, k=10.
+
+    Parameters
+    ----------
+    subset: can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
+    normalize_channels: normalize each color-channel of the images (default: False)
+    downloads_path: path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+
+    Returns
+    -------
+    data: the data numpy array (70000 x 784)
+    labels: the labels numpy array (70000)
+
+    References
+    -------
+    https://pytorch.org/vision/stable/generated/torchvision.datasets.KMNIST.html#torchvision.datasets.KMNIST
+    """
+    data, labels = _load_torch_image_data(torchvision.datasets.KMNIST, subset, normalize_channels, True,
+                                          downloads_path)
+    return data, labels
+
+
+def load_fmnist(subset="all", normalize_channels=False, downloads_path=None):
+    """
+    Load the Fashion-MNIST data set. It consists of 70000 28x28 grayscale images showing articles from the Zalando online store.
+    Each sample belongs to one of 10 product groups.
+    The data set is composed of 60000 training and 10000 test images.
+    N=70000, d=784, k=10.
+
+    Parameters
+    ----------
+    subset: can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
+    normalize_channels: normalize each color-channel of the images (default: False)
+    downloads_path: path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+
+    Returns
+    -------
+    data: the data numpy array (70000 x 784)
+    labels: the labels numpy array (70000)
+
+    References
+    -------
+    https://pytorch.org/vision/stable/generated/torchvision.datasets.FashionMNIST.html#torchvision.datasets.FashionMNIST
+    """
+    data, labels = _load_torch_image_data(torchvision.datasets.FashionMNIST, subset, normalize_channels, True,
+                                          downloads_path)
+    return data, labels
+
+
+def load_usps(subset="all", normalize_channels=False, downloads_path=None):
+    """
+    Load the USPS data set. It consists of 9298 16x16 grayscale images showing handwritten digits (0 to 9).
+    The data set is composed of 7291 training and 2007 test images.
+    N=9298, d=256, k=10.
+
+    Parameters
+    ----------
+    subset: can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
+    normalize_channels: normalize each color-channel of the images (default: False)
+    downloads_path: path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+
+    Returns
+    -------
+    data: the data numpy array (9298 x 256)
+    labels: the labels numpy array (9298)
+
+    References
+    -------
+    https://pytorch.org/vision/stable/generated/torchvision.datasets.USPS.html#torchvision.datasets.USPS
+    """
+    data, labels = _load_torch_image_data(torchvision.datasets.USPS, subset, normalize_channels, True,
+                                          downloads_path)
+    return data, labels
+
+
+def load_cifar10(subset="all", normalize_channels=False, downloads_path=None):
+    """
+    Load the CIFAR10 data set. It consists of 60000 32x32 color images showing different objects.
+    The classes are airplane, automobile, bird, cat, deer, dog, frog, horse, ship and truck.
+    The data set is composed of 50000 training and 10000 test images.
+    N=60000, d=3072, k=10.
+
+    Parameters
+    ----------
+    subset: can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
+    normalize_channels: normalize each color-channel of the images (default: False)
+    downloads_path: path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+
+    Returns
+    -------
+    data: the data numpy array (60000 x 3072)
+    labels: the labels numpy array (60000)
+
+    References
+    -------
+    https://pytorch.org/vision/stable/generated/torchvision.datasets.CIFAR10.html#torchvision.datasets.CIFAR10
+    """
+    data, labels = _load_torch_image_data(torchvision.datasets.CIFAR10, subset, normalize_channels, True,
+                                          downloads_path)
+    return data, labels
+
+
+def load_svhn(subset="all", normalize_channels=False, downloads_path=None):
+    """
+    Load the SVHN data set. It consists of 99289 32x32 color images showing house numbers (0 to 9).
+    The data set is composed of 73257 training and 26032 test images.
+    N=99289, d=3072, k=10.
+
+    Parameters
+    ----------
+    subset: can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
+    normalize_channels: normalize each color-channel of the images (default: False)
+    downloads_path: path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+
+    Returns
+    -------
+    data: the data numpy array (99289 x 3072)
+    labels: the labels numpy array (99289)
+
+    References
+    -------
+    https://pytorch.org/vision/stable/generated/torchvision.datasets.SVHN.html#torchvision.datasets.SVHN
+    """
+    data, labels = _load_torch_image_data(torchvision.datasets.SVHN, subset, normalize_channels, False,
+                                          downloads_path)
+    return data, labels
+
+
+def load_stl10(subset="all", normalize_channels=False, downloads_path=None):
+    """
+    Load the STL10 data set. It consists of 13000 96x96 color images showing different objects.
+    The classes are airplane, bird, car, cat, deer, dog, horse, monkey, ship and truck.
+    The data set is composed of 5000 training and 8000 test images.
+    N=13000, d=27648, k=10.
+
+    Parameters
+    ----------
+    subset: can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
+    normalize_channels: normalize each color-channel of the images (default: False)
+    downloads_path: path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+
+    Returns
+    -------
+    data: the data numpy array (13000 x 27648)
+    labels: the labels numpy array (13000)
+
+    References
+    -------
+    https://pytorch.org/vision/stable/generated/torchvision.datasets.STL10.html#torchvision.datasets.STL10
+    """
+    data, labels = _load_torch_image_data(torchvision.datasets.STL10, subset, normalize_channels, False,
+                                          downloads_path)
     return data, labels

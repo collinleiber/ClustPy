@@ -10,7 +10,7 @@ mining. 2016.
 from cluspy.utils import dip_test, dip_pval
 import numpy as np
 from sklearn.base import BaseEstimator, ClusterMixin
-from cluspy.utils import plot_histogram, plot_with_transformation, plot_1d_data
+
 
 def _unidip(X_1d, significance, already_sorted):
     assert X_1d.ndim == 1, "Data must be 1-dimensional"
@@ -122,7 +122,7 @@ def _merge_clusters(X_1d, argsorted, labels, n_clusters, cluster_boundaries, sig
         dip_value = dip_test(tmp_X_1d, just_dip=True, is_data_sorted=True)
         dip_pvalue_left = dip_pval(dip_value, n_points=tmp_X_1d.shape[0])
         # Dip of i combined with right (i + 1)
-        cluster_size_right = cluster_boundaries[i+1][1] - cluster_boundaries[i+1][0]
+        cluster_size_right = cluster_boundaries[i + 1][1] - cluster_boundaries[i + 1][0]
         start_right = max(cluster_boundaries[i][0], cluster_boundaries[i][1] - 2 * cluster_size_right)
         end_right = min(cluster_boundaries[i + 1][1], cluster_boundaries[i + 1][0] + 2 * cluster_size_center)
         tmp_X_1d = X_1d[start_right:end_right]
@@ -153,7 +153,7 @@ UniDip Plus
 """
 
 
-def _unidip_plus(X_1d, significance):
+def _unidip_plus(X_1d, significance, outliers):
     # Start by executing UniDip
     labels, n_clusters, sorted_X_1d, argsorted, cluster_boundaries_orig = _unidip(X_1d, significance, False)
     cluster_boundaries_orig = [(boundary[0], boundary[1], j) for j, boundary in enumerate(cluster_boundaries_orig)]
@@ -162,17 +162,19 @@ def _unidip_plus(X_1d, significance):
         while True:
             # Get points between two clusters
             if i != 0:
+                # End of cluster before
                 start = cluster_boundaries_orig[i - 1][1]
             else:
                 start = 0
             if i != len(cluster_boundaries_orig):
+                # Start of cluster
                 end = cluster_boundaries_orig[i][0]
             else:
                 end = X_1d.shape[0]
             if end - start < 4:
                 break
             X_tmp = sorted_X_1d[start:end]
-            # Calculate mirrored dip to see if there is some relevant structure left
+            # Calculate mirrored dip to see if there is some relevant structure left between the clusters
             dip_value_mirror, _, _ = _dip_mirrored_data(X_tmp, (None, None))
             dip_pvalue_mirror = dip_pval(dip_value_mirror, n_points=(X_tmp.shape[0] * 2 - 1))
             if dip_pvalue_mirror < significance:
@@ -186,10 +188,11 @@ def _unidip_plus(X_1d, significance):
                     # cluster_range = cluster_boundaries_new[0][1] - cluster_boundaries_new[0][0]
                     cluster_range = (start + cluster_boundaries_new[0][1]) - cluster_boundaries_orig[i - 1][1]
                     # Use a maximum of cluster_range points of left cluster to see if transition is unimodal
-                    start_left = max(cluster_boundaries_orig[i - 1][0], cluster_boundaries_orig[i - 1][1] - 2 * cluster_range)
+                    start_left = max(cluster_boundaries_orig[i - 1][0],
+                                     cluster_boundaries_orig[i - 1][1] - 2 * cluster_range)
                     end_left = start + cluster_boundaries_new[0][1]
                     dip_value_left = dip_test(sorted_X_1d[start_left:end_left], just_dip=True, is_data_sorted=True)
-                    dip_pvalue_left = dip_pval(dip_value_left, n_points=end_left-start_left)
+                    dip_pvalue_left = dip_pval(dip_value_left, n_points=end_left - start_left)
                 # Append last found structure to cluster after
                 # Calculate dip of last found structure with cluster after
                 if i != len(cluster_boundaries_orig) and cluster_boundaries_orig[i][2] != -1:
@@ -199,7 +202,7 @@ def _unidip_plus(X_1d, significance):
                     # Use a maximum of cluster_range points of right cluster to see if transition is unimodal
                     end_right = min(cluster_boundaries_orig[i][1], cluster_boundaries_orig[i][0] + 2 * cluster_range)
                     dip_value_right = dip_test(sorted_X_1d[start_right:end_right], just_dip=True, is_data_sorted=True)
-                    dip_pvalue_right = dip_pval(dip_value_right, n_points=end_right-start_right)
+                    dip_pvalue_right = dip_pval(dip_value_right, n_points=end_right - start_right)
                 # --- Extend clusters; Beware the order in which entries are added as boundaries! right -> center -> left
                 # Does last found structure fit the cluster after? If so, extend cluster
                 if dip_pvalue_right >= significance and (n_clusters_new > 1 or dip_pvalue_right >= dip_pvalue_left):
@@ -207,20 +210,47 @@ def _unidip_plus(X_1d, significance):
                     labels[argsorted[start_right:cluster_boundaries_orig[i][1]]] = cluster_id
                     cluster_boundaries_orig[i] = (start_right, cluster_boundaries_orig[i][1], cluster_id)
                 elif dip_pvalue_right < significance and (n_clusters_new > 1 or dip_pvalue_left < significance):
-                    cluster_boundaries_orig.insert(i, (start + cluster_boundaries_new[-1][0], start + cluster_boundaries_new[-1][1], -1))
+                    cluster_boundaries_orig.insert(i, (
+                        start + cluster_boundaries_new[-1][0], start + cluster_boundaries_new[-1][1], -1))
                 # Add all found structures except first and last as noise
                 for j in range(n_clusters_new - 2, 0, -1):
-                    cluster_boundaries_orig.insert(i, (start + cluster_boundaries_new[j][0], start + cluster_boundaries_new[j][1], -1))
+                    cluster_boundaries_orig.insert(i, (
+                        start + cluster_boundaries_new[j][0], start + cluster_boundaries_new[j][1], -1))
                 # Does first found strucure fit the cluster before? If so, extend cluster
                 if dip_pvalue_left >= significance and (n_clusters_new > 1 or dip_pvalue_left > dip_pvalue_right):
                     cluster_id = cluster_boundaries_orig[i - 1][2]
                     labels[argsorted[cluster_boundaries_orig[i - 1][0]:end_left]] = cluster_id
                     cluster_boundaries_orig[i - 1] = (cluster_boundaries_orig[i - 1][0], end_left, cluster_id)
                 elif dip_pvalue_left < significance and n_clusters_new > 1:
-                    cluster_boundaries_orig.insert(i, (start + cluster_boundaries_new[0][0], start + cluster_boundaries_new[0][1], -1))
+                    cluster_boundaries_orig.insert(i, (
+                        start + cluster_boundaries_new[0][0], start + cluster_boundaries_new[0][1], -1))
             else:
                 break
         i += 1
+    if not outliers:
+        # Add outliers to closest cluster
+        i = 0
+        while i < len(cluster_boundaries_orig):
+            if cluster_boundaries_orig[i][2] == -1:
+                del cluster_boundaries_orig[i]
+                continue
+            if i < len(cluster_boundaries_orig) - 1 and cluster_boundaries_orig[i + 1][2] == -1:
+                del cluster_boundaries_orig[i + 1]
+                continue
+            # Convert labels between first position and first cluster
+            if i == 0:
+                labels[argsorted[:cluster_boundaries_orig[i][0]]] = cluster_boundaries_orig[i][2]
+            # Convert labels between current cluster and next cluster
+            if i == len(cluster_boundaries_orig) - 1:
+                labels[argsorted[cluster_boundaries_orig[i][1]:]] = cluster_boundaries_orig[i][2]
+            else:
+                border = sorted_X_1d[cluster_boundaries_orig[i][1] - 1] + (
+                        sorted_X_1d[cluster_boundaries_orig[i + 1][0]] - sorted_X_1d[cluster_boundaries_orig[i][1] - 1]) / 2
+                labels[(X_1d >= sorted_X_1d[cluster_boundaries_orig[i][1]]) & (X_1d < border)] = \
+                cluster_boundaries_orig[i][2]
+                labels[(X_1d >= border) & (X_1d < sorted_X_1d[cluster_boundaries_orig[i + 1][0]])] = \
+                    cluster_boundaries_orig[i + 1][2]
+            i += 1
     return labels, n_clusters
 
 
@@ -238,8 +268,12 @@ class UniDip(BaseEstimator, ClusterMixin):
 
 class UniDipPlus(UniDip):
 
+    def __init__(self, significance=0.05, outliers=True):
+        super().__init__(significance)
+        self.outliers = outliers
+
     def fit(self, X, y=None):
-        labels, n_clusters = _unidip_plus(X, self.significance)
+        labels, n_clusters = _unidip_plus(X, self.significance, self.outliers)
         self.labels_ = labels
         self.n_clusters_ = n_clusters
         return self

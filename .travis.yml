@@ -8,10 +8,13 @@ python:
 # command to install dependencies
 install:
   - pip install -r requirements.txt
+  - pip install pytest-cov
   - pip install codecov
+  - pip install pytest-pylint
+  - pip install pylint
 # command to run tests
 script:
-  - pytest --cov=ClusPy
+  - pytest --cov=ClusPy --pylint
 # Codecov
 after_success:
     - codecov

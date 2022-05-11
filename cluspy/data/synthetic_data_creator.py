@@ -7,15 +7,67 @@ from sklearn.utils import check_random_state
 
 def create_subspace_data(n_samples=1000, n_clusters=3, subspace_features=[2, 2], n_outliers=[0, 0], std=1,
                          box=(-10, 10), rotate_space=True, random_state=None):
+    """
+    Create a synthetic subspace data set consisting of a subspace containing multiple Gaussian clusters (called
+    clustered space) and a subspace containing a single Gaussian cluster (called noise space).
+    This method is a special case of the create_nr_data method using only a single clustered space.
+    See create_nr_data for more information.
+
+    Parameters
+    ----------
+    n_samples: Number of samples (default: 1000)
+    n_clusters: Specifies the number of clusters in the clustered space (default: 3)
+    subspace_features: Number of features in the two subspaces (default: [2, 2])
+    n_outliers: Number of outliers for each subspace. Number of samples within the clusters will be lowered by this
+    value (default: [0, 0])
+    std: Standard deviation of the Gaussian clusters (default: 1)
+    box: The bounding box of the cluster centers (default: (-10, 10))
+    rotate_space: Specifies whether the feature space should be rotated by an orthonormal matrix (default: True)
+    random_state: The random state (default: None)
+
+    Returns
+    -------
+    data: the data numpy array
+    labels: the labels numpy array
+    """
     assert type(n_clusters) is int, "n_clusters must be of type int"
     X, L = create_nr_data(n_samples=n_samples, n_clusters=[n_clusters, 1], subspace_features=subspace_features,
                           n_outliers=n_outliers, std=std, box=box, rotate_space=rotate_space,
                           random_state=random_state)
-    return X, L[:,0]
+    return X, L[:, 0]
 
 
 def create_nr_data(n_samples=1000, n_clusters=[3, 3, 1], subspace_features=[2, 2, 2], n_outliers=[0, 0, 0], std=1,
                    box=(-10, 10), rotate_space=True, random_state=None):
+    """
+    Create a synthetic non-redundant data set consisting of multiple subspaces containing Gaussian clusters (called
+    clustered spaces). You can also create subspaces with a single Gaussian cluster (called noise space).
+    The sklearn method make_blobs is used to create the clusters. The dimensionality of the subspaces is specified by
+    the subspace_features parameter. It can be an integer, where the dimensionality is the same for all subspaces,
+    or it can be a list.
+    Additionally, one can specify the number of outliers for each subspace. Outliers will be created using a uniform
+    distribution using the box parameter as limits. If outliers are used, the number of samples within the clusters is
+    reduced accordingly.
+    The standard deviation and the bounding box can be specified either for each subspace individually or a single value
+    will be shared across all spaces.
+
+    Parameters
+    ----------
+    n_samples: Number of samples (default: 1000)
+    n_clusters: Specifies the number of clusters for each subspace (default: [3, 3, 1])
+    subspace_features: Number of features in each subspace (default: [2, 2, 2])
+    n_outliers: Number of outliers for each subspace. Number of samples within the clusters will be lowered by this
+    value (default: [0, 0, 0])
+    std: Standard deviation of the Gaussian clusters (default: 1)
+    box: The bounding box of the cluster centers (default: (-10, 10))
+    rotate_space: Specifies whether the feature space should be rotated by an orthonormal matrix (default: True)
+    random_state: The random state (default: None)
+
+    Returns
+    -------
+    data: the data numpy array
+    labels: the labels numpy array
+    """
     random_state = check_random_state(random_state)
     # Transform n_clusters to list
     if type(n_clusters) is not list:
@@ -58,6 +110,6 @@ def create_nr_data(n_samples=1000, n_clusters=[3, 3, 1], subspace_features=[2, 2
         L = np.c_[L, L_tmp]
     # Rotate space
     if rotate_space:
-        V = special_ortho_group.rvs(dim=sum(subspace_features))
+        V = special_ortho_group.rvs(dim=sum(subspace_features), random_state=random_state)
         X = np.matmul(X, V)
     return X, L
