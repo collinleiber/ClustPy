@@ -61,6 +61,24 @@ class SubKmeans(BaseEstimator, ClusterMixin):
         self.n_clusters = nrkmeans.n_clusters[0]
         return self
 
+    def transform_full_space(self, X):
+        """
+        Transform the input dataset with the orthogonal rotation matrix V from the Nr-Kmeans object.
+        :param X: input data
+        :return: the rotated dataset
+        """
+        return np.matmul(X, self.V)
+
+    def transform_subspace(self, X):
+        """
+        Transform the input dataset with the orthogonal rotation matrix V projected onto a special subspace_nr.
+        :param X: input data
+        :param subspace_index: index of the subspace_nr
+        :return: the rotated dataset
+        """
+        cluster_space_V = self.V[:, :self.m]
+        return np.matmul(X, cluster_space_V)
+
 
 class MDLSubKmeans(BaseEstimator, ClusterMixin):
 

@@ -20,6 +20,10 @@ def plot_with_transformation(X, labels=None, centers=None, true_labels=None, plo
     if X.ndim == 1:
         plot_dimensionality = 1
     elif plot_dimensionality > X.shape[1]:
+        print(
+            "[WARNING] plot_dimensionality ({0}) is higher than the dimensionaliyty of the input dataset ({1}). "
+            "plot_dimensionality will therefore be set to {1}.".format(
+                plot_dimensionality, X.shape[1]))
         plot_dimensionality = X.shape[1]
     elif plot_dimensionality < X.shape[1]:
         # Check if transformation dimensionality is smaller than number of features
@@ -80,7 +84,7 @@ def plot_1d_data(X, labels=None, centers=None):
     assert centers is None or centers.ndim == 1 or centers.shape[1] == 1, "Centers must be 1-dimensional"
     # Optional: Get first column of data
     if X.ndim == 2:
-        X = X[:,0]
+        X = X[:, 0]
     # fig, ax = plt.subplots(figsize=figsize)
     plt.hlines(1, np.min(X), np.max(X))  # Draw a horizontal line
     y = np.ones(len(X))

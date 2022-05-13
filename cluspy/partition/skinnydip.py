@@ -4,319 +4,313 @@ sea of noise." Proceedings of the 22nd ACM SIGKDD
 international conference on Knowledge discovery and data
 mining. 2016.
 
-Python version of following implementation in R:
-https://github.com/samhelmholtz/skinny-dip
-
-@authors Samuel Maurus (original R implementation), Collin Leiber (Python implementation)
+@authors Collin Leiber
 """
 
-import numpy as np
 from cluspy.utils import dip_test, dip_pval
+import numpy as np
 from sklearn.base import BaseEstimator, ClusterMixin
 
 
-def _skinnydip_clustering_full_space(X, significance, debug=False):
-    hypercubes = _find_cluster_hypercubes(np.identity(X.shape[1]), np.zeros((0, 2)), X, significance, debug)
-    # Object-assignment
-    labels = np.full(X.shape[0], -1)
-    for i in range(len(hypercubes)):
-        hypercube = hypercubes[i]
-        # Get the objects that fall within this hypercube
-        objects_in_hypercube = [True] * X.shape[0]
-        for j in range(hypercube.shape[0]):
-            objects_in_hypercube = (objects_in_hypercube) & (X[:, j] >= hypercube[j, 0]) & (X[:, j] <= hypercube[j, 1])
-        labels[objects_in_hypercube] = i
-    return labels, len(hypercubes)
+def _skinnydip(X, significance):
+    n_clusters = 1
+    # Check if we have a multidimensional dataset
+    if X.ndim == 1:
+        labels, n_clusters, _, _, _ = _unidip(X, significance, False)
+        return labels, n_clusters
+    labels = np.zeros(X.shape[0])
+    # Iterate over all featrues
+    for dim in range(X.shape[1]):
+        current_n_clusters = n_clusters
+        # Iterate over all clusters from last iteration
+        for i in range(current_n_clusters):
+            # Get points in this cluster
+            points_in_cluster = (labels == i)
+            # Call UniDip
+            labels_new, n_clusters_new, _, _, _ = _unidip(X[points_in_cluster, dim], significance, False)
+            # Update labels
+            labels_new[labels_new > 0] = labels_new[labels_new > 0] + n_clusters - 1
+            labels_new[labels_new == 0] = i
+            labels[points_in_cluster] = labels_new
+            n_clusters += n_clusters_new - 1
+    return labels, n_clusters
 
 
-def _find_cluster_hypercubes(subspace, existing_hypercube, filtered_data, significance, debug):
-    subspace_dims = subspace.shape[1]
-    if existing_hypercube.shape[0] >= subspace_dims:
-        # Our hypercube is complete...return it
-        return [existing_hypercube]
-    if filtered_data.shape[0] == 0:
-        # No objects: no cluster
-        return []
-    next_dimension = existing_hypercube.shape[0]
-    # Get the next direction onto which we'll project our data
-    projection_vector = subspace[:, next_dimension]
-    # Project the data onto that direction and sort it
-    projected_data = np.matmul(filtered_data, projection_vector)
-    sorted_projected_data = np.sort(projected_data)
-    # Get the modal intervals along this direction. We get a matrix back where the rows are the modes,
-    # with the start/end values given in the two columns
-    # We always get at least one mode back
-    modal_intervals = _extract_modal_intervals(sorted_projected_data, significance, debug)
-    num_modes_found = modal_intervals.shape[0]
+def _unidip(X_1d, significance, already_sorted):
+    assert X_1d.ndim == 1, "Data must be 1-dimensional"
+    # Create labels array (everything is noise)
+    labels = -np.ones(X_1d.shape[0])
+    cluster_boundaries = []
+    cluster_id = 0
 
-    hypercubes = []
-    for i in range(num_modes_found):
-        # Refine our hypercube
-        refined_hypercube = np.r_[existing_hypercube, modal_intervals[i, :].reshape(-1, 2)]
-        # refined_hypercube = np.r_[existing_hypercube,modal_intervals[i,:].reshape((1, 2))]
-        refined_data = filtered_data[(filtered_data[:, next_dimension] >= modal_intervals[i, 0]) & (
-                filtered_data[:, next_dimension] <= modal_intervals[i, 1]), :]
-        cluster_hypercubes = _find_cluster_hypercubes(subspace, refined_hypercube, refined_data, significance, debug)
-        hypercubes = hypercubes + cluster_hypercubes
+    if already_sorted:
+        argsorted = np.arange(X_1d.shape[0])
+        X_1d_sorted = X_1d
+    else:
+        argsorted = np.argsort(X_1d)
+        X_1d_sorted = X_1d[argsorted]
 
-    return hypercubes
-
-
-# This method is our new method for finding the modes in a 1d (ordered) sample
-def _extract_modal_intervals(X, significance, debug):
-    # Find the raw clusters using our recursive approach
-    # Note: here we're saying that we're not testing a modal interval. This means that, if the full distribution is not multimodal, it will only return its estimate of the mode (not the full distribution)
-    clusters_raw = _get_clusters_in_interval(X, 0, X.shape[0] - 1, "----", False, significance, debug)
-    clusters_raw = np.array(clusters_raw)
-    # Consolidation
-    clusters = _merge_intervals(X, clusters_raw, significance, debug)
-    clusters = np.array(clusters)
-
-    cluster_starts = clusters[list(range(0, len(clusters), 2))]
-    cluster_ends = clusters[list(range(1, len(clusters), 2))]
-    return np.c_[X[cluster_starts], X[cluster_ends]]
-
-
-# Note that here the indexes are always passed/returned in a global sense
-def _get_clusters_in_interval(X, index_start, index_end, prefix, testing_modal_interval_only, significance, debug):
-    if debug:
-        print("{0}Checking interval [{1},{2}]".format(prefix, index_start, index_end))
-    # Subset the data...that is, we want to recursively look at only the data between indexStart and indexEnd and search for modes in that distribution
-    data_subset = X[index_start:index_end + 1]
-
-    # Run the dip test on the data subset
-    dip_value, low_high, _ = dip_test(data_subset, just_dip=False, is_data_sorted=True)
-    dip_pvalue = dip_pval(dip_value, data_subset.shape[0])
-    modal_interval_left = index_start + low_high[0]
-    modal_interval_right = index_start + low_high[1]
-
-    # Check for non-significance using our significance threshold. If the result is non-significant, we'll assume we only have one cluster (unimodal)
-    if dip_pvalue > significance:
-        if testing_modal_interval_only:
-            if debug:
-                print(
-                    "{0}Modal Interval [{1},{2}] is unimodally distributed (p-value {3})...returning it as a cluster...".format(
-                        prefix, index_start, index_end, dip_pvalue))
-            return [index_start, index_end]
+    tmp_borders = [(0, X_1d.shape[0], False)]
+    while len(tmp_borders) > 0:
+        start, end, is_modal = tmp_borders.pop(0)
+        # Get part of data
+        tmp_X_1d = X_1d_sorted[start:end]
+        dip_value, low_high, _ = dip_test(tmp_X_1d, just_dip=False, is_data_sorted=True)
+        dip_pvalue = dip_pval(dip_value, n_points=tmp_X_1d.shape[0])
+        low = low_high[0]
+        high = low_high[1]
+        if dip_pvalue < significance:
+            # Beware the order in which entries are added to tmp_borders! right -> center -> left
+            # Other clusters to the right?
+            if high + 1 != end - start:
+                right_X_1d = X_1d_sorted[start + low:end]
+                dip_value = dip_test(right_X_1d, just_dip=True, is_data_sorted=True)
+                dip_pvalue = dip_pval(dip_value, n_points=right_X_1d.shape[0])
+                if dip_pvalue < significance:
+                    tmp_borders.insert(0, (start + high + 1, end, False))
+            # Check area between low and high in next iteration
+            if low != high:
+                tmp_borders.insert(0, (start + low, start + high + 1, True))
+            # Other clusters to the left?
+            if low != 0:
+                left_X_1d = X_1d_sorted[start:start + high + 1]
+                dip_value = dip_test(left_X_1d, just_dip=True, is_data_sorted=True)
+                dip_pvalue = dip_pval(dip_value, n_points=left_X_1d.shape[0])
+                if dip_pvalue < significance:
+                    tmp_borders.insert(0, (start, start + low, False))
         else:
-            # Here we know we're finding the "last" cluster. For the unimodal case where the mode is indeed just a point of a small interval, the dip test has the tendency to
-            # return a very small modal interval (makes sense). This is bad in our case because it means that our core cluster is typically going to be very small in relation to
-            # the others that are found. For this reason we need a mechanism for finding out what the "full" core cluster is
-            # Our mechanism: mirror the data and run the dip on it. We're sure that it's then multimodal, and the dip should find "fully" one of the modes as a larger interval
-            if debug:
-                print(
-                    "{0}Interval [{1},{2}] is unimodally distributed (p-value {3})...the modal interval found in was [{4},{5}]. Proceeding to mirror data to extract a fatter cluster here...".format(
-                        prefix, index_start, index_end, dip_pvalue, modal_interval_left, modal_interval_right))
-
-            ## Get left and right-mirrored results
-            left_mirrored_dataset = _mirror_dataset(data_subset, True)
-            left_mirrored_dip_value, left_mirrored_low_high, _ = \
-                dip_test(left_mirrored_dataset, is_data_sorted=True, just_dip=False)
-            right_mirrored_dataset = _mirror_dataset(data_subset, False)
-            right_mirrored_dip_value, right_mirrored_low_high, _ = \
-                dip_test(right_mirrored_dataset, is_data_sorted=True, just_dip=False)
-            if left_mirrored_dip_value > right_mirrored_dip_value:
-                cluster_range = _map_index_range_to_ordered_mirrored_data_index_range_in_original_ordered_data(
-                    left_mirrored_low_high, modal_interval_left, modal_interval_right, data_subset.shape[0], True,
-                    index_start)
-                if debug:
-                    print(
-                        "{0}Modal interval on the left-mirrored data was [{1},{2}]...which corresponds to a cluser (which we'll return now) in the original data of [{3},{4}].".format(
-                            prefix, left_mirrored_low_high[0], left_mirrored_low_high[1], cluster_range[0],
-                            cluster_range[1]))
+            # If no modal, mirror data
+            if not is_modal:
+                _, low, high = _dip_mirrored_data(tmp_X_1d, (low, high))
+                cluster_start = start + low
+                cluster_end = start + high + 1
             else:
-                cluster_range = _map_index_range_to_ordered_mirrored_data_index_range_in_original_ordered_data(
-                    right_mirrored_low_high, modal_interval_left, modal_interval_right, data_subset.shape[0], False,
-                    index_start)
-                if debug:
-                    print(
-                        "{0}Modal interval on the right-mirrored data was [{1},{2}]...which corresponds to a cluser (which we'll return now) in the original data of [{3},{4}].".format(
-                            prefix, right_mirrored_low_high[0], right_mirrored_low_high[1], cluster_range[0],
-                            cluster_range[1]))
-            return cluster_range
-
-    if debug:
-        print(
-            "{0}Modal interval [{1},{2}], p={3}".format(prefix, modal_interval_left, modal_interval_right, dip_pvalue))
-
-    # Otherwise, expand the modal interval to see if it has more than one cluster
-    modal_interval_clusters = _get_clusters_in_interval(X, modal_interval_left, modal_interval_right, prefix + "----",
-                                                        True,
-                                                        significance, debug)
-
-    # Now we need to look at the various cases.
-    # If we only have a left interval, we just need to proceed in it...there must be at least one cluster there
-    # If we only have a right interval, we just need to proceed in it...there must be at least one cluster there
-    # If we have both, we need to consider both...there COULD be one or more on either side
-    left_interval_exists = (index_start < modal_interval_left)
-    right_interval_exists = (index_end > modal_interval_right)
-    if not left_interval_exists and not right_interval_exists:
-        raise Exception(
-            "We found a statistical multimodality, but the modal interval is the full interval! This should never happen!")
-    if not left_interval_exists and right_interval_exists:
-        if debug:
-            print(
-                "{0}Interval [{1},{2}] is significantly MULTIMODAL. The modal interval [{3},{4}] leaves no other points to the left, so we can continue to the right...".format(
-                    prefix, index_start, index_end, modal_interval_left, modal_interval_right))
-        right_clusters = _get_clusters_in_interval(X, modal_interval_right + 1, index_end, prefix + "----", False,
-                                                   significance, debug)
-        return modal_interval_clusters + right_clusters
-    if left_interval_exists and not right_interval_exists:
-        if debug:
-            print(
-                "{0}Interval [{1},{2}] is significantly MULTIMODAL. The modal interval [{3},{4}] leaves no other points to the right, so we can continue to the left...".format(
-                    prefix, index_start, index_end, modal_interval_left, modal_interval_right))
-        left_clusters = _get_clusters_in_interval(X, index_start, modal_interval_left - 1, prefix + "----", False,
-                                                  significance, debug)
-        return modal_interval_clusters + left_clusters
-
-    # Otherwise, we have the general case of both intervals (left and right)
-    # Here we need to check both, including the closest cluster from the modal interval
-    if len(modal_interval_clusters) > 2:
-        # More than one cluster in the modal interval, so include the closest for the test of each extreme
-        left_clusters = _get_clusters_in_interval(X, index_start, modal_interval_clusters[1], prefix + "----", False,
-                                                  significance, debug)
-        right_clusters = _get_clusters_in_interval(X, modal_interval_clusters[-2], index_end, prefix + "----", False,
-                                                   significance, debug)
-        return modal_interval_clusters + left_clusters + right_clusters
-    else:
-        if debug:
-            print(
-                "{0}Interval [{1},{2}] is significantly MULTIMODAL. The modal interval [{3},{4}] is unimodal with intervals left and right of it. Checking these neighbouring intervals with the modal interval...".format(
-                    prefix, index_start, index_end, modal_interval_left, modal_interval_right))
-        # Single cluster in modal interval. We hence know that there exists cluster(s) outside the modal interval. Find (them) by just focusing on the extreme intervals
-        left_clusters = _get_clusters_in_interval(X, index_start, modal_interval_right, prefix + "----", False,
-                                                  significance, debug)
-        right_clusters = _get_clusters_in_interval(X, modal_interval_left, index_end, prefix + "----", False,
-                                                   significance, debug)
-        return modal_interval_clusters + left_clusters + right_clusters
+                cluster_start = start
+                cluster_end = end
+            # Set labels
+            labels[argsorted[cluster_start:cluster_end]] = cluster_id
+            cluster_boundaries.append((cluster_start, cluster_end))
+            cluster_id += 1
+    n_clusters = cluster_id
+    # Merge nearby clusters
+    labels, n_clusters, cluster_boundaries = _merge_clusters(X_1d_sorted, argsorted, labels, n_clusters,
+                                                             cluster_boundaries, significance)
+    return labels, n_clusters, X_1d_sorted, argsorted, cluster_boundaries
 
 
-# Shifts to zero start, then mirrors, then returns the mirrored data
-# E.g. input c(2,3,4), output c(-2,-1,0,1,2)
-# Assumes an ordered input
-def _mirror_dataset(X, mirror_left):
-    if mirror_left:
-        min_value = np.min(X)
-        data_shifted = X - min_value
-        data_shifted_gt_zero = data_shifted[data_shifted > 0]
-        data_shifted_gt_zero_mirrored = - data_shifted_gt_zero
-        mirrored_dataset = np.r_[data_shifted_gt_zero_mirrored, 0, data_shifted_gt_zero]
-    else:
-        max_value = np.max(X)
-        data_shifted = X - max_value
-        data_shifted_lt_zero = data_shifted[data_shifted < 0]
-        data_shifted_lt_zero_mirrored = - data_shifted_lt_zero
-        mirrored_dataset = np.r_[data_shifted_lt_zero, 0, data_shifted_lt_zero_mirrored]
-    return np.sort(mirrored_dataset)
-
-
-def _map_index_range_to_ordered_mirrored_data_index_range_in_original_ordered_data(low_high, lower_fallback_index,
-                                                                                   upper_fallback_index,
-                                                                                   length_of_original_data, mirror_left,
-                                                                                   offset_index):
-    # Let's say our original data had a length of 2
-    # Then the mirrored data will have a length of 3
-    # The mirrored data will always have an odd length
-    # The zero point will be at lengthOfOriginalData
-    lower_index_to_map = low_high[0]
-    upper_index_to_map = low_high[1]
-    if (lower_index_to_map < length_of_original_data - 1) and (upper_index_to_map > length_of_original_data - 1):
-        return [lower_fallback_index, upper_fallback_index]
-
-    lower_index_mapped = _map_index_to_ordered_mirrored_data_index_in_original_ordered_data(lower_index_to_map,
-                                                                                            length_of_original_data,
-                                                                                            mirror_left)
-    upper_index_mapped = _map_index_to_ordered_mirrored_data_index_in_original_ordered_data(upper_index_to_map,
-                                                                                            length_of_original_data,
-                                                                                            mirror_left)
-    if lower_index_mapped > upper_index_mapped:
-        return [upper_index_mapped + offset_index, lower_index_mapped + offset_index]
-    else:
-        return [lower_index_mapped + offset_index, upper_index_mapped + offset_index]
-
-
-def _map_index_to_ordered_mirrored_data_index_in_original_ordered_data(index_to_map, length_of_original_data,
-                                                                       mirror_left):
-    if mirror_left:
-        if index_to_map >= length_of_original_data - 1:
-            return index_to_map - length_of_original_data + 1
+def _dip_mirrored_data(X_1d_sorted, orig_low_high):
+    """
+    Mirror data to get the correct interval
+    :param X_1d_sorted sorted data
+    :return:
+    """
+    # Left mirror
+    mirrored_addition_left = X_1d_sorted[0] - np.flip(X_1d_sorted[1:] - X_1d_sorted[0])
+    X_1d_left_mirrored = np.append(mirrored_addition_left, X_1d_sorted)
+    dip_value_left, low_high_left, _ = dip_test(X_1d_left_mirrored, just_dip=False, is_data_sorted=True)
+    # Right mirror
+    mirrored_addition_right = X_1d_sorted[-1] + np.flip(X_1d_sorted[-1] - X_1d_sorted[:-1])
+    X_1d_right_mirrored = np.append(X_1d_sorted, mirrored_addition_right)
+    dip_value_right, low_high_right, _ = dip_test(X_1d_right_mirrored, just_dip=False, is_data_sorted=True)
+    # Get interval of larger dip
+    if dip_value_left > dip_value_right:
+        low = low_high_left[0]
+        high = low_high_left[1]
+        if low < X_1d_sorted.shape[0] and high >= X_1d_sorted.shape[0]:
+            return dip_value_left, orig_low_high[0], orig_low_high[1]
+        if low >= X_1d_sorted.shape[0]:
+            return dip_value_left, low - (X_1d_sorted.shape[0] - 1), high - (X_1d_sorted.shape[0] - 1)
         else:
-            return length_of_original_data - index_to_map - 1
+            return dip_value_left, (X_1d_sorted.shape[0] - 1) - high, (X_1d_sorted.shape[0] - 1) - low
     else:
-        if index_to_map > length_of_original_data - 1:
-            return (2 * (length_of_original_data - 1)) - index_to_map
+        low = low_high_right[0]
+        high = low_high_right[1]
+        if low < X_1d_sorted.shape[0] and high >= X_1d_sorted.shape[0]:
+            return dip_value_right, orig_low_high[0], orig_low_high[1]
+        if high < X_1d_sorted.shape[0]:
+            return dip_value_right, low, high
         else:
-            return index_to_map
+            return dip_value_right, 2 * (X_1d_sorted.shape[0] - 1) - high, 2 * (X_1d_sorted.shape[0] - 1) - low
 
 
-def _merge_intervals(ordered_data, intervals, significance, debug):
-    # We first need to find the merged clusters (any overlaps are merged), such that we only have mutually-exclusive clusters
-    cluster_starting_indices = intervals[list(range(0, len(intervals), 2))]
-    cluster_ending_indices = intervals[list(range(1, len(intervals), 2))]
-    cluster_starting_indices_order_mappings = np.argsort(cluster_starting_indices)
-    cluster_starting_indices_ordered = cluster_starting_indices[cluster_starting_indices_order_mappings]
-    cluster_ending_indices_ordered = cluster_ending_indices[cluster_starting_indices_order_mappings]
-    clusters = [cluster_starting_indices_ordered[0], cluster_ending_indices_ordered[0]]
+def _merge_clusters(X_1d_sorted, argsorted, labels, n_clusters, cluster_boundaries, significance):
+    # For each cluster check left and right partner -> first and last cluster are handled by neighbors
+    i = 1
+    while i < len(cluster_boundaries) - 1:
+        cluster_size_center = cluster_boundaries[i][1] - cluster_boundaries[i][0]
+        # Dip of i combined with left (i - 1)
+        cluster_size_left = cluster_boundaries[i - 1][1] - cluster_boundaries[i - 1][0]
+        start_left = max(cluster_boundaries[i - 1][0], cluster_boundaries[i - 1][1] - 2 * cluster_size_center)
+        end_left = min(cluster_boundaries[i][1], cluster_boundaries[i][0] + 2 * cluster_size_left)
+        tmp_X_1d = X_1d_sorted[start_left:end_left]
+        # tmp_X_1d = X_1d[cluster_boundaries[i - 1][0]:cluster_boundaries[i][1]]
+        dip_value = dip_test(tmp_X_1d, just_dip=True, is_data_sorted=True)
+        dip_pvalue_left = dip_pval(dip_value, n_points=tmp_X_1d.shape[0])
+        # Dip of i combined with right (i + 1)
+        cluster_size_right = cluster_boundaries[i + 1][1] - cluster_boundaries[i + 1][0]
+        start_right = max(cluster_boundaries[i][0], cluster_boundaries[i][1] - 2 * cluster_size_right)
+        end_right = min(cluster_boundaries[i + 1][1], cluster_boundaries[i + 1][0] + 2 * cluster_size_center)
+        tmp_X_1d = X_1d_sorted[start_right:end_right]
+        # tmp_X_1d = X_1d[cluster_boundaries[i][0]:cluster_boundaries[i + 1][1]]
+        dip_value = dip_test(tmp_X_1d, just_dip=True, is_data_sorted=True)
+        dip_pvalue_right = dip_pval(dip_value, n_points=tmp_X_1d.shape[0])
+        if dip_pvalue_left >= dip_pvalue_right and dip_pvalue_left >= significance:
+            # Merge i - 1 and i. Overwrite labels (beware, outliers can be in between)
+            labels[argsorted[cluster_boundaries[i - 1][1]:cluster_boundaries[i][1]]] = i - 1
+            labels[labels > i] -= 1
+            cluster_boundaries[i - 1] = (cluster_boundaries[i - 1][0], cluster_boundaries[i][1])
+            del cluster_boundaries[i]
+            n_clusters -= 1
+        elif dip_pvalue_right > dip_pvalue_left and dip_pvalue_right >= significance:
+            # Merge i and i + 1. Overwrite labels (beware, outliers can be in between)
+            labels[argsorted[cluster_boundaries[i][1]:cluster_boundaries[i + 1][1]]] = i
+            labels[labels > i + 1] -= 1
+            cluster_boundaries[i] = (cluster_boundaries[i][0], cluster_boundaries[i + 1][1])
+            del cluster_boundaries[i + 1]
+            n_clusters -= 1
+        else:
+            i += 1
+    return labels, n_clusters, cluster_boundaries
 
-    for i in range(1, len(cluster_starting_indices_ordered)):
-        ## Get the current interval
-        end_in_question = clusters[len(clusters) - 1]
 
-        if end_in_question < cluster_starting_indices_ordered[i]:
-            clusters = clusters + [cluster_starting_indices_ordered[i]] + [cluster_ending_indices_ordered[i]]
-        elif end_in_question < cluster_ending_indices_ordered[i]:
-            clusters[len(clusters) - 1] = cluster_ending_indices_ordered[i]
-
-    # Now we do our "consolidation" step
-    # The idea is that we merge in any "tails", "fringes" or "artefacts" that aren't
-    # statistically-significant enough to cause multimodality.
-    # How? We know that our clusters are ordered.
-    # We iterate though our clusters and perform the dip test on the range defined by successfive pairs
-    # If a pair has a non-significant multimodality, we call the entire range defined by that successive pair a single cluster
-    consolidated_clusters = _consolidate_clusters(ordered_data, clusters, 0, significance, debug)
-    return consolidated_clusters
+"""
+UniDip Plus
+"""
 
 
-def _consolidate_clusters(ordered_data, clusters, index, significance, debug):
-    # If index > length-1 done
-    # do dip
-    # If significant
-    # increment index and recurse with index++
-    # else
-    # merge and recurse with index
-
-    num_clusters_left = len(clusters) / 2
-    if index > (num_clusters_left - 2):
-        return clusters
-    starting_index = (index * 2)
-    ending_index = (index + 1) * 2 + 1
-    starting_point_index = clusters[starting_index]
-    ending_point_index = clusters[ending_index]
-    dip_value = dip_test(ordered_data[starting_point_index:ending_point_index], just_dip=True, is_data_sorted=True)
-    dip_p_value = dip_pval(dip_value, ending_point_index - starting_point_index)
-    if dip_p_value < significance:
-        if debug:
-            print("Range {0} to {1} is significant...we're happy with that cluster!".format(starting_point_index,
-                                                                                            ending_point_index))
-        # significant multimodality...continue with the next index
-        return _consolidate_clusters(ordered_data, clusters, index + 1, significance, debug)
-    else:
-        if debug:
-            print("Range {0} to {1} is not significant: merging".format(starting_point_index, ending_point_index))
-        ## not significant...merge and repeat with the same index
-        clusters = clusters[0:starting_index + 1] + clusters[ending_index:len(clusters)]
-        return _consolidate_clusters(ordered_data, clusters, index, significance, debug)
+def _unidip_plus(X_1d, significance, outliers):
+    # Start by executing UniDip
+    labels, n_clusters, sorted_X_1d, argsorted, cluster_boundaries_orig = _unidip(X_1d, significance, False)
+    cluster_boundaries_orig = [(boundary[0], boundary[1], j) for j, boundary in enumerate(cluster_boundaries_orig)]
+    i = 0
+    while i <= len(cluster_boundaries_orig):
+        while True:
+            # Get points between two clusters
+            if i != 0:
+                # End of cluster before
+                start = cluster_boundaries_orig[i - 1][1]
+            else:
+                start = 0
+            if i != len(cluster_boundaries_orig):
+                # Start of cluster
+                end = cluster_boundaries_orig[i][0]
+            else:
+                end = X_1d.shape[0]
+            if end - start < 4:
+                break
+            X_tmp = sorted_X_1d[start:end]
+            # Calculate mirrored dip to see if there is some relevant structure left between the clusters
+            dip_value_mirror, _, _ = _dip_mirrored_data(X_tmp, (None, None))
+            dip_pvalue_mirror = dip_pval(dip_value_mirror, n_points=(X_tmp.shape[0] * 2 - 1))
+            if dip_pvalue_mirror < significance:
+                # Execute UniDip in the noise data
+                labels_tmp, n_clusters_new, _, _, cluster_boundaries_new = _unidip(X_tmp, significance, True)
+                dip_pvalue_left = -1
+                dip_pvalue_right = -1
+                # Append first found structure to cluster before
+                # Calculate dip of first found structure with cluster before
+                if i != 0 and cluster_boundaries_orig[i - 1][2] != -1:
+                    # cluster_range = cluster_boundaries_new[0][1] - cluster_boundaries_new[0][0]
+                    cluster_range = (start + cluster_boundaries_new[0][1]) - cluster_boundaries_orig[i - 1][1]
+                    # Use a maximum of cluster_range points of left cluster to see if transition is unimodal
+                    start_left = max(cluster_boundaries_orig[i - 1][0],
+                                     cluster_boundaries_orig[i - 1][1] - 2 * cluster_range)
+                    end_left = start + cluster_boundaries_new[0][1]
+                    dip_value_left = dip_test(sorted_X_1d[start_left:end_left], just_dip=True, is_data_sorted=True)
+                    dip_pvalue_left = dip_pval(dip_value_left, n_points=end_left - start_left)
+                # Append last found structure to cluster after
+                # Calculate dip of last found structure with cluster after
+                if i != len(cluster_boundaries_orig) and cluster_boundaries_orig[i][2] != -1:
+                    # cluster_range = cluster_boundaries_new[-1][1] - cluster_boundaries_new[-1][0]
+                    cluster_range = cluster_boundaries_orig[i][0] - (start + cluster_boundaries_new[-1][0])
+                    start_right = start + cluster_boundaries_new[-1][0]
+                    # Use a maximum of cluster_range points of right cluster to see if transition is unimodal
+                    end_right = min(cluster_boundaries_orig[i][1], cluster_boundaries_orig[i][0] + 2 * cluster_range)
+                    dip_value_right = dip_test(sorted_X_1d[start_right:end_right], just_dip=True, is_data_sorted=True)
+                    dip_pvalue_right = dip_pval(dip_value_right, n_points=end_right - start_right)
+                # --- Extend clusters; Beware the order in which entries are added as boundaries! right -> center -> left
+                # Does last found structure fit the cluster after? If so, extend cluster
+                if dip_pvalue_right >= significance and (n_clusters_new > 1 or dip_pvalue_right >= dip_pvalue_left):
+                    cluster_id = cluster_boundaries_orig[i][2]
+                    labels[argsorted[start_right:cluster_boundaries_orig[i][1]]] = cluster_id
+                    cluster_boundaries_orig[i] = (start_right, cluster_boundaries_orig[i][1], cluster_id)
+                elif dip_pvalue_right < significance and (n_clusters_new > 1 or dip_pvalue_left < significance):
+                    cluster_boundaries_orig.insert(i, (
+                        start + cluster_boundaries_new[-1][0], start + cluster_boundaries_new[-1][1], -1))
+                # Add all found structures except first and last as noise
+                for j in range(n_clusters_new - 2, 0, -1):
+                    cluster_boundaries_orig.insert(i, (
+                        start + cluster_boundaries_new[j][0], start + cluster_boundaries_new[j][1], -1))
+                # Does first found strucure fit the cluster before? If so, extend cluster
+                if dip_pvalue_left >= significance and (n_clusters_new > 1 or dip_pvalue_left > dip_pvalue_right):
+                    cluster_id = cluster_boundaries_orig[i - 1][2]
+                    labels[argsorted[cluster_boundaries_orig[i - 1][0]:end_left]] = cluster_id
+                    cluster_boundaries_orig[i - 1] = (cluster_boundaries_orig[i - 1][0], end_left, cluster_id)
+                elif dip_pvalue_left < significance and n_clusters_new > 1:
+                    cluster_boundaries_orig.insert(i, (
+                        start + cluster_boundaries_new[0][0], start + cluster_boundaries_new[0][1], -1))
+            else:
+                break
+        i += 1
+    if not outliers:
+        # Add outliers to closest cluster
+        i = 0
+        while i < len(cluster_boundaries_orig):
+            if cluster_boundaries_orig[i][2] == -1:
+                del cluster_boundaries_orig[i]
+                continue
+            if i < len(cluster_boundaries_orig) - 1 and cluster_boundaries_orig[i + 1][2] == -1:
+                del cluster_boundaries_orig[i + 1]
+                continue
+            # Convert labels between first position and first cluster
+            if i == 0:
+                labels[argsorted[:cluster_boundaries_orig[i][0]]] = cluster_boundaries_orig[i][2]
+            # Convert labels between current cluster and next cluster
+            if i == len(cluster_boundaries_orig) - 1:
+                labels[argsorted[cluster_boundaries_orig[i][1]:]] = cluster_boundaries_orig[i][2]
+            else:
+                border = sorted_X_1d[cluster_boundaries_orig[i][1] - 1] + (
+                        sorted_X_1d[cluster_boundaries_orig[i + 1][0]] - sorted_X_1d[
+                    cluster_boundaries_orig[i][1] - 1]) / 2
+                labels[(X_1d >= sorted_X_1d[cluster_boundaries_orig[i][1]]) & (X_1d < border)] = \
+                    cluster_boundaries_orig[i][2]
+                labels[(X_1d >= border) & (X_1d < sorted_X_1d[cluster_boundaries_orig[i + 1][0]])] = \
+                    cluster_boundaries_orig[i + 1][2]
+            i += 1
+    return labels, n_clusters
 
 
 class SkinnyDip(BaseEstimator, ClusterMixin):
-
-    def __init__(self, significance=0.05, debug=False):
+    def __init__(self, significance=0.05):
         self.significance = significance
-        self.debug = debug
 
     def fit(self, X, y=None):
-        labels, n_clusters = _skinnydip_clustering_full_space(X, self.significance, debug=self.debug)
+        labels, n_clusters = _skinnydip(X, self.significance)
+        self.labels_ = labels
+        self.n_clusters_ = n_clusters
+        return self
+
+
+class UniDip(BaseEstimator, ClusterMixin):
+
+    def __init__(self, significance=0.05):
+        self.significance = significance
+
+    def fit(self, X, y=None):
+        labels, n_clusters, _, _, _ = _unidip(X, self.significance, False)
+        self.labels_ = labels
+        self.n_clusters_ = n_clusters
+        return self
+
+
+class UniDipPlus(UniDip):
+
+    def __init__(self, significance=0.05, outliers=True):
+        super().__init__(significance)
+        self.outliers = outliers
+
+    def fit(self, X, y=None):
+        labels, n_clusters = _unidip_plus(X, self.significance, self.outliers)
         self.labels_ = labels
         self.n_clusters_ = n_clusters
         return self

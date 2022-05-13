@@ -34,14 +34,13 @@ Alternatively, clone the repository, go to the directory and execute:
     - Dip-Means
     - Projected Dip-Means
     - DipExt & DipInit
-    - UniDip & Skinnydip
+    - SkinnyDip & UniDip
+    - SubKmeans
     - Fuzzy-C-Means (from [pyclustering](https://pyclustering.github.io/docs/0.10.0/html/de/df0/namespacepyclustering_1_1cluster_1_1fcm.html))
     - X-Means (from [pyclustering](https://pyclustering.github.io/docs/0.10.0/html/d2/d8b/namespacepyclustering_1_1cluster_1_1xmeans.html))
     - G-Means (from [pyclustering](https://pyclustering.github.io/docs/0.10.0/html/dc/d86/namespacepyclustering_1_1cluster_1_1gmeans.html))
 - Density-based clustering
     - Multi Density DBSCAN
-- Subspace clustering
-    - SubKmeans
 - Hierarchical clustering
     - Diana
 - Alternative clustering (Non-redundant clustering)
