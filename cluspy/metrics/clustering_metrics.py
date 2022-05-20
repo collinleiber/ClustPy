@@ -84,7 +84,7 @@ def unsupervised_clustering_accuracy(labels_true, labels_pred):
     Processing 19.10 (2010): 2761-2773.
     """
     _check_number_of_points(labels_true, labels_pred)
-    max_label = max(labels_pred.max(), labels_true.max()) + 1
+    max_label = int(max(labels_pred.max(), labels_true.max()) + 1)
     match_matrix = np.zeros((max_label, max_label), dtype=np.int64)
     for i in range(labels_true.shape[0]):
         match_matrix[int(labels_true[i]), int(labels_pred[i])] -= 1

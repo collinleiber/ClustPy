@@ -23,7 +23,7 @@ def _multi_density_dbscan(X, k, var, min_cluster_size, always_sort_densities):
     # Order densities
     order = np.argsort(densities)
     # Start parameters
-    labels = np.full(X.shape[0], -1)
+    labels = -np.ones(X.shape[0], dtype=np.int32)
     cluster_densities = []
     c_id = 0
     # Iterate over all points

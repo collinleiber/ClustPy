@@ -17,7 +17,7 @@ def _proj_dipmeans(X, pval_threshold, n_random_projections, pval_strategy, n_boo
     # Initialize parameters
     n_clusters = 0
     centers = np.mean(X, axis=0).reshape(1, -1)
-    labels = np.zeros(X.shape[0])
+    labels = np.zeros(X.shape[0], dtype=np.int32)
     while n_clusters < max_n_clusters:
         n_clusters += 1
         # Default score is 0 for all clusters

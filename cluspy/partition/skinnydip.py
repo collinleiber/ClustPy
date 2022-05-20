@@ -12,13 +12,13 @@ import numpy as np
 from sklearn.base import BaseEstimator, ClusterMixin
 
 
-def _skinnydip(X, significance):
+def _skinnydip(X, significance, outliers, add_tails):
     n_clusters = 1
     # Check if we have a multidimensional dataset
     if X.ndim == 1:
-        labels, n_clusters, _, _, _ = _unidip(X, significance, False)
+        labels, n_clusters = _unidip_improved(X, significance, outliers, add_tails)
         return labels, n_clusters
-    labels = np.zeros(X.shape[0])
+    labels = np.zeros(X.shape[0], dtype=np.int32)
     # Iterate over all featrues
     for dim in range(X.shape[1]):
         current_n_clusters = n_clusters
@@ -27,7 +27,7 @@ def _skinnydip(X, significance):
             # Get points in this cluster
             points_in_cluster = (labels == i)
             # Call UniDip
-            labels_new, n_clusters_new, _, _, _ = _unidip(X[points_in_cluster, dim], significance, False)
+            labels_new, n_clusters_new = _unidip_improved(X[points_in_cluster, dim], significance, outliers, add_tails)
             # Update labels
             labels_new[labels_new > 0] = labels_new[labels_new > 0] + n_clusters - 1
             labels_new[labels_new == 0] = i
@@ -36,10 +36,10 @@ def _skinnydip(X, significance):
     return labels, n_clusters
 
 
-def _unidip(X_1d, significance, already_sorted):
+def _unidip_original(X_1d, significance, already_sorted):
     assert X_1d.ndim == 1, "Data must be 1-dimensional"
     # Create labels array (everything is noise)
-    labels = -np.ones(X_1d.shape[0])
+    labels = -np.ones(X_1d.shape[0], dtype=np.int32)
     cluster_boundaries = []
     cluster_id = 0
 
@@ -117,6 +117,9 @@ def _dip_mirrored_data(X_1d_sorted, orig_low_high):
         low = low_high_left[0]
         high = low_high_left[1]
         if low < X_1d_sorted.shape[0] and high >= X_1d_sorted.shape[0]:
+            if orig_low_high is None:
+                # If no orig_low_high input is given, calculate low_high of original dataset
+                _, orig_low_high, _ = dip_test(X_1d_sorted, just_dip=False, is_data_sorted=True)
             return dip_value_left, orig_low_high[0], orig_low_high[1]
         if low >= X_1d_sorted.shape[0]:
             return dip_value_left, low - (X_1d_sorted.shape[0] - 1), high - (X_1d_sorted.shape[0] - 1)
@@ -126,6 +129,9 @@ def _dip_mirrored_data(X_1d_sorted, orig_low_high):
         low = low_high_right[0]
         high = low_high_right[1]
         if low < X_1d_sorted.shape[0] and high >= X_1d_sorted.shape[0]:
+            if orig_low_high is None:
+                # If no orig_low_high input is given, calculate low_high of original dataset
+                _, orig_low_high, _ = dip_test(X_1d_sorted, just_dip=False, is_data_sorted=True)
             return dip_value_right, orig_low_high[0], orig_low_high[1]
         if high < X_1d_sorted.shape[0]:
             return dip_value_right, low, high
@@ -174,84 +180,89 @@ def _merge_clusters(X_1d_sorted, argsorted, labels, n_clusters, cluster_boundari
 
 
 """
-UniDip Plus
+UniDip with improvements
 """
 
 
-def _unidip_plus(X_1d, significance, outliers):
-    # Start by executing UniDip
-    labels, n_clusters, sorted_X_1d, argsorted, cluster_boundaries_orig = _unidip(X_1d, significance, False)
-    cluster_boundaries_orig = [(boundary[0], boundary[1], j) for j, boundary in enumerate(cluster_boundaries_orig)]
-    i = 0
-    while i <= len(cluster_boundaries_orig):
-        while True:
-            # Get points between two clusters
-            if i != 0:
-                # End of cluster before
-                start = cluster_boundaries_orig[i - 1][1]
-            else:
-                start = 0
-            if i != len(cluster_boundaries_orig):
-                # Start of cluster
-                end = cluster_boundaries_orig[i][0]
-            else:
-                end = X_1d.shape[0]
-            if end - start < 4:
-                break
-            X_tmp = sorted_X_1d[start:end]
-            # Calculate mirrored dip to see if there is some relevant structure left between the clusters
-            dip_value_mirror, _, _ = _dip_mirrored_data(X_tmp, (None, None))
-            dip_pvalue_mirror = dip_pval(dip_value_mirror, n_points=(X_tmp.shape[0] * 2 - 1))
-            if dip_pvalue_mirror < significance:
-                # Execute UniDip in the noise data
-                labels_tmp, n_clusters_new, _, _, cluster_boundaries_new = _unidip(X_tmp, significance, True)
-                dip_pvalue_left = -1
-                dip_pvalue_right = -1
-                # Append first found structure to cluster before
-                # Calculate dip of first found structure with cluster before
-                if i != 0 and cluster_boundaries_orig[i - 1][2] != -1:
-                    # cluster_range = cluster_boundaries_new[0][1] - cluster_boundaries_new[0][0]
-                    cluster_range = (start + cluster_boundaries_new[0][1]) - cluster_boundaries_orig[i - 1][1]
-                    # Use a maximum of cluster_range points of left cluster to see if transition is unimodal
-                    start_left = max(cluster_boundaries_orig[i - 1][0],
-                                     cluster_boundaries_orig[i - 1][1] - 2 * cluster_range)
-                    end_left = start + cluster_boundaries_new[0][1]
-                    dip_value_left = dip_test(sorted_X_1d[start_left:end_left], just_dip=True, is_data_sorted=True)
-                    dip_pvalue_left = dip_pval(dip_value_left, n_points=end_left - start_left)
-                # Append last found structure to cluster after
-                # Calculate dip of last found structure with cluster after
-                if i != len(cluster_boundaries_orig) and cluster_boundaries_orig[i][2] != -1:
-                    # cluster_range = cluster_boundaries_new[-1][1] - cluster_boundaries_new[-1][0]
-                    cluster_range = cluster_boundaries_orig[i][0] - (start + cluster_boundaries_new[-1][0])
-                    start_right = start + cluster_boundaries_new[-1][0]
-                    # Use a maximum of cluster_range points of right cluster to see if transition is unimodal
-                    end_right = min(cluster_boundaries_orig[i][1], cluster_boundaries_orig[i][0] + 2 * cluster_range)
-                    dip_value_right = dip_test(sorted_X_1d[start_right:end_right], just_dip=True, is_data_sorted=True)
-                    dip_pvalue_right = dip_pval(dip_value_right, n_points=end_right - start_right)
-                # --- Extend clusters; Beware the order in which entries are added as boundaries! right -> center -> left
-                # Does last found structure fit the cluster after? If so, extend cluster
-                if dip_pvalue_right >= significance and (n_clusters_new > 1 or dip_pvalue_right >= dip_pvalue_left):
-                    cluster_id = cluster_boundaries_orig[i][2]
-                    labels[argsorted[start_right:cluster_boundaries_orig[i][1]]] = cluster_id
-                    cluster_boundaries_orig[i] = (start_right, cluster_boundaries_orig[i][1], cluster_id)
-                elif dip_pvalue_right < significance and (n_clusters_new > 1 or dip_pvalue_left < significance):
-                    cluster_boundaries_orig.insert(i, (
-                        start + cluster_boundaries_new[-1][0], start + cluster_boundaries_new[-1][1], -1))
-                # Add all found structures except first and last as noise
-                for j in range(n_clusters_new - 2, 0, -1):
-                    cluster_boundaries_orig.insert(i, (
-                        start + cluster_boundaries_new[j][0], start + cluster_boundaries_new[j][1], -1))
-                # Does first found strucure fit the cluster before? If so, extend cluster
-                if dip_pvalue_left >= significance and (n_clusters_new > 1 or dip_pvalue_left > dip_pvalue_right):
-                    cluster_id = cluster_boundaries_orig[i - 1][2]
-                    labels[argsorted[cluster_boundaries_orig[i - 1][0]:end_left]] = cluster_id
-                    cluster_boundaries_orig[i - 1] = (cluster_boundaries_orig[i - 1][0], end_left, cluster_id)
-                elif dip_pvalue_left < significance and n_clusters_new > 1:
-                    cluster_boundaries_orig.insert(i, (
-                        start + cluster_boundaries_new[0][0], start + cluster_boundaries_new[0][1], -1))
-            else:
-                break
-        i += 1
+def _unidip_improved(X_1d, significance, outliers, add_tails):
+    # Start by executing the original UniDip algorithm
+    labels, n_clusters, sorted_X_1d, argsorted, cluster_boundaries_orig = _unidip_original(X_1d, significance, False)
+    if add_tails:
+        # Add cluster tails to the clusters
+        cluster_boundaries_orig = [(boundary[0], boundary[1], j) for j, boundary in enumerate(cluster_boundaries_orig)]
+        i = 0
+        while i <= len(cluster_boundaries_orig):
+            while True:
+                # Get points between two clusters
+                if i != 0:
+                    # End of cluster before
+                    start = cluster_boundaries_orig[i - 1][1]
+                else:
+                    start = 0
+                if i != len(cluster_boundaries_orig):
+                    # Start of cluster
+                    end = cluster_boundaries_orig[i][0]
+                else:
+                    end = X_1d.shape[0]
+                if end - start < 4:
+                    break
+                X_tmp = sorted_X_1d[start:end]
+                # Calculate mirrored dip to see if there is some relevant structure left between the clusters
+                dip_value_mirror, _, _ = _dip_mirrored_data(X_tmp, (None, None))
+                dip_pvalue_mirror = dip_pval(dip_value_mirror, n_points=(X_tmp.shape[0] * 2 - 1))
+                if dip_pvalue_mirror < significance:
+                    # Execute UniDip on the noise data
+                    labels_tmp, n_clusters_new, _, _, cluster_boundaries_new = _unidip_original(X_tmp, significance,
+                                                                                                True)
+                    dip_pvalue_left = -1
+                    dip_pvalue_right = -1
+                    # Append first found structure to cluster before
+                    # Calculate dip of first found structure with cluster before
+                    if i != 0 and cluster_boundaries_orig[i - 1][2] != -1:
+                        # cluster_range = cluster_boundaries_new[0][1] - cluster_boundaries_new[0][0]
+                        cluster_range = (start + cluster_boundaries_new[0][1]) - cluster_boundaries_orig[i - 1][1]
+                        # Use a maximum of cluster_range points of left cluster to see if transition is unimodal
+                        start_left = max(cluster_boundaries_orig[i - 1][0],
+                                         cluster_boundaries_orig[i - 1][1] - 2 * cluster_range)
+                        end_left = start + cluster_boundaries_new[0][1]
+                        dip_value_left = dip_test(sorted_X_1d[start_left:end_left], just_dip=True, is_data_sorted=True)
+                        dip_pvalue_left = dip_pval(dip_value_left, n_points=end_left - start_left)
+                    # Append last found structure to cluster after
+                    # Calculate dip of last found structure with cluster after
+                    if i != len(cluster_boundaries_orig) and cluster_boundaries_orig[i][2] != -1:
+                        # cluster_range = cluster_boundaries_new[-1][1] - cluster_boundaries_new[-1][0]
+                        cluster_range = cluster_boundaries_orig[i][0] - (start + cluster_boundaries_new[-1][0])
+                        start_right = start + cluster_boundaries_new[-1][0]
+                        # Use a maximum of cluster_range points of right cluster to see if transition is unimodal
+                        end_right = min(cluster_boundaries_orig[i][1],
+                                        cluster_boundaries_orig[i][0] + 2 * cluster_range)
+                        dip_value_right = dip_test(sorted_X_1d[start_right:end_right], just_dip=True,
+                                                   is_data_sorted=True)
+                        dip_pvalue_right = dip_pval(dip_value_right, n_points=end_right - start_right)
+                    # --- Extend clusters; Beware the order in which entries are added as boundaries! right -> center -> left
+                    # Does last found structure fit the cluster after? If so, extend cluster
+                    if dip_pvalue_right >= significance and (n_clusters_new > 1 or dip_pvalue_right >= dip_pvalue_left):
+                        cluster_id = cluster_boundaries_orig[i][2]
+                        labels[argsorted[start_right:cluster_boundaries_orig[i][1]]] = cluster_id
+                        cluster_boundaries_orig[i] = (start_right, cluster_boundaries_orig[i][1], cluster_id)
+                    elif dip_pvalue_right < significance and (n_clusters_new > 1 or dip_pvalue_left < significance):
+                        cluster_boundaries_orig.insert(i, (
+                            start + cluster_boundaries_new[-1][0], start + cluster_boundaries_new[-1][1], -1))
+                    # Add all found structures except first and last as noise
+                    for j in range(n_clusters_new - 2, 0, -1):
+                        cluster_boundaries_orig.insert(i, (
+                            start + cluster_boundaries_new[j][0], start + cluster_boundaries_new[j][1], -1))
+                    # Does first found strucure fit the cluster before? If so, extend cluster
+                    if dip_pvalue_left >= significance and (n_clusters_new > 1 or dip_pvalue_left > dip_pvalue_right):
+                        cluster_id = cluster_boundaries_orig[i - 1][2]
+                        labels[argsorted[cluster_boundaries_orig[i - 1][0]:end_left]] = cluster_id
+                        cluster_boundaries_orig[i - 1] = (cluster_boundaries_orig[i - 1][0], end_left, cluster_id)
+                    elif dip_pvalue_left < significance and n_clusters_new > 1:
+                        cluster_boundaries_orig.insert(i, (
+                            start + cluster_boundaries_new[0][0], start + cluster_boundaries_new[0][1], -1))
+                else:
+                    break
+            i += 1
     if not outliers:
         # Add outliers to closest cluster
         i = 0
@@ -281,11 +292,13 @@ def _unidip_plus(X_1d, significance, outliers):
 
 
 class SkinnyDip(BaseEstimator, ClusterMixin):
-    def __init__(self, significance=0.05):
+    def __init__(self, significance=0.05, outliers=True, add_tails=False):
         self.significance = significance
+        self.outliers = outliers
+        self.add_tails = add_tails
 
     def fit(self, X, y=None):
-        labels, n_clusters = _skinnydip(X, self.significance)
+        labels, n_clusters = _skinnydip(X, self.significance, self.outliers, self.add_tails)
         self.labels_ = labels
         self.n_clusters_ = n_clusters
         return self
@@ -293,24 +306,13 @@ class SkinnyDip(BaseEstimator, ClusterMixin):
 
 class UniDip(BaseEstimator, ClusterMixin):
 
-    def __init__(self, significance=0.05):
+    def __init__(self, significance=0.05, outliers=True, add_tails=False):
         self.significance = significance
-
-    def fit(self, X, y=None):
-        labels, n_clusters, _, _, _ = _unidip(X, self.significance, False)
-        self.labels_ = labels
-        self.n_clusters_ = n_clusters
-        return self
-
-
-class UniDipPlus(UniDip):
-
-    def __init__(self, significance=0.05, outliers=True):
-        super().__init__(significance)
         self.outliers = outliers
+        self.add_tails = add_tails
 
     def fit(self, X, y=None):
-        labels, n_clusters = _unidip_plus(X, self.significance, self.outliers)
+        labels, n_clusters = _unidip_improved(X, self.significance, self.outliers, self.add_tails)
         self.labels_ = labels
         self.n_clusters_ = n_clusters
         return self

@@ -181,7 +181,7 @@ def evaluate_multiple_datasets(evaluation_datasets, evaluation_algorithms, evalu
             elif type(eval_data.data) is np.ndarray:
                 X = eval_data.data
             else:
-                X, gt = eval_data.data()
+                X, gt = eval_data.data(**eval_data.file_reader_params)
             # Check if ground truth columns are defined
             if type(eval_data.gt_columns) is int or type(eval_data.gt_columns) is list:
                 gt = X[:, eval_data.gt_columns]
@@ -210,7 +210,7 @@ def evaluate_multiple_datasets(evaluation_datasets, evaluation_algorithms, evalu
 
 class EvaluationDataset():
 
-    def __init__(self, name, data, gt_columns=None, file_reader_params={"delimiter":","}, preprocess_methods=None, preprocess_params={},
+    def __init__(self, name, data, gt_columns=None, file_reader_params={}, preprocess_methods=None, preprocess_params={},
                  ignore_algorithms=[]):
         assert type(name) is str, "name must be a string"
         self.name = name

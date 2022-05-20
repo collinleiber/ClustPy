@@ -30,6 +30,7 @@ Alternatively, clone the repository, go to the directory and execute:
 ### Algorithms
 
 - Partition-based clustering
+    - LDA-K-Means
     - PG-Means
     - Dip-Means
     - Projected Dip-Means
@@ -54,6 +55,7 @@ Alternatively, clone the repository, go to the directory and execute:
     - DCN
     - VaDE
     - DipDECK
+    - DipEncoder
     
 ### Other implementations
 

@@ -821,6 +821,7 @@ class AutoNR(BaseEstimator, ClusterMixin):
         self.nrkmeans = nrkmeans
         self.mdl_costs = mdl_costs
         self.all_mdl_costs = all_mdl_costs
+        self.labels_ = nrkmeans.labels_
         return self
 
     def plot_mdl_progress(self):

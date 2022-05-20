@@ -20,7 +20,7 @@ def _dipmeans(X, pval_threshold, split_viewers_threshold, pval_strategy, n_boots
     # Initialize parameters
     n_clusters = 0
     centers = np.mean(X, axis=0).reshape(1, -1)
-    labels = np.zeros(X.shape[0])
+    labels = np.zeros(X.shape[0], dtype=np.int32)
     while n_clusters < max_n_clusters:
         n_clusters += 1
         # Default score is 0 for all clusters

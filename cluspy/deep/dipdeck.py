@@ -10,7 +10,7 @@ from sklearn.base import BaseEstimator, ClusterMixin
 
 
 def _dip_deck(X, n_clusters_start, dip_merge_threshold, cluster_loss_weight, n_clusters_max, n_clusters_min, batch_size,
-              pretrain_learning_rate, dipdeck_learning_rate, pretrain_epochs, dipdeck_epochs, optimizer_class, loss_fn,
+              pretrain_learning_rate, clustering_learning_rate, pretrain_epochs, clustering_epochs, optimizer_class, loss_fn,
               autoencoder, embedding_size, max_cluster_size_diff_factor, debug):
     if n_clusters_max < n_clusters_min:
         raise Exception("n_clusters_max can not be smaller than n_clusters_min")
@@ -49,7 +49,7 @@ def _dip_deck(X, n_clusters_start, dip_merge_threshold, cluster_loss_weight, n_c
     dip_matrix_cpu = _get_dip_matrix(embedded_data, embedded_centers_cpu, cluster_labels_cpu, n_clusters_start,
                                      max_cluster_size_diff_factor)
     # Use DipDECK learning_rate (usually pretrain_learning_rate reduced by a magnitude of 10)
-    optimizer = optimizer_class(autoencoder.parameters(), lr=dipdeck_learning_rate)
+    optimizer = optimizer_class(autoencoder.parameters(), lr=clustering_learning_rate)
     # Start training
     cluster_labels_cpu, n_clusters_current, centers_cpu, autoencoder = _dip_deck_training(X, n_clusters_start,
                                                                                           dip_merge_threshold,
@@ -59,7 +59,7 @@ def _dip_deck(X, n_clusters_start, dip_merge_threshold, cluster_loss_weight, n_c
                                                                                           dip_matrix_cpu,
                                                                                           n_clusters_max,
                                                                                           n_clusters_min,
-                                                                                          dipdeck_epochs,
+                                                                                          clustering_epochs,
                                                                                           optimizer, loss_fn,
                                                                                           autoencoder,
                                                                                           device, trainloader,
@@ -71,10 +71,10 @@ def _dip_deck(X, n_clusters_start, dip_merge_threshold, cluster_loss_weight, n_c
 
 
 def _dip_deck_training(X, n_clusters_current, dip_merge_threshold, cluster_loss_weight, centers_cpu, cluster_labels_cpu,
-                       dip_matrix_cpu, n_clusters_max, n_clusters_min, dipdeck_epochs, optimizer, loss_fn, autoencoder,
+                       dip_matrix_cpu, n_clusters_max, n_clusters_min, clustering_epochs, optimizer, loss_fn, autoencoder,
                        device, trainloader, testloader, max_cluster_size_diff_factor, debug):
     i = 0
-    while i < dipdeck_epochs:
+    while i < clustering_epochs:
         cluster_labels_torch = torch.from_numpy(cluster_labels_cpu).long().to(device)
         centers_torch = torch.from_numpy(centers_cpu).float().to(device)
         dip_matrix_torch = torch.from_numpy(dip_matrix_cpu).float().to(device)
@@ -154,7 +154,7 @@ def _dip_deck_training(X, n_clusters_current, dip_merge_threshold, cluster_loss_
                                     embedded_centers_cpu, max_cluster_size_diff_factor)
             dip_argmax = np.unravel_index(np.argmax(dip_matrix_cpu, axis=None), dip_matrix_cpu.shape)
         # Optional: Force merging of clusters
-        if i == dipdeck_epochs and n_clusters_current > n_clusters_max:
+        if i == clustering_epochs and n_clusters_current > n_clusters_max:
             # Get smallest cluster
             _, cluster_sizes = np.unique(cluster_labels_cpu, return_counts=True)
             smallest_cluster_id = np.argmin(cluster_sizes)
@@ -299,8 +299,8 @@ class _DipDECK_Autoencoder(Simple_Autoencoder):
 class DipDECK(BaseEstimator, ClusterMixin):
 
     def __init__(self, n_clusters_start=35, dip_merge_threshold=0.9, cluster_loss_weight=1, n_clusters_max=np.inf,
-                 n_clusters_min=1, batch_size=256, pretrain_learning_rate=1e-3, dipdeck_learning_rate=1e-4,
-                 pretrain_epochs=100, dipdeck_epochs=50, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(),
+                 n_clusters_min=1, batch_size=256, pretrain_learning_rate=1e-3, clustering_learning_rate=1e-4,
+                 pretrain_epochs=100, clustering_epochs=50, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(),
                  autoencoder=None, embedding_size=5, max_cluster_size_diff_factor=2, debug=False):
         self.n_clusters_start = n_clusters_start
         self.dip_merge_threshold = dip_merge_threshold
@@ -309,9 +309,9 @@ class DipDECK(BaseEstimator, ClusterMixin):
         self.n_clusters_min = n_clusters_min
         self.batch_size = batch_size
         self.pretrain_learning_rate = pretrain_learning_rate
-        self.dipdeck_learning_rate = dipdeck_learning_rate
+        self.clustering_learning_rate = clustering_learning_rate
         self.pretrain_epochs = pretrain_epochs
-        self.dipdeck_epochs = dipdeck_epochs
+        self.clustering_epochs = clustering_epochs
         self.optimizer_class = optimizer_class
         self.loss_fn = loss_fn
         self.autoencoder = autoencoder
@@ -323,8 +323,8 @@ class DipDECK(BaseEstimator, ClusterMixin):
         labels, n_clusters, centers, autoencoder = _dip_deck(X, self.n_clusters_start, self.dip_merge_threshold,
                                                              self.cluster_loss_weight, self.n_clusters_max,
                                                              self.n_clusters_min, self.batch_size,
-                                                             self.pretrain_learning_rate, self.dipdeck_learning_rate,
-                                                             self.pretrain_epochs, self.dipdeck_epochs,
+                                                             self.pretrain_learning_rate, self.clustering_learning_rate,
+                                                             self.pretrain_epochs, self.clustering_epochs,
                                                              self.optimizer_class,
                                                              self.loss_fn, self.autoencoder, self.embedding_size,
                                                              self.max_cluster_size_diff_factor, self.debug)

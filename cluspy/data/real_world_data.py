@@ -615,6 +615,8 @@ def load_ecoli(ignore_small_clusters=False, downloads_path=None):
 def load_htru2(downloads_path=None):
     """
     Load the HTRU2 data set. It consists of 17898 samples belonging to the pulsar or non-pulsar class.
+    A special property is that more than 90% of the data belongs to class 0.
+
     N=17898, d=8, k=2.
 
     Parameters

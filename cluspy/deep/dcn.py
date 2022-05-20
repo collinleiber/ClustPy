@@ -13,7 +13,7 @@ from sklearn.cluster import KMeans
 from sklearn.base import BaseEstimator, ClusterMixin
 
 
-def _dcn(X, n_clusters, batch_size, pretrain_learning_rate, dcn_learning_rate, pretrain_epochs, dcn_epochs,
+def _dcn(X, n_clusters, batch_size, pretrain_learning_rate, clustering_learning_rate, pretrain_epochs, clustering_epochs,
          optimizer_class, loss_fn, autoencoder, embedding_size, degree_of_space_distortion,
          degree_of_space_preservation):
     device = detect_device()
@@ -41,9 +41,9 @@ def _dcn(X, n_clusters, batch_size, pretrain_learning_rate, dcn_learning_rate, p
     # Setup DCN Module
     dcn_module = _DCN_Module(init_centers).to_device(device)
     # Use DCN learning_rate (usually pretrain_learning_rate reduced by a magnitude of 10)
-    optimizer = optimizer_class(list(autoencoder.parameters()), lr=dcn_learning_rate)
+    optimizer = optimizer_class(list(autoencoder.parameters()), lr=clustering_learning_rate)
     # DEC Training loop
-    dcn_module.start_training(autoencoder, trainloader, dcn_epochs, device, optimizer, loss_fn,
+    dcn_module.start_training(autoencoder, trainloader, clustering_epochs, device, optimizer, loss_fn,
                               degree_of_space_distortion, degree_of_space_preservation)
     # Get labels
     dcn_labels = predict_batchwise(testloader, autoencoder, dcn_module, device)
@@ -139,16 +139,16 @@ class _DCN_Module(torch.nn.Module):
 
 class DCN(BaseEstimator, ClusterMixin):
 
-    def __init__(self, n_clusters, batch_size=256, pretrain_learning_rate=1e-3, dcn_learning_rate=1e-4,
-                 pretrain_epochs=100, dcn_epochs=150, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(),
+    def __init__(self, n_clusters, batch_size=256, pretrain_learning_rate=1e-3, clustering_learning_rate=1e-4,
+                 pretrain_epochs=100, clustering_epochs=150, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(),
                  degree_of_space_distortion=0.05, degree_of_space_preservation=1.0, autoencoder=None,
                  embedding_size=10):
         self.n_clusters = n_clusters
         self.batch_size = batch_size
         self.pretrain_learning_rate = pretrain_learning_rate
-        self.dcn_learning_rate = dcn_learning_rate
+        self.clustering_learning_rate = clustering_learning_rate
         self.pretrain_epochs = pretrain_epochs
-        self.dcn_epochs = dcn_epochs
+        self.clustering_epochs = clustering_epochs
         self.optimizer_class = optimizer_class
         self.loss_fn = loss_fn
         self.degree_of_space_distortion = degree_of_space_distortion
@@ -159,9 +159,9 @@ class DCN(BaseEstimator, ClusterMixin):
     def fit(self, X, y=None):
         kmeans_labels, kmeans_centers, dcn_labels, dcn_centers, autoencoder = _dcn(X, self.n_clusters, self.batch_size,
                                                                                    self.pretrain_learning_rate,
-                                                                                   self.dcn_learning_rate,
+                                                                                   self.clustering_learning_rate,
                                                                                    self.pretrain_epochs,
-                                                                                   self.dcn_epochs,
+                                                                                   self.clustering_epochs,
                                                                                    self.optimizer_class, self.loss_fn,
                                                                                    self.autoencoder,
                                                                                    self.embedding_size,

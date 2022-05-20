@@ -13,7 +13,8 @@ from sklearn.mixture import GaussianMixture
 from sklearn.base import BaseEstimator, ClusterMixin
 
 
-def _vade(X, n_clusters, batch_size, pretrain_learning_rate, vade_learning_rate, pretrain_epochs, vade_epochs,
+def _vade(X, n_clusters, batch_size, pretrain_learning_rate, clustering_learning_rate, pretrain_epochs,
+          clustering_epochs,
           optimizer_class, loss_fn, autoencoder, embedding_size):
     device = detect_device()
     trainloader = torch.utils.data.DataLoader(torch.from_numpy(X).float(),
@@ -40,9 +41,9 @@ def _vade(X, n_clusters, batch_size, pretrain_learning_rate, vade_learning_rate,
     vade_module = _VaDE_Module(autoencoder, n_clusters=n_clusters, embedding_size=10, pi=gmm.weights_,
                                mean=gmm.means_, var=gmm.covariances_, device=device).to(device)
     # Use VaDE learning_rate (usually pretrain_learning_rate reduced by a magnitude of 10)f 10
-    optimizer = optimizer_class(vade_module.parameters(), lr=vade_learning_rate)
+    optimizer = optimizer_class(vade_module.parameters(), lr=clustering_learning_rate)
     # Vade Training loop
-    vade_module.start_training(trainloader, vade_epochs, device, optimizer, loss_fn)
+    vade_module.start_training(trainloader, clustering_epochs, device, optimizer, loss_fn)
     # Get labels
     vade_labels = _vade_predict_batchwise(testloader, vade_module, device)
     vade_centers = vade_module.p_mean.detach().cpu().numpy()
@@ -240,15 +241,15 @@ class _VaDE_Module(torch.nn.Module):
 
 
 class VaDE(BaseEstimator, ClusterMixin):
-    def __init__(self, n_clusters, batch_size=256, pretrain_learning_rate=1e-3, vade_learning_rate=1e-4,
-                 pretrain_epochs=100, vade_epochs=150, optimizer_class=torch.optim.Adam,
+    def __init__(self, n_clusters, batch_size=256, pretrain_learning_rate=1e-3, clustering_learning_rate=1e-4,
+                 pretrain_epochs=100, clustering_epochs=150, optimizer_class=torch.optim.Adam,
                  loss_fn=torch.nn.BCELoss(reduction='sum'), autoencoder=None, embedding_size=10):
         self.n_clusters = n_clusters
         self.batch_size = batch_size
         self.pretrain_learning_rate = pretrain_learning_rate
-        self.vade_learning_rate = vade_learning_rate
+        self.clustering_learning_rate = clustering_learning_rate
         self.pretrain_epochs = pretrain_epochs
-        self.vade_epochs = vade_epochs
+        self.clustering_epochs = clustering_epochs
         self.optimizer_class = optimizer_class
         self.loss_fn = loss_fn
         self.autoencoder = autoencoder
@@ -259,9 +260,9 @@ class VaDE(BaseEstimator, ClusterMixin):
                                                                                                                  self.n_clusters,
                                                                                                                  self.batch_size,
                                                                                                                  self.pretrain_learning_rate,
-                                                                                                                 self.vade_learning_rate,
+                                                                                                                 self.clustering_learning_rate,
                                                                                                                  self.pretrain_epochs,
-                                                                                                                 self.vade_epochs,
+                                                                                                                 self.clustering_epochs,
                                                                                                                  self.optimizer_class,
                                                                                                                  self.loss_fn,
                                                                                                                  self.autoencoder,
