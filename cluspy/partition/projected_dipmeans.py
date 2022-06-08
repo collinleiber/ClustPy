@@ -35,7 +35,7 @@ def _proj_dipmeans(X, pval_threshold, n_random_projections, pval_strategy, n_boo
             pval = dip_pval(np.max(cluster_dips), ids_in_cluster.shape[0], pval_strategy=pval_strategy, n_boots=n_boots)
             # Calculate cluster score
             cluster_scores[c] = pval
-        # Get cluster with maximum score
+        # Get cluster with minimum pval
         cluster_id_to_split = np.argmin(cluster_scores)
         # Check if any cluster has to be split
         if cluster_scores[cluster_id_to_split] <= pval_threshold:
@@ -66,7 +66,7 @@ def _get_projected_data(X, n_random_projections):
 
 class ProjectedDipMeans(BaseEstimator, ClusterMixin):
 
-    def __init__(self, pval_threshold=0, n_random_projections=10, pval_strategy="table", n_boots=2000,
+    def __init__(self, pval_threshold=0.01, n_random_projections=10, pval_strategy="table", n_boots=2000,
                  n_new_centers=10, max_n_clusters=np.inf):
         self.pval_threshold = pval_threshold
         self.n_random_projections = n_random_projections

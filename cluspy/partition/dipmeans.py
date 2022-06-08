@@ -88,7 +88,7 @@ def _execute_bisecting_kmeans(X, ids_in_each_cluster, cluster_id_to_split, cente
 
 class DipMeans(BaseEstimator, ClusterMixin):
 
-    def __init__(self, pval_threshold=0, split_viewers_threshold=0.01, pval_strategy="table", n_boots=2000,
+    def __init__(self, pval_threshold=0.01, split_viewers_threshold=0.01, pval_strategy="table", n_boots=2000,
                  n_new_centers=10, max_n_clusters=np.inf):
         self.pval_threshold = pval_threshold
         self.split_viewers_threshold = split_viewers_threshold

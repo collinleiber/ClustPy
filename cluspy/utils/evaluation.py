@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import time
 from cluspy.utils._wrapper_methods import _get_n_clusters_from_algo
+import random
 
 
 def _preprocess_dataset(X, preprocess_methods, preprocess_params):
@@ -33,6 +34,8 @@ def evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=None, gt=None,
         evaluation_algorithms = [evaluation_algorithms]
     if type(evaluation_metrics) is not list and evaluation_metrics is not None:
         evaluation_metrics = [evaluation_metrics]
+    # Use same seed for each algorithm
+    seeds = random.sample(range(1000), repetitions)
     algo_names = [a.name for a in evaluation_algorithms]
     metric_names = [] if evaluation_metrics is None else [m.name for m in evaluation_metrics]
     if add_runtime:
@@ -68,6 +71,9 @@ def evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=None, gt=None,
             # Execute the algorithm multiple times
             for rep in range(repetitions):
                 print("- Iteration {0}".format(rep))
+                # set seed
+                np.random.seed(seeds[rep])
+                # Execute algorithm
                 start_time = time.time()
                 algo_obj = eval_algo.obj(**eval_algo.params)
                 try:

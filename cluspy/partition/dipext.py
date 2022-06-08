@@ -12,20 +12,17 @@ from sklearn.cluster import KMeans
 from sklearn.base import BaseEstimator, ClusterMixin
 
 
-def _dip_ext(X, n_components, do_dip_scaling, step_size, momentum, dip_threshold, n_starting_points_strategy,
+def _dip_ext(X, n_components, do_dip_scaling, step_size, momentum, dip_threshold, n_starting_points,
              check_duplicates):
     assert n_components is None or n_components < X.shape[
         1], "n_components must be None or smaller than the dimensionality of the dataset."
-    assert n_starting_points_strategy is None or callable(n_starting_points_strategy), "n_starting_points_strategy must " \
-                                                                                       "be a function to decide the " \
-                                                                                       "number of starting points for sgd"
     subspace = np.zeros((X.shape[0], 0))
     dip_values = []
     max_dip = 0
     transformed_data = X
     while True:
         dip_value, projection, projected_data = _find_max_dip_by_sgd(transformed_data, step_size, momentum,
-                                                                     n_starting_points_strategy, check_duplicates)
+                                                                     n_starting_points, check_duplicates)
         if dip_value < max_dip * dip_threshold and n_components is None:
             break
         # Always use the highest dip value
@@ -135,18 +132,14 @@ def _calculate_partial_derivative(projection_vector, dim, i1, i2, i3, beta, gamm
 
 
 # Find the axes with log(dim) highest dip values and start the search from there
-def _find_max_dip_by_sgd(X, step_size, momentum, n_starting_points_strategy, check_duplicates):
+def _find_max_dip_by_sgd(X, step_size, momentum, n_starting_points, check_duplicates):
     axis_dips = [dip_test(X[:, i], just_dip=True, is_data_sorted=False) for i in range(X.shape[1])]
     dips_argsorted = np.argsort(axis_dips)[::-1]
     max_dip = axis_dips[dips_argsorted[0]]
     best_projection = np.zeros(X.shape[1])
     best_projection[dips_argsorted[0]] = 1
     best_projected_data = X[:, dips_argsorted[0]]
-    if n_starting_points_strategy is None:
-        n_staring_points = int(np.log(X.shape[1])) + 1
-    else:
-        n_staring_points = n_starting_points_strategy(X.shape[1])
-    for i in range(n_staring_points):
+    for i in range(n_starting_points):
         start_projection = np.zeros(X.shape[1])
         start_projection[dips_argsorted[i]] = 1
         dip_value, projection, projected_data = _find_max_dip_by_sgd_with_start(X, start_projection, step_size,
@@ -213,18 +206,22 @@ def _angle(v, w):
 class DipExt():
 
     def __init__(self, n_components=None, do_dip_scaling=True, step_size=0.1, momentum=0.95, dip_threshold=0.5,
-                 n_starting_points_strategy=None, check_duplicates=False):
+                 n_starting_points=None, check_duplicates=False):
         self.n_components = n_components
         self.do_dip_scaling = do_dip_scaling
         self.step_size = step_size
         self.momentum = momentum
         self.dip_threshold = dip_threshold
-        self.n_starting_points_strategy = n_starting_points_strategy
+        self.n_starting_points = n_starting_points
         self.check_duplicates = check_duplicates
 
     def fit_transform(self, X):
+        if self.n_starting_points is None:
+            n_starting_points = int(np.log(X.shape[1])) + 1
+        else:
+            n_starting_points = self.n_starting_points
         subspace, dip_values = _dip_ext(X, self.n_components, self.do_dip_scaling, self.step_size, self.momentum,
-                                        self.dip_threshold, self.n_starting_points_strategy, self.check_duplicates)
+                                        self.dip_threshold, n_starting_points, self.check_duplicates)
         self.n_components = len(dip_values)
         self.dip_values_ = dip_values
         return subspace
@@ -232,8 +229,8 @@ class DipExt():
 class DipInit(DipExt, BaseEstimator, ClusterMixin):
 
     def __init__(self, n_clusters, n_components=None, do_dip_scaling=True, step_size=0.1, momentum=0.95, dip_threshold=0.5,
-                 n_starting_points_strategy=None, check_duplicates=False):
-        super().__init__(n_components, do_dip_scaling, step_size, momentum, dip_threshold, n_starting_points_strategy,
+                 n_starting_points=None, check_duplicates=False):
+        super().__init__(n_components, do_dip_scaling, step_size, momentum, dip_threshold, n_starting_points,
                          check_duplicates)
         self.n_clusters = n_clusters
 

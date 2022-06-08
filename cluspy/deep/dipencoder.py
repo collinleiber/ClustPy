@@ -132,7 +132,7 @@ def _get_dip_error(dip_module, embedded, j, points_in_m, points_in_n, n_points_i
 def _predict(X_train, X_test, labels_train, projections, n_clusters, index_dict):
     points_in_all_clusters = [np.where(labels_train == clus)[0] for clus in range(n_clusters)]
     n_points_in_all_clusters = [points_in_cluster.shape[0] for points_in_cluster in points_in_all_clusters]
-    labels_pred_matrix = np.ones((X_test.shape[0], n_clusters))
+    labels_pred_matrix = np.zeros((X_test.shape[0], n_clusters))
     for m in range(n_clusters - 1):
         if n_points_in_all_clusters[m] < 4:
             continue
@@ -208,15 +208,13 @@ def _dipmodule(X, n_clusters, embedding_size, batch_size, optimizer_class, loss_
                                               _DipDECK_Autoencoder)
     else:
         autoencoder.to(device)
-
     # Get factor for AE loss
     rand_samples = torch.rand((batch_size, X.shape[1]))
     data_min = np.min(X)
     data_max = np.max(X)
-    rand_samples_resized = rand_samples * (data_max - data_min) + data_min
+    rand_samples_resized = (rand_samples * (data_max - data_min) + data_min).to(device)
     rand_samples_reconstruction = autoencoder.forward(rand_samples_resized)
     ae_factor = loss_fn(rand_samples_reconstruction, rand_samples_resized).detach()
-
     # Create initial projections
     n_cluste_combinations = int((n_clusters - 1) * n_clusters / 2)
     projections = np.zeros((n_cluste_combinations, embedding_size))
@@ -267,11 +265,10 @@ def _dipmodule(X, n_clusters, embedding_size, batch_size, optimizer_class, loss_
             reconstruction = autoencoder.decode(embedded)
             ae_loss_tmp = loss_fn(reconstruction, batch_data)
             ae_loss = ae_loss_tmp / ae_factor / 4
-
+            # Get points within each cluster
             points_in_all_clusters = [torch.where(labels_torch[ids] == clus)[0].to(device) for clus in
                                       range(n_clusters)]
             n_points_in_all_clusters = [points_in_cluster.shape[0] for points_in_cluster in points_in_all_clusters]
-
             dip_loss = torch.tensor(0)
             for m in range(n_clusters - 1):
                 if n_points_in_all_clusters[m] < MIN_NUMBER_OF_POINTS:
@@ -332,8 +329,8 @@ class DipEncoder(BaseEstimator, ClusterMixin):
                                                                          self.pretrain_learning_rate, self.autoencoder,
                                                                          y, self.debug)
         self.labels_ = labels
-        self.projection_vecotrs = projection_vecotrs
-        self.index_dict = index_dict
+        self.projection_vecotrs_ = projection_vecotrs
+        self.index_dict_ = index_dict
         self.autoencoder = autoencoder
         return self
 
@@ -351,5 +348,5 @@ class DipEncoder(BaseEstimator, ClusterMixin):
         device = detect_device()
         X_train = encode_batchwise(testloader, self.autoencoder, device)
         X_test = encode_batchwise(testloader_supervised, self.autoencoder, device)
-        labels_pred = _predict(X_train, X_test, self.labels, self.projection_vecotrs, self.n_clusters, self.index_dict)
+        labels_pred = _predict(X_train, X_test, self.labels_, self.projection_vecotrs_, self.n_clusters, self.index_dict_)
         return labels_pred
