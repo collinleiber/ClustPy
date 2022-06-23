@@ -100,9 +100,9 @@ class Simple_Autoencoder(torch.nn.Module):
 
     def start_training(self, trainloader, n_epochs, device, optimizer, loss_fn):
         for _ in range(n_epochs):
-            for _, batch in trainloader:
+            for batch in trainloader:
                 # load batch on device
-                batch_data = batch.to(device)
+                batch_data = batch[1].to(device)
                 reconstruction = self.forward(batch_data)
                 loss = loss_fn(reconstruction, batch_data)
                 # reset gradients from last iteration

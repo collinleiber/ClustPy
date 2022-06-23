@@ -149,7 +149,7 @@ class FlexibleAutoencoder(torch.nn.Module):
             self.eval()
             loss = 0
             for batch in dataloader:
-                batch = batch[0].to(device)
+                batch = batch[1].to(device)
                 reconstruction = self(batch)
                 loss += loss_fn(reconstruction, batch)
             loss /= len(dataloader)
@@ -214,7 +214,7 @@ class FlexibleAutoencoder(torch.nn.Module):
         for epoch_i in range(n_epochs):
             self.train()
             for batch in dataloader:
-                batch = batch[0].to(device)
+                batch = batch[1].to(device)
                 reconstruction = self(batch)
                 loss = loss_fn(reconstruction, batch)
                 optimizer.zero_grad()

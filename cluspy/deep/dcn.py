@@ -89,8 +89,8 @@ class _DCN_Module(torch.nn.Module):
         count = torch.ones(self.centers.shape[0], dtype=torch.int32) * 100
         for _ in range(n_epochs):
             # Update Network
-            for _, batch in trainloader:
-                batch_data = batch.to(device)
+            for batch in trainloader:
+                batch_data = batch[1].to(device)
                 embedded = autoencoder.encode(batch_data)
                 reconstruction = autoencoder.decode(embedded)
 
@@ -106,8 +106,8 @@ class _DCN_Module(torch.nn.Module):
                 optimizer.step()
             # Update Assignments and Centroids
             with torch.no_grad():
-                for _, batch in trainloader:
-                    batch_data = batch.to(device)
+                for batch in trainloader:
+                    batch_data = batch[1].to(device)
                     embedded = autoencoder.encode(batch_data)
 
                     ## update centroids [on gpu] About 40 seconds for 1000 iterations
