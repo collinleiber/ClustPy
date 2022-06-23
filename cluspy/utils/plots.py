@@ -35,7 +35,7 @@ def plot_with_transformation(X, labels=None, centers=None, true_labels=None, plo
         unique_true_labels = np.unique(true_labels)
     if plot_dimensionality == 1:
         # 1d Plot
-        plot_1d_data(X, labels=labels, centers=centers)
+        plot_1d_data(X, labels=labels, centers=centers, true_labels=true_labels)
     elif plot_dimensionality == 2:
         # 2d Plot
         if true_labels is None:
@@ -79,14 +79,16 @@ def plot_with_transformation(X, labels=None, centers=None, true_labels=None, plo
                             equal_axis=equal_axis)
 
 
-def plot_1d_data(X, labels=None, centers=None):
+def plot_1d_data(X, labels=None, centers=None, true_labels=None):
     assert X.ndim == 1 or X.shape[1] == 1, "Data must be 1-dimensional"
     assert centers is None or centers.ndim == 1 or centers.shape[1] == 1, "Centers must be 1-dimensional"
     # Optional: Get first column of data
     if X.ndim == 2:
         X = X[:, 0]
     # fig, ax = plt.subplots(figsize=figsize)
-    plt.hlines(1, np.min(X), np.max(X))  # Draw a horizontal line
+    min_value = np.min(X)
+    max_value = np.max(X)
+    plt.hlines(1, min_value, max_value)  # Draw a horizontal line
     y = np.ones(len(X))
     plt.scatter(X, y, marker='|', s=500, c=labels)  # Plot a line at each location specified in X
     if centers is not None:
@@ -101,6 +103,10 @@ def plot_1d_data(X, labels=None, centers=None):
         for j in range(len(centers)):
             yt = 1.0005 if centers_order[j] % 2 == 0 else 0.9994
             plt.text(centers[j], yt, str(j), weight="bold")
+    if true_labels is not None:
+        plt.hlines(1.001, min_value, max_value)
+        y_true = np.ones(len(X)) * 1.001
+        plt.scatter(X, y_true, marker='|', s=500, c=true_labels)
     plt.show()
 
 

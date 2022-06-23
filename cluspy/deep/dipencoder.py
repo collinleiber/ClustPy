@@ -1,11 +1,11 @@
 from sklearn.base import BaseEstimator, ClusterMixin
 from sklearn.cluster import KMeans
 from cluspy.utils import dip_test
-from cluspy.deep.dipdeck import _DipDECK_Autoencoder
 import torch
 import numpy as np
 from cluspy.partition.skinnydip import _dip_mirrored_data
-from cluspy.deep._utils import detect_device, encode_batchwise, get_trained_autoencoder
+from cluspy.deep._utils import detect_device, encode_batchwise, get_trained_autoencoder, get_dataloader
+from cluspy.deep.simple_autoencoder import Simple_Autoencoder
 
 """
 Dip module - holds backward functions
@@ -52,9 +52,9 @@ class _Dip_Gradient(torch.autograd.Function):
                 projection_vector.shape).to(device)
         # Grad_output equals gradient of outer operations. Update grad_output to consider dip
         if grad_output > 0:
-            grad_output = grad_output * dip_value
+            grad_output = grad_output * dip_value * 4
         else:
-            grad_output = grad_output * (0.25 - dip_value)
+            grad_output = grad_output * (0.25 - dip_value) * 4
         # Calculate the partial derivative for all dimensions
         data_index_i1, data_index_i2, data_index_i3 = sortedIndices[modal_triangle]
         # Get A and c
@@ -183,38 +183,39 @@ def _predict(X_train, X_test, labels_train, projections, n_clusters, index_dict)
     return labels_pred
 
 
+def _get_lambda(trainloader, autoencoder_class, input_dim, embedding_size, loss_fn, device):
+    autoencoder = autoencoder_class(input_dim=input_dim, embedding_size=embedding_size).to(device)
+    batch_init = next(iter(trainloader))[1]
+    batch_init = batch_init.to(device)
+    reconstruction = autoencoder.forward(batch_init)
+    ae_loss = loss_fn(reconstruction, batch_init).detach()
+    return ae_loss
+
+
 def _dipmodule(X, n_clusters, embedding_size, batch_size, optimizer_class, loss_fn, clustering_epochs,
-               clustering_learning_rate, pretrain_epochs, pretrain_learning_rate, autoencoder=None,
-               labels_gt=None, debug=False):
+               clustering_learning_rate, pretrain_batch_size, pretrain_epochs, pretrain_learning_rate, autoencoder,
+               labels_gt, debug):
     MIN_NUMBER_OF_POINTS = 10
     # Deep Learning stuff
     device = detect_device()
-    trainloader = torch.utils.data.DataLoader(
-        torch.utils.data.TensorDataset(*(torch.from_numpy(X).float(), torch.arange(0, X.shape[0]))),
-        batch_size=batch_size,
-        # sample random mini-batches from the data
-        shuffle=True,
-        drop_last=False)
-    # create a Dataloader to test the autoencoder in mini-batch fashion (Important for validation)
-    testloader = torch.utils.data.DataLoader(torch.from_numpy(X).float(),
-                                             batch_size=batch_size,
-                                             # Note that we deactivate the shuffling
-                                             shuffle=False,
-                                             drop_last=False)
+    # sample random mini-batches from the data -> shuffle = True
+    trainloader = get_dataloader(X, batch_size, True, False)
+    testloader = get_dataloader(X, batch_size, False, False)
     # Get initial AE
     if autoencoder is None:
-        autoencoder = get_trained_autoencoder(trainloader, pretrain_learning_rate, pretrain_epochs, device,
-                                              optimizer_class, loss_fn, X.shape[1], embedding_size,
-                                              _DipDECK_Autoencoder)
+        pretrain_trainloader = get_dataloader(X, pretrain_batch_size, True, False)
+        autoencoder = get_trained_autoencoder(pretrain_trainloader, pretrain_learning_rate, pretrain_epochs, device,
+                                              optimizer_class, loss_fn, X.shape[1], embedding_size)
     else:
         autoencoder.to(device)
     # Get factor for AE loss
-    rand_samples = torch.rand((batch_size, X.shape[1]))
-    data_min = np.min(X)
-    data_max = np.max(X)
-    rand_samples_resized = (rand_samples * (data_max - data_min) + data_min).to(device)
-    rand_samples_reconstruction = autoencoder.forward(rand_samples_resized)
-    ae_factor = loss_fn(rand_samples_reconstruction, rand_samples_resized).detach()
+    # rand_samples = torch.rand((batch_size, X.shape[1]))
+    # data_min = np.min(X)
+    # data_max = np.max(X)
+    # rand_samples_resized = (rand_samples * (data_max - data_min) + data_min).to(device)
+    # rand_samples_reconstruction = autoencoder.forward(rand_samples_resized)
+    # ae_factor = loss_fn(rand_samples_reconstruction, rand_samples_resized).detach()
+    ae_factor = _get_lambda(trainloader, Simple_Autoencoder, X.shape[1], embedding_size, loss_fn, device)
     # Create initial projections
     n_cluste_combinations = int((n_clusters - 1) * n_clusters / 2)
     projections = np.zeros((n_cluste_combinations, embedding_size))
@@ -258,7 +259,7 @@ def _dipmodule(X, n_clusters, embedding_size, batch_size, optimizer_class, loss_
         if debug:
             print("iteration:", iteration, "/", clustering_epochs)
             losses = []
-        for batch, ids in trainloader:
+        for ids, batch in trainloader:
             batch_data = batch.to(device)
             embedded = autoencoder.encode(batch_data)
             # Reconstruction Loss
@@ -301,12 +302,14 @@ DipEncoder
 
 class DipEncoder(BaseEstimator, ClusterMixin):
 
-    def __init__(self, n_clusters, batch_size=None, pretrain_learning_rate=1e-3, clustering_learning_rate=1e-4,
-                 pretrain_epochs=100, clustering_epochs=100, optimizer_class=torch.optim.Adam,
-                 loss_fn=torch.nn.MSELoss(), autoencoder=None, embedding_size=10, debug=False):
+    def __init__(self, n_clusters, pretrain_batch_size=256, batch_size=None, pretrain_learning_rate=1e-3,
+                 clustering_learning_rate=1e-4, pretrain_epochs=100, clustering_epochs=100,
+                 optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(), autoencoder=None, embedding_size=10,
+                 debug=False):
         self.n_clusters = n_clusters
+        self.pretrain_batch_size = pretrain_batch_size
         if batch_size is None:
-            batch_size = 30 * n_clusters
+            batch_size = 25 * n_clusters
         self.batch_size = batch_size
         self.pretrain_learning_rate = pretrain_learning_rate
         self.clustering_learning_rate = clustering_learning_rate
@@ -321,32 +324,26 @@ class DipEncoder(BaseEstimator, ClusterMixin):
     def fit(self, X, y=None):
         if y is not None:
             assert len(np.unique(y)) == self.n_clusters, "n_clusters must match number of unique labels in y."
-        labels, autoencoder, projection_vecotrs, index_dict = _dipmodule(X, self.n_clusters, self.embedding_size,
+        labels, autoencoder, projection_vectors, index_dict = _dipmodule(X, self.n_clusters, self.embedding_size,
                                                                          self.batch_size, self.optimizer_class,
                                                                          self.loss_fn, self.clustering_epochs,
                                                                          self.clustering_learning_rate,
+                                                                         self.pretrain_batch_size,
                                                                          self.pretrain_epochs,
                                                                          self.pretrain_learning_rate, self.autoencoder,
                                                                          y, self.debug)
         self.labels_ = labels
-        self.projection_vecotrs_ = projection_vecotrs
+        self.projection_vectors_ = projection_vectors
         self.index_dict_ = index_dict
         self.autoencoder = autoencoder
         return self
 
     def predict(self, X, X_test):
-        testloader = torch.utils.data.DataLoader(torch.from_numpy(X).float(),
-                                                 batch_size=self.batch_size,
-                                                 # Note that we deactivate the shuffling
-                                                 shuffle=False,
-                                                 drop_last=False)
-        testloader_supervised = torch.utils.data.DataLoader(torch.from_numpy(X_test).float(),
-                                                            batch_size=self.batch_size,
-                                                            # Note that we deactivate the shuffling
-                                                            shuffle=False,
-                                                            drop_last=False)
+        testloader = get_dataloader(X, self.batch_size, False, False)
+        testloader_supervised = get_dataloader(X_test, self.batch_size, False, False)
         device = detect_device()
         X_train = encode_batchwise(testloader, self.autoencoder, device)
         X_test = encode_batchwise(testloader_supervised, self.autoencoder, device)
-        labels_pred = _predict(X_train, X_test, self.labels_, self.projection_vecotrs_, self.n_clusters, self.index_dict_)
+        labels_pred = _predict(X_train, X_test, self.labels_, self.projection_vectors_, self.n_clusters,
+                               self.index_dict_)
         return labels_pred

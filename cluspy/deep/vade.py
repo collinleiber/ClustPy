@@ -7,27 +7,17 @@ preprint arXiv:1611.05148 (2016).
 """
 
 import torch
-from cluspy.deep._utils import detect_device, get_trained_autoencoder
+from cluspy.deep._utils import detect_device, get_trained_autoencoder, get_dataloader
 import numpy as np
 from sklearn.mixture import GaussianMixture
 from sklearn.base import BaseEstimator, ClusterMixin
 
 
 def _vade(X, n_clusters, batch_size, pretrain_learning_rate, clustering_learning_rate, pretrain_epochs,
-          clustering_epochs,
-          optimizer_class, loss_fn, autoencoder, embedding_size):
+          clustering_epochs, optimizer_class, loss_fn, autoencoder, embedding_size):
     device = detect_device()
-    trainloader = torch.utils.data.DataLoader(torch.from_numpy(X).float(),
-                                              batch_size=batch_size,
-                                              # sample random mini-batches from the data
-                                              shuffle=True,
-                                              drop_last=False)
-    # create a Dataloader to test the autoencoder in mini-batch fashion (Important for validation)
-    testloader = torch.utils.data.DataLoader(torch.from_numpy(X).float(),
-                                             batch_size=batch_size,
-                                             # Note that we deactivate the shuffling
-                                             shuffle=False,
-                                             drop_last=False)
+    trainloader = get_dataloader(X, batch_size, True, False)
+    testloader = get_dataloader(X, batch_size, False, False)
     if autoencoder is None:
         autoencoder = get_trained_autoencoder(trainloader, pretrain_learning_rate, pretrain_epochs, device,
                                               optimizer_class, loss_fn, X.shape[1], embedding_size, _Vade_Autoencoder)
@@ -38,7 +28,7 @@ def _vade(X, n_clusters, batch_size, pretrain_learning_rate, clustering_learning
     gmm = GaussianMixture(n_components=n_clusters, covariance_type='diag', n_init=100)
     gmm.fit(embedded_data)
     # Initialize VaDE
-    vade_module = _VaDE_Module(autoencoder, n_clusters=n_clusters, embedding_size=10, pi=gmm.weights_,
+    vade_module = _VaDE_Module(autoencoder, n_clusters=n_clusters, embedding_size=embedding_size, pi=gmm.weights_,
                                mean=gmm.means_, var=gmm.covariances_, device=device).to(device)
     # Use VaDE learning_rate (usually pretrain_learning_rate reduced by a magnitude of 10)f 10
     optimizer = optimizer_class(vade_module.parameters(), lr=clustering_learning_rate)
@@ -98,7 +88,7 @@ def _vade_predict_batchwise(dataloader, vade_module, device):
     """ Utility function for predicting the cluster labels over the whole data set in a mini-batch fashion
     """
     predictions = []
-    for batch in dataloader:
+    for _, batch in dataloader:
         batch_data = batch.to(device)
         q_mean, q_var = vade_module.encode(batch_data)
         prediction = vade_module.predict(q_mean, q_var).detach().cpu()
@@ -110,7 +100,7 @@ def _vade_encode_batchwise(dataloader, model, device):
     """ Utility function for embedding the whole data set in a mini-batch fashion
     """
     embeddings = []
-    for batch in dataloader:
+    for _, batch in dataloader:
         batch_data = batch.to(device)
         q_mean, q_var = model.encode(batch_data)
         embeddings.append(q_mean.detach().cpu())
@@ -166,7 +156,7 @@ class _Vade_Autoencoder(torch.nn.Module):
         # training loop
         for _ in range(n_epochs):
             self.train()
-            for batch in trainloader:
+            for _, batch in trainloader:
                 # load batch on device
                 batch_data = batch.to(device)
                 q_mean, reconstruction = self.forward(batch_data)
@@ -228,7 +218,7 @@ class _VaDE_Module(torch.nn.Module):
         # training loop
         for _ in range(n_epochs):
             self.train()
-            for batch in trainloader:
+            for _, batch in trainloader:
                 # load batch on device
                 batch_data = batch.to(device)
 

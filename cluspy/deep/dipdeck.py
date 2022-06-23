@@ -3,15 +3,14 @@ import numpy as np
 from cluspy.utils import dip_test, dip_pval
 import torch
 from cluspy.deep._utils import detect_device, encode_batchwise, \
-    squared_euclidean_distance, int_to_one_hot, get_trained_autoencoder
-from .simple_autoencoder import Simple_Autoencoder
+    squared_euclidean_distance, int_to_one_hot, get_trained_autoencoder, get_dataloader
 from sklearn.cluster import KMeans
 from sklearn.base import BaseEstimator, ClusterMixin
 
 
 def _dip_deck(X, n_clusters_start, dip_merge_threshold, cluster_loss_weight, n_clusters_max, n_clusters_min, batch_size,
-              pretrain_learning_rate, clustering_learning_rate, pretrain_epochs, clustering_epochs, optimizer_class, loss_fn,
-              autoencoder, embedding_size, max_cluster_size_diff_factor, debug):
+              pretrain_learning_rate, clustering_learning_rate, pretrain_epochs, clustering_epochs, optimizer_class,
+              loss_fn, autoencoder, embedding_size, max_cluster_size_diff_factor, debug):
     if n_clusters_max < n_clusters_min:
         raise Exception("n_clusters_max can not be smaller than n_clusters_min")
     if n_clusters_min <= 0:
@@ -19,22 +18,11 @@ def _dip_deck(X, n_clusters_start, dip_merge_threshold, cluster_loss_weight, n_c
     if n_clusters_start < n_clusters_min:
         raise Exception("n_clusters can not be smaller than n_clusters_min")
     device = detect_device()
-    trainloader = torch.utils.data.DataLoader(
-        torch.utils.data.TensorDataset(*(torch.from_numpy(X).float(), torch.arange(0, X.shape[0]))),
-        batch_size=batch_size,
-        # sample random mini-batches from the data
-        shuffle=True,
-        drop_last=False)
-    # create a Dataloader to test the autoencoder in mini-batch fashion (Important for validation)
-    testloader = torch.utils.data.DataLoader(torch.from_numpy(X).float(),
-                                             batch_size=batch_size,
-                                             # Note that we deactivate the shuffling
-                                             shuffle=False,
-                                             drop_last=False)
+    trainloader = get_dataloader(X, batch_size, True, False)
+    testloader = get_dataloader(X, batch_size, False, False)
     if autoencoder is None:
         autoencoder = get_trained_autoencoder(trainloader, pretrain_learning_rate, pretrain_epochs, device,
-                                              optimizer_class, loss_fn, X.shape[1], embedding_size,
-                                              _DipDECK_Autoencoder)
+                                              optimizer_class, loss_fn, X.shape[1], embedding_size)
     else:
         autoencoder.to(device)
     # Execute kmeans in embedded space - initial clustering
@@ -71,8 +59,8 @@ def _dip_deck(X, n_clusters_start, dip_merge_threshold, cluster_loss_weight, n_c
 
 
 def _dip_deck_training(X, n_clusters_current, dip_merge_threshold, cluster_loss_weight, centers_cpu, cluster_labels_cpu,
-                       dip_matrix_cpu, n_clusters_max, n_clusters_min, clustering_epochs, optimizer, loss_fn, autoencoder,
-                       device, trainloader, testloader, max_cluster_size_diff_factor, debug):
+                       dip_matrix_cpu, n_clusters_max, n_clusters_min, clustering_epochs, optimizer, loss_fn,
+                       autoencoder, device, trainloader, testloader, max_cluster_size_diff_factor, debug):
     i = 0
     while i < clustering_epochs:
         cluster_labels_torch = torch.from_numpy(cluster_labels_cpu).long().to(device)
@@ -82,7 +70,7 @@ def _dip_deck_training(X, n_clusters_current, dip_merge_threshold, cluster_loss_
         dip_matrix_eye = dip_matrix_torch + torch.eye(n_clusters_current, device=device)
         dip_matrix_final = dip_matrix_eye / dip_matrix_eye.sum(1).reshape((-1, 1))
         # Iterate over batches
-        for batch, ids in trainloader:
+        for ids, batch in trainloader:
             batch_data = batch.to(device)
             embedded = autoencoder.encode(batch_data)
             reconstruction = autoencoder.decode(embedded)
@@ -279,29 +267,13 @@ def _get_dip_matrix(data, dip_centers, dip_labels, n_clusters, max_cluster_size_
     return dip_matrix
 
 
-class _DipDECK_Autoencoder(Simple_Autoencoder):
-
-    def start_training(self, trainloader, n_epochs, device, optimizer, loss_fn):
-        for _ in range(n_epochs):
-            for batch, _ in trainloader:
-                # load batch on device
-                batch_data = batch.to(device)
-                reconstruction = self.forward(batch_data)
-                loss = loss_fn(reconstruction, batch_data)
-                # reset gradients from last iteration
-                optimizer.zero_grad()
-                # calculate gradients and reset the computation graph
-                loss.backward()
-                # update the internal params (weights, etc.)
-                optimizer.step()
-
-
 class DipDECK(BaseEstimator, ClusterMixin):
 
     def __init__(self, n_clusters_start=35, dip_merge_threshold=0.9, cluster_loss_weight=1, n_clusters_max=np.inf,
                  n_clusters_min=1, batch_size=256, pretrain_learning_rate=1e-3, clustering_learning_rate=1e-4,
-                 pretrain_epochs=100, clustering_epochs=50, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(),
-                 autoencoder=None, embedding_size=5, max_cluster_size_diff_factor=2, debug=False):
+                 pretrain_epochs=100, clustering_epochs=50, optimizer_class=torch.optim.Adam,
+                 loss_fn=torch.nn.MSELoss(), autoencoder=None, embedding_size=5, max_cluster_size_diff_factor=2,
+                 debug=False):
         self.n_clusters_start = n_clusters_start
         self.dip_merge_threshold = dip_merge_threshold
         self.cluster_loss_weight = cluster_loss_weight
