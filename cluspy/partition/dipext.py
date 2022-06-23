@@ -72,7 +72,7 @@ def _dip_init(subspace, n_clusters):
 
 
 def _dip_gradient(X, projection_vector, check_duplicates):
-    projection_vector = projection_vector / np.linalg.norm(projection_vector)  ## Unit vector to start
+    # projection_vector = projection_vector / np.linalg.norm(projection_vector)  ## Unit vector to start
 
     ## Project (making a univariate sample)
     projected_data = np.matmul(X, projection_vector)
@@ -188,7 +188,7 @@ def _find_max_dip_by_sgd_with_start(X, start_projection, step_size, momentum, ch
         direction = momentum * direction + step_size * gradient
         new_projection = projection + direction
         new_angle = _angle(projection, new_projection)
-        projection = new_projection
+        projection = new_projection / np.linalg.norm(new_projection)
         if np.isnan(new_angle):
             print("Angle is NaN")
             new_angle = 0.1
@@ -199,8 +199,17 @@ def _find_max_dip_by_sgd_with_start(X, start_projection, step_size, momentum, ch
 
 
 def _angle(v, w):
-    theta = np.arccos(v.dot(w) / (np.linalg.norm(v, ord=2) * np.linalg.norm(w, ord=2)))
-    return theta * 180 / np.pi
+    quotient = np.linalg.norm(v, ord=2) * np.linalg.norm(w, ord=2)
+    if quotient != 0:
+        a = v.dot(w) / quotient
+        if a > 1:
+            a = 1
+        if a < -1:
+            a = -1
+        theta = np.arccos(a)
+    else:
+        theta = 0
+    return 180 * theta / np.pi
 
 
 class DipExt():

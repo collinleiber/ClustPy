@@ -917,6 +917,7 @@ def load_user_knowledge(subset="all", downloads_path=None):
     # Transform labels
     LE = LabelEncoder()
     labels = LE.fit_transform(labels_raw)
+    data = np.array(data, dtype=np.float64)
     return data, labels
 
 

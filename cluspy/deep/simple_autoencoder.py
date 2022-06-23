@@ -100,7 +100,7 @@ class Simple_Autoencoder(torch.nn.Module):
 
     def start_training(self, trainloader, n_epochs, device, optimizer, loss_fn):
         for _ in range(n_epochs):
-            for batch in trainloader:
+            for _, batch in trainloader:
                 # load batch on device
                 batch_data = batch.to(device)
                 reconstruction = self.forward(batch_data)

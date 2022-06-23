@@ -378,6 +378,12 @@ def _get_cost_function_of_subspace(cropped_V, scatter_matrices_subspace):
                               cropped_V))
 
 
+def _get_total_cost_function(V, P, scatter_matrices):
+    costs = np.sum(
+        [_get_cost_function_of_subspace(V[:, P[i]], scatter) for i, scatter in enumerate(scatter_matrices)])
+    return costs
+
+
 def _create_full_rotation_matrix(dimensionality, P_combined, V_C):
     """
     Create full rotation matrix out of the found eigenvectors. Set diagonal to 1 and overwrite columns and rows with
@@ -470,7 +476,8 @@ def _are_labels_equal(labels_new, labels_old):
     """
     if labels_new is None or labels_old is None or labels_new.shape[1] != labels_old.shape[1]:
         return False
-    return all([nmi(labels_new[:, i], labels_old[:, i], average_method="arithmetic") == 1 for i in range(labels_new.shape[1])])
+    return all(
+        [nmi(labels_new[:, i], labels_old[:, i], average_method="arithmetic") == 1 for i in range(labels_new.shape[1])])
 
 
 """
@@ -850,7 +857,7 @@ class NrKmeans(BaseEstimator, ClusterMixin):
 
     def have_clusters_been_lost(self):
         """
-        Check whether clusters within a subspace_nr have been lost during Nr-Kmeans execution.
+        Check whether clusters within any subspace have been lost during Nr-Kmeans execution.
         Will also return true if subspaces have been lost (check have_subspaces_been_lost())
         :return: True if at least one cluster has been lost
         """
@@ -909,6 +916,5 @@ class NrKmeans(BaseEstimator, ClusterMixin):
         """
         if self.labels_ is None:
             raise Exception("The NrKmeans algorithm has not run yet. Use the fit() function first.")
-        costs = np.sum(
-            [_get_cost_function_of_subspace(self.V[:, self.P[i]], s) for i, s in enumerate(self.scatter_matrices_)])
+        costs = _get_total_cost_function(self.V, self.P, self.scatter_matrices_)
         return costs

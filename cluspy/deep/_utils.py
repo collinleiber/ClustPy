@@ -63,11 +63,24 @@ def detect_device():
     return device
 
 
+def get_dataloader(X, batch_size, shuffle=True, drop_last=False, additional_input=None):
+    dataloader_input = [torch.arange(0, X.shape[0]), torch.from_numpy(X).float()]
+    if additional_input is not None:
+        dataloader_input += [torch.from_numpy(input).float() for input in additional_input]
+    # Create dataloader
+    dataloader = torch.utils.data.DataLoader(
+        torch.utils.data.TensorDataset(*dataloader_input),
+        batch_size=batch_size,
+        shuffle=shuffle,
+        drop_last=drop_last)
+    return dataloader
+
+
 def encode_batchwise(dataloader, model, device):
     """ Utility function for embedding the whole data set in a mini-batch fashion
     """
     embeddings = []
-    for batch in dataloader:
+    for _, batch in dataloader:
         batch_data = batch.to(device)
         embeddings.append(model.encode(batch_data).detach().cpu())
     return torch.cat(embeddings, dim=0).numpy()
@@ -77,7 +90,7 @@ def predict_batchwise(dataloader, model, cluster_module, device):
     """ Utility function for predicting the cluster labels over the whole data set in a mini-batch fashion
     """
     predictions = []
-    for batch in dataloader:
+    for _, batch in dataloader:
         batch_data = batch.to(device)
         prediction = cluster_module.prediction_hard(model.encode(batch_data)).detach().cpu()
         predictions.append(prediction)
@@ -85,8 +98,8 @@ def predict_batchwise(dataloader, model, cluster_module, device):
 
 
 def window(seq, n):
-    "Returns a sliding window (of width n) over data from the iterable"
-    "   s -> (s0,s1,...s[n-1]), (s1,s2,...,sn), ...                   "
+    """Returns a sliding window (of width n) over data from the following iterable:
+       s -> (s0,s1,...s[n-1]), (s1,s2,...,sn), ..."""
     it = iter(seq)
     result = tuple(islice(it, n))
     if len(result) == n:

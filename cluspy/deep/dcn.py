@@ -7,27 +7,18 @@ conference on machine learning. PMLR, 2017.
 """
 
 from cluspy.deep._utils import detect_device, get_trained_autoencoder, encode_batchwise, \
-    squared_euclidean_distance, predict_batchwise
+    squared_euclidean_distance, predict_batchwise, get_dataloader
 import torch
 from sklearn.cluster import KMeans
 from sklearn.base import BaseEstimator, ClusterMixin
 
 
-def _dcn(X, n_clusters, batch_size, pretrain_learning_rate, clustering_learning_rate, pretrain_epochs, clustering_epochs,
-         optimizer_class, loss_fn, autoencoder, embedding_size, degree_of_space_distortion,
+def _dcn(X, n_clusters, batch_size, pretrain_learning_rate, clustering_learning_rate, pretrain_epochs,
+         clustering_epochs, optimizer_class, loss_fn, autoencoder, embedding_size, degree_of_space_distortion,
          degree_of_space_preservation):
     device = detect_device()
-    trainloader = torch.utils.data.DataLoader(torch.from_numpy(X).float(),
-                                              batch_size=batch_size,
-                                              # sample random mini-batches from the data
-                                              shuffle=True,
-                                              drop_last=False)
-    # create a Dataloader to test the autoencoder in mini-batch fashion (Important for validation)
-    testloader = torch.utils.data.DataLoader(torch.from_numpy(X).float(),
-                                             batch_size=batch_size,
-                                             # Note that we deactivate the shuffling
-                                             shuffle=False,
-                                             drop_last=False)
+    trainloader = get_dataloader(X, batch_size, True, False)
+    testloader = get_dataloader(X, batch_size, False, False)
     if autoencoder is None:
         autoencoder = get_trained_autoencoder(trainloader, pretrain_learning_rate, pretrain_epochs, device,
                                               optimizer_class, loss_fn, X.shape[1], embedding_size)
@@ -98,7 +89,7 @@ class _DCN_Module(torch.nn.Module):
         count = torch.ones(self.centers.shape[0], dtype=torch.int32) * 100
         for _ in range(n_epochs):
             # Update Network
-            for batch in trainloader:
+            for _, batch in trainloader:
                 batch_data = batch.to(device)
                 embedded = autoencoder.encode(batch_data)
                 reconstruction = autoencoder.decode(embedded)
@@ -115,7 +106,7 @@ class _DCN_Module(torch.nn.Module):
                 optimizer.step()
             # Update Assignments and Centroids
             with torch.no_grad():
-                for batch in trainloader:
+                for _, batch in trainloader:
                     batch_data = batch.to(device)
                     embedded = autoencoder.encode(batch_data)
 
@@ -140,9 +131,9 @@ class _DCN_Module(torch.nn.Module):
 class DCN(BaseEstimator, ClusterMixin):
 
     def __init__(self, n_clusters, batch_size=256, pretrain_learning_rate=1e-3, clustering_learning_rate=1e-4,
-                 pretrain_epochs=100, clustering_epochs=150, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(),
-                 degree_of_space_distortion=0.05, degree_of_space_preservation=1.0, autoencoder=None,
-                 embedding_size=10):
+                 pretrain_epochs=100, clustering_epochs=150, optimizer_class=torch.optim.Adam,
+                 loss_fn=torch.nn.MSELoss(), degree_of_space_distortion=0.05, degree_of_space_preservation=1.0,
+                 autoencoder=None, embedding_size=10):
         self.n_clusters = n_clusters
         self.batch_size = batch_size
         self.pretrain_learning_rate = pretrain_learning_rate

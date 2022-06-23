@@ -3,7 +3,7 @@
 """
 
 from cluspy.deep._utils import detect_device, get_trained_autoencoder, encode_batchwise, \
-    squared_euclidean_distance, predict_batchwise
+    squared_euclidean_distance, predict_batchwise, get_dataloader
 import torch
 from sklearn.cluster import KMeans
 from sklearn.base import BaseEstimator, ClusterMixin
@@ -13,17 +13,8 @@ def _dec(X, n_clusters, alpha, batch_size, pretrain_learning_rate, clustering_le
          clustering_epochs,  optimizer_class, loss_fn, autoencoder, embedding_size, use_reconstruction_loss,
          cluster_loss_weight):
     device = detect_device()
-    trainloader = torch.utils.data.DataLoader(torch.from_numpy(X).float(),
-                                              batch_size=batch_size,
-                                              # sample random mini-batches from the data
-                                              shuffle=True,
-                                              drop_last=False)
-    # create a Dataloader to test the autoencoder in mini-batch fashion (Important for validation)
-    testloader = torch.utils.data.DataLoader(torch.from_numpy(X).float(),
-                                             batch_size=batch_size,
-                                             # Note that we deactivate the shuffling
-                                             shuffle=False,
-                                             drop_last=False)
+    trainloader = get_dataloader(X, batch_size, True, False)
+    testloader = get_dataloader(X, batch_size, False, False)
     if autoencoder is None:
         autoencoder = get_trained_autoencoder(trainloader, pretrain_learning_rate, pretrain_epochs, device,
                                               optimizer_class, loss_fn, X.shape[1], embedding_size)
@@ -98,7 +89,7 @@ class _DEC_Module(torch.nn.Module):
     def start_training(self, autoencoder, trainloader, n_epochs, device, optimizer, loss_fn, use_reconstruction_loss,
                        cluster_loss_weight):
         for _ in range(n_epochs):
-            for batch in trainloader:
+            for _, batch in trainloader:
                 batch_data = batch.to(device)
                 embedded = autoencoder.encode(batch_data)
 
