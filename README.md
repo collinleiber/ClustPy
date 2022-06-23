@@ -17,6 +17,9 @@ and other packages (see below).
 Furthermore, it contains wrappers for [pyclustering](https://pyclustering.github.io/) implementations.
 
 ## Installation
+
+### For Users
+
 The package can be installed directly from git by executing:
 
 `sudo pip3 install git+https://github.com/collinleiber/ClusPy.git`
@@ -24,6 +27,26 @@ The package can be installed directly from git by executing:
 Alternatively, clone the repository, go to the directory and execute:
 
 `sudo python setup.py install`
+
+If you have no sudo rights you can use:
+
+`python setup.py install --prefix ~/.local`
+
+### For Developers
+
+Clone the repository, go to the directory and do the following.
+
+Install package locally and compile C files:
+
+`python setup.py install --prefix ~/.local`
+
+Copy compiled C files to correct file location:
+
+`python setup.py build_ext --inplace`
+
+Remove cluspy via pip to avoid ambiguities during development, e.g., when changing files in the code:
+
+`pip3 uninstall cluspy`
 
 ## Components
 
@@ -56,6 +79,7 @@ Alternatively, clone the repository, go to the directory and execute:
     - VaDE
     - DipDECK
     - DipEncoder
+    - ENRC
     
 ### Other implementations
 
@@ -185,7 +209,7 @@ datasets = [
     preprocess_params=[{"dims":0.9}, {}],ignore_algorithms=["pdipmeans"]),
     EvaluationDataset("Pendigits_pca", data=load_pendigits, preprocess_methods=reduce_dimensionality, preprocess_params={"dims":0.9}),
     EvaluationDataset("Wine", data=load_wine),
-    EvaluationDataset("Wine_znorn", data=load_wine, preprocess_methods=znorm)]
+    EvaluationDataset("Wine_znorm", data=load_wine, preprocess_methods=znorm)]
 
 algorithms = [
     EvaluationAlgorithm("SubKmeans", SubKmeans, {"n_clusters": None}),

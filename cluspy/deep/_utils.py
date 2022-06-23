@@ -113,7 +113,9 @@ def get_dataloader(X, batch_size, shuffle=True, drop_last=False, additional_inpu
     The final dataloader
     """
     assert type(additional_inputs) is list, "additional_input should be of type list."
-    dataset_input = [torch.from_numpy(X).float()]
+    if type(X) is np.ndarray:
+        X = torch.from_numpy(X).float()
+    dataset_input = [X]
     for input in additional_inputs:
         if type(input) is np.ndarray:
             input = torch.from_numpy(input).float()

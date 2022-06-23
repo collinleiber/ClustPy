@@ -5,31 +5,21 @@ Proceedings of the AAAI Conference on Artificial Intelligence. Vol. 34. No. 04. 
 @authors Lukas Miklautz
 """
 
-from cluspy.deep._utils import detect_device, get_trained_autoencoder 
 import torch
 from sklearn.cluster import KMeans
 from sklearn.base import BaseEstimator, ClusterMixin
 import numpy as np
-from ._utils import int_to_one_hot, squared_euclidean_distance
+from ._utils import int_to_one_hot, squared_euclidean_distance, encode_batchwise, get_dataloader, detect_device, get_trained_autoencoder 
 from cluspy.alternative import NrKmeans
 from cluspy.alternative.nrkmeans import _initialize_nrkmeans_parameters
 from sklearn.utils import check_random_state
 from sklearn.metrics import normalized_mutual_info_score
 from cluspy.utils.plots import plot_scatter_matrix
+from cluspy.alternative.nrkmeans import _get_total_cost_function
 
 """
 ===================== Helper Functions =====================
 """
-def _encode_batchwise(dataloader, model, device):
-    """ Utility function for embedding the whole data set in a mini-batch fashion
-    """
-    embeddings = []
-    for batch in dataloader:
-        batch_data = batch[0].to(device)
-        embeddings.append(model.encode(batch_data).detach().cpu())
-    return torch.cat(embeddings, dim=0).numpy()
-
-
 class _IdentityAutoencoder(torch.nn.Module):
     """Convenience class to avoid reimplementation of the remaining ENRC pipeline for the initialization.
     Encoder and decoder are here just identity functions implemented via lambda x:x.
@@ -158,7 +148,7 @@ def enrc_predict_batchwise(V, centers, subspace_betas, model, dataloader, device
     predictions = []
     with torch.no_grad():
         for batch in dataloader:
-            batch_data = batch[0].to(device)
+            batch_data = batch[1].to(device)
             z = model.encode(batch_data)
             pred_i = enrc_predict(z=z, V=V, centers=centers, subspace_betas=subspace_betas, use_P=use_P)
             predictions.append(pred_i)
@@ -172,14 +162,6 @@ def available_init_strategies():
     """ Returns list of strings of available initialization strategies for ENRC.   
     """
     return ['nrkmeans', 'random', 'sgd', 'auto']
-
-def _determine_nrkmeans_init_costs(scatter_matrices, P, V):
-    costs = 0.0
-    for s_i in range(len(P)):
-        cluster_space_V = V[:, P[s_i]]
-        sm = np.sum(scatter_matrices[s_i], 0)
-        costs += np.trace(np.matmul(np.matmul(cluster_space_V.transpose(), sm), cluster_space_V))
-    return costs
 
 def optimal_beta(kmeans_loss, other_losses_mean_sum):
     """Calculate optimal values for the beta weight for each dimension.
@@ -214,14 +196,13 @@ def calculate_optimal_beta_weights_special_case(data, centers, V, batch_size=32)
     -------
     optimal_beta_weights: torch.tensor, a c x d vector containing the optimal weights for the softmax to indicate which dimensions d are important for each clustering c.
     """
-    dataloader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(data),
-                                            batch_size=batch_size, shuffle=False, drop_last=False)
+    dataloader = get_dataloader(data, batch_size=batch_size, shuffle=True, drop_last=False)
     device = V.device
     with torch.no_grad():
         # calculate kmeans losses for each clustering
         km_losses = [[] for _ in centers]
         for batch in dataloader:
-            batch = batch[0].to(device)
+            batch = batch[1].to(device)
             z_rot = torch.matmul(batch, V)
             for i, centers_i in enumerate(centers):
                 weighted_squared_diff = squared_euclidean_distance(centers=centers_i.unsqueeze(1), embedded=z_rot.unsqueeze(1))
@@ -344,7 +325,7 @@ def nrkmeans_init(data, n_clusters, rounds=10, random_state=None, max_iter=100, 
             if verbose:
                 print(f"WARNING: Lost Subspace. Found only {len(P_i)} subspaces for {len(n_clusters)} clusterings. Try to increase the size of the embedded space or the number of iterations of nrkmeans to avoid this from happening.")
         else:
-            cost = _determine_nrkmeans_init_costs(scatter_matrices=scatter_matrices_i, P=P_i, V=V_i)
+            cost = _get_total_cost_function(V=V_i, P=P_i, scatter_matrices=scatter_matrices_i)
             if lowest > cost:
                 best = [centers_i, P_i, V_i,]
                 lowest = cost
@@ -374,7 +355,7 @@ def _determine_sgd_init_costs(enrc, dataloader, loss_fn, device):
     cost = 0
     with torch.no_grad():
         for batch in dataloader:
-            batch = batch[0].to(device)
+            batch = batch[1].to(device)
             subspace_loss, _, batch_rot_back, _ = enrc(batch)
             rec_loss = loss_fn(batch_rot_back, batch)
             cost += (subspace_loss + rec_loss)
@@ -414,8 +395,7 @@ def sgd_init(data, n_clusters, learning_rate, batch_size=128, optimizer_class=No
 
     best = None
     lowest = np.inf
-    dataloader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(torch.from_numpy(data).float()),
-                                             batch_size=batch_size, shuffle=True, drop_last=True)
+    dataloader = get_dataloader(data, batch_size=batch_size, shuffle=True, drop_last=True)
     
     for round_i in range(rounds):
         random_state = check_random_state(random_state)
@@ -436,11 +416,12 @@ def sgd_init(data, n_clusters, learning_rate, batch_size=128, optimizer_class=No
         optimizer = optimizer_class(param_dict)
         # Training loop
         # For the initialization we increase the weight for the rec error to enforce close to orthogonal V by setting fix_rec_error=True
-        enrc_module.fit(trainloader=dataloader, 
+        enrc_module.fit(data=data, 
                         optimizer=optimizer,
                         max_epochs=epochs, 
                         model=_IdentityAutoencoder(),
                         loss_fn=torch.nn.MSELoss(),
+                        batch_size=batch_size,
                         device=device,
                         verbose=False,
                         fix_rec_error=True)
@@ -544,7 +525,7 @@ def _calculate_rotated_embeddings_and_distances_for_n_samples(enrc, model, datal
     embedding_rot = []
     dists = []
     for batch in dataloader:
-        batch = batch[0].to(device)
+        batch = batch[1].to(device)
         if (batch.shape[0] + sample_count) > n_samples:
             # Remove samples from the batch that are too many.
             # Assumes that dataloader randomly samples minibatches, 
@@ -637,7 +618,6 @@ def reinit_centers(enrc, subspace_id, dataloader, model, n_samples=512, kmeans_s
                 enrc.centers[subspace_id][center_id, :] = new_center.to(device)
 
                 embeddingloader = torch.utils.data.DataLoader(embedding_rot, batch_size=dataloader.batch_size, shuffle=False, drop_last=False)
-
                 # perform mini-batch kmeans steps
                 batch_cluster_sums = 0
                 mask_sum = 0
@@ -926,7 +906,7 @@ class ENRC_Module(torch.nn.Module):
         n_clusters = [c.shape[0] for c in self.centers]
 
         # Encode data
-        embedded_data = _encode_batchwise(dataloader, model, device)
+        embedded_data = encode_batchwise(dataloader, model, device)
         embedded_rot = np.matmul(embedded_data, V)
         
         # Apply reclustering in the rotated space, because V does not have to be orthogonal, so it could learn a mapping that is not recoverable by nrkmeans.
@@ -945,17 +925,17 @@ class ENRC_Module(torch.nn.Module):
 
 
    
-    def fit(self, trainloader, optimizer, max_epochs, model, loss_fn=torch.nn.MSELoss(), device=torch.device("cpu"), print_step=5, verbose=True, scheduler=None, fix_rec_error=False, tolerance_threshold=None):
+    def fit(self, data, optimizer, max_epochs, model, batch_size, loss_fn=torch.nn.MSELoss(), device=torch.device("cpu"), print_step=5, verbose=True, scheduler=None, fix_rec_error=False, tolerance_threshold=None):
         """Trains ENRC and the autoencoder in place.
         
         Parameters
         ----------
-        trainloader : torch.utils.data.DataLoader, default=None, dataloader to be used for training
+        data : torch.tensor or np.ndarray, dataset to be used for training
         optimizer : torch.optim, parameterized optimizer to be used
         max_epochs : int, maximum number of epochs for training
+        batch_size: int, batch size for dataloader
         loss_fn : torch.nn, default=torch.nn.MSELoss(), loss function to be used for reconstruction
         device : torch.device, default=torch.device('cpu'), device to be trained on
-        model_path : str, default=None, if specified will save the trained autoencoder and ENRC params to the location.
         print_step : int, default=10, specifies how often the losses are printed
         verbose : bool, default=True, if True than training errors will be printed.
         scheduler : torch.optim.lr_scheduler, default=None, parameterized learning rate scheduler that should be used. 
@@ -976,17 +956,15 @@ class ENRC_Module(torch.nn.Module):
 
         # Save learning rate for reclustering
         self.learning_rate = optimizer.param_groups[0]["lr"]
-
         # Evalloader is used for checking label change. Only difference to the trainloader here is that shuffle=False.
-        evalloader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(trainloader.dataset.tensors[0]),
-                                            batch_size=trainloader.batch_size,
-                                            shuffle=False,
-                                            drop_last=False)
+        trainloader = get_dataloader(data, batch_size=batch_size, shuffle=True, drop_last=True)
+        evalloader = get_dataloader(data, batch_size=batch_size, shuffle=False, drop_last=False)
+        
         i = 0
         labels_old = None
         for epoch_i in range(max_epochs):
             for batch in trainloader:
-                batch = batch[0].to(device)
+                batch = batch[1].to(device)
                 
                 z = model.encode(batch)
                 subspace_loss, z_rot, z_rot_back, assignment_matrix_dict = self(z)
@@ -1052,40 +1030,25 @@ def _enrc(X, n_clusters, V, P, input_centers, batch_size, pretrain_learning_rate
         device = detect_device()
     
     # Setup dataloaders
-    trainloader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(torch.from_numpy(X).float()),
-                                              batch_size=batch_size,
-                                              shuffle=True,
-                                              drop_last=True)
-    testloader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(torch.from_numpy(X).float()),
-                                             batch_size=batch_size,
-                                             shuffle=False,
-                                             drop_last=False)
+    trainloader = get_dataloader(X, batch_size=batch_size, shuffle=True, drop_last=True)
+    testloader = get_dataloader(X, batch_size=batch_size, shuffle=False, drop_last=False)
     
     # Use subsample of the data if specified
     if init_subsample_size is not None and init_subsample_size > 0:
         rng = np.random.default_rng(random_state)
         rand_idx = rng.choice(X.shape[0], init_subsample_size, replace=False)
-        subsampleloader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(torch.from_numpy(X[rand_idx]).float()),
-                                            batch_size=batch_size,
-                                            shuffle=False,
-                                            drop_last=False)
+        subsampleloader = get_dataloader(X[rand_idx], batch_size=batch_size, shuffle=False, drop_last=False)
     else:
         subsampleloader = testloader
 
     # Setup autoencoder
     if autoencoder is None:
-        # TODO: get_trained_autoencoder does not work with TensorDataset, so we have to create a separate loader
-        # This might be fixed in a future update
-        ae_loader = torch.utils.data.DataLoader(torch.from_numpy(X).float(),
-                                            batch_size=batch_size,
-                                            shuffle=True,
-                                            drop_last=True)
-        autoencoder = get_trained_autoencoder(ae_loader, pretrain_learning_rate, pretrain_epochs, device,
+        autoencoder = get_trained_autoencoder(trainloader, pretrain_learning_rate, pretrain_epochs, device,
                                               optimizer_class, loss_fn, X.shape[1], embedding_size)
     else:
         autoencoder.to(device)
 
-    embedded_data = _encode_batchwise(subsampleloader, autoencoder, device)
+    embedded_data = encode_batchwise(subsampleloader, autoencoder, device)
 
     # Run ENRC init
     print("Run ENRC init: ", init)
@@ -1109,10 +1072,11 @@ def _enrc(X, n_clusters, V, P, input_centers, batch_size, pretrain_learning_rate
     
     # Training loop
     print("Start ENRC training")
-    enrc_module.fit(trainloader=trainloader,
+    enrc_module.fit(data=X,
                     max_epochs=max_epochs,
                     optimizer=optimizer,
                     loss_fn=loss_fn,
+                    batch_size=batch_size,
                     model=autoencoder,
                     device=device,
                     scheduler=scheduler,
@@ -1266,8 +1230,8 @@ class ENRC(BaseEstimator, ClusterMixin):
         -------
         predicted_labels : np.ndarray, n x c matrix, where n is the number of data points in X and c is the number of clusterings.
         """
-        dataloader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(torch.from_numpy(X).float()),
-                                        batch_size=self.batch_size, shuffle=False, drop_last=False)
+        dataloader = get_dataloader(X, batch_size=self.batch_size, shuffle=False, drop_last=False)
+
         self.autoencoder.to(self.device)
         return enrc_predict_batchwise(V=torch.from_numpy(self.V).float().to(self.device),
                                       centers=[torch.from_numpy(c).float().to(self.device) for c in self.cluster_centers_],
@@ -1291,11 +1255,8 @@ class ENRC(BaseEstimator, ClusterMixin):
         The transformed data
         """
         if not embedded:
-            dataloader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(torch.from_numpy(X).float()),
-                                        batch_size=self.batch_size,
-                                        shuffle=False,
-                                        drop_last=False)
-            emb = _encode_batchwise(dataloader=dataloader, model=self.autoencoder, device=self.device)
+            dataloader = get_dataloader(X, batch_size=self.batch_size, shuffle=False, drop_last=False)
+            emb = encode_batchwise(dataloader=dataloader, model=self.autoencoder, device=self.device)
         else:
             emb = X
         return np.matmul(emb, self.V)
@@ -1315,11 +1276,8 @@ class ENRC(BaseEstimator, ClusterMixin):
         The transformed subspace
         """
         if not embedded:
-            dataloader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(torch.from_numpy(X).float()),
-                                        batch_size=self.batch_size,
-                                        shuffle=False,
-                                        drop_last=False)
-            emb = _encode_batchwise(dataloader=dataloader, model=self.autoencoder, device=self.device)
+            dataloader = get_dataloader(X, batch_size=self.batch_size, shuffle=False, drop_last=False)
+            emb = encode_batchwise(dataloader=dataloader, model=self.autoencoder, device=self.device)
         else:
             emb = X
         cluster_space_V = self.V[:, self.P[subspace_index]]
