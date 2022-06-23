@@ -259,8 +259,9 @@ def _dipmodule(X, n_clusters, embedding_size, batch_size, optimizer_class, loss_
         if debug:
             print("iteration:", iteration, "/", clustering_epochs)
             losses = []
-        for ids, batch in trainloader:
-            batch_data = batch.to(device)
+        for batch in trainloader:
+            ids = batch[0]
+            batch_data = batch[1].to(device)
             embedded = autoencoder.encode(batch_data)
             # Reconstruction Loss
             reconstruction = autoencoder.decode(embedded)

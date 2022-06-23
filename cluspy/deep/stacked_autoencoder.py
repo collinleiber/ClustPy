@@ -181,13 +181,13 @@ class Stacked_Autoencoder(torch.nn.Module):
             optimizer = self.optimizer_fn(self.parameters_pretrain(layer))
             round = 0
             while True:  # each iteration is equal to an epoch
-                for batch_data in dataset:
+                for batch in dataset:
 
                     round += 1
                     if round > rounds_per_layer:
                         break
 
-                    batch_data = batch_data.to(device)  # cuda()
+                    batch_data = batch[1].to(device)  # cuda()
                     if corruption_fn is not None:
                         corrupted_batch = corruption_fn(batch_data)
                         _, reconstruced_data = self.forward_pretrain(corrupted_batch, layer, use_dropout=True,
@@ -216,11 +216,11 @@ class Stacked_Autoencoder(torch.nn.Module):
 
         index = 0
         while True:  # each iteration is equal to an epoch
-            for batch_data in dataset:
+            for batch in dataset:
                 index += 1
                 if index > rounds:
                     break
-                batch_data = batch_data.to(device)  # cuda()
+                batch_data = batch[1].to(device)  # cuda()
 
                 # Forward pass
                 if corruption_fn is not None:

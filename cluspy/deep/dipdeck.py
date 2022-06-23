@@ -70,8 +70,9 @@ def _dip_deck_training(X, n_clusters_current, dip_merge_threshold, cluster_loss_
         dip_matrix_eye = dip_matrix_torch + torch.eye(n_clusters_current, device=device)
         dip_matrix_final = dip_matrix_eye / dip_matrix_eye.sum(1).reshape((-1, 1))
         # Iterate over batches
-        for ids, batch in trainloader:
-            batch_data = batch.to(device)
+        for batch in trainloader:
+            ids = batch[0]
+            batch_data = batch[1].to(device)
             embedded = autoencoder.encode(batch_data)
             reconstruction = autoencoder.decode(embedded)
             embedded_centers_torch = autoencoder.encode(centers_torch)

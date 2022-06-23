@@ -10,7 +10,7 @@ from sklearn.base import BaseEstimator, ClusterMixin
 
 
 def _dec(X, n_clusters, alpha, batch_size, pretrain_learning_rate, clustering_learning_rate, pretrain_epochs,
-         clustering_epochs,  optimizer_class, loss_fn, autoencoder, embedding_size, use_reconstruction_loss,
+         clustering_epochs, optimizer_class, loss_fn, autoencoder, embedding_size, use_reconstruction_loss,
          cluster_loss_weight):
     device = detect_device()
     trainloader = get_dataloader(X, batch_size, True, False)
@@ -28,7 +28,8 @@ def _dec(X, n_clusters, alpha, batch_size, pretrain_learning_rate, clustering_le
     # Setup DEC Module
     dec_module = _DEC_Module(init_centers, alpha).to(device)
     # Use DEC learning_rate (usually pretrain_learning_rate reduced by a magnitude of 10)
-    optimizer = optimizer_class(list(autoencoder.parameters()) + list(dec_module.parameters()), lr=clustering_learning_rate)
+    optimizer = optimizer_class(list(autoencoder.parameters()) + list(dec_module.parameters()),
+                                lr=clustering_learning_rate)
     # DEC Training loop
     dec_module.start_training(autoencoder, trainloader, clustering_epochs, device, optimizer, loss_fn,
                               use_reconstruction_loss, cluster_loss_weight)
@@ -89,8 +90,8 @@ class _DEC_Module(torch.nn.Module):
     def start_training(self, autoencoder, trainloader, n_epochs, device, optimizer, loss_fn, use_reconstruction_loss,
                        cluster_loss_weight):
         for _ in range(n_epochs):
-            for _, batch in trainloader:
-                batch_data = batch.to(device)
+            for batch in trainloader:
+                batch_data = batch[1].to(device)
                 embedded = autoencoder.encode(batch_data)
 
                 cluster_loss = self.compression_loss(embedded)
@@ -112,9 +113,10 @@ class DEC(BaseEstimator, ClusterMixin):
     Deep Embedded Clustering
     """
 
-    def __init__(self, n_clusters, alpha=1.0, batch_size=256, pretrain_learning_rate=1e-3, clustering_learning_rate=1e-4,
-                 pretrain_epochs=100, clustering_epochs=150, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(),
-                 autoencoder=None, embedding_size=10, use_reconstruction_loss=False, cluster_loss_weight=1):
+    def __init__(self, n_clusters, alpha=1.0, batch_size=256, pretrain_learning_rate=1e-3,
+                 clustering_learning_rate=1e-4, pretrain_epochs=100, clustering_epochs=150,
+                 optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(), autoencoder=None,
+                 embedding_size=10, use_reconstruction_loss=False, cluster_loss_weight=1):
         """
         Create an instance of the DEC algorithm.
 
@@ -184,7 +186,7 @@ class DEC(BaseEstimator, ClusterMixin):
                                                                                    self.optimizer_class, self.loss_fn,
                                                                                    self.autoencoder,
                                                                                    self.embedding_size,
-                                                                                   self.use_reconstruction_loss, 
+                                                                                   self.use_reconstruction_loss,
                                                                                    self.cluster_loss_weight)
         self.labels_ = kmeans_labels
         self.cluster_centers_ = kmeans_centers
@@ -224,8 +226,10 @@ class IDEC(DEC):
     Guo, Xifeng, et al. "Improved deep embedded clustering with
     local structure preservation." IJCAI. 2017.
     """
-    def __init__(self, n_clusters, alpha=1.0, batch_size=256, pretrain_learning_rate=1e-3, clustering_learning_rate=1e-4,
-                 pretrain_epochs=100, clustering_epochs=150, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(),
-                 autoencoder=None, embedding_size=10):
-        super().__init__(n_clusters, alpha, batch_size, pretrain_learning_rate, clustering_learning_rate, pretrain_epochs,
-              clustering_epochs, optimizer_class, loss_fn, autoencoder, embedding_size, True, 0.1)
+
+    def __init__(self, n_clusters, alpha=1.0, batch_size=256, pretrain_learning_rate=1e-3,
+                 clustering_learning_rate=1e-4, pretrain_epochs=100, clustering_epochs=150,
+                 optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(), autoencoder=None, embedding_size=10):
+        super().__init__(n_clusters, alpha, batch_size, pretrain_learning_rate, clustering_learning_rate,
+                         pretrain_epochs,
+                         clustering_epochs, optimizer_class, loss_fn, autoencoder, embedding_size, True, 0.1)

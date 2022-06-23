@@ -88,8 +88,8 @@ def _vade_predict_batchwise(dataloader, vade_module, device):
     """ Utility function for predicting the cluster labels over the whole data set in a mini-batch fashion
     """
     predictions = []
-    for _, batch in dataloader:
-        batch_data = batch.to(device)
+    for batch in dataloader:
+        batch_data = batch[1].to(device)
         q_mean, q_var = vade_module.encode(batch_data)
         prediction = vade_module.predict(q_mean, q_var).detach().cpu()
         predictions.append(prediction)
@@ -100,8 +100,8 @@ def _vade_encode_batchwise(dataloader, model, device):
     """ Utility function for embedding the whole data set in a mini-batch fashion
     """
     embeddings = []
-    for _, batch in dataloader:
-        batch_data = batch.to(device)
+    for batch in dataloader:
+        batch_data = batch[1].to(device)
         q_mean, q_var = model.encode(batch_data)
         embeddings.append(q_mean.detach().cpu())
     return torch.cat(embeddings, dim=0).numpy()
@@ -156,9 +156,9 @@ class _Vade_Autoencoder(torch.nn.Module):
         # training loop
         for _ in range(n_epochs):
             self.train()
-            for _, batch in trainloader:
+            for batch in trainloader:
                 # load batch on device
-                batch_data = batch.to(device)
+                batch_data = batch[1].to(device)
                 q_mean, reconstruction = self.forward(batch_data)
                 loss = loss_fn(reconstruction, batch_data) / batch_data.size(0)
                 # reset gradients from last iteration
@@ -218,9 +218,9 @@ class _VaDE_Module(torch.nn.Module):
         # training loop
         for _ in range(n_epochs):
             self.train()
-            for _, batch in trainloader:
+            for batch in trainloader:
                 # load batch on device
-                batch_data = batch.to(device)
+                batch_data = batch[1].to(device)
 
                 z, q_mean, q_var, reconstruction = self.forward(batch_data)
                 loss = self.vae_loss(batch_data, reconstruction, q_mean, q_var, loss_fn)
