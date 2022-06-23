@@ -7,11 +7,14 @@ preprint arXiv:1611.05148 (2016).
 """
 
 import torch
-from cluspy.deep._utils import detect_device, get_trained_autoencoder, get_dataloader
+from cluspy.deep._utils import detect_device
+from ._data_utils import get_dataloader
+from ._train_utils import get_trained_autoencoder 
 import numpy as np
 from sklearn.mixture import GaussianMixture
 from sklearn.base import BaseEstimator, ClusterMixin
 
+# TODO: Anpassen des _Vade_Autoencoder mit neuer get_trained_autoencoder Struktur
 
 def _vade(X, n_clusters, batch_size, pretrain_learning_rate, clustering_learning_rate, pretrain_epochs,
           clustering_epochs, optimizer_class, loss_fn, autoencoder, embedding_size):

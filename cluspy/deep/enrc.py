@@ -9,7 +9,9 @@ import torch
 from sklearn.cluster import KMeans
 from sklearn.base import BaseEstimator, ClusterMixin
 import numpy as np
-from ._utils import int_to_one_hot, squared_euclidean_distance, encode_batchwise, get_dataloader, detect_device, get_trained_autoencoder 
+from ._utils import int_to_one_hot, squared_euclidean_distance, encode_batchwise, detect_device
+from ._data_utils import get_dataloader
+from ._train_utils import get_trained_autoencoder 
 from cluspy.alternative import NrKmeans
 from cluspy.alternative.nrkmeans import _initialize_nrkmeans_parameters
 from sklearn.utils import check_random_state
@@ -1042,11 +1044,8 @@ def _enrc(X, n_clusters, V, P, input_centers, batch_size, pretrain_learning_rate
         subsampleloader = testloader
 
     # Setup autoencoder
-    if autoencoder is None:
-        autoencoder = get_trained_autoencoder(trainloader, pretrain_learning_rate, pretrain_epochs, device,
-                                              optimizer_class, loss_fn, X.shape[1], embedding_size)
-    else:
-        autoencoder.to(device)
+    autoencoder = get_trained_autoencoder(trainloader, pretrain_learning_rate, pretrain_epochs, device,
+                                          optimizer_class, loss_fn, X.shape[1], embedding_size, autoencoder)
 
     embedded_data = encode_batchwise(subsampleloader, autoencoder, device)
 
