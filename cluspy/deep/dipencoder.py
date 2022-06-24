@@ -4,7 +4,9 @@ from cluspy.utils import dip_test
 import torch
 import numpy as np
 from cluspy.partition.skinnydip import _dip_mirrored_data
-from cluspy.deep._utils import detect_device, encode_batchwise, get_trained_autoencoder, get_dataloader
+from cluspy.deep._utils import detect_device, encode_batchwise
+from ._data_utils import get_dataloader
+from ._train_utils import get_trained_autoencoder 
 from cluspy.deep.simple_autoencoder import Simple_Autoencoder
 
 """
@@ -202,12 +204,10 @@ def _dipmodule(X, n_clusters, embedding_size, batch_size, optimizer_class, loss_
     trainloader = get_dataloader(X, batch_size, True, False)
     testloader = get_dataloader(X, batch_size, False, False)
     # Get initial AE
-    if autoencoder is None:
-        pretrain_trainloader = get_dataloader(X, pretrain_batch_size, True, False)
-        autoencoder = get_trained_autoencoder(pretrain_trainloader, pretrain_learning_rate, pretrain_epochs, device,
-                                              optimizer_class, loss_fn, X.shape[1], embedding_size)
-    else:
-        autoencoder.to(device)
+    pretrain_trainloader = get_dataloader(X, pretrain_batch_size, True, False)
+    autoencoder = get_trained_autoencoder(pretrain_trainloader, pretrain_learning_rate, pretrain_epochs, device,
+                                    optimizer_class, loss_fn, X.shape[1], embedding_size, autoencoder)
+
     # Get factor for AE loss
     # rand_samples = torch.rand((batch_size, X.shape[1]))
     # data_min = np.min(X)

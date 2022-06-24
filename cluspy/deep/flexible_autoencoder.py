@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 import numpy as np
-from ._utils import EarlyStopping
+from ._early_stopping import EarlyStopping
 
 class FullyConnectedBlock(nn.Module):
     """Feed Forward Neural Network Block
@@ -66,6 +66,7 @@ class FlexibleAutoencoder(torch.nn.Module):
     ----------
     encoder : encoder part of the autoencoder, responsible for embedding data points
     decoder : decoder part of the autoencoder, responsible for reconstructing data points from the embedding
+    fitted  : boolean value indicating whether the autoencoder is already fitted.
     """
     def __init__(self, layers, batch_norm=False, dropout=None, activation_fn=torch.nn.LeakyReLU, bias=True, decoder_layers=None, decoder_output_fn=None):
         super(FlexibleAutoencoder, self).__init__()
@@ -75,6 +76,7 @@ class FlexibleAutoencoder(torch.nn.Module):
         self.activation_fn = activation_fn
         self.bias = bias
         self.decoder_output_fn = decoder_output_fn
+        self.fitted = False
         if decoder_layers is None:
             self.decoder_layers = self.layers[::-1]
         else:
@@ -155,19 +157,19 @@ class FlexibleAutoencoder(torch.nn.Module):
             loss /= len(dataloader)
         return loss
 
-    def fit(self, n_epochs, lr, batch_size=128, data=None, data_eval=None, dataloader=None, evalloader=None, optimizer_fn=torch.optim.Adam, loss_fn=torch.nn.MSELoss(), patience=5, scheduler=None, scheduler_params=None, device=torch.device("cpu"), model_path=None, print_step=10):
+    def fit(self, n_epochs, lr, batch_size=128, data=None, data_eval=None, dataloader=None, evalloader=None, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(), patience=5, scheduler=None, scheduler_params=None, device=torch.device("cpu"), model_path=None, print_step=10):
         """Trains the autoencoder in place.
         
         Parameters
         ----------
         n_epochs : int, number of epochs for training
-        lr : float, learning rate to be used for the optimizer_fn
+        lr : float, learning rate to be used for the optimizer_class
         batch_size : int, default=128
         data : np.ndarray, default=None, train data set. If data is passed then dataloader can remain empty
         data_eval : np.ndarray, default=None, evaluation data set. If data_eval is passed then evalloader can remain empty.
         dataloader : torch.utils.data.DataLoader, default=None, dataloader to be used for training
         evalloader : torch.utils.data.DataLoader, default=None, dataloader to be used for evaluation, early stopping and learning rate scheduling if scheduler=torch.optim.lr_scheduler.ReduceLROnPlateau
-        optimizer_fn : torch.optim, default=torch.optim.Adam, optimizer to be used
+        optimizer_class : torch.optim, default=torch.optim.Adam, optimizer to be used
         loss_fn : torch.nn, default=torch.nn.MSELoss(), loss function to be used for reconstruction
         patience : int, default=5, patience parameter for EarlyStopping
         scheduler : torch.optim.lr_scheduler, default=None, learning rate scheduler that should be used. 
@@ -185,6 +187,8 @@ class FlexibleAutoencoder(torch.nn.Module):
         if dataloader is None:
             if data is None:
                 raise ValueError("data must be specified if dataloader is None")
+
+            # TODO: Replace with get_dataloader
             dataloader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(torch.from_numpy(data).float()),
                                                     batch_size=batch_size,
                                                     shuffle=True)
@@ -196,7 +200,7 @@ class FlexibleAutoencoder(torch.nn.Module):
                                                         shuffle=False)
         
         params_dict = {'params': self.parameters(), 'lr': lr}
-        optimizer = optimizer_fn(**params_dict)
+        optimizer = optimizer_class(**params_dict)
         
         early_stopping = EarlyStopping(patience=patience)
         if scheduler is not None:
@@ -249,3 +253,9 @@ class FlexibleAutoencoder(torch.nn.Module):
         # Save last version of model
         if evalloader is None and model_path is not None:
             torch.save(self.state_dict(), model_path)
+        
+        # Autoencoder is now pretrained
+        self.fitted = True
+
+        return self
+

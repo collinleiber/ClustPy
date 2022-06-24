@@ -3,7 +3,9 @@ import numpy as np
 from cluspy.utils import dip_test, dip_pval
 import torch
 from cluspy.deep._utils import detect_device, encode_batchwise, \
-    squared_euclidean_distance, int_to_one_hot, get_trained_autoencoder, get_dataloader
+    squared_euclidean_distance, int_to_one_hot
+from ._data_utils import get_dataloader
+from ._train_utils import get_trained_autoencoder 
 from sklearn.cluster import KMeans
 from sklearn.base import BaseEstimator, ClusterMixin
 
@@ -20,11 +22,8 @@ def _dip_deck(X, n_clusters_start, dip_merge_threshold, cluster_loss_weight, n_c
     device = detect_device()
     trainloader = get_dataloader(X, batch_size, True, False)
     testloader = get_dataloader(X, batch_size, False, False)
-    if autoencoder is None:
-        autoencoder = get_trained_autoencoder(trainloader, pretrain_learning_rate, pretrain_epochs, device,
-                                              optimizer_class, loss_fn, X.shape[1], embedding_size)
-    else:
-        autoencoder.to(device)
+    autoencoder = get_trained_autoencoder(trainloader, pretrain_learning_rate, pretrain_epochs, device,
+                                          optimizer_class, loss_fn, X.shape[1], embedding_size, autoencoder)
     # Execute kmeans in embedded space - initial clustering
     embedded_data = encode_batchwise(testloader, autoencoder, device)
     kmeans = KMeans(n_clusters=n_clusters_start)
