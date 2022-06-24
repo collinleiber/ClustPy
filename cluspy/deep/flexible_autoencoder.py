@@ -1,9 +1,10 @@
 import torch
-from torch import nn
 import numpy as np
 from ._early_stopping import EarlyStopping
+from ._data_utils import get_dataloader
 
-class FullyConnectedBlock(nn.Module):
+
+class FullyConnectedBlock(torch.nn.Module):
     """Feed Forward Neural Network Block
 
     Parameters
@@ -19,6 +20,7 @@ class FullyConnectedBlock(nn.Module):
     ----------
     block: torch.nn.Sequential, feed forward neural network
     """
+
     def __init__(self, layers, batch_norm=False, dropout=None, activation_fn=None, bias=True, output_fn=None):
         super(FullyConnectedBlock, self).__init__()
         self.layers = layers
@@ -29,24 +31,25 @@ class FullyConnectedBlock(nn.Module):
         self.output_fn = output_fn
 
         fc_block_list = []
-        for i in range(len(layers)-1):
-            fc_block_list.append(nn.Linear(layers[i], layers[i+1], bias=self.bias))
+        for i in range(len(layers) - 1):
+            fc_block_list.append(torch.nn.Linear(layers[i], layers[i + 1], bias=self.bias))
             if self.batch_norm:
-                fc_block_list.append(nn.BatchNorm1d(layers[i+1]))
+                fc_block_list.append(torch.nn.BatchNorm1d(layers[i + 1]))
             if self.dropout is not None:
-                fc_block_list.append(nn.Dropout(self.dropout))
+                fc_block_list.append(torch.nn.Dropout(self.dropout))
             if self.activation_fn is not None:
                 # last layer is handled differently
-                if (i != len(layers)-2):
+                if (i != len(layers) - 2):
                     fc_block_list.append(activation_fn())
                 else:
                     if self.output_fn is not None:
                         fc_block_list.append(self.output_fn())
 
-        self.block =  nn.Sequential(*fc_block_list)
-    
+        self.block = torch.nn.Sequential(*fc_block_list)
+
     def forward(self, x):
         return self.block(x)
+
 
 class FlexibleAutoencoder(torch.nn.Module):
     """A feedforward autoencoder.
@@ -68,7 +71,9 @@ class FlexibleAutoencoder(torch.nn.Module):
     decoder : decoder part of the autoencoder, responsible for reconstructing data points from the embedding
     fitted  : boolean value indicating whether the autoencoder is already fitted.
     """
-    def __init__(self, layers, batch_norm=False, dropout=None, activation_fn=torch.nn.LeakyReLU, bias=True, decoder_layers=None, decoder_output_fn=None):
+
+    def __init__(self, layers, batch_norm=False, dropout=None, activation_fn=torch.nn.LeakyReLU, bias=True,
+                 decoder_layers=None, decoder_output_fn=None):
         super(FlexibleAutoencoder, self).__init__()
         self.layers = layers
         self.batch_norm = batch_norm
@@ -82,19 +87,22 @@ class FlexibleAutoencoder(torch.nn.Module):
         else:
             self.decoder_layers = decoder_layers
         if (self.layers[-1] != self.decoder_layers[0]):
-            raise ValueError(f"Innermost hidden layer and first decoder layer do not match, they are {self.layers[-1]} and {self.decoder_layers[0]} respectively.")
+            raise ValueError(
+                f"Innermost hidden layer and first decoder layer do not match, they are {self.layers[-1]} and {self.decoder_layers[0]} respectively.")
         if (self.layers[0] != self.decoder_layers[-1]):
-            raise ValueError(f"Output and input dimension do not match, they are {self.layers[0]} and {self.decoder_layers[-1]} respectively.")
+            raise ValueError(
+                f"Output and input dimension do not match, they are {self.layers[0]} and {self.decoder_layers[-1]} respectively.")
 
-        
         # Initialize encoder
-        self.encoder = FullyConnectedBlock(layers=self.layers, batch_norm=self.batch_norm, dropout=self.dropout, activation_fn=self.activation_fn, bias=self.bias, output_fn=None)
-        
-        # Inverts the list of layers to make symmetric version of the encoder
-        self.decoder = FullyConnectedBlock(layers=self.decoder_layers, batch_norm=self.batch_norm, dropout=self.dropout, activation_fn=self.activation_fn, bias=self.bias, output_fn=self.decoder_output_fn)
+        self.encoder = FullyConnectedBlock(layers=self.layers, batch_norm=self.batch_norm, dropout=self.dropout,
+                                           activation_fn=self.activation_fn, bias=self.bias, output_fn=None)
 
-    
-    def encode(self, x:torch.Tensor)->torch.Tensor:
+        # Inverts the list of layers to make symmetric version of the encoder
+        self.decoder = FullyConnectedBlock(layers=self.decoder_layers, batch_norm=self.batch_norm, dropout=self.dropout,
+                                           activation_fn=self.activation_fn, bias=self.bias,
+                                           output_fn=self.decoder_output_fn)
+
+    def encode(self, x: torch.Tensor) -> torch.Tensor:
         """
         Parameters
         ----------
@@ -105,8 +113,8 @@ class FlexibleAutoencoder(torch.nn.Module):
         embedded : the embedded data point with dimensionality embedding_size
         """
         return self.encoder(x)
-    
-    def decode(self, embedded:torch.Tensor)->torch.Tensor:
+
+    def decode(self, embedded: torch.Tensor) -> torch.Tensor:
         """
         Parameters
         ----------
@@ -117,8 +125,8 @@ class FlexibleAutoencoder(torch.nn.Module):
         reconstruction: returns the reconstruction of a data point
         """
         return self.decoder(embedded)
-    
-    def forward(self, x:torch.Tensor)->torch.Tensor:
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """ Applies both encode and decode function. 
         The forward function is automatically called if we call self(x).
 
@@ -133,7 +141,7 @@ class FlexibleAutoencoder(torch.nn.Module):
         embedded = self.encode(x)
         reconstruction = self.decode(embedded)
         return reconstruction
-    
+
     def evaluate(self, dataloader, loss_fn, device=torch.device("cpu")):
         """Evaluates the autoencoder.
         
@@ -157,7 +165,9 @@ class FlexibleAutoencoder(torch.nn.Module):
             loss /= len(dataloader)
         return loss
 
-    def fit(self, n_epochs, lr, batch_size=128, data=None, data_eval=None, dataloader=None, evalloader=None, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(), patience=5, scheduler=None, scheduler_params=None, device=torch.device("cpu"), model_path=None, print_step=10):
+    def fit(self, n_epochs, lr, batch_size=128, data=None, data_eval=None, dataloader=None, evalloader=None,
+            optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(), patience=5, scheduler=None,
+            scheduler_params=None, device=torch.device("cpu"), model_path=None, print_step=0):
         """Trains the autoencoder in place.
         
         Parameters
@@ -177,7 +187,7 @@ class FlexibleAutoencoder(torch.nn.Module):
         scheduler_params : dict, default=None, dictionary of the parameters of the scheduler object
         device : torch.device, default=torch.device('cpu'), device to be trained on
         model_path : str, default=None, if specified will save the trained model to the location. If evalloader is used, then only the best model w.r.t. evaluation loss is saved.
-        print_step : int, default=10, specifies how often the losses are printed
+        print_step : int, default=0, specifies how often the losses are printed. If 0, no prints will occur
         
         Raises
         ----------
@@ -187,21 +197,14 @@ class FlexibleAutoencoder(torch.nn.Module):
         if dataloader is None:
             if data is None:
                 raise ValueError("data must be specified if dataloader is None")
-
-            # TODO: Replace with get_dataloader
-            dataloader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(torch.from_numpy(data).float()),
-                                                    batch_size=batch_size,
-                                                    shuffle=True)
+            dataloader = get_dataloader(data, batch_size, True)
         # evalloader has priority over data_eval
         if evalloader is None:
             if data_eval is not None:
-                evalloader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(torch.from_numpy(data_eval).float()),
-                                                        batch_size=batch_size,
-                                                        shuffle=False)
-        
+                evalloader = get_dataloader(data_eval, batch_size, False)
         params_dict = {'params': self.parameters(), 'lr': lr}
         optimizer = optimizer_class(**params_dict)
-        
+
         early_stopping = EarlyStopping(patience=patience)
         if scheduler is not None:
             scheduler = scheduler(optimizer=optimizer, **scheduler_params)
@@ -209,11 +212,11 @@ class FlexibleAutoencoder(torch.nn.Module):
             if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
                 eval_step_scheduler = True
                 if evalloader is None:
-                    raise ValueError("scheduler=torch.optim.lr_scheduler.ReduceLROnPlateau, but evalloader is None. Specify evalloader such that validation loss can be computed.")
+                    raise ValueError(
+                        "scheduler=torch.optim.lr_scheduler.ReduceLROnPlateau, but evalloader is None. Specify evalloader such that validation loss can be computed.")
             else:
                 eval_step_scheduler = False
         best_loss = np.inf
-        i = 0
         # training loop
         for epoch_i in range(n_epochs):
             self.train()
@@ -224,17 +227,16 @@ class FlexibleAutoencoder(torch.nn.Module):
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-            if (epoch_i-1) % print_step == 0 or epoch_i == (n_epochs-1):
-                print(f"Epoch {epoch_i}/{n_epochs-1} - Batch Reconstruction loss: {loss.item():.6f}")
-            
-            
+            if print_step > 0 and ((epoch_i - 1) % print_step == 0 or epoch_i == (n_epochs - 1)):
+                print(f"Epoch {epoch_i}/{n_epochs - 1} - Batch Reconstruction loss: {loss.item():.6f}")
+
             if scheduler is not None and not eval_step_scheduler:
                 scheduler.step()
             # Evaluate autoencoder
             if evalloader is not None:
                 # self.evaluate calls self.eval()
                 val_loss = self.evaluate(dataloader=evalloader, loss_fn=loss_fn, device=device)
-                if (epoch_i-1) % print_step == 0 or epoch_i == (n_epochs - 1):
+                if print_step > 0 and ((epoch_i - 1) % print_step == 0 or epoch_i == (n_epochs - 1)):
                     print(f"Epoch {epoch_i} EVAL loss total: {val_loss.item():.6f}")
                 early_stopping(val_loss)
                 if val_loss < best_loss:
@@ -244,7 +246,7 @@ class FlexibleAutoencoder(torch.nn.Module):
                     if model_path is not None:
                         torch.save(self.state_dict(), model_path)
 
-                if early_stopping.early_stop:
+                if print_step > 0 and early_stopping.early_stop:
                     print(f"Stop training at epoch {best_epoch}")
                     print(f"Best Loss: {best_loss:.6f}, Last Loss: {val_loss:.6f}")
                     break
@@ -253,9 +255,8 @@ class FlexibleAutoencoder(torch.nn.Module):
         # Save last version of model
         if evalloader is None and model_path is not None:
             torch.save(self.state_dict(), model_path)
-        
+
         # Autoencoder is now pretrained
         self.fitted = True
 
         return self
-

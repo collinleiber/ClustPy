@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 
+
 class _CluspyDataset(torch.utils.data.Dataset):
     """
     Dataset wrapping tensors that has the indices always in the first entry.
@@ -21,6 +22,7 @@ class _CluspyDataset(torch.utils.data.Dataset):
 
     def __len__(self):
         return self.tensors[0].size(0)
+
 
 def get_dataloader(X, batch_size, shuffle=True, drop_last=False, additional_inputs=[],
                    dataset_class=_CluspyDataset, **dl_kwargs):

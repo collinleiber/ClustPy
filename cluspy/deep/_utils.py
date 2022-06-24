@@ -1,6 +1,5 @@
 import torch
 from itertools import islice
-import numpy as np
 
 
 def squared_euclidean_distance(centers, embedded, weights=None):
@@ -21,6 +20,7 @@ def detect_device():
     else:
         device = torch.device('cpu')
     return device
+
 
 def encode_batchwise(dataloader, model, device):
     """ Utility function for embedding the whole data set in a mini-batch fashion
@@ -65,6 +65,3 @@ def int_to_one_hot(label_tensor, n_labels):
     onehot = torch.zeros([label_tensor.shape[0], n_labels], dtype=torch.float, device=label_tensor.device)
     onehot.scatter_(1, label_tensor.unsqueeze(1).long(), 1.0)
     return onehot
-
-
-

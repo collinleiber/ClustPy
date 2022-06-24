@@ -1,5 +1,6 @@
 from cluspy.deep.flexible_autoencoder import FlexibleAutoencoder
 
+
 def get_trained_autoencoder(trainloader, learning_rate, n_epochs, device, optimizer_class, loss_fn,
                             input_dim, embedding_size, autoencoder=None, autoencoder_class=FlexibleAutoencoder):
     """This function returns a trained autoencoder. The following cases are considered
@@ -26,7 +27,7 @@ def get_trained_autoencoder(trainloader, learning_rate, n_epochs, device, optimi
     fitted autoencoder
     """
     if autoencoder is None:
-       # Train new autoencoder
+        # Train new autoencoder
         if embedding_size > input_dim:
             print(
                 "WARNING: embedding_size is larger than the dimensionality of the input dataset. Setting embedding_size to",
@@ -34,15 +35,13 @@ def get_trained_autoencoder(trainloader, learning_rate, n_epochs, device, optimi
             embedding_size = input_dim
         # Init Autoencoder parameters
         layers = [input_dim, 500, 500, 2000, embedding_size]
-        autoencoder = autoencoder_class(layers=layers).to(device) 
+        autoencoder = autoencoder_class(layers=layers).to(device)
     else:
         autoencoder.to(device)
-    assert hasattr(autoencoder, "fitted"), "Autoencoder has no attribute 'fitted' and is therefore not compatible. Check documentation of fitted cluspy.deep.flexible_autoencoder.FlexibleAutoencoder"
+    assert hasattr(autoencoder,
+                   "fitted"), "Autoencoder has no attribute 'fitted' and is therefore not compatible. Check documentation of fitted cluspy.deep.flexible_autoencoder.FlexibleAutoencoder"
     if not autoencoder.fitted:
         # Pretrain Autoencoder
         autoencoder.fit(n_epochs=n_epochs, lr=learning_rate, dataloader=trainloader,
-            device=device, optimizer_class=optimizer_class, loss_fn=loss_fn)
+                        device=device, optimizer_class=optimizer_class, loss_fn=loss_fn)
     return autoencoder
-
-
-

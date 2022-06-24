@@ -9,7 +9,7 @@ conference on machine learning. PMLR, 2017.
 from cluspy.deep._utils import detect_device, encode_batchwise, \
     squared_euclidean_distance, predict_batchwise
 from ._data_utils import get_dataloader
-from ._train_utils import get_trained_autoencoder 
+from ._train_utils import get_trained_autoencoder
 import torch
 from sklearn.cluster import KMeans
 from sklearn.base import BaseEstimator, ClusterMixin
@@ -21,7 +21,7 @@ def _dcn(X, n_clusters, batch_size, pretrain_learning_rate, clustering_learning_
     device = detect_device()
     trainloader = get_dataloader(X, batch_size, True, False)
     testloader = get_dataloader(X, batch_size, False, False)
-    
+
     autoencoder = get_trained_autoencoder(trainloader, pretrain_learning_rate, pretrain_epochs, device,
                                           optimizer_class, loss_fn, X.shape[1], embedding_size, autoencoder)
     # Execute kmeans in embedded space

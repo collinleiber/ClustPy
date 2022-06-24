@@ -4,14 +4,12 @@ from .vade import VaDE
 from .dipdeck import DipDECK
 from .dipencoder import DipEncoder
 from .enrc import ENRC
-from .simple_autoencoder import Simple_Autoencoder
-from .stacked_autoencoder import Stacked_Autoencoder
+from .stacked_autoencoder import StackedAutoencoder
 from .flexible_autoencoder import FlexibleAutoencoder
+from .variational_autoencoder import VariationalAutoencoder
 from ._data_utils import get_dataloader
 from ._train_utils import get_trained_autoencoder
-from ._utils import encode_batchwise
-from ._utils import predict_batchwise
-
+from ._utils import encode_batchwise, predict_batchwise
 
 __all__ = ['DEC',
            'IDEC',
@@ -19,9 +17,9 @@ __all__ = ['DEC',
            'VaDE',
            'DipDECK',
            'ENRC',
-           'Simple_Autoencoder',
            'FlexibleAutoencoder',
-           'Stacked_Autoencoder',
+           'StackedAutoencoder',
+           'VariationalAutoencoder',
            'DipEncoder',
            'get_dataloader',
            'get_trained_autoencoder',

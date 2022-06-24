@@ -8,27 +8,25 @@ preprint arXiv:1611.05148 (2016).
 
 import torch
 from cluspy.deep._utils import detect_device
-from ._data_utils import get_dataloader
-from ._train_utils import get_trained_autoencoder 
+from cluspy.deep._data_utils import get_dataloader
+from cluspy.deep._train_utils import get_trained_autoencoder
+from cluspy.deep.variational_autoencoder import VariationalAutoencoder
 import numpy as np
 from sklearn.mixture import GaussianMixture
 from sklearn.base import BaseEstimator, ClusterMixin
 
-# TODO: Anpassen des _Vade_Autoencoder mit neuer get_trained_autoencoder Struktur
 
 def _vade(X, n_clusters, batch_size, pretrain_learning_rate, clustering_learning_rate, pretrain_epochs,
-          clustering_epochs, optimizer_class, loss_fn, autoencoder, embedding_size):
+          clustering_epochs, optimizer_class, loss_fn, autoencoder, embedding_size, n_gmm_initializations):
     device = detect_device()
     trainloader = get_dataloader(X, batch_size, True, False)
     testloader = get_dataloader(X, batch_size, False, False)
-    if autoencoder is None:
-        autoencoder = get_trained_autoencoder(trainloader, pretrain_learning_rate, pretrain_epochs, device,
-                                              optimizer_class, loss_fn, X.shape[1], embedding_size, _Vade_Autoencoder)
-    else:
-        autoencoder.to(device)
+    autoencoder = get_trained_autoencoder(trainloader, pretrain_learning_rate, pretrain_epochs, device,
+                                          optimizer_class, loss_fn, X.shape[1], embedding_size, autoencoder,
+                                          VariationalAutoencoder)
     # Execute EM in embedded space
     embedded_data = _vade_encode_batchwise(testloader, autoencoder, device)
-    gmm = GaussianMixture(n_components=n_clusters, covariance_type='diag', n_init=100)
+    gmm = GaussianMixture(n_components=n_clusters, covariance_type='diag', n_init=n_gmm_initializations)
     gmm.fit(embedded_data)
     # Initialize VaDE
     vade_module = _VaDE_Module(autoencoder, n_clusters=n_clusters, embedding_size=embedding_size, pi=gmm.weights_,
@@ -110,68 +108,6 @@ def _vade_encode_batchwise(dataloader, model, device):
     return torch.cat(embeddings, dim=0).numpy()
 
 
-class _Vade_Autoencoder(torch.nn.Module):
-    def __init__(self, input_dim: int, embedding_size: int):
-        super(_Vade_Autoencoder, self).__init__()
-
-        self.encoder = torch.nn.Sequential(
-            torch.nn.Linear(input_dim, 500),
-            torch.nn.ReLU(inplace=True),
-            torch.nn.Linear(500, 500),
-            torch.nn.ReLU(inplace=True),
-            torch.nn.Linear(500, 2000),
-            torch.nn.ReLU(inplace=True),
-        )
-
-        # naming is used for later correspondence in VaDE
-        self.mean_ = torch.nn.Linear(2000, embedding_size)
-        # is only initialized
-        self.variance_ = torch.nn.Linear(2000, embedding_size)
-
-        self.classify = torch.nn.LogSoftmax(dim=1)
-
-        self.decoder = torch.nn.Sequential(
-            torch.nn.Linear(embedding_size, 2000),
-            torch.nn.ReLU(inplace=True),
-            torch.nn.Linear(2000, 500),
-            torch.nn.ReLU(inplace=True),
-            torch.nn.Linear(500, 500),
-            torch.nn.ReLU(inplace=True),
-            torch.nn.Linear(500, input_dim),
-            torch.nn.Sigmoid()
-        )
-
-    def encode(self, x: torch.Tensor) -> torch.Tensor:
-        embedded = self.encoder(x)
-        q_mean = self.mean_(embedded)
-        q_var = self.variance_(embedded)
-        return q_mean, q_var
-
-    def decode(self, z: torch.Tensor) -> torch.Tensor:
-        return self.decoder(z)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        q_mean, q_var = self.encode(x)
-        reconstruction = self.decode(q_mean)
-        return q_mean, reconstruction
-
-    def start_training(self, trainloader, n_epochs, device, optimizer, loss_fn):
-        # training loop
-        for _ in range(n_epochs):
-            self.train()
-            for batch in trainloader:
-                # load batch on device
-                batch_data = batch[1].to(device)
-                q_mean, reconstruction = self.forward(batch_data)
-                loss = loss_fn(reconstruction, batch_data) / batch_data.size(0)
-                # reset gradients from last iteration
-                optimizer.zero_grad()
-                # calculate gradients and reset the computation graph
-                loss.backward()
-                # update the internal params (weights, etc.)
-                optimizer.step()
-
-
 class _VaDE_Module(torch.nn.Module):
     def __init__(self, autoencoder, n_clusters, embedding_size, pi, mean, var, device):
         super(_VaDE_Module, self).__init__()
@@ -236,7 +172,8 @@ class _VaDE_Module(torch.nn.Module):
 class VaDE(BaseEstimator, ClusterMixin):
     def __init__(self, n_clusters, batch_size=256, pretrain_learning_rate=1e-3, clustering_learning_rate=1e-4,
                  pretrain_epochs=100, clustering_epochs=150, optimizer_class=torch.optim.Adam,
-                 loss_fn=torch.nn.BCELoss(reduction='sum'), autoencoder=None, embedding_size=10):
+                 loss_fn=torch.nn.BCELoss(reduction='sum'), autoencoder=None, embedding_size=10,
+                 n_gmm_initializations=100):
         self.n_clusters = n_clusters
         self.batch_size = batch_size
         self.pretrain_learning_rate = pretrain_learning_rate
@@ -247,6 +184,7 @@ class VaDE(BaseEstimator, ClusterMixin):
         self.loss_fn = loss_fn
         self.autoencoder = autoencoder
         self.embedding_size = embedding_size
+        self.n_gmm_initializations = n_gmm_initializations
 
     def fit(self, X, y=None):
         gmm_labels, gmm_means, gmm_covariances, vade_labels, vade_centers, vade_covariances, autoencoder = _vade(X,
@@ -259,7 +197,8 @@ class VaDE(BaseEstimator, ClusterMixin):
                                                                                                                  self.optimizer_class,
                                                                                                                  self.loss_fn,
                                                                                                                  self.autoencoder,
-                                                                                                                 self.embedding_size)
+                                                                                                                 self.embedding_size,
+                                                                                                                 self.n_gmm_initializations)
         self.labels_ = gmm_labels
         self.cluster_centers_ = gmm_means
         self.covariances_ = gmm_covariances

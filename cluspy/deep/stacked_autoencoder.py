@@ -3,7 +3,7 @@ import torch.nn.functional as F
 from cluspy.deep._utils import window
 
 
-class Stacked_Autoencoder(torch.nn.Module):
+class StackedAutoencoder(torch.nn.Module):
 
     def __init__(self, feature_dim, embedding_size, layer_dims=[500, 500, 2000],
                  weight_initalizer=torch.nn.init.xavier_normal_,
