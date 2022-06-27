@@ -7,7 +7,6 @@ from cluspy.partition.skinnydip import _dip_mirrored_data
 from cluspy.deep._utils import detect_device, encode_batchwise
 from ._data_utils import get_dataloader
 from ._train_utils import get_trained_autoencoder
-from cluspy.deep.simple_autoencoder import Simple_Autoencoder
 
 """
 Dip module - holds backward functions

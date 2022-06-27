@@ -245,7 +245,7 @@ def load_webkb(use_universities=["cornell", "texas", "washington", "wisconsin"],
             inner_directory = "{0}webkb/{1}/{2}/".format(directory, category, univerity)
             files = os.listdir(inner_directory)
             for file in files:
-                with open(inner_directory + file, "r") as f:
+                with open(inner_directory + file, "r", encoding='latin-1') as f:
                     lines = f.read()
                     if remove_headers:
                         # Remove header

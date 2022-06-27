@@ -222,7 +222,7 @@ class FlexibleAutoencoder(torch.nn.Module):
             self.train()
             for batch in dataloader:
                 batch_data = batch[1].to(device)
-                reconstruction = self(batch_data)
+                reconstruction = self.forward(batch_data)
                 loss = loss_fn(reconstruction, batch_data)
                 optimizer.zero_grad()
                 loss.backward()

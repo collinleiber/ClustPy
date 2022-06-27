@@ -5,6 +5,44 @@ from cluspy.deep._early_stopping import EarlyStopping
 import numpy as np
 
 
+def _compute_loss(pi, p_mean, p_var, q_mean, q_var, batch_data, p_c_z, reconstruction, loss_fn):
+    q_mean = q_mean.unsqueeze(1)
+    p_var = p_var.unsqueeze(0)
+
+    p_x_z = loss_fn(reconstruction, batch_data)
+
+    p_z_c = torch.sum(p_c_z * (0.5 * np.log(2 * np.pi) + 0.5 * (
+            torch.sum(p_var, dim=2) + torch.sum(torch.exp(q_var.unsqueeze(1)) / torch.exp(p_var),
+                                                dim=2) + torch.sum((q_mean - p_mean).pow(2) / torch.exp(p_var),
+                                                                   dim=2))))
+    p_c = torch.sum(p_c_z * torch.log(pi))
+    q_z_x = 0.5 * (np.log(2 * np.pi)) + 0.5 * torch.sum(1 + q_var)
+    q_c_x = torch.sum(p_c_z * torch.log(p_c_z))
+
+    loss = p_x_z + p_z_c - p_c - q_z_x + q_c_x
+    loss /= batch_data.size(0)
+    return loss
+
+
+def _sampling(q_mean, q_var):
+    std = torch.exp(0.5 * q_var)
+    eps = torch.randn_like(std)
+    z = q_mean + eps * std
+    return z
+
+
+def _get_gamma(pi, p_mean, p_var, z):
+    z = z.unsqueeze(1)
+    p_var = p_var.unsqueeze(0)
+    pi = pi.unsqueeze(0)
+
+    p_z_c = -torch.sum(0.5 * (np.log(2 * np.pi)) + p_var + ((z - p_mean).pow(2) / (2. * torch.exp(p_var))), dim=2)
+    p_c_z_c = torch.exp(torch.log(pi) + p_z_c) + 1e-10
+    p_c_z = p_c_z_c / torch.sum(p_c_z_c, dim=1, keepdim=True)
+
+    return p_c_z
+
+
 class VariationalAutoencoder(torch.nn.Module):
     """
     A variational autoencoder (VAE).
@@ -13,7 +51,8 @@ class VariationalAutoencoder(torch.nn.Module):
     ----------
     layers : list of the different layer sizes from input to embedding, e.g. an example architecture for MNIST [784, 512, 256, 10], where 784 is the input dimension and 10 the dimension of the central mean and variance value.
              If decoder_layers are not specified then the decoder is symmetric and goes in the same order from embedding to input.
-    batch_norm : bool, default=False, set True if you want to use torch.nn.BatchNorm1d
+    n_distributions : number of distributions in the VAE.
+    batch_norm : bool, default=False, set True if you want to use torch.nn.BatchNorm1d.
     dropout : float, default=None, set the amount of dropout you want to use.
     activation: activation function from torch.nn, default=torch.nn.LeakyReLU, set the activation function for the hidden layers, if None then it will be linear.
     bias : bool, default=True, set False if you do not want to use a bias term in the linear layers
@@ -27,8 +66,8 @@ class VariationalAutoencoder(torch.nn.Module):
     fitted  : boolean value indicating whether the autoencoder is already fitted.
     """
 
-    def __init__(self, layers, batch_norm=False, dropout=None, activation_fn=torch.nn.LeakyReLU, bias=True,
-                 decoder_layers=None, decoder_output_fn=torch.nn.Sigmoid):
+    def __init__(self, layers, n_distributions, batch_norm=False, dropout=None, activation_fn=torch.nn.LeakyReLU,
+                 bias=True, decoder_layers=None, decoder_output_fn=torch.nn.Sigmoid):
         super(VariationalAutoencoder, self).__init__()
         self.layers = layers
         self.batch_norm = batch_norm
@@ -47,21 +86,25 @@ class VariationalAutoencoder(torch.nn.Module):
         if (self.layers[0] != self.decoder_layers[-1]):
             raise ValueError(
                 f"Output and input dimension do not match, they are {self.layers[0]} and {self.decoder_layers[-1]} respectively.")
-
+        # Get size of embedding from last dimension of layers
+        embedding_size = self.layers[-1]
         # Initialize encoder
         self.encoder = FullyConnectedBlock(layers=self.layers[:-1], batch_norm=self.batch_norm, dropout=self.dropout,
                                            activation_fn=self.activation_fn, bias=self.bias,
                                            output_fn=self.activation_fn)
-        # naming is used for later correspondence in VaDE
-        self.mean_ = torch.nn.Linear(self.layers[-2], self.layers[-1])
-        # is only initialized
-        self.variance_ = torch.nn.Linear(self.layers[-2], self.layers[-1])
-
-        self.classify = torch.nn.LogSoftmax(dim=1)
         # Inverts the list of layers to make symmetric version of the encoder
         self.decoder = FullyConnectedBlock(layers=self.decoder_layers, batch_norm=self.batch_norm, dropout=self.dropout,
                                            activation_fn=self.activation_fn, bias=self.bias,
                                            output_fn=self.decoder_output_fn)
+
+        self.q_mean_ = torch.nn.Linear(self.layers[-2], embedding_size)
+        self.q_variance_ = torch.nn.Linear(self.layers[-2], embedding_size)
+
+        self.pi = torch.nn.Parameter(torch.ones(n_distributions) / self.layers[-1], requires_grad=True)
+        self.p_mean = torch.nn.Parameter(torch.randn(n_distributions, embedding_size),
+                                         requires_grad=True)  # if not initialized then use torch.randn
+        self.p_var = torch.nn.Parameter(torch.ones(n_distributions, embedding_size), requires_grad=True)
+        self.normalize_prob = torch.nn.Softmax(dim=0)
 
     def encode(self, x: torch.Tensor) -> (torch.Tensor, torch.Tensor):
         """
@@ -75,23 +118,23 @@ class VariationalAutoencoder(torch.nn.Module):
         q_var : variance value of the central VAE layer
         """
         embedded = self.encoder(x)
-        q_mean = self.mean_(embedded)
-        q_var = self.variance_(embedded)
+        q_mean = self.q_mean_(embedded)
+        q_var = self.q_variance_(embedded)
         return q_mean, q_var
 
-    def decode(self, q_mean: torch.Tensor) -> torch.Tensor:
+    def decode(self, z: torch.Tensor) -> torch.Tensor:
         """
         Parameters
         ----------
-        q_mean: mean value of the central VAE layer
+        z: embedded data point, can also be a mini-batch of embedded points
 
         Returns
         -------
         reconstruction: returns the reconstruction of a data point
         """
-        return self.decoder(q_mean)
+        return self.decoder(z)
 
-    def forward(self, x: torch.Tensor) -> (torch.Tensor, torch.Tensor):
+    def forward(self, x: torch.Tensor) -> (torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor):
         """ Applies both encode and decode function.
         The forward function is automatically called if we call self(x).
 
@@ -101,15 +144,34 @@ class VariationalAutoencoder(torch.nn.Module):
 
         Returns
         -------
+        z : sampling using q_mean and q_var
         q_mean : mean value of the central VAE layer
+        q_var : variance value of the central VAE layer
         reconstruction: returns the reconstruction of a data point
         """
         q_mean, q_var = self.encode(x)
-        reconstruction = self.decode(q_mean)
-        return q_mean, reconstruction
+        z = _sampling(q_mean, q_var)
+        reconstruction = self.decode(z)
+        return z, q_mean, q_var, reconstruction
+
+    def predict(self, q_mean, q_var) -> torch.Tensor:
+        z = _sampling(q_mean, q_var)
+        pi_normalized = self.normalize_prob(self.pi)
+        p_c_z = _get_gamma(pi_normalized, self.p_mean, self.p_var, z)
+        pred = torch.argmax(p_c_z, dim=1)
+        return pred
+
+    def vae_loss(self, batch_data, reconstruction, q_mean, q_var, loss_fn) -> torch.Tensor:
+        z = _sampling(q_mean, q_var)
+        pi_normalized = self.normalize_prob(self.pi)
+        p_c_z = _get_gamma(pi_normalized, self.p_mean, self.p_var, z)
+        loss = _compute_loss(pi_normalized, self.p_mean, self.p_var, q_mean, q_var, batch_data, p_c_z, reconstruction,
+                             loss_fn)
+        return loss
 
     def evaluate(self, dataloader, loss_fn, device=torch.device("cpu")):
-        """Evaluates the VAE.
+        """
+        Evaluates the VAE.
 
         Parameters
         ----------
@@ -126,16 +188,16 @@ class VariationalAutoencoder(torch.nn.Module):
             loss = 0
             for batch in dataloader:
                 batch_data = batch[1].to(device)
-                _, reconstruction = self.forward(batch_data)
-                loss += loss_fn(reconstruction, batch_data)
+                _, q_mean, q_var, reconstruction = self.forward(batch_data)
+                loss += self.vae_loss(batch_data, reconstruction, q_mean, q_var, loss_fn)
             loss /= len(dataloader)
         return loss
 
     def fit(self, n_epochs, lr, batch_size=128, data=None, data_eval=None, dataloader=None, evalloader=None,
             optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(), patience=5, scheduler=None,
             scheduler_params=None, device=torch.device("cpu"), model_path=None, print_step=0):
-        """Trains the autoencoder in place.
-
+        """
+        Trains the VAE in place.
 
         Parameters
         ----------
@@ -189,8 +251,8 @@ class VariationalAutoencoder(torch.nn.Module):
             self.train()
             for batch in dataloader:
                 batch_data = batch[1].to(device)
-                _, reconstruction = self.forward(batch_data)
-                loss = loss_fn(reconstruction, batch_data)
+                _, q_mean, q_var, reconstruction = self.forward(batch_data)
+                loss = self.vae_loss(batch_data, reconstruction, q_mean, q_var, loss_fn)
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
