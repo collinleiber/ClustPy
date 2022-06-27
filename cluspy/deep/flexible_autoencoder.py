@@ -159,9 +159,9 @@ class FlexibleAutoencoder(torch.nn.Module):
             self.eval()
             loss = 0
             for batch in dataloader:
-                batch = batch[1].to(device)
-                reconstruction = self(batch)
-                loss += loss_fn(reconstruction, batch)
+                batch_data = batch[1].to(device)
+                reconstruction = self(batch_data)
+                loss += loss_fn(reconstruction, batch_data)
             loss /= len(dataloader)
         return loss
 
@@ -221,9 +221,9 @@ class FlexibleAutoencoder(torch.nn.Module):
         for epoch_i in range(n_epochs):
             self.train()
             for batch in dataloader:
-                batch = batch[1].to(device)
-                reconstruction = self(batch)
-                loss = loss_fn(reconstruction, batch)
+                batch_data = batch[1].to(device)
+                reconstruction = self(batch_data)
+                loss = loss_fn(reconstruction, batch_data)
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
@@ -246,17 +246,16 @@ class FlexibleAutoencoder(torch.nn.Module):
                     if model_path is not None:
                         torch.save(self.state_dict(), model_path)
 
-                if print_step > 0 and early_stopping.early_stop:
-                    print(f"Stop training at epoch {best_epoch}")
-                    print(f"Best Loss: {best_loss:.6f}, Last Loss: {val_loss:.6f}")
+                if early_stopping.early_stop:
+                    if print_step > 0:
+                        print(f"Stop training at epoch {best_epoch}")
+                        print(f"Best Loss: {best_loss:.6f}, Last Loss: {val_loss:.6f}")
                     break
                 if scheduler is not None and eval_step_scheduler:
                     scheduler.step(val_loss)
         # Save last version of model
         if evalloader is None and model_path is not None:
             torch.save(self.state_dict(), model_path)
-
         # Autoencoder is now pretrained
         self.fitted = True
-
         return self

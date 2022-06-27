@@ -66,7 +66,7 @@ def get_dataloader(X, batch_size, shuffle=True, drop_last=False, additional_inpu
     batch_size: the batch size
     shuffle: boolean that defines if the data set should be shuffled (default: True)
     drop_last: boolean that defines if the last batch should be ignored (default: False)
-    additional_inputs: additional inputs for the datalaoder, e.g. labels. Can be None, np.ndarray, torch.Tensor or a list containing np.ndarrays/torch.Tensors (default: None)
+    additional_inputs: additional inputs for the dataloader, e.g. labels. Can be None, np.ndarray, torch.Tensor or a list containing np.ndarrays/torch.Tensors (default: None)
     dataset_class: defines the class of the tensor dataset that is contained in the dataloader (default: _CluspyDataset)
     dl_kwargs: other arguments for torch.utils.data.DataLoader
 
@@ -74,8 +74,7 @@ def get_dataloader(X, batch_size, shuffle=True, drop_last=False, additional_inpu
     -------
     The final dataloader
     """
-    assert X is None or type(additional_inputs) in [np.ndarray,
-                                                    torch.Tensor], "X must be of type np.ndarray or torch.Tensor."
+    assert type(X) in [np.ndarray, torch.Tensor], "X must be of type np.ndarray or torch.Tensor."
     assert additional_inputs is None or type(additional_inputs) in [np.ndarray, torch.Tensor,
                                                                     list], "additional_input must be None or of type np.ndarray, torch.Tensor or list."
     if type(X) is np.ndarray:
