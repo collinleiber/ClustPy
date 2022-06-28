@@ -5,8 +5,9 @@ import torch
 import numpy as np
 from cluspy.partition.skinnydip import _dip_mirrored_data
 from cluspy.deep._utils import detect_device, encode_batchwise
-from ._data_utils import get_dataloader
-from ._train_utils import get_trained_autoencoder
+from cluspy.deep._data_utils import get_dataloader
+from cluspy.deep._train_utils import get_trained_autoencoder, get_default_layers
+from cluspy.deep.flexible_autoencoder import FlexibleAutoencoder
 
 """
 Dip module - holds backward functions
@@ -185,7 +186,8 @@ def _predict(X_train, X_test, labels_train, projections, n_clusters, index_dict)
 
 
 def _get_lambda(trainloader, autoencoder_class, input_dim, embedding_size, loss_fn, device):
-    autoencoder = autoencoder_class(input_dim=input_dim, embedding_size=embedding_size).to(device)
+    layers = get_default_layers(input_dim, embedding_size)
+    autoencoder = autoencoder_class(layers).to(device)
     batch_init = next(iter(trainloader))[1]
     batch_init = batch_init.to(device)
     reconstruction = autoencoder.forward(batch_init)
@@ -214,7 +216,7 @@ def _dipmodule(X, n_clusters, embedding_size, batch_size, optimizer_class, loss_
     # rand_samples_resized = (rand_samples * (data_max - data_min) + data_min).to(device)
     # rand_samples_reconstruction = autoencoder.forward(rand_samples_resized)
     # ae_factor = loss_fn(rand_samples_reconstruction, rand_samples_resized).detach()
-    ae_factor = _get_lambda(trainloader, Simple_Autoencoder, X.shape[1], embedding_size, loss_fn, device)
+    ae_factor = _get_lambda(trainloader, FlexibleAutoencoder, X.shape[1], embedding_size, loss_fn, device)
     # Create initial projections
     n_cluste_combinations = int((n_clusters - 1) * n_clusters / 2)
     projections = np.zeros((n_cluste_combinations, embedding_size))

@@ -34,7 +34,7 @@ def _dcn(X, n_clusters, batch_size, pretrain_learning_rate, clustering_learning_
     # Use DCN learning_rate (usually pretrain_learning_rate reduced by a magnitude of 10)
     optimizer = optimizer_class(list(autoencoder.parameters()), lr=clustering_learning_rate)
     # DEC Training loop
-    dcn_module.start_training(autoencoder, trainloader, clustering_epochs, device, optimizer, loss_fn,
+    dcn_module.fit(autoencoder, trainloader, clustering_epochs, device, optimizer, loss_fn,
                               degree_of_space_distortion, degree_of_space_preservation)
     # Get labels
     dcn_labels = predict_batchwise(testloader, autoencoder, dcn_module, device)
@@ -81,7 +81,7 @@ class _DCN_Module(torch.nn.Module):
         self.to(device)
         return self
 
-    def start_training(self, autoencoder, trainloader, n_epochs, device, optimizer, loss_fn,
+    def fit(self, autoencoder, trainloader, n_epochs, device, optimizer, loss_fn,
                        degree_of_space_distortion, degree_of_space_preservation):
         # DCN training loop
         # Init for count from original DCN code (not reported in Paper)

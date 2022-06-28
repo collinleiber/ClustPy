@@ -1,17 +1,14 @@
 """
-Jiang, Zhuxi, et al. "Variational deep embedding: An
-unsupervised and generative approach to clustering." arXiv
-preprint arXiv:1611.05148 (2016).
-
-@authors: Donatella Novakovic
+@authors:
+Donatella Novakovic
+Lukas Miklautz
 """
 
 import torch
-from cluspy.deep._utils import detect_device, encode_batchwise
+from cluspy.deep._utils import detect_device
 from cluspy.deep._data_utils import get_dataloader
 from cluspy.deep._train_utils import get_trained_autoencoder
-from cluspy.deep.variational_autoencoder import VariationalAutoencoder
-from cluspy.deep.flexible_autoencoder import FlexibleAutoencoder, FullyConnectedBlock
+from cluspy.deep.variational_autoencoder import VariationalAutoencoder, _vae_sampling
 import numpy as np
 from sklearn.mixture import GaussianMixture
 from sklearn.base import BaseEstimator, ClusterMixin
@@ -19,149 +16,333 @@ from sklearn.base import BaseEstimator, ClusterMixin
 
 def _vade(X, n_clusters, batch_size, pretrain_learning_rate, clustering_learning_rate, pretrain_epochs,
           clustering_epochs, optimizer_class, loss_fn, autoencoder, embedding_size, n_gmm_initializations):
+    """
+    Start the actual VaDE clustering procedure on the input data set.
+    First an variational autoencoder (VAE) will be trained (will be skipped if input autoencoder is given).
+    Afterwards, a GMM will be fit to identify the initial clustering structures.
+    Last, the VAE will be optimized using the VaDE loss function from the _VaDE_Module.
+
+    Parameters
+    ----------
+    X : the given data set
+    n_clusters : int, number of clusters
+    batch_size : int, size of the data batches
+    pretrain_learning_rate : double, learning rate for the pretraining of the autoencoder
+    clustering_learning_rate : double, learning rate of the actual clustering procedure
+    pretrain_epochs : int, number of epochs for the pretraining of the autoencoder
+    clustering_epochs : int, number of epochs for the actual clustering procedure
+    optimizer_class : Optimizer
+    loss_fn : loss function for the reconstruction
+    autoencoder : the input autoencoder. If None a variation of a VariationalAutoencoder will be created
+    embedding_size : int, size of the embedding within the autoencoder (central layer with mean and variance)
+    n_gmm_initializations : int, number of initializations for the initial GMM clustering within the embedding
+
+    Returns
+    -------
+    gmm_labels, gmm.means_, gmm.covariances_, vade_labels, vade_centers, vade_covariances, autoencoder
+    """
     device = detect_device()
     trainloader = get_dataloader(X, batch_size, True, False)
     testloader = get_dataloader(X, batch_size, False, False)
-    if autoencoder is None:
-        autoencoder = get_trained_autoencoder(trainloader, pretrain_learning_rate, pretrain_epochs, device,
-                                              optimizer_class, loss_fn, X.shape[1], embedding_size, autoencoder,
-                                              _VaDE_AE)
-        # Execute EM in embedded space
-        embedded_data = encode_batchwise(testloader, autoencoder, device)
-        gmm = GaussianMixture(n_components=n_clusters, covariance_type='diag', n_init=n_gmm_initializations)
-        gmm.fit(embedded_data)
-        # Initialize VaDE
-        vae = VariationalAutoencoder(layers=autoencoder.layers, n_distributions=n_clusters,
-                                             batch_norm=autoencoder.batch_norm,
-                                             dropout=autoencoder.dropout, activation_fn=autoencoder.activation_fn,
-                                             bias=autoencoder.bias, decoder_layers=autoencoder.decoder_layers,
-                                             decoder_output_fn=autoencoder.decoder_output_fn)
-        # Copy data from _VadeAE to VAE
-        vae.pi.data = torch.from_numpy(gmm.weights_).float()
-        vae.p_mean.data = torch.from_numpy(gmm.means_).float()
-        vae.p_var.data = torch.log(torch.from_numpy(gmm.covariances_)).float()
-        vae.q_mean_ = autoencoder.q_mean_
-        vae.encoder = autoencoder.encoder
-        vae.decoder = autoencoder.decoder
-        vae.to(device)
-    else:
-        vae = autoencoder
-        vae.to(device)
+    autoencoder = get_trained_autoencoder(trainloader, pretrain_learning_rate, pretrain_epochs, device,
+                                          optimizer_class, loss_fn, X.shape[1], embedding_size, autoencoder,
+                                          _VaDE_VAE)
+    # Execute EM in embedded space
+    embedded_data = _vade_encode_batchwise(testloader, autoencoder, device)
+    gmm = GaussianMixture(n_components=n_clusters, covariance_type='diag', n_init=n_gmm_initializations)
+    gmm.fit(embedded_data)
+    # Initialize VaDE
+    vade_module = _VaDE_Module(n_clusters=n_clusters, embedding_size=embedding_size, weights=gmm.weights_,
+                               means=gmm.means_, variances=gmm.covariances_).to(device)
+    # Use vade learning_rate (usually pretrain_learning_rate reduced by a magnitude of 10)
+    optimizer = optimizer_class(list(autoencoder.parameters()) + list(vade_module.parameters()),
+                                lr=clustering_learning_rate)
     # Vade Training loop
-    vae.fit(n_epochs=clustering_epochs, lr=clustering_learning_rate, batch_size=batch_size,
-                    dataloader=trainloader,
-                    optimizer_class=optimizer_class, loss_fn=loss_fn, device=device)
+    vade_module.fit(autoencoder, trainloader, clustering_epochs, device, optimizer, loss_fn)
     # Get labels
-    vade_labels = _vade_predict_batchwise(testloader, vae, device)
-    vade_centers = vae.p_mean.detach().cpu().numpy()
-    vade_covariances = vae.p_var.detach().cpu().numpy()
+    vade_labels = _vade_predict_batchwise(testloader, autoencoder, vade_module, device)
+    vade_centers = vade_module.p_mean.detach().cpu().numpy()
+    vade_covariances = vade_module.p_var.detach().cpu().numpy()
     # Do reclustering with GMM
-    embedded_data = _vade_encode_batchwise(testloader, vae, device)
+    embedded_data = _vade_encode_batchwise(testloader, autoencoder, device)
     gmm = GaussianMixture(n_components=n_clusters, covariance_type='diag', n_init=100)
     gmm_labels = gmm.fit_predict(embedded_data)
     # Return results
-    return gmm_labels, gmm.means_, gmm.covariances_, vade_labels, vade_centers, vade_covariances, vae
+    return gmm_labels, gmm.means_, gmm.covariances_, vade_labels, vade_centers, vade_covariances, autoencoder
 
 
-def _vade_predict_batchwise(dataloader, vade_module, device):
+class _VaDE_VAE(VariationalAutoencoder):
+    """
+    A special variational autoencoder used for VaDE.
+    Has a slightly different forward function while pretraining the autoencoder.
+    Further, Loss function is more similar to the FlexibleAutoencoder while pretraining.
+
+    Attributes
+    ----------
+    encoder : encoder part of the autoencoder, responsible for embedding data points (class is FullyConnectedBlock)
+    decoder : decoder part of the autoencoder, responsible for reconstructing data points from the embedding (class is FullyConnectedBlock)
+    mean : mean value of the central layer
+    log_variance : variance of the central layer (use logirithm of variance - numerical purposes)
+    fitted  : boolean value indicating whether the autoencoder is already fitted.
+    pretraining : boolean value indicating if pretraining has already happen
+    """
+
+    def __init__(self, **kwargs):
+        super(_VaDE_VAE, self).__init__(**kwargs)
+        self.pretraining = True
+
+    def forward(self, x: torch.Tensor) -> (torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor):
+        """
+        Applies both encode and decode function.
+        The forward function is automatically called if we call self(x).
+        Matches forward behavior from FlexibleAutoencoder for pretraining and from VariationalAutoencoder afterwards.
+        Overwrites function from VariationalAutoencoder.
+
+        Parameters
+        ----------
+        x : input data point, can also be a mini-batch of embedded points
+
+        Returns
+        -------
+        reconstruction: returns the reconstruction of the data point
+        """
+        if self.pretraining:
+            mean, _ = self.encode(x)
+            reconstruction = self.decode(mean)
+            return None, None, None, reconstruction
+        else:
+            return super().forward(x)
+
+    def loss(self, batch_data, loss_fn, beta=1):
+        """
+        Calculate the loss of a single batch of data.
+        Matches loss calculation from FlexibleAutoencoder for pretraining and from VariationalAutoencoder afterwards.
+        Overwrites function from VariationalAutoencoder.
+
+        Parameters
+        ----------
+        batch_data : torch.Tensor, the samples
+        loss_fn : torch.nn, loss function to be used for reconstruction
+        beta : Not used at the moment
+
+        Returns
+        -------
+        loss: returns the reconstruction loss of the input sample
+        """
+        if self.pretraining:
+            _, _, _, reconstruction = self.forward(batch_data)
+            loss = loss_fn(reconstruction, batch_data)
+        else:
+            loss = super().loss(batch_data, loss_fn, beta)
+        return loss
+
+    def fit(self, **kwargs):
+        """
+        Calls the fit function from the FlexibleAutoencoder.
+        Additionally, the pretraining parameter will be set to False, which changes the behavior of forward() and loss().
+
+        Parameters
+        ----------
+        kwargs : see FlexibleAutoencoder for more information
+
+        Returns
+        -------
+        The _Vade_VAE object
+        """
+        super().fit(**kwargs)
+        self.pretraining = False
+        return self
+
+
+def _vade_predict_batchwise(dataloader, autoencoder, vade_module, device):
     """ Utility function for predicting the cluster labels over the whole data set in a mini-batch fashion
     """
     predictions = []
     for batch in dataloader:
         batch_data = batch[1].to(device)
-        q_mean, q_var = vade_module.encode(batch_data)
-        prediction = vade_module.predict(q_mean, q_var).detach().cpu()
+        q_mean, q_logvar = autoencoder.encode(batch_data)
+        prediction = vade_module.predict(q_mean, q_logvar).detach().cpu()
         predictions.append(prediction)
     return torch.cat(predictions, dim=0).numpy()
 
 
-def _vade_encode_batchwise(dataloader, vade_module, device):
+def _vade_encode_batchwise(dataloader, autoencoder, device):
     """ Utility function for embedding the whole data set in a mini-batch fashion
     """
     embeddings = []
     for batch in dataloader:
         batch_data = batch[1].to(device)
-        q_mean, _ = vade_module.encode(batch_data)
+        q_mean, _ = autoencoder.encode(batch_data)
         embeddings.append(q_mean.detach().cpu())
     return torch.cat(embeddings, dim=0).numpy()
 
 
-class _VaDE_AE(FlexibleAutoencoder):
-    """
-    A special autoencoder used for VaDE.
+def _get_gamma(pi, p_mean, p_var, z):
+    z = z.unsqueeze(1)
+    p_var = p_var.unsqueeze(0)
+    pi = pi.unsqueeze(0)
 
-    Parameters
-    ----------
-    layers : list of the different layer sizes from input to embedding, e.g. an example architecture for MNIST [784, 512, 256, 10], where 784 is the input dimension and 10 the dimension of the embedding.
-             If decoder_layers are not specified then the decoder is symmetric and goes in the same order from embedding to input.
-    batch_norm : bool, default=False, set True if you want to use torch.nn.BatchNorm1d
-    dropout : float, default=None, set the amount of dropout you want to use.
-    activation: activation function from torch.nn, default=torch.nn.LeakyReLU, set the activation function for the hidden layers, if None then it will be linear.
-    bias : bool, default=True, set False if you do not want to use a bias term in the linear layers
-    decoder_layers : list, default=None, list of different layer sizes from embedding to output of the decoder. If set to None, will be symmetric to layers.
-    decoder_output_fn : activation function from torch.nn, default=None, set the activation function for the decoder output layer, if None then it will be linear.
-                        e.g. set to torch.nn.Sigmoid if you want to scale the decoder output between 0 and 1.
+    p_z_c = -torch.sum(0.5 * (np.log(2 * np.pi)) + p_var + ((z - p_mean).pow(2) / (2. * torch.exp(p_var))), dim=2)
+    p_c_z_c = torch.exp(torch.log(pi) + p_z_c) + 1e-10
+    p_c_z = p_c_z_c / torch.sum(p_c_z_c, dim=1, keepdim=True)
+
+    return p_c_z
+
+
+def _compute_vade_loss(pi, p_mean, p_var, q_mean, q_var, batch_data, p_c_z, reconstruction, loss_fn):
+    q_mean = q_mean.unsqueeze(1)
+    p_var = p_var.unsqueeze(0)
+
+    p_x_z = loss_fn(reconstruction, batch_data)
+
+    p_z_c = torch.sum(p_c_z * (0.5 * np.log(2 * np.pi) + 0.5 * (
+            torch.sum(p_var, dim=2) + torch.sum(torch.exp(q_var.unsqueeze(1)) / torch.exp(p_var),
+                                                dim=2) + torch.sum((q_mean - p_mean).pow(2) / torch.exp(p_var),
+                                                                   dim=2))))
+    p_c = torch.sum(p_c_z * torch.log(pi))
+    q_z_x = 0.5 * (np.log(2 * np.pi)) + 0.5 * torch.sum(1 + q_var)
+    q_c_x = torch.sum(p_c_z * torch.log(p_c_z))
+
+    loss = p_z_c - p_c - q_z_x + q_c_x
+    loss /= batch_data.size(0)
+    loss += p_x_z  # Should not divide two times by number of samples
+    return loss
+
+
+class _VaDE_Module(torch.nn.Module):
+    """
+    The _VaDE_Module. Contains most of the algorithm specific procedures.
+
     Attributes
     ----------
-    encoder : encoder part of the autoencoder, responsible for embedding data points
-    decoder : decoder part of the autoencoder, responsible for reconstructing data points from the embedding
-    fitted  : boolean value indicating whether the autoencoder is already fitted.
+    pi : the soft assignments of the VAE
+    p_mean : the cluster centers of the VAE
+    p_var : the variances of the VAE
+    normalize_prob : torch.nn.Softmax function for the prediction method
     """
 
-    def __init__(self, layers, batch_norm=False, dropout=None, activation_fn=torch.nn.LeakyReLU, bias=True,
-                 decoder_layers=None, decoder_output_fn=torch.nn.Sigmoid):
-        super(_VaDE_AE, self).__init__(layers, batch_norm, dropout, activation_fn, bias,
-                                       decoder_layers, decoder_output_fn)
-        self.layers = layers
-        self.batch_norm = batch_norm
-        self.dropout = dropout
-        self.activation_fn = activation_fn
-        self.bias = bias
-        self.decoder_output_fn = decoder_output_fn
-        self.fitted = False
-        if decoder_layers is None:
-            self.decoder_layers = self.layers[::-1]
-        else:
-            self.decoder_layers = decoder_layers
-        if (self.layers[-1] != self.decoder_layers[0]):
-            raise ValueError(
-                f"Innermost hidden layer and first decoder layer do not match, they are {self.layers[-1]} and {self.decoder_layers[0]} respectively.")
-        if (self.layers[0] != self.decoder_layers[-1]):
-            raise ValueError(
-                f"Output and input dimension do not match, they are {self.layers[0]} and {self.decoder_layers[-1]} respectively.")
-
-        # Initialize encoder
-        self.encoder = FullyConnectedBlock(layers=self.layers[:-1], batch_norm=self.batch_norm, dropout=self.dropout,
-                                           activation_fn=self.activation_fn, bias=self.bias,
-                                           output_fn=self.activation_fn)
-        # naming is used for later correspondence in VAE
-        self.q_mean_ = torch.nn.Linear(self.layers[-2], self.layers[-1])
-        # Inverts the list of layers to make symmetric version of the encoder
-        self.decoder = FullyConnectedBlock(layers=self.decoder_layers, batch_norm=self.batch_norm, dropout=self.dropout,
-                                           activation_fn=self.activation_fn, bias=self.bias,
-                                           output_fn=self.decoder_output_fn)
-
-    def encode(self, x: torch.Tensor) -> (torch.Tensor, torch.Tensor):
+    def __init__(self, n_clusters, embedding_size, weights=None, means=None, variances=None):
         """
+
+
         Parameters
         ----------
-        x : input data point, can also be a mini-batch of points
+        n_clusters : int, number of clusters
+        embedding_size : int, size of the central layer within the VAE
+        weights : the initial soft cluster assignments (default: None)
+        means : the initial means of the VAE (default: None)
+        variances : the initial variances of the VAE (default: None)
+        """
+        super(_VaDE_Module, self).__init__()
+        if weights is None:
+            weights = torch.ones(n_clusters) / n_clusters
+        self.pi = torch.nn.Parameter(torch.tensor(weights), requires_grad=True)
+        if means is None:
+            # if not initialized then use torch.randn
+            means = torch.randn(n_clusters, embedding_size)
+        self.p_mean = torch.nn.Parameter(torch.tensor(means), requires_grad=True)
+        if variances is None:
+            variances = torch.ones(n_clusters, embedding_size)
+        self.p_var = torch.nn.Parameter(torch.tensor(variances), requires_grad=True)
+        self.normalize_prob = torch.nn.Softmax(dim=0)
+
+    def predict(self, q_mean, q_logvar) -> torch.Tensor:
+        """
+        Predict the label given the specific mean and variance values of a given sample.
+        Uses argmax to return a hard cluster label.
+
+        Parameters
+        ----------
+        q_mean : mean value of the central layer.
+        q_var : variance of the central layer (use logirithm of variance - numerical purposes)
 
         Returns
         -------
-        q_mean : mean value of the central VAE layer
-        q_var : variance value of the central VAE layer
+        The predicted label
         """
-        embedded = self.encoder(x)
-        q_mean = self.q_mean_(embedded)
-        return q_mean
+        z = _vae_sampling(q_mean, q_logvar)
+        pi_normalized = self.normalize_prob(self.pi)
+        p_c_z = _get_gamma(pi_normalized, self.p_mean, self.p_var, z)
+        pred = torch.argmax(p_c_z, dim=1)
+        return pred
+
+    def loss(self, autoencoder, batch_data, loss_fn):
+        """
+        Calculate the VaDE loss of a single batch of data.
+
+        Parameters
+        ----------
+        batch : torch.Tensor, the samples
+        loss_fn : torch.nn, loss function to be used for reconstruction
+
+        Returns
+        -------
+        loss: returns the reconstruction loss of the input sample
+        """
+        z, q_mean, q_logvar, reconstruction = autoencoder.forward(batch_data)
+        pi_normalized = self.normalize_prob(self.pi)
+        p_c_z = _get_gamma(pi_normalized, self.p_mean, self.p_var, z)
+        loss = _compute_vade_loss(pi_normalized, self.p_mean, self.p_var, q_mean, q_logvar, batch_data, p_c_z,
+                                  reconstruction, loss_fn)
+        return loss
+
+    def fit(self, autoencoder, trainloader, n_epochs, device, optimizer, loss_fn):
+        """
+        Trains the _VaDE_Module in place.
+
+        Parameters
+        ----------
+        autoencoder : torch.nn.Module, Variational Autoencoder
+        trainloader : torch.utils.data.DataLoader, dataloader to be used for training
+        n_epochs : int, number of epochs for the clustering procedure
+        device : torch.device, device to be trained on
+        loss_fn : loss function for the reconstruction
+        """
+        # lr_decrease = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.9)
+        # training loop
+        for _ in range(n_epochs):
+            self.train()
+            for batch in trainloader:
+                # load batch on device
+                batch_data = batch[1].to(device)
+                loss = self.loss(autoencoder, batch_data, loss_fn)
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
 
 
 class VaDE(BaseEstimator, ClusterMixin):
+    """
+    Variational Deep Embedding
+    """
+
     def __init__(self, n_clusters, batch_size=256, pretrain_learning_rate=1e-3, clustering_learning_rate=1e-4,
                  pretrain_epochs=100, clustering_epochs=150, optimizer_class=torch.optim.Adam,
-                 loss_fn=torch.nn.BCELoss(reduction='sum'), autoencoder=None, embedding_size=10,
+                 loss_fn=torch.nn.BCELoss(), autoencoder=None, embedding_size=10,
                  n_gmm_initializations=100):
+        """
+        Create an instance of the VaDE algorithm.
+
+        Parameters
+        ----------
+        n_clusters : int, number of clusters
+        batch_size : int, size of the data batches (default: 256)
+        pretrain_learning_rate : double, learning rate for the pretraining of the autoencoder (default: 1e-3)
+        clustering_learning_rate : double, learning rate of the actual clustering procedure (default: 1e-4)
+        pretrain_epochs : int, number of epochs for the pretraining of the autoencoder (default: 100)
+        clustering_epochs : int, number of epochs for the actual clustering procedure (default: 150)
+        optimizer_class : Optimizer (default: torch.optim.Adam)
+        loss_fn : loss function for the reconstruction (default: torch.nn.BCELoss())
+        autoencoder : the input autoencoder. If None a variation of a VariationalAutoencoder will be created (default: None)
+        embedding_size : int, size of the embedding within the autoencoder (central layer with mean and variance) (default: 10)
+        n_gmm_initializations : int, number of initializations for the initial GMM clustering within the embedding (default: 100)
+
+        References
+        ----------
+        Jiang, Zhuxi, et al. "Variational deep embedding: An
+        unsupervised and generative approach to clustering." arXiv
+        preprint arXiv:1611.05148 (2016).
+        """
         self.n_clusters = n_clusters
         self.batch_size = batch_size
         self.pretrain_learning_rate = pretrain_learning_rate
@@ -175,6 +356,19 @@ class VaDE(BaseEstimator, ClusterMixin):
         self.n_gmm_initializations = n_gmm_initializations
 
     def fit(self, X, y=None):
+        """
+        Initiate the actual clustering process on the input data set.
+        The resulting cluster labels are contained in the labels_ attribute.
+
+        Parameters
+        ----------
+        X : the given data set
+        y : the labels (can be ignored)
+
+        Returns
+        -------
+        returns the clustering object
+        """
         gmm_labels, gmm_means, gmm_covariances, vade_labels, vade_centers, vade_covariances, autoencoder = _vade(X,
                                                                                                                  self.n_clusters,
                                                                                                                  self.batch_size,

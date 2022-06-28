@@ -31,7 +31,7 @@ def _dec(X, n_clusters, alpha, batch_size, pretrain_learning_rate, clustering_le
     optimizer = optimizer_class(list(autoencoder.parameters()) + list(dec_module.parameters()),
                                 lr=clustering_learning_rate)
     # DEC Training loop
-    dec_module.start_training(autoencoder, trainloader, clustering_epochs, device, optimizer, loss_fn,
+    dec_module.fit(autoencoder, trainloader, clustering_epochs, device, optimizer, loss_fn,
                               use_reconstruction_loss, cluster_loss_weight)
     # Get labels
     dec_labels = predict_batchwise(testloader, autoencoder, dec_module, device)
@@ -87,7 +87,7 @@ class _DEC_Module(torch.nn.Module):
         loss = _dec_compression_loss_fn(prediction)
         return loss
 
-    def start_training(self, autoencoder, trainloader, n_epochs, device, optimizer, loss_fn, use_reconstruction_loss,
+    def fit(self, autoencoder, trainloader, n_epochs, device, optimizer, loss_fn, use_reconstruction_loss,
                        cluster_loss_weight):
         for _ in range(n_epochs):
             for batch in trainloader:
@@ -129,9 +129,9 @@ class DEC(BaseEstimator, ClusterMixin):
         clustering_learning_rate : learning rate of the actual clustering procedure
         pretrain_epochs : number of epochs for the pretraining of the autoencoder
         clustering_epochs : number of epochs for the actual clustering procedure
-        optimizer_class : Optimizer (default: ADAM)
-        loss_fn : loss function for the reconstruction (default: MSELoss)
-        autoencoder : the input autoencoder. If None a new autoencoder will be created
+        optimizer_class : Optimizer (default: torch.optim.Adam)
+        loss_fn : loss function for the reconstruction (default: torch.nn.MSELoss())
+        autoencoder : the input autoencoder. If None a new FlexibleAutoencoder will be created
         embedding_size : size of the embedding within the autoencoder
         use_reconstruction_loss : should the reconstruction loss be used during clustering training
         cluster_loss_weight : weight of the clustering loss compared to the reconstruction loss

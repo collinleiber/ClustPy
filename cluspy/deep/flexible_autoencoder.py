@@ -48,6 +48,17 @@ class FullyConnectedBlock(torch.nn.Module):
         self.block = torch.nn.Sequential(*fc_block_list)
 
     def forward(self, x):
+        """
+        Pass a sample through the FullyConnectedBlock.
+
+        Parameters
+        ----------
+        x : the sample
+
+        Returns
+        -------
+        The passed sample.
+        """
         return self.block(x)
 
 
@@ -67,43 +78,36 @@ class FlexibleAutoencoder(torch.nn.Module):
                         e.g. set to torch.nn.Sigmoid if you want to scale the decoder output between 0 and 1. 
     Attributes
     ----------
-    encoder : encoder part of the autoencoder, responsible for embedding data points
-    decoder : decoder part of the autoencoder, responsible for reconstructing data points from the embedding
+    encoder : encoder part of the autoencoder, responsible for embedding data points (class is FullyConnectedBlock)
+    decoder : decoder part of the autoencoder, responsible for reconstructing data points from the embedding (class is FullyConnectedBlock)
     fitted  : boolean value indicating whether the autoencoder is already fitted.
     """
 
     def __init__(self, layers, batch_norm=False, dropout=None, activation_fn=torch.nn.LeakyReLU, bias=True,
                  decoder_layers=None, decoder_output_fn=None):
         super(FlexibleAutoencoder, self).__init__()
-        self.layers = layers
-        self.batch_norm = batch_norm
-        self.dropout = dropout
-        self.activation_fn = activation_fn
-        self.bias = bias
-        self.decoder_output_fn = decoder_output_fn
         self.fitted = False
         if decoder_layers is None:
-            self.decoder_layers = self.layers[::-1]
-        else:
-            self.decoder_layers = decoder_layers
-        if (self.layers[-1] != self.decoder_layers[0]):
+            decoder_layers = layers[::-1]
+        if (layers[-1] != decoder_layers[0]):
             raise ValueError(
-                f"Innermost hidden layer and first decoder layer do not match, they are {self.layers[-1]} and {self.decoder_layers[0]} respectively.")
-        if (self.layers[0] != self.decoder_layers[-1]):
+                f"Innermost hidden layer and first decoder layer do not match, they are {layers[-1]} and {decoder_layers[0]} respectively.")
+        if (layers[0] != decoder_layers[-1]):
             raise ValueError(
-                f"Output and input dimension do not match, they are {self.layers[0]} and {self.decoder_layers[-1]} respectively.")
-
+                f"Output and input dimension do not match, they are {layers[0]} and {decoder_layers[-1]} respectively.")
         # Initialize encoder
-        self.encoder = FullyConnectedBlock(layers=self.layers, batch_norm=self.batch_norm, dropout=self.dropout,
-                                           activation_fn=self.activation_fn, bias=self.bias, output_fn=None)
+        self.encoder = FullyConnectedBlock(layers=layers, batch_norm=batch_norm, dropout=dropout,
+                                           activation_fn=activation_fn, bias=bias, output_fn=None)
 
         # Inverts the list of layers to make symmetric version of the encoder
-        self.decoder = FullyConnectedBlock(layers=self.decoder_layers, batch_norm=self.batch_norm, dropout=self.dropout,
-                                           activation_fn=self.activation_fn, bias=self.bias,
-                                           output_fn=self.decoder_output_fn)
+        self.decoder = FullyConnectedBlock(layers=decoder_layers, batch_norm=batch_norm, dropout=dropout,
+                                           activation_fn=activation_fn, bias=bias,
+                                           output_fn=decoder_output_fn)
 
     def encode(self, x: torch.Tensor) -> torch.Tensor:
         """
+        Apply the encoder function to x.
+
         Parameters
         ----------
         x : input data point, can also be a mini-batch of points
@@ -116,6 +120,8 @@ class FlexibleAutoencoder(torch.nn.Module):
 
     def decode(self, embedded: torch.Tensor) -> torch.Tensor:
         """
+        Apply the decoder function to embedded.
+
         Parameters
         ----------
         embedded: embedded data point, can also be a mini-batch of embedded points
@@ -127,7 +133,8 @@ class FlexibleAutoencoder(torch.nn.Module):
         return self.decoder(embedded)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """ Applies both encode and decode function. 
+        """
+        Applies both encode and decode function.
         The forward function is automatically called if we call self(x).
 
         Parameters
@@ -142,8 +149,26 @@ class FlexibleAutoencoder(torch.nn.Module):
         reconstruction = self.decode(embedded)
         return reconstruction
 
+    def loss(self, batch_data, loss_fn):
+        """
+        Calculate the loss of a single batch of data.
+
+        Parameters
+        ----------
+        batch : torch.Tensor, the samples
+        loss_fn : torch.nn, loss function to be used for reconstruction
+
+        Returns
+        -------
+        loss: returns the reconstruction loss of the input sample
+        """
+        reconstruction = self.forward(batch_data)
+        loss = loss_fn(reconstruction, batch_data)
+        return loss
+
     def evaluate(self, dataloader, loss_fn, device=torch.device("cpu")):
-        """Evaluates the autoencoder.
+        """
+        Evaluates the autoencoder.
         
         Parameters
         ----------
@@ -160,15 +185,15 @@ class FlexibleAutoencoder(torch.nn.Module):
             loss = 0
             for batch in dataloader:
                 batch_data = batch[1].to(device)
-                reconstruction = self(batch_data)
-                loss += loss_fn(reconstruction, batch_data)
+                loss += self.loss(batch_data, loss_fn)
             loss /= len(dataloader)
         return loss
 
     def fit(self, n_epochs, lr, batch_size=128, data=None, data_eval=None, dataloader=None, evalloader=None,
             optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(), patience=5, scheduler=None,
             scheduler_params=None, device=torch.device("cpu"), model_path=None, print_step=0):
-        """Trains the autoencoder in place.
+        """
+        Trains the autoencoder in place.
         
         Parameters
         ----------
@@ -222,8 +247,7 @@ class FlexibleAutoencoder(torch.nn.Module):
             self.train()
             for batch in dataloader:
                 batch_data = batch[1].to(device)
-                reconstruction = self.forward(batch_data)
-                loss = loss_fn(reconstruction, batch_data)
+                loss = self.loss(batch_data, loss_fn)
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()

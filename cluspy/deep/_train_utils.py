@@ -1,6 +1,22 @@
 from cluspy.deep.flexible_autoencoder import FlexibleAutoencoder
 
 
+def get_default_layers(input_dim, embedding_size):
+    """
+    Get the default layers for an autoencoder.
+    Default layers are [input_dim, 500, 500, 2000, embedding_size]
+
+    Parameters
+    ----------
+    input_dim : int, size of the first layer
+    embedding_size : int, size of the last layer
+
+    Returns
+    -------
+    list containing the layers
+    """
+    return [input_dim, 500, 500, 2000, embedding_size]
+
 def get_trained_autoencoder(trainloader, learning_rate, n_epochs, device, optimizer_class, loss_fn,
                             input_dim, embedding_size, autoencoder=None, autoencoder_class=FlexibleAutoencoder):
     """This function returns a trained autoencoder. The following cases are considered
@@ -34,7 +50,7 @@ def get_trained_autoencoder(trainloader, learning_rate, n_epochs, device, optimi
                 input_dim)
             embedding_size = input_dim
         # Init Autoencoder parameters
-        layers = [input_dim, 500, 500, 2000, embedding_size]
+        layers = get_default_layers(input_dim, embedding_size)
         autoencoder = autoencoder_class(layers=layers).to(device)
     else:
         autoencoder.to(device)
