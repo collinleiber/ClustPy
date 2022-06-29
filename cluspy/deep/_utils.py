@@ -38,7 +38,7 @@ def predict_batchwise(dataloader, model, cluster_module, device):
     predictions = []
     for batch in dataloader:
         batch_data = batch[1].to(device)
-        prediction = cluster_module.prediction_hard(model.encode(batch_data)).detach().cpu()
+        prediction = cluster_module.predict_hard(model.encode(batch_data)).detach().cpu()
         predictions.append(prediction)
     return torch.cat(predictions, dim=0).numpy()
 

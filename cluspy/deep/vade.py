@@ -40,7 +40,13 @@ def _vade(X, n_clusters, batch_size, pretrain_learning_rate, clustering_learning
 
     Returns
     -------
-    gmm_labels, gmm.means_, gmm.covariances_, vade_labels, vade_centers, vade_covariances, autoencoder
+    gmm_labels
+    gmm.means_
+    gmm.covariances_
+    vade_labels
+    vade_centers
+    vade_covariances
+    autoencoder
     """
     device = detect_device()
     trainloader = get_dataloader(X, batch_size, True, False)
@@ -83,12 +89,19 @@ class _VaDE_VAE(VariationalAutoencoder):
     encoder : encoder part of the autoencoder, responsible for embedding data points (class is FullyConnectedBlock)
     decoder : decoder part of the autoencoder, responsible for reconstructing data points from the embedding (class is FullyConnectedBlock)
     mean : mean value of the central layer
-    log_variance : variance of the central layer (use logirithm of variance - numerical purposes)
+    log_variance : logarithmic variance of the central layer (use logarithm of variance - numerical purposes)
     fitted  : boolean value indicating whether the autoencoder is already fitted.
     pretraining : boolean value indicating if pretraining has already happen
     """
 
     def __init__(self, **kwargs):
+        """
+        Create an instance of the _VaDE_VAE. All parameters will be passed to VariationalAutoencoder.
+
+        Parameters
+        ----------
+        **kwargs : input parameters of the VariationalAutoencoder class
+        """
         # Super calls the __init__ method from the VariationalAutoencoder class
         super(_VaDE_VAE, self).__init__(**kwargs)
         # Start wirth pretraining mode. Sets the behavior of forwad() and loss()
@@ -314,13 +327,13 @@ class _VaDE_Module(torch.nn.Module):
 
     def predict(self, q_mean, q_logvar) -> torch.Tensor:
         """
-        Predict the label given the specific mean and variance values of a given sample.
+        Predict the labels given the specific means and variances of given samples.
         Uses argmax to return a hard cluster label.
 
         Parameters
         ----------
-        q_mean : mean value of the central layer of the VAE
-        q_logvar : logarithmic variance of the central layer of the VAE (use logirithm of variance - numerical purposes)
+        q_mean : mean values of the central layer of the VAE
+        q_logvar : logarithmic variances of the central layer of the VAE (use logarithm of variance - numerical purposes)
 
         Returns
         -------
@@ -332,9 +345,9 @@ class _VaDE_Module(torch.nn.Module):
         pred = torch.argmax(p_c_z, dim=1)
         return pred
 
-    def loss(self, autoencoder, batch_data, loss_fn):
+    def vade_loss(self, autoencoder, batch_data, loss_fn):
         """
-        Calculate the VaDE loss of a single batch of data.
+        Calculate the VaDE loss of given samples.
 
         Parameters
         ----------
@@ -363,6 +376,7 @@ class _VaDE_Module(torch.nn.Module):
         trainloader : torch.utils.data.DataLoader, dataloader to be used for training
         n_epochs : int, number of epochs for the clustering procedure
         device : torch.device, device to be trained on
+        optimizer : the optimizer
         loss_fn : loss function for the reconstruction
         """
         # lr_decrease = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.9)
@@ -372,7 +386,7 @@ class _VaDE_Module(torch.nn.Module):
             for batch in trainloader:
                 # load batch on device
                 batch_data = batch[1].to(device)
-                loss = self.loss(autoencoder, batch_data, loss_fn)
+                loss = self.vade_loss(autoencoder, batch_data, loss_fn)
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()

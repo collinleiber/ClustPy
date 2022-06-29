@@ -16,6 +16,37 @@ from sklearn.base import BaseEstimator, ClusterMixin
 def _dec(X, n_clusters, alpha, batch_size, pretrain_learning_rate, clustering_learning_rate, pretrain_epochs,
          clustering_epochs, optimizer_class, loss_fn, autoencoder, embedding_size, use_reconstruction_loss,
          cluster_loss_weight):
+    """
+    Start the actual DEC clustering procedure on the input data set.
+    First an autoencoder (AE) will be trained (will be skipped if input autoencoder is given).
+    Afterwards, KMeans identifies the initial clusters.
+    Last, the AE will be optimized using the DEC loss function from the _DEC_Module.
+
+    Parameters
+    ----------
+    X : the given data set
+    n_clusters : number of clusters
+    alpha : double, alpha value for the prediction
+    batch_size : int, size of the data batches
+    pretrain_learning_rate : double, learning rate for the pretraining of the autoencoder
+    clustering_learning_rate : double, learning rate of the actual clustering procedure
+    pretrain_epochs : int, number of epochs for the pretraining of the autoencoder
+    clustering_epochs : int, number of epochs for the actual clustering procedure
+    optimizer_class : Optimizer
+    loss_fn : loss function for the reconstruction
+    autoencoder : the input autoencoder. If None a new FlexibleAutoencoder will be created
+    embedding_size : int, size of the embedding within the autoencoder
+    use_reconstruction_loss : boolean, defines whether the reconstruction loss will be used during clustering training
+    cluster_loss_weight : double, weight of the clustering loss compared to the reconstruction loss
+
+    Returns
+    -------
+    kmeans.labels_
+    kmeans.cluster_centers_
+    dec_labels
+    dec_centers
+    autoencoder
+    """
     device = detect_device()
     trainloader = get_dataloader(X, batch_size, True, False)
     testloader = get_dataloader(X, batch_size, False, False)
@@ -46,7 +77,21 @@ def _dec(X, n_clusters, alpha, batch_size, pretrain_learning_rate, clustering_le
     return kmeans.labels_, kmeans.cluster_centers_, dec_labels, dec_centers, autoencoder
 
 
-def _dec_prediction(centers, embedded, alpha=1.0, weights=None):
+def _dec_predict(centers, embedded, alpha, weights):
+    """
+    Predict soft cluster labels given embedded samples.
+
+    Parameters
+    ----------
+    centers : the cluster centers
+    embedded : the embedded samples
+    alpha : double, the alpha value
+    weights : the cluster weights
+
+    Returns
+    -------
+    The predicted labels
+    """
     squared_diffs = squared_euclidean_distance(centers, embedded, weights)
     numerator = (1.0 + squared_diffs / alpha).pow(-1.0 * (alpha + 1.0) / 2.0)
     denominator = numerator.sum(1)
@@ -55,6 +100,17 @@ def _dec_prediction(centers, embedded, alpha=1.0, weights=None):
 
 
 def _dec_compression_value(pred_labels):
+    """
+    Get the DEC compression value.
+
+    Parameters
+    ----------
+    pred_labels : the predictions of the embedded samples.
+
+    Returns
+    -------
+    The compression value
+    """
     soft_freq = pred_labels.sum(0)
     squared_pred = pred_labels.pow(2)
     normalized_squares = squared_pred / soft_freq.unsqueeze(0)
@@ -63,41 +119,117 @@ def _dec_compression_value(pred_labels):
     return p
 
 
-def _dec_compression_loss_fn(q):
-    p = _dec_compression_value(q).detach().data
-    loss = -1.0 * torch.mean(torch.sum(p * torch.log(q + 1e-8), dim=1))
+def _dec_compression_loss_fn(pred_labels):
+    """
+    Calculate the loss of DEC by computing the DEC compression value.
+
+    Parameters
+    ----------
+    pred_labels : the predictions of the embedded samples.
+
+    Returns
+    -------
+    The final loss
+    """
+    p = _dec_compression_value(pred_labels).detach().data
+    loss = -1.0 * torch.mean(torch.sum(p * torch.log(pred_labels + 1e-8), dim=1))
     return loss
 
 
 class _DEC_Module(torch.nn.Module):
-    def __init__(self, init_np_centers, alpha):
+    """
+    The _DEC_Module. Contains most of the algorithm specific procedures.
+
+    Attributes
+    ----------
+    alpha : the soft assignments
+    centers : the cluster centers
+    """
+
+    def __init__(self, init_centers, alpha):
+        """
+        Create an instance of the _DEC_Module.
+
+        Parameters
+        ----------
+        init_centers : np.ndarray, initial cluster centers
+        alpha : double, alpha value for the prediction method
+        """
         super().__init__()
         self.alpha = alpha
         # Centers are learnable parameters
-        self.centers = torch.nn.Parameter(torch.tensor(init_np_centers), requires_grad=True)
+        self.centers = torch.nn.Parameter(torch.tensor(init_centers), requires_grad=True)
 
-    def prediction(self, embedded, weights=None) -> torch.Tensor:
-        """Soft prediction $q$"""
-        return _dec_prediction(self.centers, embedded, self.alpha, weights=weights)
+    def predict(self, embedded, weights=None) -> torch.Tensor:
+        """
+        Soft prediction of given embedded samples. Returns the corresponding soft labels.
 
-    def prediction_hard(self, embedded, weights=None) -> torch.Tensor:
-        """Hard prediction"""
-        return self.prediction(embedded, weights=weights).argmax(1)
+        Parameters
+        ----------
+        embedded : the embedded samples
+        weights : cluster weights for the dec_predict method (default: None)
 
-    def compression_loss(self, embedded, weights=None) -> torch.Tensor:
-        """Loss of DEC"""
-        prediction = _dec_prediction(self.centers, embedded, self.alpha, weights=weights)
+        Returns
+        -------
+        The predicted soft label
+        """
+        return _dec_predict(self.centers, embedded, self.alpha, weights=weights)
+
+    def predict_hard(self, embedded, weights=None) -> torch.Tensor:
+        """
+        Hard prediction of given embedded samples. Returns the corresponding hard labels.
+        Uses the soft prediction method and then applies argmax.
+
+        Parameters
+        ----------
+        embedded : the embedded samples
+        weights : cluster weights for the dec_predict method (default: None)
+
+        Returns
+        -------
+        The predicted hard label
+        """
+        return self.predict(embedded, weights=weights).argmax(1)
+
+    def dec_loss(self, embedded, weights=None) -> torch.Tensor:
+        """
+        Calculate the DEC loss of given embedded samples.
+
+        Parameters
+        ----------
+        embedded : the embedded samples
+        weights : cluster weights for the dec_predict method (default: None)
+
+        Returns
+        -------
+        loss: returns the reconstruction loss of the input sample
+        """
+        prediction = _dec_predict(self.centers, embedded, self.alpha, weights=weights)
         loss = _dec_compression_loss_fn(prediction)
         return loss
 
     def fit(self, autoencoder, trainloader, n_epochs, device, optimizer, loss_fn, use_reconstruction_loss,
             cluster_loss_weight):
+        """
+        Trains the _DEC_Module in place.
+
+        Parameters
+        ----------
+        autoencoder : torch.nn.Module, Autoencoder
+        trainloader : torch.utils.data.DataLoader, dataloader to be used for training
+        n_epochs : int, number of epochs for the clustering procedure
+        device : torch.device, device to be trained on
+        optimizer : the optimizer
+        loss_fn : loss function for the reconstruction
+        use_reconstruction_loss : boolean, defines whether the reconstruction loss will be used during clustering training
+        cluster_loss_weight : double, weight of the clustering loss compared to the reconstruction loss
+        """
         for _ in range(n_epochs):
             for batch in trainloader:
                 batch_data = batch[1].to(device)
                 embedded = autoencoder.encode(batch_data)
 
-                cluster_loss = self.compression_loss(embedded)
+                cluster_loss = self.dec_loss(embedded)
                 loss = cluster_loss * cluster_loss_weight
                 # Reconstruction loss is not included in DEC
                 if use_reconstruction_loss:
@@ -147,7 +279,7 @@ class DEC(BaseEstimator, ClusterMixin):
         Parameters
         ----------
         n_clusters : number of clusters
-        alpha : double, alpha for the prediction (default: 1.0)
+        alpha : double, alpha value for the prediction (default: 1.0)
         batch_size : int, size of the data batches (default: 256)
         pretrain_learning_rate : double, learning rate for the pretraining of the autoencoder (default: 1e-3)
         clustering_learning_rate : double, learning rate of the actual clustering procedure (default: 1e-4)
@@ -157,7 +289,7 @@ class DEC(BaseEstimator, ClusterMixin):
         loss_fn : loss function for the reconstruction (default: torch.nn.MSELoss())
         autoencoder : the input autoencoder. If None a new FlexibleAutoencoder will be created (default: None)
         embedding_size : int, size of the embedding within the autoencoder (default: 10)
-        use_reconstruction_loss : boolean, should the reconstruction loss be used during clustering training (default: False)
+        use_reconstruction_loss : boolean, defines whether the reconstruction loss will be used during clustering training (default: False)
         cluster_loss_weight : double, weight of the clustering loss compared to the reconstruction loss (default: 1)
         """
         self.n_clusters = n_clusters

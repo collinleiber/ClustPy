@@ -1,7 +1,4 @@
 """
-Miklautz, Lukas & Dominik Mautz et al. "Deep embedded non-redundant clustering." 
-Proceedings of the AAAI Conference on Artificial Intelligence. Vol. 34. No. 04. 2020.
-
 @authors Lukas Miklautz
 """
 
@@ -1123,9 +1120,15 @@ class ENRC(BaseEstimator, ClusterMixin):
     init_kwargs : dict, default=None, additional parameters that are used if init is a callable. (optional)
     init_subsample_size: int, default=None, specify if only a subsample of size 'init_subsample_size' of the data should be used for the initialization. (optional)
     verbose: bool, default=False, if True additional information during the training will be printed.
+
     Raises
     ----------
     ValueError : if init is not one of 'nrkmeans', 'random', 'auto' or 'sgd'.
+
+    References
+    ----------
+    Miklautz, Lukas & Dominik Mautz et al. "Deep embedded non-redundant clustering."
+    Proceedings of the AAAI Conference on Artificial Intelligence. Vol. 34. No. 04. 2020.
     """
     def __init__(self, n_clusters, V=None, P=None, input_centers=None, batch_size=128, pretrain_learning_rate=1e-3,
                  clustering_learning_rate=1e-4, pretrain_epochs=100, clustering_epochs=150, tolerance_threshold=None, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(),

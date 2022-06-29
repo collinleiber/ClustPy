@@ -16,7 +16,7 @@ def _vae_sampling(q_mean, q_logvar):
     Parameters
     ----------
     q_mean : mean value of the central layer.
-    q_logvar : logarithmic variance of the central layer (use logirithm of variance - numerical purposes)
+    q_logvar : logarithmic variance of the central layer (use logarithm of variance - numerical purposes)
 
     Returns
     -------
@@ -37,7 +37,7 @@ class VariationalAutoencoder(FlexibleAutoencoder):
     encoder : encoder part of the autoencoder, responsible for embedding data points (class is FullyConnectedBlock)
     decoder : decoder part of the autoencoder, responsible for reconstructing data points from the embedding (class is FullyConnectedBlock)
     mean : mean value of the central layer
-    log_variance : variance of the central layer (use logirithm of variance - numerical purposes)
+    log_variance : logarithmic variance of the central layer (use logarithm of variance - numerical purposes)
     fitted  : boolean value indicating whether the autoencoder is already fitted.
 
     References
@@ -84,7 +84,7 @@ class VariationalAutoencoder(FlexibleAutoencoder):
         Returns
         -------
         q_mean : mean value of the central VAE layer
-        q_logvar : logarithmic variance value of the central VAE layer (use logirithm of variance - numerical purposes)
+        q_logvar : logarithmic variance value of the central VAE layer (use logarithm of variance - numerical purposes)
         """
         embedded = self.encoder(x)
         q_mean = self.mean(embedded)
@@ -105,7 +105,7 @@ class VariationalAutoencoder(FlexibleAutoencoder):
         -------
         z : sampling using q_mean and q_logvar
         q_mean : mean value of the central VAE layer
-        q_logvar : logarithmic variance value of the central VAE layer (use logirithm of variance - numerical purposes)
+        q_logvar : logarithmic variance value of the central VAE layer (use logarithm of variance - numerical purposes)
         reconstruction: returns the reconstruction of the data point
         """
         q_mean, q_logvar = self.encode(x)

@@ -35,7 +35,7 @@ def _dcn(X, n_clusters, batch_size, pretrain_learning_rate, clustering_learning_
     optimizer = optimizer_class(list(autoencoder.parameters()), lr=clustering_learning_rate)
     # DEC Training loop
     dcn_module.fit(autoencoder, trainloader, clustering_epochs, device, optimizer, loss_fn,
-                              degree_of_space_distortion, degree_of_space_preservation)
+                   degree_of_space_distortion, degree_of_space_preservation)
     # Get labels
     dcn_labels = predict_batchwise(testloader, autoencoder, dcn_module, device)
     dcn_centers = dcn_module.centers.detach().cpu().numpy()
@@ -62,12 +62,12 @@ class _DCN_Module(torch.nn.Module):
         super().__init__()
         self.centers = torch.tensor(init_np_centers)
 
-    def compression_loss(self, embedded, weights=None) -> torch.Tensor:
+    def dcn_loss(self, embedded, weights=None) -> torch.Tensor:
         dist = squared_euclidean_distance(self.centers, embedded, weights=weights)
         loss = (dist.min(dim=1)[0]).mean()
         return loss
 
-    def prediction_hard(self, embedded, weights=None) -> torch.Tensor:
+    def predict_hard(self, embedded, weights=None) -> torch.Tensor:
         dist = squared_euclidean_distance(self.centers, embedded, weights=weights)
         s = (dist.min(dim=1)[1])
         return s
@@ -82,7 +82,7 @@ class _DCN_Module(torch.nn.Module):
         return self
 
     def fit(self, autoencoder, trainloader, n_epochs, device, optimizer, loss_fn,
-                       degree_of_space_distortion, degree_of_space_preservation):
+            degree_of_space_distortion, degree_of_space_preservation):
         # DCN training loop
         # Init for count from original DCN code (not reported in Paper)
         # This means centroid learning rate at the beginning is scaled by a hundred
@@ -97,7 +97,7 @@ class _DCN_Module(torch.nn.Module):
                 # compute reconstruction loss
                 ae_loss = loss_fn(batch_data, reconstruction)
                 # compute cluster loss
-                cluster_loss = self.compression_loss(embedded)
+                cluster_loss = self.dcn_loss(embedded)
                 # compute total loss
                 loss = degree_of_space_preservation * ae_loss + 0.5 * degree_of_space_distortion * cluster_loss
                 # Backward pass - update weights
@@ -120,7 +120,7 @@ class _DCN_Module(torch.nn.Module):
                     self.centers = self.centers.cpu()
 
                     # update assignments
-                    s = self.prediction_hard(embedded)
+                    s = self.predict_hard(embedded)
 
                     # update centroids
                     count = self.update_centroids(embedded, count.cpu(), s.cpu())
