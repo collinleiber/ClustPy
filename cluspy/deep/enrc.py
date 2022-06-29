@@ -1,19 +1,14 @@
 """
-Miklautz, Lukas & Dominik Mautz et al. "Deep embedded non-redundant clustering." 
-Proceedings of the AAAI Conference on Artificial Intelligence. Vol. 34. No. 04. 2020.
-
 @authors Lukas Miklautz
 """
 
 import torch
-from sklearn.cluster import KMeans
 from sklearn.base import BaseEstimator, ClusterMixin
 import numpy as np
 from ._utils import int_to_one_hot, squared_euclidean_distance, encode_batchwise, detect_device
 from ._data_utils import get_dataloader
 from ._train_utils import get_trained_autoencoder 
 from cluspy.alternative import NrKmeans
-from cluspy.alternative.nrkmeans import _initialize_nrkmeans_parameters
 from sklearn.utils import check_random_state
 from sklearn.metrics import normalized_mutual_info_score
 from cluspy.utils.plots import plot_scatter_matrix
@@ -318,7 +313,6 @@ def nrkmeans_init(data, n_clusters, rounds=10, random_state=None, max_iter=100, 
     """
     best = None
     lowest = np.inf
-    random_state = check_random_state(random_state)
     for i in range(rounds):
         nrkmeans = NrKmeans(n_clusters=n_clusters, input_centers=input_centers, P=P, V=V, max_iter=max_iter)
         nrkmeans.fit(X=data)
@@ -1106,9 +1100,9 @@ class ENRC(BaseEstimator, ClusterMixin):
     input_centers : list, default=None, list containing the cluster centers for each clustering (optional)
     batch_size : int, default=128, size of the data batches
     pretrain_learning_rate : float, default=1e-3, learning rate for the pretraining of the autoencoder
-    learning_rate : float, default=1e-4, learning rate of the actual clustering procedure
+    clustering_learning_rate : float, default=1e-4, learning rate of the actual clustering procedure
     pretrain_epochs : int, default=100, number of epochs for the pretraining of the autoencoder
-    max_epochs : int, default=150, maximum number of epochs for the actual clustering procedure
+    clustering_epochs : int, default=150, maximum number of epochs for the actual clustering procedure
     tolerance_threshold : float, default=None, tolerance threshold to determine when the training should stop. If the NMI(old_labels, new_labels) >= (1-tolerance_threshold) 
                         for all clusterings then the training will stop before max_epochs is reached. If set high than training will stop earlier then max_epochs, and if set to 0 or None the training 
                         will train as long as the labels are not changing anymore.
@@ -1117,7 +1111,7 @@ class ENRC(BaseEstimator, ClusterMixin):
     degree_of_space_distortion : float, default=1.0, weight of the cluster loss term. The higher it is set the more the embedded space will be shaped to the assumed cluster structure
     degree_of_space_preservation : float, default=1.0, weight of regularization loss term, e.g., reconstruction loss.        
     autoencoder : the input autoencoder. If None a new autoencoder will be created and trained.
-    embedding_size : size of the embedding within the autoencoder. Only used if autoencoder is None.
+    embedding_size : int, default=20, size of the embedding within the autoencoder. Only used if autoencoder is None.
     init : str, default='nrkmeans', choose which initialization strategy should be used. Has to be one of 'nrkmeans', 'random' or 'sgd'. 
     random_state : use a fixed random state to get a repeatable solution (optional)
     device : torch.device, default=None, if device is None then it will be checked whether a gpu is available or not.
@@ -1126,23 +1120,28 @@ class ENRC(BaseEstimator, ClusterMixin):
     init_kwargs : dict, default=None, additional parameters that are used if init is a callable. (optional)
     init_subsample_size: int, default=None, specify if only a subsample of size 'init_subsample_size' of the data should be used for the initialization. (optional)
     verbose: bool, default=False, if True additional information during the training will be printed.
+
     Raises
     ----------
     ValueError : if init is not one of 'nrkmeans', 'random', 'auto' or 'sgd'.
+
+    References
+    ----------
+    Miklautz, Lukas & Dominik Mautz et al. "Deep embedded non-redundant clustering."
+    Proceedings of the AAAI Conference on Artificial Intelligence. Vol. 34. No. 04. 2020.
     """
     def __init__(self, n_clusters, V=None, P=None, input_centers=None, batch_size=128, pretrain_learning_rate=1e-3,
-                 learning_rate=1e-4, pretrain_epochs=100, max_epochs=150, tolerance_threshold=None, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(),
+                 clustering_learning_rate=1e-4, pretrain_epochs=100, clustering_epochs=150, tolerance_threshold=None, optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(),
                  degree_of_space_distortion=1.0, degree_of_space_preservation=1.0, autoencoder=None,
-                 embedding_size=None, init="nrkmeans", random_state=None, device=None, scheduler=None, scheduler_params=None, init_kwargs=None, init_subsample_size=None, verbose=False):
-       
+                 embedding_size=20, init="nrkmeans", random_state=None, device=None, scheduler=None, scheduler_params=None, init_kwargs=None, init_subsample_size=None, verbose=False):
         self.n_clusters = n_clusters.copy()
         self.random_state = random_state
         self.device = device
         self.batch_size = batch_size
         self.pretrain_learning_rate = pretrain_learning_rate
-        self.learning_rate = learning_rate
+        self.clustering_learning_rate = clustering_learning_rate
         self.pretrain_epochs = pretrain_epochs
-        self.max_epochs = max_epochs
+        self.clustering_epochs = clustering_epochs
         self.tolerance_threshold = tolerance_threshold
         self.optimizer_class = optimizer_class
         self.loss_fn = loss_fn
@@ -1188,9 +1187,9 @@ class ENRC(BaseEstimator, ClusterMixin):
                                                                                          input_centers=self.input_centers,
                                                                                          batch_size=self.batch_size,
                                                                                          pretrain_learning_rate=self.pretrain_learning_rate,
-                                                                                         learning_rate=self.learning_rate,
+                                                                                         learning_rate=self.clustering_learning_rate,
                                                                                          pretrain_epochs=self.pretrain_epochs,
-                                                                                         max_epochs=self.max_epochs,
+                                                                                         max_epochs=self.clustering_epochs,
                                                                                          tolerance_threshold=self.tolerance_threshold,
                                                                                          optimizer_class=self.optimizer_class,
                                                                                          loss_fn=self.loss_fn,

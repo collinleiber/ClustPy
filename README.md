@@ -71,8 +71,9 @@ Remove cluspy via pip to avoid ambiguities during development, e.g., when changi
     - NR-Kmeans
     - AutoNR
 - Deep clustering
-    - Simple Autoencoder
+    - Flexible Autoencoder
     - Stacked Autoencoder
+    - Variational Autoencoder
     - DEC
     - IDEC
     - DCN

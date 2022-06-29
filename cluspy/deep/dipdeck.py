@@ -4,8 +4,8 @@ from cluspy.utils import dip_test, dip_pval
 import torch
 from cluspy.deep._utils import detect_device, encode_batchwise, \
     squared_euclidean_distance, int_to_one_hot
-from ._data_utils import get_dataloader
-from ._train_utils import get_trained_autoencoder 
+from cluspy.deep._data_utils import get_dataloader
+from cluspy.deep._train_utils import get_trained_autoencoder
 from sklearn.cluster import KMeans
 from sklearn.base import BaseEstimator, ClusterMixin
 

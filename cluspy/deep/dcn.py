@@ -9,7 +9,7 @@ conference on machine learning. PMLR, 2017.
 from cluspy.deep._utils import detect_device, encode_batchwise, \
     squared_euclidean_distance, predict_batchwise
 from ._data_utils import get_dataloader
-from ._train_utils import get_trained_autoencoder 
+from ._train_utils import get_trained_autoencoder
 import torch
 from sklearn.cluster import KMeans
 from sklearn.base import BaseEstimator, ClusterMixin
@@ -21,7 +21,7 @@ def _dcn(X, n_clusters, batch_size, pretrain_learning_rate, clustering_learning_
     device = detect_device()
     trainloader = get_dataloader(X, batch_size, True, False)
     testloader = get_dataloader(X, batch_size, False, False)
-    
+
     autoencoder = get_trained_autoencoder(trainloader, pretrain_learning_rate, pretrain_epochs, device,
                                           optimizer_class, loss_fn, X.shape[1], embedding_size, autoencoder)
     # Execute kmeans in embedded space
@@ -34,8 +34,8 @@ def _dcn(X, n_clusters, batch_size, pretrain_learning_rate, clustering_learning_
     # Use DCN learning_rate (usually pretrain_learning_rate reduced by a magnitude of 10)
     optimizer = optimizer_class(list(autoencoder.parameters()), lr=clustering_learning_rate)
     # DEC Training loop
-    dcn_module.start_training(autoencoder, trainloader, clustering_epochs, device, optimizer, loss_fn,
-                              degree_of_space_distortion, degree_of_space_preservation)
+    dcn_module.fit(autoencoder, trainloader, clustering_epochs, device, optimizer, loss_fn,
+                   degree_of_space_distortion, degree_of_space_preservation)
     # Get labels
     dcn_labels = predict_batchwise(testloader, autoencoder, dcn_module, device)
     dcn_centers = dcn_module.centers.detach().cpu().numpy()
@@ -62,12 +62,12 @@ class _DCN_Module(torch.nn.Module):
         super().__init__()
         self.centers = torch.tensor(init_np_centers)
 
-    def compression_loss(self, embedded, weights=None) -> torch.Tensor:
+    def dcn_loss(self, embedded, weights=None) -> torch.Tensor:
         dist = squared_euclidean_distance(self.centers, embedded, weights=weights)
         loss = (dist.min(dim=1)[0]).mean()
         return loss
 
-    def prediction_hard(self, embedded, weights=None) -> torch.Tensor:
+    def predict_hard(self, embedded, weights=None) -> torch.Tensor:
         dist = squared_euclidean_distance(self.centers, embedded, weights=weights)
         s = (dist.min(dim=1)[1])
         return s
@@ -81,8 +81,8 @@ class _DCN_Module(torch.nn.Module):
         self.to(device)
         return self
 
-    def start_training(self, autoencoder, trainloader, n_epochs, device, optimizer, loss_fn,
-                       degree_of_space_distortion, degree_of_space_preservation):
+    def fit(self, autoencoder, trainloader, n_epochs, device, optimizer, loss_fn,
+            degree_of_space_distortion, degree_of_space_preservation):
         # DCN training loop
         # Init for count from original DCN code (not reported in Paper)
         # This means centroid learning rate at the beginning is scaled by a hundred
@@ -97,7 +97,7 @@ class _DCN_Module(torch.nn.Module):
                 # compute reconstruction loss
                 ae_loss = loss_fn(batch_data, reconstruction)
                 # compute cluster loss
-                cluster_loss = self.compression_loss(embedded)
+                cluster_loss = self.dcn_loss(embedded)
                 # compute total loss
                 loss = degree_of_space_preservation * ae_loss + 0.5 * degree_of_space_distortion * cluster_loss
                 # Backward pass - update weights
@@ -120,7 +120,7 @@ class _DCN_Module(torch.nn.Module):
                     self.centers = self.centers.cpu()
 
                     # update assignments
-                    s = self.prediction_hard(embedded)
+                    s = self.predict_hard(embedded)
 
                     # update centroids
                     count = self.update_centroids(embedded, count.cpu(), s.cpu())
