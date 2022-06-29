@@ -1,3 +1,8 @@
+"""
+@authors:
+Lukas Miklautz
+"""
+
 import torch
 import numpy as np
 from ._early_stopping import EarlyStopping
@@ -5,16 +10,8 @@ from ._data_utils import get_dataloader
 
 
 class FullyConnectedBlock(torch.nn.Module):
-    """Feed Forward Neural Network Block
-
-    Parameters
-    ----------
-    layers : list of the different layer sizes 
-    batch_norm : bool, default=False, set True if you want to use torch.nn.BatchNorm1d
-    dropout : float, default=None, set the amount of dropout you want to use.
-    activation : activation function from torch.nn, default=None, set the activation function for the hidden layers, if None then it will be linear. 
-    bias : bool, default=True, set False if you do not want to use a bias term in the linear layers
-    output_fn : activation function from torch.nn, default=None, set the activation function for the last layer, if None then it will be linear. 
+    """
+    Feed Forward Neural Network Block
 
     Attributes
     ----------
@@ -22,6 +19,18 @@ class FullyConnectedBlock(torch.nn.Module):
     """
 
     def __init__(self, layers, batch_norm=False, dropout=None, activation_fn=None, bias=True, output_fn=None):
+        """
+        Create an instance of a FullyConnectedBlock.
+
+        Parameters
+        ----------
+        layers : list of the different layer sizes
+        batch_norm : bool, default=False, set True if you want to use torch.nn.BatchNorm1d
+        dropout : float, default=None, set the amount of dropout you want to use.
+        activation_fn : activation function from torch.nn, default=None, set the activation function for the hidden layers, if None then it will be linear.
+        bias : bool, default=True, set False if you do not want to use a bias term in the linear layers
+        output_fn : activation function from torch.nn, default=None, set the activation function for the last layer, if None then it will be linear.
+        """
         super(FullyConnectedBlock, self).__init__()
         self.layers = layers
         self.batch_norm = batch_norm
@@ -63,28 +72,37 @@ class FullyConnectedBlock(torch.nn.Module):
 
 
 class FlexibleAutoencoder(torch.nn.Module):
-    """A feedforward autoencoder.
+    """
+    A flexible feedforward autoencoder.
     
-    Parameters
-    ----------
-    layers : list of the different layer sizes from input to embedding, e.g. an example architecture for MNIST [784, 512, 256, 10], where 784 is the input dimension and 10 the embedding dimension. 
-             If decoder_layers are not specified then the decoder is symmetric and goes in the same order from embedding to input.
-    batch_norm : bool, default=False, set True if you want to use torch.nn.BatchNorm1d
-    dropout : float, default=None, set the amount of dropout you want to use.
-    activation: activation function from torch.nn, default=torch.nn.LeakyReLU, set the activation function for the hidden layers, if None then it will be linear. 
-    bias : bool, default=True, set False if you do not want to use a bias term in the linear layers
-    decoder_layers : list, default=None, list of different layer sizes from embedding to output of the decoder. If set to None, will be symmetric to layers.
-    decoder_output_fn : activation function from torch.nn, default=None, set the activation function for the decoder output layer, if None then it will be linear. 
-                        e.g. set to torch.nn.Sigmoid if you want to scale the decoder output between 0 and 1. 
     Attributes
     ----------
     encoder : encoder part of the autoencoder, responsible for embedding data points (class is FullyConnectedBlock)
     decoder : decoder part of the autoencoder, responsible for reconstructing data points from the embedding (class is FullyConnectedBlock)
     fitted  : boolean value indicating whether the autoencoder is already fitted.
+
+    References
+    ----------
+    E.g. Ballard, Dana H. "Modular learning in neural networks." Aaai. Vol. 647. 1987.
     """
 
     def __init__(self, layers, batch_norm=False, dropout=None, activation_fn=torch.nn.LeakyReLU, bias=True,
                  decoder_layers=None, decoder_output_fn=None):
+        """
+        Create an instance of a flexible autoencoder.
+
+        Parameters
+        ----------
+        layers : list of the different layer sizes from input to embedding, e.g. an example architecture for MNIST [784, 512, 256, 10], where 784 is the input dimension and 10 the embedding dimension.
+                 If decoder_layers are not specified then the decoder is symmetric and goes in the same order from embedding to input.
+        batch_norm : bool, default=False, set True if you want to use torch.nn.BatchNorm1d
+        dropout : float, default=None, set the amount of dropout you want to use.
+        activation_fn: activation function from torch.nn, default=torch.nn.LeakyReLU, set the activation function for the hidden layers, if None then it will be linear.
+        bias : bool, default=True, set False if you do not want to use a bias term in the linear layers
+        decoder_layers : list, default=None, list of different layer sizes from embedding to output of the decoder. If set to None, will be symmetric to layers.
+        decoder_output_fn : activation function from torch.nn, default=None, set the activation function for the decoder output layer, if None then it will be linear.
+                            e.g. set to torch.nn.Sigmoid if you want to scale the decoder output between 0 and 1.
+        """
         super(FlexibleAutoencoder, self).__init__()
         self.fitted = False
         if decoder_layers is None:
@@ -155,7 +173,7 @@ class FlexibleAutoencoder(torch.nn.Module):
 
         Parameters
         ----------
-        batch : torch.Tensor, the samples
+        batch_data : torch.Tensor, the samples
         loss_fn : torch.nn, loss function to be used for reconstruction
 
         Returns

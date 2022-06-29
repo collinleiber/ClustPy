@@ -3,18 +3,11 @@ Hartigan, J. A.; Hartigan, P. M. The Dip Test of Unimodality. The Annals
 of Statistics 13 (1985), no. 1, 70--84. doi:10.1214/aos/1176346577.
 http://projecteuclid.org/euclid.aos/1176346577.
 
-Credit for Dip implementation:
-Johannes Bauer, Python implementation of Hartigan's dip test, Jun 17, 2015,
-commit a0e3d448a4b266f54ec63a5b3d5be351fbd1db1c,
-https://github.com/tatome/dip_test
-
-and
-
-https://github.com/alimuldal/diptest
-
-and
-
+Python Implementation of R version from:
 Dario Ringach <dario@wotan.cns.nyu.edu>, Martin Maechler <maechler@stat.math.ethz.ch>
+
+Credit for parts of the python Dip implementation:
+https://github.com/alimuldal/diptest
 """
 
 import numpy as np
@@ -47,14 +40,15 @@ def dip_test(X, just_dip=True, is_data_sorted=False, use_c=True, debug=False):
 
 def _dip_c_port(X, debug):
     # Create reference numpy arrays
-    low_high = np.zeros(2, dtype=np.int)
-    modal_triangle = -np.ones(3, dtype=np.int)
-    gcm = np.zeros(X.shape, dtype=np.int)
-    lcm = np.zeros(X.shape, dtype=np.int)
-    mj = np.zeros(X.shape, dtype=np.int)
-    mn = np.zeros(X.shape, dtype=np.int)
+    low_high = np.zeros(2, dtype=np.int32)
+    modal_triangle = -np.ones(3, dtype=np.int32)
+    gcm = np.zeros(X.shape, dtype=np.int32)
+    lcm = np.zeros(X.shape, dtype=np.int32)
+    mj = np.zeros(X.shape, dtype=np.int32)
+    mn = np.zeros(X.shape, dtype=np.int32)
     # Execute C function
-    dip_value = c_diptest(X.astype(np.float64), low_high, modal_triangle, gcm, lcm, mn, mj, X.shape[0], 1 if debug else 0)
+    dip_value = c_diptest(X.astype(np.float64), low_high, modal_triangle, gcm, lcm, mn, mj, X.shape[0],
+                          1 if debug else 0)
     return dip_value, (low_high[0], low_high[1]), (modal_triangle[0], modal_triangle[1], modal_triangle[2])
 
 
@@ -254,19 +248,17 @@ def _dip_python_port(X, is_data_sorted=False, debug=False):
 
 def dip_pval(dip_value, n_points, pval_strategy="table", n_boots=2000):
     assert pval_strategy in ["bootstrap", "table",
-                             "function"], "pval_strategy must match 'bootstrap', 'table' or 'function'"
-    if n_points <= 4:
+                             "function"], "pval_strategy must match 'bootstrap', 'table' or 'function'. " \
+                                          "Your input: {0}".format(pval_strategy)
+    if n_points < 4:
         pval = 1.0
     elif pval_strategy == "bootstrap":
-        boot_dips = dip_boot_samples(n_points, n_boots)
+        boot_dips = dip_boot_samples(int(n_points), n_boots)
         pval = np.mean(dip_value <= boot_dips)
     elif pval_strategy == "table":
         pval = _dip_pval_table(dip_value, n_points)
     elif pval_strategy == "function":
         pval = _dip_pval_function(dip_value, n_points)
-    else:
-        raise ValueError(
-            "pval_strategy must be 0 (table), 1 (boot) or 2 (function). Your input: {0}".format(pval_strategy))
     return pval
 
 
@@ -283,7 +275,7 @@ Dip Gradient
 
 
 def dip_gradient(X, x_proj, sorted_indices, modal_triangle):
-    if modal_triangle is None:
+    if modal_triangle is None or modal_triangle[0] == -1:
         return np.zeros(X.shape[1])
     data_index_i1 = sorted_indices[modal_triangle[0]]
     data_index_i2 = sorted_indices[modal_triangle[1]]
@@ -306,15 +298,17 @@ def dip_gradient(X, x_proj, sorted_indices, modal_triangle):
 
 
 def dip_pval_gradient(X, x_proj, sorted_indices, modal_triangle, dip_value):
-    if modal_triangle is None:
+    if modal_triangle is None or modal_triangle[0] == -1:
         return np.zeros(X.shape[1])
-    # b = 17.30784022 * np.sqrt(X.shape[0]) + 12.04917889
-    b = 17.31 * np.sqrt(X.shape[0]) + 12.05
-    exponent = np.exp(-b * dip_value + 6.5)
     dip_grad = dip_gradient(X, x_proj, sorted_indices, modal_triangle)
-    quotient = (0.6 * (1 + 1.6 * exponent) ** (1 / 1.6) + 0.4 * (1 + 0.2 * exponent) ** 5) ** 2
-    pval_grad = (0.6 * (1 + 1.6 * exponent) ** (-0.6 / 1.6) + 0.4 * (1 + 0.2 * exponent) ** 4) / quotient
-    pval_grad *= exponent * (-b) * dip_grad
+
+    b = 17.34238413 * np.sqrt(X.shape[1]) + 12.09073478
+    exponent = np.exp(-b * dip_value + 6.53)
+    quotient = (0.648 * (1 + 1.58 * exponent) ** (1 / 1.58) + 0.352 * (1 + 0.18 * exponent) ** (1/0.18)) ** 2
+    grad_factor = (0.648 * (1 + 1.58 * exponent) ** (1 / 1.58 - 1) + 0.352 * (1 + 0.18 * exponent) ** (1/0.18-1)) / quotient
+    grad_factor *= exponent * (-b)
+
+    pval_grad = grad_factor * dip_grad
     return pval_grad
 
 
@@ -336,7 +330,10 @@ def _dip_pval_table(dip_value, n_points):
     i1 = min(N.shape[0] - 1, i1)
     # interpolate on sqrt(n)
     n0, n1 = N[[i0, i1]]
-    fn = float(n_points - n0) / (n1 - n0)
+    if i0 != i1:
+        fn = float(n_points - n0) / (n1 - n0)
+    else:
+        fn = 0
     y0 = np.sqrt(n0) * CV[i0]
     y1 = np.sqrt(n1) * CV[i1]
     sD = np.sqrt(n_points) * dip_value
@@ -345,9 +342,9 @@ def _dip_pval_table(dip_value, n_points):
 
 
 def _dip_pval_function(dip_value, n_points):
-    b = 17.31 * np.sqrt(n_points) + 12.05
-    exponent = np.e ** (-b * dip_value + 6.5)
-    pval = 1 - 1 / (0.6 * (1 + 1.6 * exponent) ** (1 / 1.6) + 0.4 * (1 + 0.2 * exponent) ** 5)
+    b = 17.34238413 * np.sqrt(n_points) + 12.09073478
+    exponent = np.exp(-b * dip_value + 6.53)
+    pval = 1 - 1 / (0.648 * (1 + 1.58 * exponent) ** (1 / 1.58) + 0.352 * (1 + 0.18 * exponent) ** (1/0.18))
     return pval
 
 

@@ -1,5 +1,8 @@
 """
-@authors Lukas Miklautz, Dominik Mautz, Collin leiber
+@authors:
+Lukas Miklautz
+Dominik Mautz
+Collin leiber
 """
 
 from cluspy.deep._utils import detect_device, encode_batchwise, squared_euclidean_distance, predict_batchwise
@@ -32,7 +35,7 @@ def _dec(X, n_clusters, alpha, batch_size, pretrain_learning_rate, clustering_le
                                 lr=clustering_learning_rate)
     # DEC Training loop
     dec_module.fit(autoencoder, trainloader, clustering_epochs, device, optimizer, loss_fn,
-                              use_reconstruction_loss, cluster_loss_weight)
+                   use_reconstruction_loss, cluster_loss_weight)
     # Get labels
     dec_labels = predict_batchwise(testloader, autoencoder, dec_module, device)
     dec_centers = dec_module.centers.detach().cpu().numpy()
@@ -88,7 +91,7 @@ class _DEC_Module(torch.nn.Module):
         return loss
 
     def fit(self, autoencoder, trainloader, n_epochs, device, optimizer, loss_fn, use_reconstruction_loss,
-                       cluster_loss_weight):
+            cluster_loss_weight):
         for _ in range(n_epochs):
             for batch in trainloader:
                 batch_data = batch[1].to(device)
@@ -110,7 +113,28 @@ class _DEC_Module(torch.nn.Module):
 
 class DEC(BaseEstimator, ClusterMixin):
     """
-    Deep Embedded Clustering
+    The Deep Embedded Clustering (DEC) algorithm.
+
+    Attributes
+    ----------
+    labels_
+    cluster_centers_
+    dec_labels_
+    dec_cluster_centers_
+    autoencoder
+
+    Examples
+    ----------
+    from cluspy.data import load_mnist
+    data, labels = load_mnist()
+    idec = DEC(n_clusters=10)
+    dec.fit(data)
+
+    References
+    ----------
+    Xie, Junyuan, Ross Girshick, and Ali Farhadi. "Unsupervised
+    deep embedding for clustering analysis." International
+    conference on machine learning. 2016.
     """
 
     def __init__(self, n_clusters, alpha=1.0, batch_size=256, pretrain_learning_rate=1e-3,
@@ -123,31 +147,18 @@ class DEC(BaseEstimator, ClusterMixin):
         Parameters
         ----------
         n_clusters : number of clusters
-        alpha : alpha for the prediction
-        batch_size : size of the data batches
-        pretrain_learning_rate : learning rate for the pretraining of the autoencoder
-        clustering_learning_rate : learning rate of the actual clustering procedure
-        pretrain_epochs : number of epochs for the pretraining of the autoencoder
-        clustering_epochs : number of epochs for the actual clustering procedure
+        alpha : double, alpha for the prediction (default: 1.0)
+        batch_size : int, size of the data batches (default: 256)
+        pretrain_learning_rate : double, learning rate for the pretraining of the autoencoder (default: 1e-3)
+        clustering_learning_rate : double, learning rate of the actual clustering procedure (default: 1e-4)
+        pretrain_epochs : int, number of epochs for the pretraining of the autoencoder (default: 100)
+        clustering_epochs : int, number of epochs for the actual clustering procedure (default: 150)
         optimizer_class : Optimizer (default: torch.optim.Adam)
         loss_fn : loss function for the reconstruction (default: torch.nn.MSELoss())
-        autoencoder : the input autoencoder. If None a new FlexibleAutoencoder will be created
-        embedding_size : size of the embedding within the autoencoder
-        use_reconstruction_loss : should the reconstruction loss be used during clustering training
-        cluster_loss_weight : weight of the clustering loss compared to the reconstruction loss
-
-        Examples
-        ----------
-        from cluspy.data import load_mnist
-        data, labels = load_mnist
-        idec = DEC(n_clusters=10)
-        dec.fit(data)
-
-        References
-         ----------
-        Xie, Junyuan, Ross Girshick, and Ali Farhadi. "Unsupervised
-        deep embedding for clustering analysis." International
-        conference on machine learning. 2016.
+        autoencoder : the input autoencoder. If None a new FlexibleAutoencoder will be created (default: None)
+        embedding_size : int, size of the embedding within the autoencoder (default: 10)
+        use_reconstruction_loss : boolean, should the reconstruction loss be used during clustering training (default: False)
+        cluster_loss_weight : double, weight of the clustering loss compared to the reconstruction loss (default: 1)
         """
         self.n_clusters = n_clusters
         self.alpha = alpha
@@ -198,26 +209,21 @@ class DEC(BaseEstimator, ClusterMixin):
 
 class IDEC(DEC):
     """
-    Create an instance of the IDEC algorithm.
+    The Improved Deep Embedded Clustering (IDEC) algorithm.
+    Implemented as a child of the DEC class.
 
-    Parameters
+    Attributes
     ----------
-    n_clusters : number of clusters
-    alpha : alpha for the prediction
-    batch_size : size of the data batches
-    pretrain_learning_rate : learning rate for the pretraining of the autoencoder
-    clustering_learning_rate : learning rate of the actual clustering procedure
-    pretrain_epochs : number of epochs for the pretraining of the autoencoder
-    clustering_epochs : number of epochs for the actual clustering procedure
-    optimizer_class : Optimizer (default: ADAM)
-    loss_fn : loss function for the reconstruction (default: MSELoss)
-    autoencoder : the input autoencoder. If None a new autoencoder will be created
-    embedding_size : size of the embedding within the autoencoder
+    labels_
+    cluster_centers_
+    dec_labels_
+    dec_cluster_centers_
+    autoencoder
 
     Examples
     ----------
     from cluspy.data import load_mnist
-    data, labels = load_mnist
+    data, labels = load_mnist()
     idec = IDEC(n_clusters=10)
     idec.fit(data)
 
@@ -230,6 +236,24 @@ class IDEC(DEC):
     def __init__(self, n_clusters, alpha=1.0, batch_size=256, pretrain_learning_rate=1e-3,
                  clustering_learning_rate=1e-4, pretrain_epochs=100, clustering_epochs=150,
                  optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(), autoencoder=None, embedding_size=10):
+        """
+        Create an instance of the IDEC algorithm.
+        Matches the __init__ from DEC but with use_reconstruction_loss=True and cluster_loss_weight=0.1.
+
+        Parameters
+        ----------
+        n_clusters : number of clusters
+        alpha : double, alpha for the prediction (default: 1.0)
+        batch_size : int, size of the data batches (default: 256)
+        pretrain_learning_rate : double, learning rate for the pretraining of the autoencoder (default: 1e-3)
+        clustering_learning_rate : double, learning rate of the actual clustering procedure (default: 1e-4)
+        pretrain_epochs : int, number of epochs for the pretraining of the autoencoder (default: 100)
+        clustering_epochs : int, number of epochs for the actual clustering procedure (default: 150)
+        optimizer_class : Optimizer (default: torch.optim.Adam)
+        loss_fn : loss function for the reconstruction (default: torch.nn.MSELoss())
+        autoencoder : the input autoencoder. If None a new FlexibleAutoencoder will be created (default: None)
+        embedding_size : int, size of the embedding within the autoencoder (default: 10)
+        """
         super().__init__(n_clusters, alpha, batch_size, pretrain_learning_rate, clustering_learning_rate,
                          pretrain_epochs,
                          clustering_epochs, optimizer_class, loss_fn, autoencoder, embedding_size, True, 0.1)

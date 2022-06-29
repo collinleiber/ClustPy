@@ -218,8 +218,8 @@ def _dipmodule(X, n_clusters, embedding_size, batch_size, optimizer_class, loss_
     # ae_factor = loss_fn(rand_samples_reconstruction, rand_samples_resized).detach()
     ae_factor = _get_lambda(trainloader, FlexibleAutoencoder, X.shape[1], embedding_size, loss_fn, device)
     # Create initial projections
-    n_cluste_combinations = int((n_clusters - 1) * n_clusters / 2)
-    projections = np.zeros((n_cluste_combinations, embedding_size))
+    n_cluster_combinations = int((n_clusters - 1) * n_clusters / 2)
+    projections = np.zeros((n_cluster_combinations, embedding_size))
     X_embed = encode_batchwise(testloader, autoencoder, device)
     if labels_gt is None:
         # Execute kmeans to get initial clusters
@@ -283,7 +283,7 @@ def _dipmodule(X, n_clusters, embedding_size, batch_size, optimizer_class, loss_
                         dip_module, embedded, index_dict[(m, n)], points_in_all_clusters[m], points_in_all_clusters[n],
                         n_points_in_all_clusters[m], n_points_in_all_clusters[n], device)
                     dip_loss = dip_loss + dip_loss_new
-            final_dip_loss = torch.true_divide(dip_loss, n_cluste_combinations)
+            final_dip_loss = torch.true_divide(dip_loss, n_cluster_combinations)
             total_loss = final_dip_loss + ae_loss
             # Optimize
             optimizer.zero_grad()

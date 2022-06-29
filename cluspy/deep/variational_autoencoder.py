@@ -1,3 +1,10 @@
+"""
+@authors:
+Lukas Miklautz
+Donatella Novakovic
+Collin leiber
+"""
+
 import torch
 from cluspy.deep.flexible_autoencoder import FullyConnectedBlock, FlexibleAutoencoder
 
@@ -9,7 +16,7 @@ def _vae_sampling(q_mean, q_logvar):
     Parameters
     ----------
     q_mean : mean value of the central layer.
-    q_var : variance of the central layer (use logirithm of variance - numerical purposes)
+    q_logvar : logarithmic variance of the central layer (use logirithm of variance - numerical purposes)
 
     Returns
     -------
@@ -25,18 +32,6 @@ class VariationalAutoencoder(FlexibleAutoencoder):
     """
     A variational autoencoder (VAE).
 
-    Parameters
-    ----------
-    layers : list of the different layer sizes from input to embedding, e.g. an example architecture for MNIST [784, 512, 256, 10], where 784 is the input dimension and 10 the dimension of the mean and variance value in the central layer.
-             If decoder_layers are not specified then the decoder is symmetric and goes in the same order from embedding to input.
-    batch_norm : bool, default=False, set True if you want to use torch.nn.BatchNorm1d.
-    dropout : float, default=None, set the amount of dropout you want to use.
-    activation: activation function from torch.nn, default=torch.nn.LeakyReLU, set the activation function for the hidden layers, if None then it will be linear.
-    bias : bool, default=True, set False if you do not want to use a bias term in the linear layers
-    decoder_layers : list, default=None, list of different layer sizes from embedding to output of the decoder. If set to None, will be symmetric to layers.
-    decoder_output_fn : activation function from torch.nn, default=None, set the activation function for the decoder output layer, if None then it will be linear.
-                        e.g. set to torch.nn.Sigmoid if you want to scale the decoder output between 0 and 1.
-
     Attributes
     ----------
     encoder : encoder part of the autoencoder, responsible for embedding data points (class is FullyConnectedBlock)
@@ -44,10 +39,29 @@ class VariationalAutoencoder(FlexibleAutoencoder):
     mean : mean value of the central layer
     log_variance : variance of the central layer (use logirithm of variance - numerical purposes)
     fitted  : boolean value indicating whether the autoencoder is already fitted.
+
+    References
+    ----------
+    Kingma, Diederik P., and Max Welling. "Auto-encoding variational Bayes." Int. Conf. on Learning Representations.
     """
 
     def __init__(self, layers, batch_norm=False, dropout=None, activation_fn=torch.nn.LeakyReLU,
                  bias=True, decoder_layers=None, decoder_output_fn=torch.nn.Sigmoid):
+        """
+        Create an instance of a variational autoencoder.
+
+        Parameters
+        ----------
+        layers : list of the different layer sizes from input to embedding, e.g. an example architecture for MNIST [784, 512, 256, 10], where 784 is the input dimension and 10 the dimension of the mean and variance value in the central layer.
+                 If decoder_layers are not specified then the decoder is symmetric and goes in the same order from embedding to input.
+        batch_norm : bool, default=False, set True if you want to use torch.nn.BatchNorm1d.
+        dropout : float, default=None, set the amount of dropout you want to use.
+        activation: activation function from torch.nn, default=torch.nn.LeakyReLU, set the activation function for the hidden layers, if None then it will be linear.
+        bias : bool, default=True, set False if you do not want to use a bias term in the linear layers
+        decoder_layers : list, default=None, list of different layer sizes from embedding to output of the decoder. If set to None, will be symmetric to layers.
+        decoder_output_fn : activation function from torch.nn, default=None, set the activation function for the decoder output layer, if None then it will be linear.
+                            e.g. set to torch.nn.Sigmoid if you want to scale the decoder output between 0 and 1.
+        """
         super(VariationalAutoencoder, self).__init__(layers, batch_norm, dropout, activation_fn, bias,
                                                      decoder_layers, decoder_output_fn)
         # Get size of embedding from last dimension of layers
@@ -70,7 +84,7 @@ class VariationalAutoencoder(FlexibleAutoencoder):
         Returns
         -------
         q_mean : mean value of the central VAE layer
-        q_logvar : variance value of the central VAE layer
+        q_logvar : logarithmic variance value of the central VAE layer (use logirithm of variance - numerical purposes)
         """
         embedded = self.encoder(x)
         q_mean = self.mean(embedded)
@@ -89,9 +103,9 @@ class VariationalAutoencoder(FlexibleAutoencoder):
 
         Returns
         -------
-        z : sampling using q_mean and q_var
+        z : sampling using q_mean and q_logvar
         q_mean : mean value of the central VAE layer
-        q_logvar : variance value of the central VAE layer
+        q_logvar : logarithmic variance value of the central VAE layer (use logirithm of variance - numerical purposes)
         reconstruction: returns the reconstruction of the data point
         """
         q_mean, q_logvar = self.encode(x)
