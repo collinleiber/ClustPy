@@ -69,7 +69,7 @@ def _get_P(betas, centers, shared_space_variation=0.05):
         P[cluster_subspace_id].append(dim_i)
     return P
 
-def rotate(z, V):
+def _rotate(z, V):
     """
     Parameters
     ----------
@@ -82,7 +82,7 @@ def rotate(z, V):
     """
     return torch.matmul(z, V)
 
-def rotate_back(z_rot, V):
+def _rotate_back(z_rot, V):
     """
     Parameters
     ----------
@@ -110,7 +110,7 @@ def enrc_predict(z, V, centers, subspace_betas, use_P=False):
     -------
     predicted_labels : n x c matrix, where n is the number of data points in z and c is the number of clusterings.
     """
-    z_rot = rotate(z, V)
+    z_rot = _rotate(z, V)
     if use_P:
         P = _get_P(betas=subspace_betas.detach(), centers=centers)
     labels = []
@@ -400,7 +400,7 @@ def sgd_init(data, n_clusters, learning_rate, batch_size=128, optimizer_class=No
                                                                P=P, V=V, random_state=random_state.randint(900000), verbose=False)
 
         # Initialize betas with uniform distribution
-        enrc_module = ENRC_Module(init_centers, P_init, V_init, beta_init_value=1.0/len(P_init)).to_device(device)
+        enrc_module = _ENRC_Module(init_centers, P_init, V_init, beta_init_value=1.0/len(P_init)).to_device(device)
         enrc_module.to_device(device)
         param_dict = [{'params': [enrc_module .V],
                     'lr': learning_rate},
@@ -579,7 +579,7 @@ def reinit_centers(enrc, subspace_id, dataloader, model, n_samples=512, kmeans_s
     
     Parameters
     ----------
-    enrc : ENRC_Module, torch.nn.Module instance for the ENRC algorithm
+    enrc : _ENRC_Module, torch.nn.Module instance for the ENRC algorithm
     subspace_id : int, integer which indicates which subspace the cluster to be checked are in.
     dataloader : torch.utils.data.DataLoader, dataloader from which data is randomly sampled. Important shuffle=True needs to be set, because n_samples random samples are drawn.
     model : torch.nn.Module, autoencoder model used for the embedding
@@ -659,7 +659,7 @@ def _are_labels_equal(labels_new, labels_old, threshold=None):
         v = 1 - threshold
     return all([normalized_mutual_info_score(labels_new[:, i], labels_old[:, i], average_method="arithmetic") >= v for i in range(labels_new.shape[1])])
 
-class ENRC_Module(torch.nn.Module):
+class _ENRC_Module(torch.nn.Module):
     """Create an instance of the ENRC torch.nn.Module.
         
     Parameters
@@ -747,7 +747,7 @@ class ENRC_Module(torch.nn.Module):
         -------
         z_rot : the rotated embedded data point
         """
-        return rotate(z, self.V)
+        return _rotate(z, self.V)
     
     def rotate_back(self, z_rot):
         """
@@ -759,7 +759,7 @@ class ENRC_Module(torch.nn.Module):
         -------
         z : the back-rotated embedded data point
         """
-        return rotate_back(z_rot, self.V)
+        return _rotate_back(z_rot, self.V)
 
     def rotation_loss(self):
         """Computes how much the rotation matrix self.V diverges from an orthogonal matrix by calculating |V^T V - I|.
@@ -921,7 +921,7 @@ class ENRC_Module(torch.nn.Module):
 
 
    
-    def fit(self, data, optimizer, max_epochs, model, batch_size, loss_fn=torch.nn.MSELoss(), device=torch.device("cpu"), print_step=5, verbose=True, scheduler=None, fix_rec_error=False, tolerance_threshold=None):
+    def fit(self, data, optimizer, max_epochs, model, batch_size, loss_fn=torch.nn.MSELoss(), device=torch.device("cpu"), print_step=10, verbose=True, scheduler=None, fix_rec_error=False, tolerance_threshold=None):
         """Trains ENRC and the autoencoder in place.
         
         Parameters
@@ -1048,7 +1048,7 @@ def _enrc(X, n_clusters, V, P, input_centers, batch_size, pretrain_learning_rate
     input_centers, P, V, beta_weights = enrc_init(data=embedded_data, n_clusters=n_clusters, device=device, init=init, rounds=10, epochs=10, batch_size=batch_size, verbose=verbose,
                                                   input_centers=input_centers, P=P, V=V, random_state=random_state, max_iter=100, learning_rate=learning_rate, optimizer_class=optimizer_class, init_kwargs=init_kwargs)
     # Setup ENRC Module
-    enrc_module = ENRC_Module(input_centers, P, V, degree_of_space_distortion=degree_of_space_distortion, degree_of_space_preservation=degree_of_space_preservation, beta_weights=beta_weights).to_device(device)
+    enrc_module = _ENRC_Module(input_centers, P, V, degree_of_space_distortion=degree_of_space_distortion, degree_of_space_preservation=degree_of_space_preservation, beta_weights=beta_weights).to_device(device)
 
     param_dict = [{'params': autoencoder.parameters(),
                    'lr': learning_rate},
@@ -1299,7 +1299,7 @@ class ENRC(BaseEstimator, ClusterMixin):
         scatter matrix plot of the input data
         """
         if self.labels_ is None:
-            raise Exception("The NrKmeans algorithm has not run yet. Use the fit() function first.")
+            raise Exception("The ENRC algorithm has not run yet. Use the fit() function first.")
         if labels is None:
             labels = self.labels_[:, subspace_index]
         if X.shape[0] != labels.shape[0]:
@@ -1307,3 +1307,21 @@ class ENRC(BaseEstimator, ClusterMixin):
         plot_scatter_matrix(self.transform_subspace(X, subspace_index), labels,
                             self.cluster_centers_[subspace_index] if plot_centers else None,
                             true_labels=gt, equal_axis=equal_axis)
+    
+    def reconstruct_subspace_centroids(self, subspace_index):
+        """
+        Reconstructs the centroids in the specified subspace_nr.
+       
+        Parameters
+        ----------
+        subspace_index: int, index of the subspace_nr
+       
+        Returns
+        -------
+        reconstructed centers as np.ndarray
+        """
+        cluster_space_centers = self.cluster_centers_[subspace_index]
+        # rotate back as centers are in the V-rotated space
+        centers_rot_back = np.matmul(cluster_space_centers, self.V.transpose())
+        centers_rec = self.autoencoder.decode(torch.from_numpy(centers_rot_back).float().to(self.device))
+        return centers_rec.detach().cpu().numpy()
