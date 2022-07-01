@@ -86,6 +86,7 @@ class VariationalAutoencoder(FlexibleAutoencoder):
         q_mean : mean value of the central VAE layer
         q_logvar : logarithmic variance value of the central VAE layer (use logarithm of variance - numerical purposes)
         """
+        assert x.shape[1] == self.encoder.layers[0], "Input layer of the encoder does not match input sample."
         embedded = self.encoder(x)
         q_mean = self.mean(embedded)
         q_logvar = self.log_variance(embedded)

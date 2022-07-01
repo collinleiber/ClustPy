@@ -134,6 +134,7 @@ class FlexibleAutoencoder(torch.nn.Module):
         -------
         embedded : the embedded data point with dimensionality embedding_size
         """
+        assert x.shape[1] == self.encoder.layers[0], "Input layer of the encoder does not match input sample"
         return self.encoder(x)
 
     def decode(self, embedded: torch.Tensor) -> torch.Tensor:
@@ -148,6 +149,7 @@ class FlexibleAutoencoder(torch.nn.Module):
         -------
         reconstruction: returns the reconstruction of a data point
         """
+        assert embedded.shape[1] == self.decoder.layers[0], "Input layer of the decoder does not match input sample"
         return self.decoder(embedded)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
