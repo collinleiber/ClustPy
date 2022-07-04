@@ -3,7 +3,9 @@ Yang, Bo, et al. "Towards k-means-friendly spaces:
 Simultaneous deep learning and clustering." international
 conference on machine learning. PMLR, 2017.
 
-@authors Lukas Miklautz, Dominik Mautz
+@authors:
+Lukas Miklautz
+Dominik Mautz
 """
 
 from cluspy.deep._utils import detect_device, encode_batchwise, \
@@ -63,12 +65,12 @@ class _DCN_Module(torch.nn.Module):
         self.centers = torch.tensor(init_np_centers)
 
     def dcn_loss(self, embedded, weights=None) -> torch.Tensor:
-        dist = squared_euclidean_distance(self.centers, embedded, weights=weights)
+        dist = squared_euclidean_distance(embedded, self.centers, weights=weights)
         loss = (dist.min(dim=1)[0]).mean()
         return loss
 
     def predict_hard(self, embedded, weights=None) -> torch.Tensor:
-        dist = squared_euclidean_distance(self.centers, embedded, weights=weights)
+        dist = squared_euclidean_distance(embedded, self.centers, weights=weights)
         s = (dist.min(dim=1)[1])
         return s
 

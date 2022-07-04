@@ -8,50 +8,53 @@ class _CluspyDataset(torch.utils.data.Dataset):
     Each sample will be retrieved by indexing tensors along the first dimension.
     Implementation is based on torch.utils.data.TensorDataset.
 
+    Parameters
+    ----------
+    *tensors : torch.Tensor
+        tensors that have the same size of the first dimension. Usually contains the data.
+
     Attributes
     ----------
     tensors (torch.Tensor): tensors that have the same size of the first dimension. Usually contains the data.
     """
 
-    def __init__(self, *tensors):
-        """
-        Initialize an object of type _CluspyDataset (child of torch.utils.data.Dataset).
-        Each sample will be retrieved by indexing tensors along the first dimension.
-
-        Parameters
-        ----------
-        *tensors (torch.Tensor): tensors that have the same size of the first dimension. Usually contains the data.
-        """
+    def __init__(self, *tensors: torch.Tensor):
         assert all(tensors[0].size(0) == tensor.size(0) for tensor in tensors), "Size mismatch between tensors"
         self.tensors = tensors
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int) -> tuple:
         """
         Get sample at specified index.
 
         Parameters
         ----------
-        index : index of the desired sample
+        index : int
+            index of the desired sample
 
         Returns
         -------
-        Tuple containing the sample. Consists of (index, data1, data2, ...), depending on the input tensors.
+        final_tuple : tuple
+            Tuple containing the sample. Consists of (index, data1, data2, ...), depending on the input tensors.
         """
-        return tuple([index] + [tensor[index] for tensor in self.tensors])
+        final_tuple = tuple([index] + [tensor[index] for tensor in self.tensors])
+        return final_tuple
 
-    def __len__(self):
+    def __len__(self) -> int:
         """
         Get length of the dataset which equals the length of the input tensors.
 
         Returns
         -------
-        Length of the dataset.
+        dataset_size : int
+            Length of the dataset.
         """
-        return self.tensors[0].size(0)
+        dataset_size = self.tensors[0].size(0)
+        return dataset_size
 
 
-def get_dataloader(X, batch_size, shuffle=True, drop_last=False, additional_inputs=None,
-                   dataset_class=_CluspyDataset, **dl_kwargs):
+def get_dataloader(X: np.ndarray, batch_size: int, shuffle: bool = True, drop_last: bool = False,
+                   additional_inputs: list = None, dataset_class: torch.utils.data.Dataset = _CluspyDataset,
+                   **dl_kwargs: any) -> torch.utils.data.DataLoader:
     """
     Create a dataloader for Deep Clustering algorithms.
     First entry always contains the indices of the data samples.
@@ -62,17 +65,25 @@ def get_dataloader(X, batch_size, shuffle=True, drop_last=False, additional_inpu
 
     Parameters
     ----------
-    X: the actual data set
-    batch_size: the batch size
-    shuffle: boolean that defines if the data set should be shuffled (default: True)
-    drop_last: boolean that defines if the last batch should be ignored (default: False)
-    additional_inputs: additional inputs for the dataloader, e.g. labels. Can be None, np.ndarray, torch.Tensor or a list containing np.ndarrays/torch.Tensors (default: None)
-    dataset_class: defines the class of the tensor dataset that is contained in the dataloader (default: _CluspyDataset)
-    dl_kwargs: other arguments for torch.utils.data.DataLoader
+    X : np.ndarray / torch.Tensor
+        the actual data set (can be np.ndarray or torch.Tensor)
+    batch_size : int
+        the batch size
+    shuffle : bool
+        boolean that defines if the data set should be shuffled (default: True)
+    drop_last : bool
+        boolean that defines if the last batch should be ignored (default: False)
+    additional_inputs : list / np.ndarray / torch.Tensor
+        additional inputs for the dataloader, e.g. labels. Can be None, np.ndarray, torch.Tensor or a list containing np.ndarrays/torch.Tensors (default: None)
+    dataset_class : torch.utils.data.Dataset
+        defines the class of the tensor dataset that is contained in the dataloader (default: _CluspyDataset)
+    dl_kwargs : any
+        other arguments for torch.utils.data.DataLoader
 
     Returns
     -------
-    The final dataloader
+    dataloader : torch.utils.data.DataLoader
+        The final dataloader
     """
     assert type(X) in [np.ndarray, torch.Tensor], "X must be of type np.ndarray or torch.Tensor."
     assert additional_inputs is None or type(additional_inputs) in [np.ndarray, torch.Tensor,

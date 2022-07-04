@@ -78,7 +78,7 @@ def _dip_deck_training(X, n_clusters_current, dip_merge_threshold, cluster_loss_
             # Reconstruction Loss
             ae_loss = loss_fn(reconstruction, batch_data)
             # Get distances between points and centers. Get nearest center
-            squared_diffs = squared_euclidean_distance(embedded_centers_torch, embedded)
+            squared_diffs = squared_euclidean_distance(embedded, embedded_centers_torch)
             # Update labels? Pause is needed, so cluster labels can adjust to the new structure
             if i != 0:
                 # Update labels

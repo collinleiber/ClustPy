@@ -91,21 +91,7 @@ class _VaDE_VAE(VariationalAutoencoder):
     mean : mean value of the central layer
     log_variance : logarithmic variance of the central layer (use logarithm of variance - numerical purposes)
     fitted  : boolean value indicating whether the autoencoder is already fitted.
-    pretraining : boolean value indicating if pretraining has already happen
     """
-
-    def __init__(self, **kwargs):
-        """
-        Create an instance of the _VaDE_VAE. All parameters will be passed to VariationalAutoencoder.
-
-        Parameters
-        ----------
-        **kwargs : input parameters of the VariationalAutoencoder class
-        """
-        # Super calls the __init__ method from the VariationalAutoencoder class
-        super(_VaDE_VAE, self).__init__(**kwargs)
-        # Start wirth pretraining mode. Sets the behavior of forwad() and loss()
-        self.pretraining = True
 
     def forward(self, x: torch.Tensor) -> (torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor):
         """
@@ -122,14 +108,15 @@ class _VaDE_VAE(VariationalAutoencoder):
         -------
         reconstruction: returns the reconstruction of the data point
         """
-        if self.pretraining:
+        if not self.fitted:
             # While pretraining a forward method similar to a regular autoencoder (FlexibleAutoencoder) should be used
             mean, _ = self.encode(x)
             reconstruction = self.decode(mean)
-            return None, None, None, reconstruction
+            z, q_mean, q_logvar = None, None, None
         else:
             # After pretraining the usual forward of a VAE should be used. Super() uses function from VariationalAutoencoder
-            return super().forward(x)
+            z, q_mean, q_logvar, reconstruction = super().forward(x)
+        return z, q_mean, q_logvar, reconstruction
 
     def loss(self, batch_data, loss_fn, beta=1):
         """
@@ -147,7 +134,7 @@ class _VaDE_VAE(VariationalAutoencoder):
         -------
         loss: returns the reconstruction loss of the input sample
         """
-        if self.pretraining:
+        if not self.fitted:
             # While pretraining a loss similar to a regular autoencoder (FlexibleAutoencoder) should be used
             _, _, _, reconstruction = self.forward(batch_data)
             loss = loss_fn(reconstruction, batch_data)
@@ -155,25 +142,6 @@ class _VaDE_VAE(VariationalAutoencoder):
             # After pretraining the usual loss of a VAE should be used. Super() uses function from VariationalAutoencoder
             loss = super().loss(batch_data, loss_fn, beta)
         return loss
-
-    def fit(self, **kwargs):
-        """
-        Calls the fit function from the FlexibleAutoencoder.
-        Additionally, the pretraining parameter will be set to False, which changes the behavior of forward() and loss().
-
-        Parameters
-        ----------
-        kwargs : see FlexibleAutoencoder for more information
-
-        Returns
-        -------
-        The _Vade_VAE object
-        """
-        # Super calls the fit() method from VariationalAutoencoder
-        super().fit(**kwargs)
-        # End the pretraining mode. Changes the behavior of forwad() and loss()
-        self.pretraining = False
-        return self
 
 
 def _vade_predict_batchwise(dataloader, autoencoder, vade_module, device):

@@ -92,7 +92,7 @@ def _dec_predict(centers, embedded, alpha, weights):
     -------
     The predicted labels
     """
-    squared_diffs = squared_euclidean_distance(centers, embedded, weights)
+    squared_diffs = squared_euclidean_distance(embedded, centers, weights)
     numerator = (1.0 + squared_diffs / alpha).pow(-1.0 * (alpha + 1.0) / 2.0)
     denominator = numerator.sum(1)
     prob = numerator / denominator.unsqueeze(1)

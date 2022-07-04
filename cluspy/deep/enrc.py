@@ -116,9 +116,9 @@ def enrc_predict(z, V, centers, subspace_betas, use_P=False):
     labels = []
     for i, centers_i in enumerate(centers):
         if use_P:
-            weighted_squared_diff = squared_euclidean_distance(centers=centers_i[:, P[i]], embedded=z_rot[:, P[i]])
+            weighted_squared_diff = squared_euclidean_distance(z_rot[:, P[i]], centers_i[:, P[i]])
         else:
-            weighted_squared_diff = squared_euclidean_distance(centers=centers_i, embedded=z_rot, weights=subspace_betas[i, :])
+            weighted_squared_diff = squared_euclidean_distance(z_rot, centers_i, weights=subspace_betas[i, :])
         labels_sub = weighted_squared_diff.argmin(1)
         labels_sub = labels_sub.detach().cpu().numpy()
         labels.append(labels_sub)
@@ -202,7 +202,7 @@ def calculate_optimal_beta_weights_special_case(data, centers, V, batch_size=32)
             batch = batch[1].to(device)
             z_rot = torch.matmul(batch, V)
             for i, centers_i in enumerate(centers):
-                weighted_squared_diff = squared_euclidean_distance(centers=centers_i.unsqueeze(1), embedded=z_rot.unsqueeze(1))
+                weighted_squared_diff = squared_euclidean_distance(z_rot.unsqueeze(1), centers_i.unsqueeze(1))
                 assignments = weighted_squared_diff.detach().sum(2).argmin(1)
                 one_hot_mask = int_to_one_hot(assignments, centers_i.shape[0])            
                 weighted_squared_diff_masked = weighted_squared_diff * one_hot_mask.unsqueeze(2)
@@ -534,7 +534,7 @@ def _calculate_rotated_embeddings_and_distances_for_n_samples(enrc, model, datal
         if calc_distances:
             # Calculate distance from all not lonely centers to embedded data points
             idx_other_centers = [i for i in range(subspace_centers.shape[0]) if i != center_id]
-            weighted_squared_diff = squared_euclidean_distance(centers=subspace_centers[idx_other_centers], embedded=z_rot, weights=subspace_betas)
+            weighted_squared_diff = squared_euclidean_distance(z_rot, subspace_centers[idx_other_centers], weights=subspace_betas)
             dists.append(weighted_squared_diff.detach().cpu())
         
         # Increase sample_count by batch size. 
@@ -620,7 +620,7 @@ def reinit_centers(enrc, subspace_id, dataloader, model, n_samples=512, kmeans_s
                 for step_i in range(kmeans_steps):
                     for z_rot in embeddingloader:
                         z_rot = z_rot.to(device)
-                        weighted_squared_diff = squared_euclidean_distance(centers=enrc.centers[subspace_id], embedded=z_rot, weights=subspace_betas[subspace_id, :])
+                        weighted_squared_diff = squared_euclidean_distance(z_rot, enrc.centers[subspace_id], weights=subspace_betas[subspace_id, :])
                         assignments = weighted_squared_diff.detach().argmin(1)
                         one_hot_mask = int_to_one_hot(assignments, k)
                         batch_cluster_sums += (z_rot.unsqueeze(1) * one_hot_mask.unsqueeze(2)).sum(0)
@@ -843,7 +843,7 @@ class ENRC_Module(torch.nn.Module):
         subspace_losses = 0
         assignment_matrix_dict = {}
         for i, centers_i in enumerate(self.centers):
-            weighted_squared_diff = squared_euclidean_distance(centers=centers_i.detach(), embedded=z_rot, weights=subspace_betas[i, :])
+            weighted_squared_diff = squared_euclidean_distance(z_rot, centers_i.detach(), weights=subspace_betas[i, :])
             weighted_squared_diff /= z_rot.shape[0]
             assignments = weighted_squared_diff.detach().argmin(1)
             one_hot_mask = int_to_one_hot(assignments, centers_i.shape[0])            
@@ -1254,7 +1254,7 @@ class ENRC(BaseEstimator, ClusterMixin):
         """
         if not embedded:
             dataloader = get_dataloader(X, batch_size=self.batch_size, shuffle=False, drop_last=False)
-            emb = encode_batchwise(dataloader=dataloader, model=self.autoencoder, device=self.device)
+            emb = encode_batchwise(dataloader=dataloader, module=self.autoencoder, device=self.device)
         else:
             emb = X
         return np.matmul(emb, self.V)
@@ -1275,7 +1275,7 @@ class ENRC(BaseEstimator, ClusterMixin):
         """
         if not embedded:
             dataloader = get_dataloader(X, batch_size=self.batch_size, shuffle=False, drop_last=False)
-            emb = encode_batchwise(dataloader=dataloader, model=self.autoencoder, device=self.device)
+            emb = encode_batchwise(dataloader=dataloader, module=self.autoencoder, device=self.device)
         else:
             emb = X
         cluster_space_V = self.V[:, self.P[subspace_index]]
