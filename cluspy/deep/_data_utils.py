@@ -15,7 +15,8 @@ class _CluspyDataset(torch.utils.data.Dataset):
 
     Attributes
     ----------
-    tensors (torch.Tensor): tensors that have the same size of the first dimension. Usually contains the data.
+    tensors : torch.Tensor
+        tensors that have the same size of the first dimension. Usually contains the data.
     """
 
     def __init__(self, *tensors: torch.Tensor):

@@ -1,8 +1,8 @@
+from cluspy.data import load_optdigits
 from cluspy.deep._utils import squared_euclidean_distance, detect_device, encode_batchwise, predict_batchwise, window, \
     int_to_one_hot
-import torch
-from cluspy.data import load_optdigits
 from cluspy.deep.tests._test_helpers import _get_test_dataloader, _TestAutoencoder, _TestClusterModule
+import torch
 import numpy as np
 
 
@@ -21,7 +21,7 @@ def test_squared_euclidean_distance():
                             [0.01 + 0.04 + 0.09, 0.01 * 1 + 0.04 * 4 + 0.09 * 9, 0.01 * 9 + 0.04 * 9 + 0.09 * 9],
                             [0.01 * 4 + 0.04 * 4 + 0.09 * 4, 0 + 0.04 * 1 + 0.09 * 4, 0.01 * 4 + 0.04 * 4 + 0.09 * 4],
                             [0.01 * 9 + 0.04 * 9 + 0.09 * 9, 0.01 * 1 + 0 + 0.09 * 1, 0.01 + 0.04 + 0.09]])
-    assert torch.all(torch.isclose(dist_tensor, desired))  # Equal not working because of numerical issues
+    assert torch.all(torch.isclose(dist_tensor, desired))  # torch.equal is not working due to numerical issues
 
 
 def test_detect_device():

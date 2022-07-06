@@ -9,13 +9,17 @@ from cluspy.deep._utils import detect_device, encode_batchwise, squared_euclidea
 from cluspy.deep._data_utils import get_dataloader
 from cluspy.deep._train_utils import get_trained_autoencoder
 import torch
+import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.base import BaseEstimator, ClusterMixin
 
 
-def _dec(X, n_clusters, alpha, batch_size, pretrain_learning_rate, clustering_learning_rate, pretrain_epochs,
-         clustering_epochs, optimizer_class, loss_fn, autoencoder, embedding_size, use_reconstruction_loss,
-         cluster_loss_weight):
+def _dec(X: np.ndarray, n_clusters: int, alpha: float, batch_size: int, pretrain_learning_rate: float,
+         clustering_learning_rate: float,
+         pretrain_epochs: int,
+         clustering_epochs: int, optimizer_class: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss,
+         autoencoder: torch.nn.Module, embedding_size: int, use_reconstruction_loss: bool,
+         cluster_loss_weight: float) -> (np.ndarray, np.ndarray, np.ndarray, np.ndarray, torch.nn.Module):
     """
     Start the actual DEC clustering procedure on the input data set.
     First an autoencoder (AE) will be trained (will be skipped if input autoencoder is given).
@@ -24,28 +28,43 @@ def _dec(X, n_clusters, alpha, batch_size, pretrain_learning_rate, clustering_le
 
     Parameters
     ----------
-    X : the given data set
-    n_clusters : number of clusters
-    alpha : double, alpha value for the prediction
-    batch_size : int, size of the data batches
-    pretrain_learning_rate : double, learning rate for the pretraining of the autoencoder
-    clustering_learning_rate : double, learning rate of the actual clustering procedure
-    pretrain_epochs : int, number of epochs for the pretraining of the autoencoder
-    clustering_epochs : int, number of epochs for the actual clustering procedure
-    optimizer_class : Optimizer
-    loss_fn : loss function for the reconstruction
-    autoencoder : the input autoencoder. If None a new FlexibleAutoencoder will be created
-    embedding_size : int, size of the embedding within the autoencoder
-    use_reconstruction_loss : boolean, defines whether the reconstruction loss will be used during clustering training
-    cluster_loss_weight : double, weight of the clustering loss compared to the reconstruction loss
+    X : np.ndarray / torch.Tensor
+        the given data set. Can be a np.ndarray or a torch.Tensor
+    n_clusters : int
+        number of clusters
+    alpha : float
+        alpha value for the prediction
+    batch_size : int
+        size of the data batches
+    pretrain_learning_rate : float
+        learning rate for the pretraining of the autoencoder
+    clustering_learning_rate : float
+        learning rate of the actual clustering procedure
+    pretrain_epochs : int
+        number of epochs for the pretraining of the autoencoder
+    clustering_epochs : int
+        number of epochs for the actual clustering procedure
+    optimizer_class : torch.optim.Optimizer
+        the optimizer
+    loss_fn : torch.nn.modules.loss._Loss
+         loss function for the reconstruction
+    autoencoder : torch.nn.Module
+        the input autoencoder. If None a new FlexibleAutoencoder will be created
+    embedding_size : int
+        size of the embedding within the autoencoder
+    use_reconstruction_loss : bool
+        defines whether the reconstruction loss will be used during clustering training
+    cluster_loss_weight : float
+        weight of the clustering loss compared to the reconstruction loss
 
     Returns
     -------
-    kmeans.labels_
-    kmeans.cluster_centers_
-    dec_labels
-    dec_centers
-    autoencoder
+    tuple : (np.ndarray, np.ndarray, np.ndarray, np.ndarray, torch.nn.Module)
+        The labels as identified by a final KMeans execution,
+        The cluster centers as identified by a final KMeans execution,
+        The labels as identified by DEC after the training terminated,
+        The cluster centers as identified by DEC after the training terminated,
+        The final autoencoder
     """
     device = detect_device()
     trainloader = get_dataloader(X, batch_size, True, False)
@@ -138,23 +157,20 @@ def _dec_compression_loss_fn(pred_labels):
 
 class _DEC_Module(torch.nn.Module):
     """
-    The _DEC_Module. Contains most of the algorithm specific procedures.
+    The _DEC_Module. Contains most of the algorithm specific procedures like the loss and prediction functions.
 
     Attributes
     ----------
     alpha : the soft assignments
     centers : the cluster centers
+
+    Parameters
+    ----------
+    init_centers : np.ndarray, initial cluster centers
+    alpha : double, alpha value for the prediction method
     """
 
     def __init__(self, init_centers, alpha):
-        """
-        Create an instance of the _DEC_Module.
-
-        Parameters
-        ----------
-        init_centers : np.ndarray, initial cluster centers
-        alpha : double, alpha value for the prediction method
-        """
         super().__init__()
         self.alpha = alpha
         # Centers are learnable parameters
@@ -177,7 +193,7 @@ class _DEC_Module(torch.nn.Module):
 
     def predict_hard(self, embedded, weights=None) -> torch.Tensor:
         """
-        Hard prediction of given embedded samples. Returns the corresponding hard labels.
+        Hard prediction of the given embedded samples. Returns the corresponding hard labels.
         Uses the soft prediction method and then applies argmax.
 
         Parameters
@@ -198,11 +214,11 @@ class _DEC_Module(torch.nn.Module):
         Parameters
         ----------
         embedded : the embedded samples
-        weights : cluster weights for the dec_predict method (default: None)
+        weights : cluster weights for the squared euclidean distance within dec_predict (default: None)
 
         Returns
         -------
-        loss: returns the reconstruction loss of the input sample
+        loss: the final DEC loss
         """
         prediction = _dec_predict(self.centers, embedded, self.alpha, weights=weights)
         loss = _dec_compression_loss_fn(prediction)
@@ -241,6 +257,7 @@ class _DEC_Module(torch.nn.Module):
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
+        return self
 
 
 class DEC(BaseEstimator, ClusterMixin):
@@ -258,8 +275,9 @@ class DEC(BaseEstimator, ClusterMixin):
     Examples
     ----------
     from cluspy.data import load_mnist
+    from cluspy.deep import DEC
     data, labels = load_mnist()
-    idec = DEC(n_clusters=10)
+    dec = DEC(n_clusters=10)
     dec.fit(data)
 
     References
@@ -355,6 +373,7 @@ class IDEC(DEC):
     Examples
     ----------
     from cluspy.data import load_mnist
+    from cluspy.deep import IDEC
     data, labels = load_mnist()
     idec = IDEC(n_clusters=10)
     idec.fit(data)

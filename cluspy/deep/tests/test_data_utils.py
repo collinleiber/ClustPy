@@ -1,6 +1,6 @@
-import torch
-from cluspy.deep._data_utils import _CluspyDataset, get_dataloader
 from cluspy.data import load_optdigits
+from cluspy.deep._data_utils import _CluspyDataset, get_dataloader
+import torch
 
 def test_CluspyDataset_with_optidigits():
     data, labels = load_optdigits()
