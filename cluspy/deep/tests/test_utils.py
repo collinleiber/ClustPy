@@ -1,7 +1,7 @@
 from cluspy.data import load_optdigits
 from cluspy.deep._utils import squared_euclidean_distance, detect_device, encode_batchwise, predict_batchwise, window, \
     int_to_one_hot
-from cluspy.deep.tests._test_helpers import _get_test_dataloader, _TestAutoencoder, _TestClusterModule
+from cluspy.deep.tests._helpers_for_tests import _get_test_dataloader, _TestAutoencoder, _TestClusterModule
 import torch
 import numpy as np
 
@@ -65,11 +65,11 @@ def test_window():
 
 
 def test_int_to_one_hot():
-    labels = torch.tensor([0, 0, 1, 1, 2])
+    labels = torch.tensor([0, 0, 1, 2, 1])
     desired = torch.tensor([[1., 0., 0.],
                             [1, 0, 0],
                             [0, 1, 0],
-                            [0, 1, 0],
-                            [0, 0, 1]])
+                            [0, 0, 1],
+                            [0, 1, 0]])
     onehot = int_to_one_hot(labels, 3)
     assert torch.equal(onehot, desired)

@@ -134,12 +134,12 @@ def int_to_one_hot(int_tensor: torch.Tensor, n_integers: int) -> torch.Tensor:
     """
     Convert a tensor containing integers (e.g. labels) to an one hot encoding.
     Here, each integer gets its own features in the resulting tensor, where only the values 0 or 1 are accepted.
-    E.g. [0,0,1,1,2] gets
+    E.g. [0,0,1,2,1] gets
     [[1,0,0],
     [1,0,0],
     [0,1,0],
-    [0,1,0],
-    [0,0,1]]
+    [0,0,1],
+    [0,1,0]]
 
     Parameters
     ----------

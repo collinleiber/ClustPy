@@ -139,7 +139,7 @@ class _DCN_Module(torch.nn.Module):
         the cluster centers
     """
 
-    def __init__(self, init_np_centers):
+    def __init__(self, init_np_centers: np.ndarray):
         super().__init__()
         self.centers = torch.tensor(init_np_centers)
 
@@ -152,7 +152,7 @@ class _DCN_Module(torch.nn.Module):
         embedded : torch.Tensor
             the embedded samples
         weights : torch.Tensor
-            cluster weights for the squared euclidean distance (default: None)
+            feature weights for the squared euclidean distance (default: None)
 
         Returns
         -------
@@ -173,11 +173,11 @@ class _DCN_Module(torch.nn.Module):
         embedded : torch.Tensor
             the embedded samples
         weights : torch.Tensor
-            cluster weights for the squared euclidean distance (default: None)
+            feature weights for the squared euclidean distance (default: None)
 
         Returns
         -------
-        labels: torch.Tensor
+        labels : torch.Tensor
             the final labels
         """
         dist = squared_euclidean_distance(embedded, self.centers, weights=weights)
@@ -358,12 +358,11 @@ class DCN(BaseEstimator, ClusterMixin):
     """
 
     def __init__(self, n_clusters: int, batch_size: int = 256, pretrain_learning_rate: float = 1e-3,
-                 clustering_learning_rate: float = 1e-4,
-                 pretrain_epochs: int = 100, clustering_epochs: int = 150,
+                 clustering_learning_rate: float = 1e-4, pretrain_epochs: int = 100, clustering_epochs: int = 150,
                  optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), degree_of_space_distortion: float = 0.05,
-                 degree_of_space_preservation: float = 1.0,
-                 autoencoder: torch.nn.Module = None, embedding_size: int = 10):
+                 degree_of_space_preservation: float = 1.0, autoencoder: torch.nn.Module = None,
+                 embedding_size: int = 10):
         self.n_clusters = n_clusters
         self.batch_size = batch_size
         self.pretrain_learning_rate = pretrain_learning_rate

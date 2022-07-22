@@ -112,7 +112,6 @@ class VariationalAutoencoder(FlexibleAutoencoder):
         q_mean, q_logvar = self.encode(x)
         z = _vae_sampling(q_mean, q_logvar)
         reconstruction = self.decode(z)
-        assert torch.all(reconstruction >= 0) and torch.all(reconstruction <= 1)
         return z, q_mean, q_logvar, reconstruction
 
     def loss(self, batch_data, loss_fn, beta=1):

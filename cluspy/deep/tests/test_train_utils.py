@@ -1,7 +1,7 @@
 from cluspy.data import load_optdigits
 from cluspy.deep import FlexibleAutoencoder, VariationalAutoencoder
 from cluspy.deep._train_utils import get_trained_autoencoder, get_default_layers
-from cluspy.deep.tests._test_helpers import _get_test_dataloader
+from cluspy.deep.tests._helpers_for_tests import _get_test_dataloader
 import numpy as np
 import torch
 
