@@ -2,7 +2,7 @@
 @authors:
 Lukas Miklautz
 Donatella Novakovic
-Collin leiber
+Collin Leiber
 """
 
 import torch

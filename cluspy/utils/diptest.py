@@ -249,6 +249,8 @@ def _dip_python_port(X, is_data_sorted=False, debug=False):
 
 
 def dip_pval(dip_value, n_points, pval_strategy="table", n_boots=2000):
+    assert type(pval_strategy) is str, "pval_stratgegy must be of type string"
+    pval_strategy = pval_strategy.lower()
     assert pval_strategy in ["bootstrap", "table",
                              "function"], "pval_strategy must match 'bootstrap', 'table' or 'function'. " \
                                           "Your input: {0}".format(pval_strategy)
@@ -309,7 +311,7 @@ def dip_pval_gradient(X, x_proj, sorted_indices, modal_triangle, dip_value):
     quotient = (0.648 * (1 + 1.58 * exponent) ** (1 / 1.58) + 0.352 * (1 + 0.18 * exponent) ** (1/0.18)) ** 2
     grad_factor = (0.648 * (1 + 1.58 * exponent) ** (1 / 1.58 - 1) + 0.352 * (1 + 0.18 * exponent) ** (1/0.18-1)) / quotient
     grad_factor *= exponent * (-b)
-    
+
     pval_grad = grad_factor * dip_grad
     return pval_grad
 
@@ -343,9 +345,8 @@ def _strip_gcm_lcm(gcm, lcm):
 
 
 def plot_dip(X, is_data_sorted=False, dip_value=None, modal_interval=None, modal_triangle=None,
-             gcm_lcm=None, add_histogram=True, labels=None, histogram_density=True, histogram_n_bins=100,
-             show_legend=True,
-             height_ratio=(1, 2), show_plot=True):
+             gcm_lcm=None, show_legend=True, add_histogram=True, histogram_labels=None, histogram_show_legend=True,
+             histogram_density=True, histogram_n_bins=100, height_ratio=(1, 2), show_plot=True):
     assert X.ndim == 1, "Data must be 1-dimensional for the dip-test. Your shape:{0}".format(X.shape)
     N = len(X)
     if not is_data_sorted:
@@ -353,8 +354,11 @@ def plot_dip(X, is_data_sorted=False, dip_value=None, modal_interval=None, modal
     if add_histogram:
         # Add histogram at the top of the plot (uses plot_histogram from cluspy.utils.plots)
         fig, (ax1, ax2) = plt.subplots(2, sharex=True, gridspec_kw={'height_ratios': height_ratio})
-        plot_histogram(X, labels, density=histogram_density, n_bins=histogram_n_bins, show_legend=show_legend,
+        plot_histogram(X, histogram_labels, density=histogram_density, n_bins=histogram_n_bins, show_legend=histogram_show_legend,
                        container=ax1, show_plot=False)
+        if modal_interval is not None:
+            ax1.plot([X[modal_interval[0]], X[modal_interval[0]]], ax1.get_ylim(), "g--")
+            ax1.plot([X[modal_interval[1]], X[modal_interval[1]]], ax1.get_ylim(), "g--")
         dip_container = ax2
         # Remove spacing between the two plots
         fig.subplots_adjust(hspace=0)

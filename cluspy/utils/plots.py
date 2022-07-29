@@ -202,29 +202,7 @@ def plot_scatter_matrix(X, labels=None, centers=None, true_labels=None, density=
                     # Second plot for actual histogram
                     twin_axis = ax.twinx()
                     twin_axis.yaxis.set_visible(False)
-                    if labels is not None:
-                        for lab in unique_labels:
-                            hist_color = cmap(norm(lab))
-                            twin_axis.hist(X[labels == lab, i], alpha=0.5, bins=n_bins,
-                                           color=hist_color, range=(np.min(X[:, i]), np.max(X[:, i])))
-                    else:
-                        twin_axis.hist(X[:, i], alpha=0.5, bins=n_bins)
-                    # Plot densities
-                    if density:
-                        twin_axis2 = ax.twinx()
-                        twin_axis2.yaxis.set_visible(False)
-                        if labels is not None:
-                            for lab in unique_labels:
-                                den_objects = X[labels == lab]
-                                if den_objects.shape[0] >= _MIN_OBJECTS_FOR_DENS_PLOT:
-                                    hist_color = cmap(norm(lab))
-                                    kde = stats.gaussian_kde(den_objects[:, i])
-                                    steps = np.linspace(np.min(den_objects[:, i]), np.max(den_objects[:, i]), 1000)
-                                    twin_axis2.plot(steps, kde(steps), color=hist_color)
-                        elif X[:, i].shape[0] >= _MIN_OBJECTS_FOR_DENS_PLOT:
-                            kde = stats.gaussian_kde(X[:, i])
-                            steps = np.linspace(np.min(X[:, i]), np.max(X[:, i]), 1000)
-                            twin_axis2.plot(steps, kde(steps))
+                    plot_histogram(X[:, i], labels, density, n_bins, show_legend=False, container=twin_axis, show_plot=False)
                 else:
                     # Scatter plot
                     if true_labels is None:
@@ -244,6 +222,7 @@ def plot_scatter_matrix(X, labels=None, centers=None, true_labels=None, density=
             _add_legend(fig, unique_labels, cmap, norm)
         if show_plot:
             plt.show()
+        return axes
 
 
 def _add_legend(fig, unique_labels, cmap, norm):

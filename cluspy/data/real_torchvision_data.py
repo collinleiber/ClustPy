@@ -78,6 +78,9 @@ def _load_torch_image_data(data_source: torchvision.datasets.VisionDataset, subs
         else:
             data = data_test
             labels = labels_test
+    # Convert data to float and labels to int
+    data = data.float()
+    labels = labels.int()
     ssl._create_default_https_context = ssl._create_default_https_context
     if normalize_channels:
         if data.dim() == 3:

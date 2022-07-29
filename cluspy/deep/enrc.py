@@ -1,5 +1,6 @@
 """
-@authors Lukas Miklautz
+@authors:
+Lukas Miklautz
 """
 
 import torch

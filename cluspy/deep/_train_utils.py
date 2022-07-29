@@ -2,7 +2,7 @@ from cluspy.deep.flexible_autoencoder import FlexibleAutoencoder
 import torch
 
 
-def get_default_layers(input_dim: int, embedding_size: int) -> list:
+def _get_default_layers(input_dim: int, embedding_size: int) -> list:
     """
     Get the default layers for an autoencoder.
     Default layers are [input_dim, 500, 500, 2000, embedding_size]
@@ -69,7 +69,7 @@ def get_trained_autoencoder(trainloader: torch.utils.data.DataLoader, learning_r
                 input_dim)
             embedding_size = input_dim
         # Init Autoencoder parameters
-        layers = get_default_layers(input_dim, embedding_size)
+        layers = _get_default_layers(input_dim, embedding_size)
         autoencoder = autoencoder_class(layers=layers).to(device)
     else:
         autoencoder.to(device)

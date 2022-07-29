@@ -38,19 +38,25 @@ def squared_euclidean_distance(tensor1: torch.Tensor, tensor2: torch.Tensor,
     return squared_diffs
 
 
-def detect_device() -> torch.device:
+def detect_device(device: torch.device = None) -> torch.device:
     """
-    Automatically detects if you have a cuda enabled GPU
+    Automatically detects if you have a cuda enabled GPU.
+
+    Parameters
+    ----------
+    device : torch.device
+        the input device. Will be returned if it is not None (default: None)
 
     Returns
     -------
     device : torch.device
         device on which the prediction should take place
     """
-    if torch.cuda.is_available():
-        device = torch.device('cuda')
-    else:
-        device = torch.device('cpu')
+    if device is None:
+        if torch.cuda.is_available():
+            device = torch.device('cuda')
+        else:
+            device = torch.device('cpu')
     return device
 
 
