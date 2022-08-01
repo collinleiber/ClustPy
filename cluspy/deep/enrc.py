@@ -1823,7 +1823,7 @@ class ENRC(BaseEstimator, ClusterMixin):
         scatter matrix plot of the input data
         """
         if self.labels_ is None:
-            raise Exception("ENRC has not run yet. Use the fit() function first.")
+            raise Exception("The ENRC algorithm has not run yet. Use the fit() function first.")
         if labels is None:
             labels = self.labels_[:, subspace_index]
         if X.shape[0] != labels.shape[0]:
@@ -1831,6 +1831,7 @@ class ENRC(BaseEstimator, ClusterMixin):
         plot_scatter_matrix(self.transform_subspace(X, subspace_index), labels,
                             self.cluster_centers_[subspace_index] if plot_centers else None,
                             true_labels=gt, equal_axis=equal_axis)
+
 
     def reconstruct_subspace_centroids(self, subspace_index: int) -> np.ndarray:
         """
