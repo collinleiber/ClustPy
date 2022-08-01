@@ -227,8 +227,9 @@ Module-helpers
 """
 
 
-def plot_dipenocder_embedding(X_embed: np.ndarray, n_clusters: int, labels: np.ndarray, projection_axes: np.ndarray,
-                              index_dict: dict, edge_width: float = 0.1, show_legend: bool = False):
+def plot_dipencoder_embedding(X_embed: np.ndarray, n_clusters: int, labels: np.ndarray, projection_axes: np.ndarray,
+                              index_dict: dict, edge_width: float = 0.1, show_legend: bool = False,
+                              show_plot: bool = True) -> None:
     """
     Plot the current state of the DipEncoder.
     Uses the plot_scatter_matrix as a basis and adds projection axes in red.
@@ -249,6 +250,8 @@ def plot_dipenocder_embedding(X_embed: np.ndarray, n_clusters: int, labels: np.n
         Specifies the width of the empty space (containung no points) at the edges of the plots
     show_legend : bool
         Specifies whether a legend should be added to the plot
+    show_plot : bool
+        Specifies whether the plot should be plotted, i.e. if plt.show() should be executed (default: True)
     """
     # Get cluster means do plot projection axes
     means = [np.mean(X_embed[labels == i], axis=0) for i in range(n_clusters)]
@@ -276,7 +279,8 @@ def plot_dipenocder_embedding(X_embed: np.ndarray, n_clusters: int, labels: np.n
             # Set the limits -> will create the empty space (no points) at the edge of the plot
             ax.set_ylim([mins[m] - edge_width * max_min_diffs[m], maxs[m] + edge_width * max_min_diffs[m]])
             ax.set_xlim([mins[n] - edge_width * max_min_diffs[n], maxs[n] + edge_width * max_min_diffs[n]])
-    plt.show()
+    if show_plot:
+        plt.show()
 
 
 def _get_dip_error(dip_module: _Dip_Module, X_embed: torch.Tensor, projection_axis_index: int,
@@ -751,7 +755,7 @@ class DipEncoder(BaseEstimator, ClusterMixin):
                                self.index_dict_)
         return labels_pred
 
-    def plot(self, X: np.ndarray, edge_width: float = 0.2, show_legend: bool = True):
+    def plot(self, X: np.ndarray, edge_width: float = 0.2, show_legend: bool = True) -> None:
         """
         Plot the current state of the DipEncoder.
         First the data set will be encoded using the autoencoder, afterwards the plot will be created.
@@ -769,5 +773,5 @@ class DipEncoder(BaseEstimator, ClusterMixin):
         device = detect_device()
         testloader = get_dataloader(X, self.batch_size, False, False)
         X_embed = encode_batchwise(testloader, self.autoencoder, device)
-        plot_dipenocder_embedding(X_embed, self.n_clusters, self.labels_, self.projection_axes_, self.index_dict_,
+        plot_dipencoder_embedding(X_embed, self.n_clusters, self.labels_, self.projection_axes_, self.index_dict_,
                                   edge_width, show_legend=show_legend)

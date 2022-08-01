@@ -15,9 +15,8 @@ from sklearn.base import BaseEstimator, ClusterMixin
 
 
 def _dec(X: np.ndarray, n_clusters: int, alpha: float, batch_size: int, pretrain_learning_rate: float,
-         clustering_learning_rate: float,
-         pretrain_epochs: int,
-         clustering_epochs: int, optimizer_class: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss,
+         clustering_learning_rate: float, pretrain_epochs: int, clustering_epochs: int,
+         optimizer_class: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss,
          autoencoder: torch.nn.Module, embedding_size: int, use_reconstruction_loss: bool,
          cluster_loss_weight: float) -> (np.ndarray, np.ndarray, np.ndarray, np.ndarray, torch.nn.Module):
     """
@@ -273,6 +272,11 @@ class _DEC_Module(torch.nn.Module):
             defines whether the reconstruction loss will be used during clustering training
         cluster_loss_weight : float
             weight of the clustering loss compared to the reconstruction loss
+
+        Returns
+        -------
+        self : _DEC_Module
+            this instance of the _DEC_Module
         """
         for _ in range(n_epochs):
             for batch in trainloader:

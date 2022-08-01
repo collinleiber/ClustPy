@@ -13,24 +13,29 @@ class FullyConnectedBlock(torch.nn.Module):
     """
     Feed Forward Neural Network Block
 
+    Parameters
+    ----------
+    layers : list
+        list of the different layer sizes
+    batch_norm : bool
+        set True if you want to use torch.nn.BatchNorm1d (default: False)
+    dropout : float
+        set the amount of dropout you want to use (default: None)
+    activation_fn : torch.nn.Module
+        activation function from torch.nn, set the activation function for the hidden layers, if None then it will be linear (default: None)
+    bias : bool
+        set False if you do not want to use a bias term in the linear layers (default: None)
+    output_fn : torch.nn.Module
+        activation function from torch.nn, set the activation function for the last layer, if None then it will be linear (default: None)
+
     Attributes
     ----------
-    block: torch.nn.Sequential, feed forward neural network
+    block: torch.nn.Sequential
+        feed forward neural network
     """
 
-    def __init__(self, layers, batch_norm=False, dropout=None, activation_fn=None, bias=True, output_fn=None):
-        """
-        Create an instance of a FullyConnectedBlock.
-
-        Parameters
-        ----------
-        layers : list of the different layer sizes
-        batch_norm : bool, default=False, set True if you want to use torch.nn.BatchNorm1d
-        dropout : float, default=None, set the amount of dropout you want to use.
-        activation_fn : activation function from torch.nn, default=None, set the activation function for the hidden layers, if None then it will be linear.
-        bias : bool, default=True, set False if you do not want to use a bias term in the linear layers
-        output_fn : activation function from torch.nn, default=None, set the activation function for the last layer, if None then it will be linear.
-        """
+    def __init__(self, layers: list, batch_norm: bool = False, dropout: float = None,
+                 activation_fn: torch.nn.Module = None, bias: bool = True, output_fn: torch.nn.Module = None):
         super(FullyConnectedBlock, self).__init__()
         self.layers = layers
         self.batch_norm = batch_norm
@@ -56,53 +61,64 @@ class FullyConnectedBlock(torch.nn.Module):
 
         self.block = torch.nn.Sequential(*fc_block_list)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Pass a sample through the FullyConnectedBlock.
 
         Parameters
         ----------
-        x : the sample
+        x : torch.Tensor
+            the sample
 
         Returns
         -------
-        The passed sample.
+        forwarded : torch.Tensor
+            The passed sample.
         """
-        return self.block(x)
+        forwarded = self.block(x)
+        return forwarded
 
 
 class FlexibleAutoencoder(torch.nn.Module):
     """
     A flexible feedforward autoencoder.
-    
+
+    Parameters
+    ----------
+    layers : list
+        list of the different layer sizes from input to embedding, e.g. an example architecture for MNIST [784, 512, 256, 10], where 784 is the input dimension and 10 the embedding dimension.
+        If decoder_layers are not specified then the decoder is symmetric and goes in the same order from embedding to input.
+    batch_norm : bool
+        Set True if you want to use torch.nn.BatchNorm1d (default: False)
+    dropout : float
+        Set the amount of dropout you want to use (default: None)
+    activation_fn : torch.nn.Module
+        activation function from torch.nn, set the activation function for the hidden layers, if None then it will be linear (default: torch.nn.LeakyReLU)
+    bias : bool
+        set False if you do not want to use a bias term in the linear layers (default: True)
+    decoder_layers : list
+        list of different layer sizes from embedding to output of the decoder. If set to None, will be symmetric to layers (default: None)
+    decoder_output_fn : torch.nn.Module
+        activation function from torch.nn, set the activation function for the decoder output layer, if None then it will be linear.
+        e.g. set to torch.nn.Sigmoid if you want to scale the decoder output between 0 and 1 (default: None)
+
     Attributes
     ----------
-    encoder : encoder part of the autoencoder, responsible for embedding data points (class is FullyConnectedBlock)
-    decoder : decoder part of the autoencoder, responsible for reconstructing data points from the embedding (class is FullyConnectedBlock)
-    fitted  : boolean value indicating whether the autoencoder is already fitted.
+    encoder : FullyConnectedBlock
+        encoder part of the autoencoder, responsible for embedding data points (class is FullyConnectedBlock)
+    decoder : FullyConnectedBlock
+        decoder part of the autoencoder, responsible for reconstructing data points from the embedding (class is FullyConnectedBlock)
+    fitted  : bool
+        boolean value indicating whether the autoencoder is already fitted.
 
     References
     ----------
     E.g. Ballard, Dana H. "Modular learning in neural networks." Aaai. Vol. 647. 1987.
     """
 
-    def __init__(self, layers, batch_norm=False, dropout=None, activation_fn=torch.nn.LeakyReLU, bias=True,
-                 decoder_layers=None, decoder_output_fn=None):
-        """
-        Create an instance of a flexible autoencoder.
-
-        Parameters
-        ----------
-        layers : list of the different layer sizes from input to embedding, e.g. an example architecture for MNIST [784, 512, 256, 10], where 784 is the input dimension and 10 the embedding dimension.
-                 If decoder_layers are not specified then the decoder is symmetric and goes in the same order from embedding to input.
-        batch_norm : bool, default=False, set True if you want to use torch.nn.BatchNorm1d
-        dropout : float, default=None, set the amount of dropout you want to use.
-        activation_fn: activation function from torch.nn, default=torch.nn.LeakyReLU, set the activation function for the hidden layers, if None then it will be linear.
-        bias : bool, default=True, set False if you do not want to use a bias term in the linear layers
-        decoder_layers : list, default=None, list of different layer sizes from embedding to output of the decoder. If set to None, will be symmetric to layers.
-        decoder_output_fn : activation function from torch.nn, default=None, set the activation function for the decoder output layer, if None then it will be linear.
-                            e.g. set to torch.nn.Sigmoid if you want to scale the decoder output between 0 and 1.
-        """
+    def __init__(self, layers: list, batch_norm: bool = False, dropout: float = None,
+                 activation_fn: torch.nn.Module = torch.nn.LeakyReLU, bias: bool = True, decoder_layers: list = None,
+                 decoder_output_fn: torch.nn.Module = None):
         super(FlexibleAutoencoder, self).__init__()
         self.fitted = False
         if decoder_layers is None:
@@ -128,14 +144,17 @@ class FlexibleAutoencoder(torch.nn.Module):
 
         Parameters
         ----------
-        x : input data point, can also be a mini-batch of points
+        x : torch.Tensor
+            input data point, can also be a mini-batch of points
         
         Returns
         -------
-        embedded : the embedded data point with dimensionality embedding_size
+        embedded : torch.Tensor
+            the embedded data point with dimensionality embedding_size
         """
         assert x.shape[1] == self.encoder.layers[0], "Input layer of the encoder does not match input sample"
-        return self.encoder(x)
+        embedded = self.encoder(x)
+        return embedded
 
     def decode(self, embedded: torch.Tensor) -> torch.Tensor:
         """
@@ -143,62 +162,75 @@ class FlexibleAutoencoder(torch.nn.Module):
 
         Parameters
         ----------
-        embedded: embedded data point, can also be a mini-batch of embedded points
+        embedded : torch.Tensor
+            embedded data point, can also be a mini-batch of embedded points
         
         Returns
         -------
-        reconstruction: returns the reconstruction of a data point
+        decoded : torch.Tensor
+            returns the reconstruction of embedded
         """
         assert embedded.shape[1] == self.decoder.layers[0], "Input layer of the decoder does not match input sample"
-        return self.decoder(embedded)
+        decoded = self.decoder(embedded)
+        return decoded
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
-        Applies both encode and decode function.
+        Applies both the encode and decode function.
         The forward function is automatically called if we call self(x).
 
         Parameters
         ----------
-        x : input data point, can also be a mini-batch of embedded points
+        x : torch.Tensor
+            input data point, can also be a mini-batch of embedded points
         
         Returns
         -------
-        reconstruction: returns the reconstruction of a data point
+        reconstruction : torch.Tensor
+            returns the reconstruction of a data point
         """
         embedded = self.encode(x)
         reconstruction = self.decode(embedded)
         return reconstruction
 
-    def loss(self, batch_data, loss_fn):
+    def loss(self, batch_data: torch.Tensor, loss_fn: torch.nn.modules.loss._Loss) -> torch.Tensor:
         """
         Calculate the loss of a single batch of data.
 
         Parameters
         ----------
-        batch_data : torch.Tensor, the samples
-        loss_fn : torch.nn, loss function to be used for reconstruction
+        batch_data : torch.Tensor
+            the samples
+        loss_fn : torch.nn.modules.loss._Loss
+            loss function to be used for reconstruction
 
         Returns
         -------
-        loss: returns the reconstruction loss of the input sample
+        loss : torch.Tensor
+            returns the reconstruction loss of the input sample
         """
         reconstruction = self.forward(batch_data)
         loss = loss_fn(reconstruction, batch_data)
         return loss
 
-    def evaluate(self, dataloader, loss_fn, device=torch.device("cpu")):
+    def evaluate(self, dataloader: torch.utils.data.DataLoader, loss_fn: torch.nn.modules.loss._Loss,
+                 device: torch.device = torch.device("cpu")) -> torch.Tensor:
         """
         Evaluates the autoencoder.
         
         Parameters
         ----------
-        dataloader : torch.utils.data.DataLoader, dataloader to be used for training
-        loss_fn : torch.nn, loss function to be used for reconstruction
-        device : torch.device, default=torch.device('cpu'), device to be trained on
+        dataloader : torch.utils.data.DataLoader
+            dataloader to be used for training
+        loss_fn : torch.nn.modules.loss._Loss
+            loss function to be used for reconstruction
+        device : torch.device
+            device to be trained on (default: torch.device('cpu'))
         
         Returns
         -------
-        loss: returns the reconstruction loss of all samples in dataloader
+        loss: torch.Tensor
+            returns the reconstruction loss of all samples in dataloader
         """
         with torch.no_grad():
             self.eval()
@@ -209,31 +241,56 @@ class FlexibleAutoencoder(torch.nn.Module):
             loss /= len(dataloader)
         return loss
 
-    def fit(self, n_epochs, lr, batch_size=128, data=None, data_eval=None, dataloader=None, evalloader=None,
-            optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(), patience=5, scheduler=None,
-            scheduler_params=None, device=torch.device("cpu"), model_path=None, print_step=0):
+    def fit(self, n_epochs: int, lr: float, batch_size: int = 128, data: np.ndarray = None,
+            data_eval: np.ndarray = None,
+            dataloader: torch.utils.data.DataLoader = None, evalloader: torch.utils.data.DataLoader = None,
+            optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
+            loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), patience: int = 5,
+            scheduler: torch.optim.lr_scheduler = None, scheduler_params: dict = None,
+            device: torch.device = torch.device("cpu"), model_path: str = None,
+            print_step: int = 0) -> 'FlexibleAutoencoder':
         """
         Trains the autoencoder in place.
         
         Parameters
         ----------
-        n_epochs : int, number of epochs for training
-        lr : float, learning rate to be used for the optimizer_class
-        batch_size : int, default=128
-        data : np.ndarray, default=None, train data set. If data is passed then dataloader can remain empty
-        data_eval : np.ndarray, default=None, evaluation data set. If data_eval is passed then evalloader can remain empty.
-        dataloader : torch.utils.data.DataLoader, default=None, dataloader to be used for training
-        evalloader : torch.utils.data.DataLoader, default=None, dataloader to be used for evaluation, early stopping and learning rate scheduling if scheduler=torch.optim.lr_scheduler.ReduceLROnPlateau
-        optimizer_class : torch.optim, default=torch.optim.Adam, optimizer to be used
-        loss_fn : torch.nn, default=torch.nn.MSELoss(), loss function to be used for reconstruction
-        patience : int, default=5, patience parameter for EarlyStopping
-        scheduler : torch.optim.lr_scheduler, default=None, learning rate scheduler that should be used. 
-                    If torch.optim.lr_scheduler.ReduceLROnPlateau is used then the behaviour is matched by providing the validation_loss calculated based on samples from evalloader.
-        scheduler_params : dict, default=None, dictionary of the parameters of the scheduler object
-        device : torch.device, default=torch.device('cpu'), device to be trained on
-        model_path : str, default=None, if specified will save the trained model to the location. If evalloader is used, then only the best model w.r.t. evaluation loss is saved.
-        print_step : int, default=0, specifies how often the losses are printed. If 0, no prints will occur
-        
+        n_epochs : int
+            number of epochs for training
+        lr : float
+            learning rate to be used for the optimizer_class
+        batch_size : int
+            size of the data batches (default: 128)
+        data : np.ndarray
+            train data set. If data is passed then dataloader can remain empty (default: None)
+        data_eval : np.ndarray
+            evaluation data set. If data_eval is passed then evalloader can remain empty (default: None)
+        dataloader : torch.utils.data.DataLoader
+            dataloader to be used for training (default: default=None)
+        evalloader : torch.utils.data.DataLoader
+            dataloader to be used for evaluation, early stopping and learning rate scheduling if scheduler=torch.optim.lr_scheduler.ReduceLROnPlateau (default: None)
+        optimizer_class : torch.optim.Optimizer
+            optimizer to be used (default: torch.optim.Adam)
+        loss_fn : torch.nn.modules.loss._Loss
+            loss function to be used for reconstruction (default: torch.nn.MSELoss())
+        patience : int
+            patience parameter for EarlyStopping (default: 5)
+        scheduler : torch.optim.lr_scheduler
+            learning rate scheduler that should be used.
+            If torch.optim.lr_scheduler.ReduceLROnPlateau is used then the behaviour is matched by providing the validation_loss calculated based on samples from evalloader (default: None)
+        scheduler_params : dict
+            dictionary of the parameters of the scheduler object (default: None)
+        device : torch.device
+            device to be trained on (default: torch.device('cpu'))
+        model_path : str
+            if specified will save the trained model to the location. If evalloader is used, then only the best model w.r.t. evaluation loss is saved (default: None)
+        print_step : int
+            specifies how often the losses are printed. If 0, no prints will occur (default: 0)
+
+        Returns
+        -------
+        self : FlexibleAutoencoder
+            this instance of the FlexibleAutoencoder
+
         Raises
         ----------
         ValueError: data cannot be None if dataloader is None
