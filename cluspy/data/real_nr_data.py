@@ -9,7 +9,7 @@ from nltk.stem import SnowballStemmer
 from PIL import Image
 
 
-def _laod_nr_data(file_name: str, n_labels: int) -> (np.ndarray, np.ndarray):
+def _load_nr_data(file_name: str, n_labels: int) -> (np.ndarray, np.ndarray):
     """
     Helper function to load a non-redundant data set from ClusPys internal data sets directory.
     The first n_labels columns will be specified as labels.
@@ -53,7 +53,7 @@ def load_aloi_small() -> (np.ndarray, np.ndarray):
     Ye, Wei, et al. "Generalized independent subspace clustering." 2016 IEEE 16th International Conference on Data
     Mining (ICDM). IEEE, 2016.
     """
-    return _laod_nr_data("aloi_small.data", 2)
+    return _load_nr_data("aloi_small.data", 2)
 
 
 def load_fruit() -> (np.ndarray, np.ndarray):
@@ -70,7 +70,7 @@ def load_fruit() -> (np.ndarray, np.ndarray):
     -------
     Hu, Juhua, et al. "Finding multiple stable clusterings." Knowledge and Information Systems 51.3 (2017): 991-1021.
     """
-    return _laod_nr_data("fruit.data", 2)
+    return _load_nr_data("fruit.data", 2)
 
 
 def load_nrletters() -> (np.ndarray, np.ndarray):
@@ -89,7 +89,7 @@ def load_nrletters() -> (np.ndarray, np.ndarray):
     Leiber, Collin, et al. "Automatic Parameter Selection for Non-Redundant Clustering." Proceedings of the 2022 SIAM
     International Conference on Data Mining (SDM). Society for Industrial and Applied Mathematics, 2022.
     """
-    return _laod_nr_data("nrLetters.data", 3)
+    return _load_nr_data("nrLetters.data", 3)
 
 
 def load_stickfigures() -> (np.ndarray, np.ndarray):
@@ -108,7 +108,7 @@ def load_stickfigures() -> (np.ndarray, np.ndarray):
     Günnemann, Stephan, et al. "Smvc: semi-supervised multi-view clustering in subspace projections." Proceedings of
     the 20th ACM SIGKDD international conference on Knowledge discovery and data mining. 2014.
     """
-    return _laod_nr_data("stickfigures.data", 2)
+    return _load_nr_data("stickfigures.data", 2)
 
 
 """
