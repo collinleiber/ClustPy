@@ -139,6 +139,7 @@ class MultipleLabelingsConfusionMatrix(ConfusionMatrix):
                             _CONFUSION_AGGREGATIONS)
         # Permutation strategy
         if aggregation == "permut-max" or aggregation == "permut-min":
+            # TODO: use scipy.optimize.linear_sum_assignment
             best_score = -np.inf if aggregation == "permut-max" else np.inf
             max_sub = max(self.confusion_matrix.shape)
             min_sub = min(self.confusion_matrix.shape)

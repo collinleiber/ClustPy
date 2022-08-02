@@ -5,8 +5,9 @@ from sklearn.utils import shuffle
 from sklearn.utils import check_random_state
 
 
-def create_subspace_data(n_samples=1000, n_clusters=3, subspace_features=[2, 2], n_outliers=[0, 0], std=1,
-                         box=(-10, 10), rotate_space=True, random_state=None):
+def create_subspace_data(n_samples: int = 1000, n_clusters: int = 3, subspace_features: tuple = (2, 2),
+                         n_outliers: tuple = (0, 0), std: float = 1., box: tuple = (-10, 10), rotate_space: bool = True,
+                         random_state: int = None) -> (np.ndarray, np.ndarray):
     """
     Create a synthetic subspace data set consisting of a subspace containing multiple Gaussian clusters (called
     clustered space) and a subspace containing a single Gaussian cluster (called noise space).
@@ -15,30 +16,38 @@ def create_subspace_data(n_samples=1000, n_clusters=3, subspace_features=[2, 2],
 
     Parameters
     ----------
-    n_samples: Number of samples (default: 1000)
-    n_clusters: Specifies the number of clusters in the clustered space (default: 3)
-    subspace_features: Number of features in the two subspaces (default: [2, 2])
-    n_outliers: Number of outliers for each subspace. Number of samples within the clusters will be lowered by this
-    value (default: [0, 0])
-    std: Standard deviation of the Gaussian clusters (default: 1)
-    box: The bounding box of the cluster centers (default: (-10, 10))
-    rotate_space: Specifies whether the feature space should be rotated by an orthonormal matrix (default: True)
-    random_state: The random state (default: None)
+    n_samples : int
+        Number of samples (default: 1000)
+    n_clusters : int
+        Specifies the number of clusters in the clustered space (default: 3)
+    subspace_features : tuple
+        Number of features in the two subspaces (default: (2, 2))
+    n_outliers : tuple
+        Number of outliers for each subspace. Number of samples within the clusters will be lowered by this value (default: (0, 0))
+    std : float
+        Standard deviation of the Gaussian clusters (default: 1.)
+    box : tuple
+        The bounding box of the cluster centers (default: (-10, 10))
+    rotate_space : bool
+        Specifies whether the feature space should be rotated by an orthonormal matrix (default: True)
+    random_state: int / np.random.RandomState
+        The random state (default: None)
 
     Returns
     -------
-    data: the data numpy array
-    labels: the labels numpy array
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (n_samples x sum(subspace_features)), the labels numpy array (n_samples)
     """
     assert type(n_clusters) is int, "n_clusters must be of type int"
-    X, L = create_nr_data(n_samples=n_samples, n_clusters=[n_clusters, 1], subspace_features=subspace_features,
+    X, L = create_nr_data(n_samples=n_samples, n_clusters=(n_clusters, 1), subspace_features=subspace_features,
                           n_outliers=n_outliers, std=std, box=box, rotate_space=rotate_space,
                           random_state=random_state)
     return X, L[:, 0]
 
 
-def create_nr_data(n_samples=1000, n_clusters=[3, 3, 1], subspace_features=[2, 2, 2], n_outliers=[0, 0, 0], std=1,
-                   box=(-10, 10), rotate_space=True, random_state=None):
+def create_nr_data(n_samples: int = 1000, n_clusters: tuple = (3, 3, 1), subspace_features: tuple = (2, 2, 2),
+                   n_outliers: tuple = (0, 0, 0), std: float = 1., box: tuple = (-10, 10), rotate_space: bool = True,
+                   random_state: int = None) -> (np.ndarray, np.ndarray):
     """
     Create a synthetic non-redundant data set consisting of multiple subspaces containing Gaussian clusters (called
     clustered spaces). You can also create subspaces with a single Gaussian cluster (called noise space).
@@ -53,44 +62,53 @@ def create_nr_data(n_samples=1000, n_clusters=[3, 3, 1], subspace_features=[2, 2
 
     Parameters
     ----------
-    n_samples: Number of samples (default: 1000)
-    n_clusters: Specifies the number of clusters for each subspace (default: [3, 3, 1])
-    subspace_features: Number of features in each subspace (default: [2, 2, 2])
-    n_outliers: Number of outliers for each subspace. Number of samples within the clusters will be lowered by this
-    value (default: [0, 0, 0])
-    std: Standard deviation of the Gaussian clusters (default: 1)
-    box: The bounding box of the cluster centers (default: (-10, 10))
-    rotate_space: Specifies whether the feature space should be rotated by an orthonormal matrix (default: True)
-    random_state: The random state (default: None)
+    n_samples : int
+        Number of samples (default: 1000)
+    n_clusters : tuple
+        Specifies the number of clusters for each subspace (default: (3, 3, 1))
+    subspace_features : tuple
+        Number of features in each subspace (default: (2, 2, 2))
+    n_outliers : tuple
+        Number of outliers for each subspace. Number of samples within the clusters will be lowered by this value (default: (0, 0, 0))
+    std : float
+        Standard deviation of the Gaussian clusters (default: 1.)
+    box : tuple
+        The bounding box of the cluster centers (default: (-10, 10))
+    rotate_space : bool
+        Specifies whether the feature space should be rotated by an orthonormal matrix (default: True)
+    random_state: int / np.random.RandomState
+        The random state (default: None)
 
     Returns
     -------
-    data: the data numpy array
-    labels: the labels numpy array
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (n_samples x sum(subspace_features)), the labels numpy array (n_samples x len(subspace_features))
     """
     random_state = check_random_state(random_state)
     # Transform n_clusters to list
-    if type(n_clusters) is not list:
+    if type(n_clusters) is not list and type(n_clusters) is not tuple:
         n_clusters = [n_clusters]
     # Transform cluster_features to list
-    if type(subspace_features) is not list:
+    if type(subspace_features) is not list and type(subspace_features) is not tuple:
         subspace_features = [subspace_features] * len(n_clusters)
     assert len(n_clusters) == len(
         subspace_features), "inconsistent number of subspaces between n_clusters and subspace_features"
     # Transform n_outliers to list
-    if type(n_outliers) is not list:
+    if type(n_outliers) is not list and type(n_outliers) is not tuple:
         n_outliers = [n_outliers] * len(n_clusters)
     assert len(n_clusters) == len(n_outliers), "inconsistent number of subspaces between n_clusters and n_outliers"
     # Transform std to list
-    if type(std) is not list:
+    if type(std) is not list and type(std) is not tuple:
         std = [std] * len(n_clusters)
     assert len(n_clusters) == len(std), "inconsistent number of subspaces between n_clusters and std"
     # Transform box to list
-    if type(box) is not list:
+    if type(box) is not list and type(box) is not tuple:
+        raise Exception("Each entry of the tuple box must contain two values (upper and lower bound)")
+    if type(box[0]) is not list and type(box[0]) is not tuple:
         box = [box] * len(n_clusters)
     assert len(n_clusters) == len(box), "inconsistent number of subspaces between n_clusters and box"
     # Create empty dataset
-    X, L = np.empty((n_samples, 0)), np.empty((n_samples, 0), dtype=np.int)
+    X, L = np.empty((n_samples, 0)), np.empty((n_samples, 0), dtype=np.int32)
     for i in range(len(n_clusters)):
         # Create Clusters
         X_tmp, L_tmp = make_blobs(n_samples - n_outliers[i], subspace_features[i], centers=n_clusters[i],

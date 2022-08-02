@@ -9,20 +9,22 @@ from nltk.stem import SnowballStemmer
 from PIL import Image
 
 
-def _laod_nr_data(file_name, n_labels):
+def _load_nr_data(file_name: str, n_labels: int) -> (np.ndarray, np.ndarray):
     """
     Helper function to load a non-redundant data set from ClusPys internal data sets directory.
     The first n_labels columns will be specified as labels.
 
     Parameters
     ----------
-    file_name: Name of the data set
-    n_labels: Number of label sets
+    file_name: str
+        Name of the data set
+    n_labels: int
+        Number of label sets
 
     Returns
     -------
-    data: the data numpy array
-    labels: the labels numpy array
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array, the labels numpy array
     """
     path = os.path.dirname(__file__) + "/datasets/" + file_name
     dataset = np.genfromtxt(path, delimiter=",")
@@ -31,7 +33,7 @@ def _laod_nr_data(file_name, n_labels):
     return data, labels
 
 
-def load_aloi_small():
+def load_aloi_small() -> (np.ndarray, np.ndarray):
     """
     Load a subset of the Amsterdam Library of Object Image (ALOI) consisting of 288 images of the objects red ball,
     red cylinder, green ball and green cylinder. The two label sets are cylinder/ball and red/green.
@@ -39,8 +41,8 @@ def load_aloi_small():
 
     Returns
     -------
-    data: the data numpy array (288 x 611)
-    labels: the labels numpy array (288 x 2)
+    data, labels: (np.ndarray, np.ndarray)
+        the data numpy array (288 x 611), the labels numpy array (288 x 2)
 
     References
     -------
@@ -51,27 +53,27 @@ def load_aloi_small():
     Ye, Wei, et al. "Generalized independent subspace clustering." 2016 IEEE 16th International Conference on Data
     Mining (ICDM). IEEE, 2016.
     """
-    return _laod_nr_data("aloi_small.data", 2)
+    return _load_nr_data("aloi_small.data", 2)
 
 
-def load_fruit():
+def load_fruit() -> (np.ndarray, np.ndarray):
     """
     Load the fruits data set. It consists of 105 preprocessed images of apples, bananas and grapes in red, green and yellow.
     N=105, d=6, k=[3,3].
 
     Returns
     -------
-    data: the data numpy array (105 x 6)
-    labels: the labels numpy array (105 x 2)
+    data, labels  : (np.ndarray, np.ndarray)
+        the data numpy array (105 x 6), the labels numpy array (105 x 2)
 
     References
     -------
     Hu, Juhua, et al. "Finding multiple stable clusterings." Knowledge and Information Systems 51.3 (2017): 991-1021.
     """
-    return _laod_nr_data("fruit.data", 2)
+    return _load_nr_data("fruit.data", 2)
 
 
-def load_nrletters():
+def load_nrletters() -> (np.ndarray, np.ndarray):
     """
     Load the NRLetters data set. It consists of 10000 9x7 images of the letters A, B, C, X, Y and Z in pink, cyan and
     yellow. Additionally, each image highlights one corner in color.
@@ -79,18 +81,18 @@ def load_nrletters():
 
     Returns
     -------
-    data: the data numpy array (10000 x 189)
-    labels: the labels numpy array (10000 x 3)
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (10000 x 189), the labels numpy array (10000 x 3)
 
     References
     -------
     Leiber, Collin, et al. "Automatic Parameter Selection for Non-Redundant Clustering." Proceedings of the 2022 SIAM
     International Conference on Data Mining (SDM). Society for Industrial and Applied Mathematics, 2022.
     """
-    return _laod_nr_data("nrLetters.data", 3)
+    return _load_nr_data("nrLetters.data", 3)
 
 
-def load_stickfigures():
+def load_stickfigures() -> (np.ndarray, np.ndarray):
     """
     Load the Dancing Stick Figures data set. It consists of 900 20x20 grayscale images of stick figures in different poses.
     The poses can be divided into three upp-body and three lower-body motions.
@@ -98,15 +100,15 @@ def load_stickfigures():
 
     Returns
     -------
-    data: the data numpy array (900 x 400)
-    labels: the labels numpy array (900 x 2)
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (900 x 400), labels: the labels numpy array (900 x 2)
 
     References
     -------
     Günnemann, Stephan, et al. "Smvc: semi-supervised multi-view clustering in subspace projections." Proceedings of
     the 20th ACM SIGKDD international conference on Knowledge discovery and data mining. 2014.
     """
-    return _laod_nr_data("stickfigures.data", 2)
+    return _load_nr_data("stickfigures.data", 2)
 
 
 """
@@ -114,7 +116,7 @@ UCI
 """
 
 
-def load_cmu_faces(downloads_path=None):
+def load_cmu_faces(downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the CMU Face Images data set. It consists of 640 30x32 grayscale images showing 20 persons in different poses
     (up, straight, left, right) und with different expressions (neutral, happy, sad, angry). Additionally, the persons
@@ -124,12 +126,13 @@ def load_cmu_faces(downloads_path=None):
 
     Parameters
     -------
-    downloads_path: path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
 
     Returns
     -------
-    data: the data numpy array (624 x 400)
-    labels: the labels numpy array (624 x 4)
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (624 x 400), the labels numpy array (624 x 4)
 
     References
     -------
@@ -181,9 +184,10 @@ Load WebKB
 """
 
 
-def load_webkb(use_universities=["cornell", "texas", "washington", "wisconsin"],
-               use_categories=["course", "faculty", "project", "student"], remove_headers=True,
-               min_doc_frequency=0.01, min_variance=0.25, downloads_path=None):
+def load_webkb(use_universities: tuple = ("cornell", "texas", "washington", "wisconsin"),
+               use_categories: tuple = ("course", "faculty", "project", "student"), remove_headers: bool = True,
+               min_doc_frequency: float = 0.01, min_variance: float = 0.25, downloads_path: str = None) -> (
+        np.ndarray, np.ndarray):
     """
     Load the WebKB data set. It consists of 1041 Html documents from different universities (default: "cornell", "texas",
     "washington" and "wisconsin"). These web pages have a specified category (default: "course", "faculty", "project",
@@ -194,17 +198,23 @@ def load_webkb(use_universities=["cornell", "texas", "washington", "wisconsin"],
 
     Parameters
     ----------
-    use_universities: specify the universities (default: ["cornell", "texas", "washington", "wisconsin"]
-    use_categories: specify the categories (default: ["course", "faculty", "project", "student"]
-    remove_headers: should the headers of the Html files be removed? (default: True)
-    min_doc_frequency: minimum document frequency of the words (default: 0.01)
-    min_variance: minimum variance of the words (default: 0.25)
-    downloads_path: path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+    use_universities : tuple
+        specify the universities (default: ("cornell", "texas", "washington", "wisconsin"))
+    use_categories : tuple
+        specify the categories (default: ("course", "faculty", "project", "student"))
+    remove_headers : bool
+        should the headers of the Html files be removed? (default: True)
+    min_doc_frequency : float
+        minimum document frequency of the words (default: 0.01)
+    min_variance : float
+        minimum variance of the words (default: 0.25)
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
 
     Returns
     -------
-    data: the data numpy array (1041 x 323) using the default settings
-    labels: the labels numpy array (1041 x 2) using the default settings
+    data, labels: (np.ndarray, np.ndarray)
+        the data numpy array (1041 x 323 - using the default settings), the labels numpy array (1041 x 2 - using the default settings)
 
     References
     -------
@@ -273,6 +283,16 @@ class _StemmedCountVectorizer(CountVectorizer):
     """
 
     def build_analyzer(self):
+        """
+        Custom build_analyzer method. Calls the build_analyzer of the CountVectorizer parent class and then applies
+        SnowballStemmer('english')
+
+        Returns
+        -------
+        stemmed_words : Generator
+            the stemmed words in the document
+        """
         stemmer = SnowballStemmer('english')
         analyzer = super(_StemmedCountVectorizer, self).build_analyzer()
-        return lambda doc: (stemmer.stem(word) for word in analyzer(doc))
+        stemmed_words = lambda doc: (stemmer.stem(word) for word in analyzer(doc))
+        return stemmed_words

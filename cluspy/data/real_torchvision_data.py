@@ -9,25 +9,32 @@ Load torchvision datasets
 """
 
 
-def _load_torch_image_data(data_source, subset, normalize_channels, uses_train_param, downloads_path):
+def _load_torch_image_data(data_source: torchvision.datasets.VisionDataset, subset: str, normalize_channels: bool,
+                           uses_train_param: bool, downloads_path: str) -> (
+        np.ndarray, np.ndarray):
     """
     Helper function to load a data set from the torchvision package.
 
     Parameters
     ----------
-    data_source: the data source from torchvision.datasets
-    subset: can be 'all', 'test' or 'train'. 'all' combines test and train data
-    normalize_channels: normalize each color-channel of the images
-    uses_train_param: does the data loader use 'test' or 'split' parameter
-    downloads_path: path to the directory where the data is stored
+    data_source : torchvision.datasets.VisionDataset
+        the data source from torchvision.datasets
+    subset : str
+        can be 'all', 'test' or 'train'. 'all' combines test and train data
+    normalize_channels : bool
+        normalize each color-channel of the images
+    uses_train_param : bool
+        is the test/train parameter called 'train' or 'split' in the data loader. uses_train_param = True corresponds to 'train'
+    downloads_path : str
+        path to the directory where the data is stored
 
     Returns
     -------
-    data: the data numpy array
-    labels: the labels numpy array
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array, the labels numpy array
     """
     assert subset in ["all", "train",
-                          "test"], "subset must match 'all', 'train' or 'test' Your input {0}".format(subset)
+                      "test"], "subset must match 'all', 'train' or 'test' Your input {0}".format(subset)
     # Get data from source
     ssl._create_default_https_context = ssl._create_unverified_context
     if subset == "all" or subset == "train":
@@ -71,6 +78,9 @@ def _load_torch_image_data(data_source, subset, normalize_channels, uses_train_p
         else:
             data = data_test
             labels = labels_test
+    # Convert data to float and labels to int
+    data = data.float()
+    labels = labels.int()
     ssl._create_default_https_context = ssl._create_default_https_context
     if normalize_channels:
         if data.dim() == 3:
@@ -100,7 +110,8 @@ def _load_torch_image_data(data_source, subset, normalize_channels, uses_train_p
     return data_cpu, labels_cpu
 
 
-def load_mnist(subset="all", normalize_channels=False, downloads_path=None):
+def load_mnist(subset: str = "all", normalize_channels: bool = False, downloads_path: str = None) -> (
+        np.ndarray, np.ndarray):
     """
     Load the MNIST data set. It consists of 70000 28x28 grayscale images showing handwritten digits (0 to 9).
     The data set is composed of 60000 training and 10000 test images.
@@ -108,14 +119,17 @@ def load_mnist(subset="all", normalize_channels=False, downloads_path=None):
 
     Parameters
     ----------
-    subset: can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
-    normalize_channels: normalize each color-channel of the images (default: False)
-    downloads_path: path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+    subset : str
+        can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
+    normalize_channels : bool
+        normalize each color-channel of the images (default: False)
+    downloads_path : bool
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
 
     Returns
     -------
-    data: the data numpy array (70000 x 784)
-    labels: the labels numpy array (70000)
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (70000 x 784), the labels numpy array (70000)
 
     References
     -------
@@ -126,7 +140,8 @@ def load_mnist(subset="all", normalize_channels=False, downloads_path=None):
     return data, labels
 
 
-def load_kmnist(subset="all", normalize_channels=False, downloads_path=None):
+def load_kmnist(subset: str = "all", normalize_channels: bool = False, downloads_path: str = None) -> (
+        np.ndarray, np.ndarray):
     """
     Load the Kuzushiji-MNIST data set. It consists of 70000 28x28 grayscale images showing Kanji characters.
     It is composed of 10 different characters, each representing one column of hiragana.
@@ -135,14 +150,17 @@ def load_kmnist(subset="all", normalize_channels=False, downloads_path=None):
 
     Parameters
     ----------
-    subset: can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
-    normalize_channels: normalize each color-channel of the images (default: False)
-    downloads_path: path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+    subset : str
+        can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
+    normalize_channels : bool
+        normalize each color-channel of the images (default: False)
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
 
     Returns
     -------
-    data: the data numpy array (70000 x 784)
-    labels: the labels numpy array (70000)
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (70000 x 784), the labels numpy array (70000)
 
     References
     -------
@@ -153,7 +171,8 @@ def load_kmnist(subset="all", normalize_channels=False, downloads_path=None):
     return data, labels
 
 
-def load_fmnist(subset="all", normalize_channels=False, downloads_path=None):
+def load_fmnist(subset: str = "all", normalize_channels: bool = False, downloads_path: str = None) -> (
+        np.ndarray, np.ndarray):
     """
     Load the Fashion-MNIST data set. It consists of 70000 28x28 grayscale images showing articles from the Zalando online store.
     Each sample belongs to one of 10 product groups.
@@ -162,14 +181,17 @@ def load_fmnist(subset="all", normalize_channels=False, downloads_path=None):
 
     Parameters
     ----------
-    subset: can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
-    normalize_channels: normalize each color-channel of the images (default: False)
-    downloads_path: path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+    subset : str
+        can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
+    normalize_channels : bool
+        normalize each color-channel of the images (default: False)
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
 
     Returns
     -------
-    data: the data numpy array (70000 x 784)
-    labels: the labels numpy array (70000)
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (70000 x 784), the labels numpy array (70000)
 
     References
     -------
@@ -180,7 +202,8 @@ def load_fmnist(subset="all", normalize_channels=False, downloads_path=None):
     return data, labels
 
 
-def load_usps(subset="all", normalize_channels=False, downloads_path=None):
+def load_usps(subset: str = "all", normalize_channels: bool = False, downloads_path: str = None) -> (
+        np.ndarray, np.ndarray):
     """
     Load the USPS data set. It consists of 9298 16x16 grayscale images showing handwritten digits (0 to 9).
     The data set is composed of 7291 training and 2007 test images.
@@ -188,14 +211,17 @@ def load_usps(subset="all", normalize_channels=False, downloads_path=None):
 
     Parameters
     ----------
-    subset: can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
-    normalize_channels: normalize each color-channel of the images (default: False)
-    downloads_path: path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+    subset : str
+        can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
+    normalize_channels : bool
+        normalize each color-channel of the images (default: False)
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
 
     Returns
     -------
-    data: the data numpy array (9298 x 256)
-    labels: the labels numpy array (9298)
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (9298 x 256), the labels numpy array (9298)
 
     References
     -------
@@ -206,7 +232,8 @@ def load_usps(subset="all", normalize_channels=False, downloads_path=None):
     return data, labels
 
 
-def load_cifar10(subset="all", normalize_channels=False, downloads_path=None):
+def load_cifar10(subset: str = "all", normalize_channels: bool = False, downloads_path: str = None) -> (
+        np.ndarray, np.ndarray):
     """
     Load the CIFAR10 data set. It consists of 60000 32x32 color images showing different objects.
     The classes are airplane, automobile, bird, cat, deer, dog, frog, horse, ship and truck.
@@ -215,14 +242,17 @@ def load_cifar10(subset="all", normalize_channels=False, downloads_path=None):
 
     Parameters
     ----------
-    subset: can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
-    normalize_channels: normalize each color-channel of the images (default: False)
-    downloads_path: path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+    subset : str
+        can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
+    normalize_channels : bool
+        normalize each color-channel of the images (default: False)
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
 
     Returns
     -------
-    data: the data numpy array (60000 x 3072)
-    labels: the labels numpy array (60000)
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (60000 x 3072), the labels numpy array (60000)
 
     References
     -------
@@ -233,7 +263,8 @@ def load_cifar10(subset="all", normalize_channels=False, downloads_path=None):
     return data, labels
 
 
-def load_svhn(subset="all", normalize_channels=False, downloads_path=None):
+def load_svhn(subset: str = "all", normalize_channels: bool = False, downloads_path: str = None) -> (
+        np.ndarray, np.ndarray):
     """
     Load the SVHN data set. It consists of 99289 32x32 color images showing house numbers (0 to 9).
     The data set is composed of 73257 training and 26032 test images.
@@ -241,14 +272,17 @@ def load_svhn(subset="all", normalize_channels=False, downloads_path=None):
 
     Parameters
     ----------
-    subset: can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
-    normalize_channels: normalize each color-channel of the images (default: False)
-    downloads_path: path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+    subset : str
+        can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
+    normalize_channels : bool
+        normalize each color-channel of the images (default: False)
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
 
     Returns
     -------
-    data: the data numpy array (99289 x 3072)
-    labels: the labels numpy array (99289)
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (99289 x 3072), the labels numpy array (99289)
 
     References
     -------
@@ -259,7 +293,8 @@ def load_svhn(subset="all", normalize_channels=False, downloads_path=None):
     return data, labels
 
 
-def load_stl10(subset="all", normalize_channels=False, downloads_path=None):
+def load_stl10(subset: str = "all", normalize_channels: bool = False, downloads_path: str = None) -> (
+        np.ndarray, np.ndarray):
     """
     Load the STL10 data set. It consists of 13000 96x96 color images showing different objects.
     The classes are airplane, bird, car, cat, deer, dog, horse, monkey, ship and truck.
@@ -268,14 +303,17 @@ def load_stl10(subset="all", normalize_channels=False, downloads_path=None):
 
     Parameters
     ----------
-    subset: can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
-    normalize_channels: normalize each color-channel of the images (default: False)
-    downloads_path: path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+    subset : str
+        can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
+    normalize_channels : bool
+        normalize each color-channel of the images (default: False)
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
 
     Returns
     -------
-    data: the data numpy array (13000 x 27648)
-    labels: the labels numpy array (13000)
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (13000 x 27648), the labels numpy array (13000)
 
     References
     -------

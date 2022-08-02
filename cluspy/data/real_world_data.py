@@ -15,19 +15,21 @@ DEFAULT_DOWNLOAD_PATH = str(Path.home() / "Downloads/cluspy_datafiles")
 
 # More datasets https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/multiclass.html#usps
 
-def _get_download_dir(downloads_path):
+def _get_download_dir(downloads_path: str) -> str:
     """
     Helper function to define the path where the data files should be stored. If downloads_path is None then default path
     '[USER]/Downloads/cluspy_datafiles' will be used. If the directory does not exists it will be created.
 
     Parameters
     ----------
-    downloads_path: path to the directory where the data will be stored. Can be None
+    downloads_path : str
+        path to the directory where the data will be stored. Can be None
 
     Returns
     -------
-    path to the directory where the data will be stored. If input was None this will be equal to
-    '[USER]/Downloads/cluspy_datafiles'
+    downloads_path : str
+        path to the directory where the data will be stored. If input was None this will be equal to
+        '[USER]/Downloads/cluspy_datafiles'
     """
     if downloads_path is None:
         downloads_path = DEFAULT_DOWNLOAD_PATH
@@ -36,14 +38,16 @@ def _get_download_dir(downloads_path):
     return downloads_path
 
 
-def _download_file(file_url, filename_local):
+def _download_file(file_url: str, filename_local: str) -> None:
     """
     Helper function to download a file into a specified location.
 
     Parameters
     ----------
-    file_url: URL of the file
-    filename_local: local name of the file after it has been downloaded
+    file_url : str
+        URL of the file
+    filename_local : str
+        local name of the file after it has been downloaded
     """
     print("Downloading data set from {0} to {1}".format(file_url, filename_local))
     ssl._create_default_https_context = ssl._create_unverified_context
@@ -51,7 +55,8 @@ def _download_file(file_url, filename_local):
     ssl._create_default_https_context = ssl._create_default_https_context
 
 
-def _load_data_file(filename_local, file_url, delimiter=",", last_column_are_labels=True):
+def _load_data_file(filename_local: str, file_url: str, delimiter: str = ",", last_column_are_labels: bool = True) -> (
+        np.ndarray, np.ndarray):
     """
     Helper function to load a data file. Either the first or last column, depending on last_column_are_labels, of the
     data file is used as the label column.
@@ -59,16 +64,19 @@ def _load_data_file(filename_local, file_url, delimiter=",", last_column_are_lab
 
     Parameters
     ----------
-    filename_local: local name of the file after it has been downloaded
-    file_url: URL of the file
-    delimiter: delimiter in the data file (default: ";")
-    last_column_are_labels: specifies if the last column contains the labels. If false labels should be contained in
-    the first column
+    filename_local : str
+        local name of the file after it has been downloaded
+    file_url : str
+        URL of the file
+    delimiter : str
+        delimiter in the data file (default: ";")
+    last_column_are_labels : bool
+        specifies if the last column contains the labels. If false labels should be contained in the first column (default: True)
 
     Returns
     -------
-    data: the data numpy array
-    labels: the labels numpy array
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array, the labels numpy array
     """
     if not os.path.isfile(filename_local):
         _download_file(file_url, filename_local)
@@ -82,21 +90,26 @@ def _load_data_file(filename_local, file_url, delimiter=",", last_column_are_lab
     return data, labels
 
 
-def _load_timeseries_classification_data(dataset_name, subset, labels_minus_one, downloads_path):
+def _load_timeseries_classification_data(dataset_name: str, subset: str, labels_minus_one: bool,
+                                         downloads_path: str) -> (np.ndarray, np.ndarray):
     """
     Helper function to load timeseries data from www.timeseriesclassification.com.
 
     Parameters
     ----------
-    dataset_name: name of the data set
-    subset: can be 'all', 'test' or 'train'. 'all' combines test and train data
-    labels_minus_one: Convert labels from 1,... to 0,...
-    downloads_path: path to the directory where the data is stored
+    dataset_name : str
+        name of the data set
+    subset : str
+        can be 'all', 'test' or 'train'. 'all' combines test and train data
+    labels_minus_one : bool
+        Convert labels from 1,... to 0,...
+    downloads_path : str
+        path to the directory where the data is stored
 
     Returns
     -------
-    data: the data numpy array
-    labels: the labels numpy array
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array, the labels numpy array
     """
     assert subset in ["all", "train",
                       "test"], "subset must match 'all', 'train' or 'test' Your input {0}".format(subset)
@@ -129,27 +142,30 @@ def _load_timeseries_classification_data(dataset_name, subset, labels_minus_one,
     return data, labels
 
 
-def _decompress_z_file(filename, directory):
+def _decompress_z_file(filename: str, directory: str) -> bool:
     """
     Helper function to decompress a 7z file. The function uses an installed version of 7zip to decompress the file.
     If 7zip is not installed on this machine, the function will return False and a warning is printed.
 
     Parameters
     ----------
-    filename: name of the file that should be decompressed
-    directory: directory of the file that should be decompressed
+    filename : str
+        name of the file that should be decompressed
+    directory : str
+        directory of the file that should be decompressed
 
     Returns
     -------
-    True if decompression was successful, else False
+    successful : bool
+        True if decompression was successful, else False
     """
     os.system("7z x {0} -o{1}".format(filename.replace("\\", "/"), directory.replace("\\", "/")))
-    if os.path.isfile(filename[:-2]):
-        # If file without .z exists, decompression was successful
-        return True
-    else:
+    successful = True
+    if not os.path.isfile(filename[:-2]):
+        # If no file without .z exists, decompression was not successful
+        successful = False
         print("[WARNING] 7Zip is needed to uncompress *.Z files!")
-        return False
+    return successful
 
 
 """
@@ -157,7 +173,7 @@ Load Sklearn datasets
 """
 
 
-def load_iris():
+def load_iris() -> (np.ndarray, np.ndarray):
     """
     Load the iris data set. It consists of the petal and sepal width and length of three different types of irises (Setosa,
     Versicolour, Virginica).
@@ -165,36 +181,38 @@ def load_iris():
 
     Returns
     -------
-    data: the data numpy array (150 x 4)
-    labels: the labels numpy array (150)
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (150 x 4), the labels numpy array (150)
 
     References
     -------
     https://scikit-learn.org/stable/modules/generated/sklearn.datasets.load_iris.html
     https://archive.ics.uci.edu/ml/datasets/iris
     """
-    return sk_load_iris(return_X_y=True)
+    data, labels = sk_load_iris(return_X_y=True)
+    return data, labels
 
 
-def load_wine():
+def load_wine() -> (np.ndarray, np.ndarray):
     """
     Load the wine data set. It consists of 13 different properties of three different types of wine.
     N=178, d=13, k=3.
 
     Returns
     -------
-    data: the data numpy array (178 x 13)
-    labels: the labels numpy array (178)
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (178 x 13), the labels numpy array (178)
 
     References
     -------
     https://scikit-learn.org/stable/modules/generated/sklearn.datasets.load_wine.html
     https://archive.ics.uci.edu/ml/datasets/wine
     """
-    return sk_load_wine(return_X_y=True)
+    data, labels = sk_load_wine(return_X_y=True)
+    return data, labels
 
 
-def load_breast_cancer():
+def load_breast_cancer() -> (np.ndarray, np.ndarray):
     """
     Load the breast cancer wisconsin data set. It consists of 32 features computed from digitized images of fine needle
     aspirate of breast mass. The classes are the result of a diagnosis (malignant or benign).
@@ -202,18 +220,19 @@ def load_breast_cancer():
 
     Returns
     -------
-    data: the data numpy array (569 x 30)
-    labels: the labels numpy array (569)
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (569 x 30), the labels numpy array (569)
 
     References
     -------
     https://scikit-learn.org/stable/modules/generated/sklearn.datasets.load_breast_cancer.html#sklearn.datasets.load_breast_cancer
     https://archive.ics.uci.edu/ml/datasets/breast+cancer+wisconsin+(diagnostic)
     """
-    return sk_load_breast_cancer(return_X_y=True)
+    data, labels = sk_load_breast_cancer(return_X_y=True)
+    return data, labels
 
 
-def load_newsgroups(subset="all", n_features=2000):
+def load_newsgroups(subset: str = "all", n_features: int = 2000) -> (np.ndarray, np.ndarray):
     """
     Load the 20 newsgroups data set. It consists of a collection of 18846 newsgroup documents, partitioned
     (nearly) evenly across 20 different newsgroups. The documents are converted into feature vectors using TF-IDF.
@@ -222,13 +241,15 @@ def load_newsgroups(subset="all", n_features=2000):
 
     Parameters
     ----------
-    subset: can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
-    n_features: number of features used by TF-IDF (default: 2000)
+    subset : str
+        can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
+    n_features : int
+        number of features used by TF-IDF (default: 2000)
 
     Returns
     -------
-    data: the data numpy array (18846 x 2000) using the default settings
-    labels: the labels numpy array (18846)
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (18846 x 2000 - using the default settings), the labels numpy array (18846)
 
     References
     -------
@@ -243,7 +264,8 @@ def load_newsgroups(subset="all", n_features=2000):
     return data, labels
 
 
-def load_reuters(subset="all", n_features=2000, categories=["CCAT", "GCAT", "MCAT", "ECAT"]):
+def load_reuters(subset: str = "all", n_features: int = 2000, categories: tuple = ("CCAT", "GCAT", "MCAT", "ECAT")) -> (
+        np.ndarray, np.ndarray):
     """
     Load the Reuters data set. It consists of over 800000 manually categorized newswire stories made available by Reuters,
     Ltd. Usually only a subset of the categories is used. Those categories are defined by the attribute 'categories'.
@@ -254,14 +276,17 @@ def load_reuters(subset="all", n_features=2000, categories=["CCAT", "GCAT", "MCA
 
     Parameters
     ----------
-    add_testdata: can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
-    n_features: number of features used (default: 2000)
-    categories: the categories that should be contained (default: ["CCAT", "GCAT", "MCAT", "ECAT"])
+    subset : str
+        can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
+    n_features : int
+        number of features used (default: 2000)
+    categories : tuple
+        the categories that should be contained (default: ("CCAT", "GCAT", "MCAT", "ECAT"))
 
     Returns
     -------
-    data: the data numpy array (685071 x 2000) using the default settings
-    labels: the labels numpy array (685071) using the default settings
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (685071 x 2000 - using the default settings), the labels numpy array (685071 - using the default settings)
 
     References
     -------
@@ -298,19 +323,20 @@ Load UCI data
 """
 
 
-def load_banknotes(downloads_path=None):
+def load_banknotes(downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the banknote authentication data set. It consists of 1372 genuine and forged banknote samples.
     N=1372, d=4, k=2.
 
     Parameters
     ----------
-    downloads_path: path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
 
     Returns
     -------
-    data: the data numpy array (1372 x 4)
-    labels: the labels numpy array (1372)
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (1372 x 4), the labels numpy array (1372)
 
     References
     -------
@@ -322,19 +348,20 @@ def load_banknotes(downloads_path=None):
     return data, labels
 
 
-def load_spambase(downloads_path=None):
+def load_spambase(downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the spambase data set. It consists of 4601 spam and non-spam mails.
     N=4601, d=57, k=2.
 
     Parameters
     ----------
-    downloads_path: path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
 
     Returns
     -------
-    data: the data numpy array (4601 x 57)
-    labels: the labels numpy array (4601)
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (4601 x 57), the labels numpy array (4601)
 
     References
     -------
@@ -346,19 +373,20 @@ def load_spambase(downloads_path=None):
     return data, labels
 
 
-def load_seeds(downloads_path=None):
+def load_seeds(downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the seeds data set. It consists of 210 samples belonging to one of three varieties of wheat.
     N=210, d=7, k=3.
 
     Parameters
     ----------
-    downloads_path: path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
 
     Returns
     -------
-    data: the data numpy array (210 x 7)
-    labels: the labels numpy array (210)
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (210 x 7), the labels numpy array (210)
 
     References
     -------
@@ -373,7 +401,7 @@ def load_seeds(downloads_path=None):
     return data, labels
 
 
-def load_skin(downloads_path=None):
+def load_skin(downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the Skin Segmentation data set. It consists of 245057 skin- and non-skin samples with their B, G, R color
     information.
@@ -381,12 +409,13 @@ def load_skin(downloads_path=None):
 
     Parameters
     ----------
-    downloads_path: path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
 
     Returns
     -------
-    data: the data numpy array (245057 x 3)
-    labels: the labels numpy array (245057)
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (245057 x 3), the labels numpy array (245057)
 
     References
     -------
@@ -401,7 +430,7 @@ def load_skin(downloads_path=None):
     return data, labels
 
 
-def load_soybean_small(downloads_path=None):
+def load_soybean_small(downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the small version of the soybean data set. It is a small subset of the original soybean data set.
     It consists of 47 samples belonging to one of 4 classes.
@@ -409,12 +438,13 @@ def load_soybean_small(downloads_path=None):
 
     Parameters
     ----------
-    downloads_path: path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
 
     Returns
     -------
-    data: the data numpy array (47 x 35)
-    labels: the labels numpy array (47)
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (47 x 35), the labels numpy array (47)
 
     References
     -------
@@ -434,7 +464,7 @@ def load_soybean_small(downloads_path=None):
     return data, labels
 
 
-def load_soybean_large(subset="all", downloads_path=None):
+def load_soybean_large(subset: str = "all", downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the large version of the soybean data set. It consists of 562 samples belonging to one of 15 classes.
     Originally, the data set would have samples and 19 classes but some samples have attributes showing '?' values. Those
@@ -444,13 +474,15 @@ def load_soybean_large(subset="all", downloads_path=None):
 
     Parameters
     ----------
-    subset: can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
-    downloads_path: path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+    subset : str
+        can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
 
     Returns
     -------
-    data: the data numpy array (562 x 35)
-    labels: the labels numpy array (562)
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (562 x 35), the labels numpy array (562)
 
     References
     -------
@@ -491,7 +523,7 @@ def load_soybean_large(subset="all", downloads_path=None):
     return data, labels
 
 
-def load_optdigits(subset="all", downloads_path=None):
+def load_optdigits(subset: str = "all", downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the optdigits data set. It consists of 5620 8x8 grayscale images, each representing a digit (0 to 9).
     Each pixel depicts the number of marked pixel within a 4x4 block of the original 32x32 bitmaps.
@@ -500,13 +532,15 @@ def load_optdigits(subset="all", downloads_path=None):
 
     Parameters
     ----------
-    subset: can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
-    downloads_path: path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+    subset : str
+        can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
 
     Returns
     -------
-    data: the data numpy array (5620 x 64)
-    labels: the labels numpy array (5620)
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (5620 x 64), the labels numpy array (5620)
 
     References
     -------
@@ -531,7 +565,7 @@ def load_optdigits(subset="all", downloads_path=None):
     return data, labels
 
 
-def load_pendigits(subset="all", downloads_path=None):
+def load_pendigits(subset: str = "all", downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the pendigits data set. It consists of 10992 vectors of length 16, representing 8 coordinates. The coordinates
     were taken from the task of writing digits (0 to 9) on a tablet.
@@ -540,13 +574,15 @@ def load_pendigits(subset="all", downloads_path=None):
 
     Parameters
     ----------
-    subset: can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
-    downloads_path: path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+    subset : str
+        can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
 
     Returns
     -------
-    data: the data numpy array (10992 x 16)
-    labels: the labels numpy array (10992)
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (10992 x 16), the labels numpy array (10992)
 
     References
     -------
@@ -571,20 +607,22 @@ def load_pendigits(subset="all", downloads_path=None):
     return data, labels
 
 
-def load_ecoli(ignore_small_clusters=False, downloads_path=None):
+def load_ecoli(ignore_small_clusters: bool = False, downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the ecoli data set. It consists of 336 samples belonging to one of 8 classes.
     N=336, d=7, k=8.
 
     Parameters
     ----------
-    ignore_small_clusters: specify if the three small clusters with size 2, 2 and 5 should be ignored (default: False)
-    downloads_path: path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+    ignore_small_clusters : bool
+        specify if the three small clusters with size 2, 2 and 5 should be ignored (default: False)
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
 
     Returns
     -------
-    data: the data numpy array (336 x 7)
-    labels: the labels numpy array (336)
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (336 x 7), the labels numpy array (336)
 
     References
     -------
@@ -612,7 +650,7 @@ def load_ecoli(ignore_small_clusters=False, downloads_path=None):
     return data, labels
 
 
-def load_htru2(downloads_path=None):
+def load_htru2(downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the HTRU2 data set. It consists of 17898 samples belonging to the pulsar or non-pulsar class.
     A special property is that more than 90% of the data belongs to class 0.
@@ -621,12 +659,13 @@ def load_htru2(downloads_path=None):
 
     Parameters
     ----------
-    downloads_path: path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
 
     Returns
     -------
-    data: the data numpy array (17898 x 8)
-    labels: the labels numpy array (17898)
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (17898 x 8), the labels numpy array (17898)
 
     References
     -------
@@ -649,7 +688,7 @@ def load_htru2(downloads_path=None):
     return data, labels
 
 
-def load_letterrecognition(downloads_path=None):
+def load_letterrecognition(downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the Letter Recognition data set. It consists of 20000 samples where each sample represents one of the 26 capital
     letters in the English alphabet. All samples are composed of 16 numerical stimuli describing the respective letter.
@@ -657,12 +696,13 @@ def load_letterrecognition(downloads_path=None):
 
     Parameters
     ----------
-    downloads_path: path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
 
     Returns
     -------
-    data: the data numpy array (20000 x 16)
-    labels: the labels numpy array (20000)
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (20000 x 16), the labels numpy array (20000)
 
     References
     -------
@@ -690,7 +730,7 @@ def load_letterrecognition(downloads_path=None):
     return data, labels
 
 
-def load_har(subset="all", downloads_path=None):
+def load_har(subset: str = "all", downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the Human Activity Recognition data set. It consists of 10299 samples each representing sensor data of a person
     performing an activity. The six activities are walking, walking_upstairs, walking_downstairs, sitting, standing and
@@ -700,13 +740,15 @@ def load_har(subset="all", downloads_path=None):
 
     Parameters
     ----------
-    subset: can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
-    downloads_path: path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+    subset : str
+        can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
 
     Returns
     -------
-    data: the data numpy array (10992 x 561)
-    labels: the labels numpy array (10992)
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (10992 x 561), the labels numpy array (10992)
 
     References
     -------
@@ -742,7 +784,7 @@ def load_har(subset="all", downloads_path=None):
     return data, labels
 
 
-def load_statlog_shuttle(subset="all", downloads_path=None):
+def load_statlog_shuttle(subset: str = "all", downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the statlog shuttle data set. It consists of 58000 samples belonging to one of 7 classes. A special property is
     that about 80% of the data belongs to class 0.
@@ -751,13 +793,15 @@ def load_statlog_shuttle(subset="all", downloads_path=None):
 
     Parameters
     ----------
-    subset: can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
-    downloads_path: path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+    subset : str
+        can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
 
     Returns
     -------
-    data: the data numpy array (58000 x 9)
-    labels: the labels numpy array (58000)
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (58000 x 9), the labels numpy array (58000)
 
     References
     -------
@@ -802,7 +846,7 @@ def load_statlog_shuttle(subset="all", downloads_path=None):
     return data, labels
 
 
-def load_mice_protein(return_additional_labels=False, downloads_path=None):
+def load_mice_protein(return_additional_labels: bool = False, downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the Mice Protein Expression data set. It consists of 1077 samples belonging to one of 8 classes.
     Each features represents the expression level of one of 77 proteins.
@@ -814,13 +858,15 @@ def load_mice_protein(return_additional_labels=False, downloads_path=None):
 
     Parameters
     ----------
-    return_additional_labels: return additional labels (default: False)
-    downloads_path: path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+    return_additional_labels : bool
+        return additional labels (default: False)
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
 
     Returns
     -------
-    data: the data numpy array (1077 x 68)
-    labels: the labels numpy array (1077)
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (1077 x 68), the labels numpy array (1077)
 
     References
     -------
@@ -865,7 +911,7 @@ def load_mice_protein(return_additional_labels=False, downloads_path=None):
     return data, labels
 
 
-def load_user_knowledge(subset="all", downloads_path=None):
+def load_user_knowledge(subset: str = "all", downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the user knowledge data set. It consists of 403 samples belonging to one of 4 classes.
     The 4 classes are the knowledge levels 'very low', 'low', 'middle' and 'high'.
@@ -874,13 +920,15 @@ def load_user_knowledge(subset="all", downloads_path=None):
 
     Parameters
     ----------
-    subset: can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
-    downloads_path: path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+    subset : str
+        can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
 
     Returns
     -------
-    data: the data numpy array (403 x 5)
-    labels: the labels numpy array (403)
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (403 x 5), the labels numpy array (403)
 
     References
     -------
@@ -921,19 +969,20 @@ def load_user_knowledge(subset="all", downloads_path=None):
     return data, labels
 
 
-def load_breast_tissue(downloads_path=None):
+def load_breast_tissue(downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the breast tissue data set. It consists of 106 samples belonging to one of 6 classes.
     N=106, d=9, k=6.
 
     Parameters
     ----------
-    downloads_path: path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
 
     Returns
     -------
-    data: the data numpy array (106 x 9)
-    labels: the labels numpy array (106)
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (106 x 9), the labels numpy array (106)
 
     References
     -------
@@ -955,7 +1004,7 @@ def load_breast_tissue(downloads_path=None):
     return data, labels
 
 
-def load_forest_types(subset="all", downloads_path=None):
+def load_forest_types(subset: str = "all", downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the forest type mapping data set. It consists of 523 samples belonging to one of 4 classes.
     The data set is composed of 198 training and 325 test samples.
@@ -963,13 +1012,15 @@ def load_forest_types(subset="all", downloads_path=None):
 
     Parameters
     ----------
-    subset: can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
-    downloads_path: path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+    subset : str
+        can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
 
     Returns
     -------
-    data: the data numpy array (523 x 27)
-    labels: the labels numpy array (523)
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (523 x 27), the labels numpy array (523)
 
     References
     -------
@@ -1012,7 +1063,7 @@ Load timeseries classification data
 """
 
 
-def load_motestrain(subset="all", downloads_path=None):
+def load_motestrain(subset: str = "all", downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the motestrain data set. It consists of 1272 samples belonging to one of 2 classes.
     The data set is composed of 20 training and 1252 test samples.
@@ -1020,13 +1071,15 @@ def load_motestrain(subset="all", downloads_path=None):
 
     Parameters
     ----------
-    subset: can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
-    downloads_path: path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+    subset : str
+        can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
 
     Returns
     -------
-    data: the data numpy array (1272 x 84)
-    labels: the labels numpy array (1272)
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (1272 x 84), the labels numpy array (1272)
 
     References
     -------
@@ -1036,7 +1089,7 @@ def load_motestrain(subset="all", downloads_path=None):
     return data, labels
 
 
-def load_proximal_phalanx_outline(subset="all", downloads_path=None):
+def load_proximal_phalanx_outline(subset: str = "all", downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the proximal phalanx outline data set. It consists of 876 samples belonging to one of 2 classes.
     The data set is composed of 600 training and 276 test samples.
@@ -1044,13 +1097,15 @@ def load_proximal_phalanx_outline(subset="all", downloads_path=None):
 
     Parameters
     ----------
-    subset: can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
-    downloads_path: path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+    subset : str
+        can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
 
     Returns
     -------
-    data: the data numpy array (876 x 80)
-    labels: the labels numpy array (876)
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (876 x 80), the labels numpy array (876)
 
     References
     -------
@@ -1060,7 +1115,7 @@ def load_proximal_phalanx_outline(subset="all", downloads_path=None):
     return data, labels
 
 
-def load_diatom_size_reduction(subset="all", downloads_path=None):
+def load_diatom_size_reduction(subset: str = "all", downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the diatom size reduction data set. It consists of 322 samples belonging to one of 4 classes.
     The data set is composed of 16 training and 306 test samples.
@@ -1068,13 +1123,15 @@ def load_diatom_size_reduction(subset="all", downloads_path=None):
 
     Parameters
     ----------
-    subset: can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
-    downloads_path: path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+    subset : str
+        can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
 
     Returns
     -------
-    data: the data numpy array (322 x 345)
-    labels: the labels numpy array (322)
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (322 x 345), the labels numpy array (322)
 
     References
     -------
@@ -1084,7 +1141,7 @@ def load_diatom_size_reduction(subset="all", downloads_path=None):
     return data, labels
 
 
-def load_symbols(subset="all", downloads_path=None):
+def load_symbols(subset: str = "all", downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the symbols data set. It consists of 1020 samples belonging to one of 6 classes.
     The data set is composed of 25 training and 995 test samples.
@@ -1092,13 +1149,15 @@ def load_symbols(subset="all", downloads_path=None):
 
     Parameters
     ----------
-    subset: can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
-    downloads_path: path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+    subset : str
+        can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
 
     Returns
     -------
-    data: the data numpy array (1020 x 398)
-    labels: the labels numpy array (1020)
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (1020 x 398), the labels numpy array (1020)
 
     References
     -------
@@ -1108,7 +1167,7 @@ def load_symbols(subset="all", downloads_path=None):
     return data, labels
 
 
-def load_olive_oil(subset="all", downloads_path=None):
+def load_olive_oil(subset: str = "all", downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the OliveOil data set. It consists of 60 samples belonging to one of 4 classes.
     The data set is composed of 30 training and 30 test samples.
@@ -1116,13 +1175,15 @@ def load_olive_oil(subset="all", downloads_path=None):
 
     Parameters
     ----------
-    subset: can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
-    downloads_path: path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+    subset : str
+        can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
 
     Returns
     -------
-    data: the data numpy array (60 x 570)
-    labels: the labels numpy array (60)
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (60 x 570), the labels numpy array (60)
 
     References
     -------
@@ -1132,7 +1193,7 @@ def load_olive_oil(subset="all", downloads_path=None):
     return data, labels
 
 
-def load_plane(subset="all", downloads_path=None):
+def load_plane(subset: str = "all", downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the plane data set. It consists of 210 samples belonging to one of 7 classes.
     The data set is composed of 105 training and 105 test samples.
@@ -1140,13 +1201,15 @@ def load_plane(subset="all", downloads_path=None):
 
     Parameters
     ----------
-    subset: can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
-    downloads_path: path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+    subset : str
+        can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
 
     Returns
     -------
-    data: the data numpy array (210 x 144)
-    labels: the labels numpy array (210)
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (210 x 144), the labels numpy array (210)
 
     References
     -------

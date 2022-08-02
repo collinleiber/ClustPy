@@ -10,8 +10,10 @@ Credit for parts of the python Dip implementation:
 https://github.com/alimuldal/diptest
 """
 
+from cluspy.utils.dipModule import c_diptest  # noqa - Import from C file (could be marked as unresolved)
 import numpy as np
-from cluspy.utils.dipModule import c_diptest # noqa - Import from C file (could be marked as unresolved)
+import matplotlib.pyplot as plt
+from cluspy.utils.plots import plot_histogram
 
 
 def dip_test(X, just_dip=True, is_data_sorted=False, use_c=True, debug=False):
@@ -25,31 +27,31 @@ def dip_test(X, just_dip=True, is_data_sorted=False, use_c=True, debug=False):
         return d if just_dip else (d, (0, N - 1), None)
     if use_c:
         try:
-            dip_value, low_high, modal_triangle = _dip_c_port(X, debug)
+            dip_value, modal_interval, modal_triangle = _dip_c_port(X, debug)
         except Exception as e:
             print("[WARNING] C implementation can not be used for dip calculation.")
             print(e)
-            dip_value, low_high, modal_triangle = _dip_python_port(X, True, debug)
+            dip_value, modal_interval, modal_triangle = _dip_python_port(X, True, debug)
     else:
-        dip_value, low_high, modal_triangle = _dip_python_port(X, True, debug)
+        dip_value, modal_interval, modal_triangle = _dip_python_port(X, True, debug)
     if just_dip:
         return dip_value
     else:
-        return dip_value, low_high, modal_triangle
+        return dip_value, modal_interval, modal_triangle
 
 
 def _dip_c_port(X, debug):
     # Create reference numpy arrays
-    low_high = np.zeros(2, dtype=np.int32)
+    modal_interval = np.zeros(2, dtype=np.int32)
     modal_triangle = -np.ones(3, dtype=np.int32)
     gcm = np.zeros(X.shape, dtype=np.int32)
     lcm = np.zeros(X.shape, dtype=np.int32)
     mj = np.zeros(X.shape, dtype=np.int32)
     mn = np.zeros(X.shape, dtype=np.int32)
     # Execute C function
-    dip_value = c_diptest(X.astype(np.float64), low_high, modal_triangle, gcm, lcm, mn, mj, X.shape[0],
+    dip_value = c_diptest(X.astype(np.float64), modal_interval, modal_triangle, gcm, lcm, mn, mj, X.shape[0],
                           1 if debug else 0)
-    return dip_value, (low_high[0], low_high[1]), (modal_triangle[0], modal_triangle[1], modal_triangle[2])
+    return dip_value, (modal_interval[0], modal_interval[1]), (modal_triangle[0], modal_triangle[1], modal_triangle[2])
 
 
 def _dip_python_port(X, is_data_sorted=False, debug=False):
@@ -247,6 +249,8 @@ def _dip_python_port(X, is_data_sorted=False, debug=False):
 
 
 def dip_pval(dip_value, n_points, pval_strategy="table", n_boots=2000):
+    assert type(pval_strategy) is str, "pval_stratgegy must be of type string"
+    pval_strategy = pval_strategy.lower()
     assert pval_strategy in ["bootstrap", "table",
                              "function"], "pval_strategy must match 'bootstrap', 'table' or 'function'. " \
                                           "Your input: {0}".format(pval_strategy)
@@ -310,6 +314,84 @@ def dip_pval_gradient(X, x_proj, sorted_indices, modal_triangle, dip_value):
 
     pval_grad = grad_factor * dip_grad
     return pval_grad
+
+
+"""
+Plot
+"""
+
+
+def _strip_gcm_lcm(gcm, lcm):
+    N = len(lcm)
+    # Check that indices decrease
+    gcm = list(gcm)
+    i = 1
+    while i < len(gcm):
+        if gcm[i] >= gcm[i - 1]:
+            del gcm[i]
+        else:
+            i += 1
+    # Check that indices increase
+    lcm = list(lcm)
+    i = 1
+    while i < len(lcm):
+        if lcm[i] < lcm[i - 1]:
+            del lcm[i]
+        else:
+            i += 1
+    if lcm[-1] != N - 1:
+        lcm.append(N - 1)
+    return (gcm, lcm)
+
+
+def plot_dip(X, is_data_sorted=False, dip_value=None, modal_interval=None, modal_triangle=None,
+             gcm_lcm=None, show_legend=True, add_histogram=True, histogram_labels=None, histogram_show_legend=True,
+             histogram_density=True, histogram_n_bins=100, height_ratio=(1, 2), show_plot=True):
+    assert X.ndim == 1, "Data must be 1-dimensional for the dip-test. Your shape:{0}".format(X.shape)
+    N = len(X)
+    if not is_data_sorted:
+        X = np.sort(X)
+    if add_histogram:
+        # Add histogram at the top of the plot (uses plot_histogram from cluspy.utils.plots)
+        fig, (ax1, ax2) = plt.subplots(2, sharex=True, gridspec_kw={'height_ratios': height_ratio})
+        plot_histogram(X, histogram_labels, density=histogram_density, n_bins=histogram_n_bins, show_legend=histogram_show_legend,
+                       container=ax1, show_plot=False)
+        if modal_interval is not None:
+            ax1.plot([X[modal_interval[0]], X[modal_interval[0]]], ax1.get_ylim(), "g--")
+            ax1.plot([X[modal_interval[1]], X[modal_interval[1]]], ax1.get_ylim(), "g--")
+        dip_container = ax2
+        # Remove spacing between the two plots
+        fig.subplots_adjust(hspace=0)
+    else:
+        dip_container = plt
+    # Plot ECDF
+    dip_container.plot(X, np.arange(N) / N, "b", label="ECDF")
+    if dip_value is not None:
+        # Add Dip range around ECDF
+        dip_container.plot(X, np.arange(N) / N - dip_value * 2, "k:", alpha=0.7, label="2x dip")
+        dip_container.plot(X, np.arange(N) / N + dip_value * 2, "k:", alpha=0.7)
+    if modal_interval is not None:
+        # Add modal interval in green
+        dip_container.plot([X[modal_interval[0]], X[modal_interval[1]]], [modal_interval[0] / N, modal_interval[1] / N],
+                           linewidth=1.5, c="g", label="modal interval")
+    if modal_triangle is not None:
+        # Add modal triangle in red
+        dip_container.plot([X[modal_triangle[0]], X[modal_triangle[1]], X[modal_triangle[2]], X[modal_triangle[0]]],
+                           [modal_triangle[0] / N, modal_triangle[1] / N, modal_triangle[2] / N, modal_triangle[0] / N],
+                           linewidth=1.5, c="r", label="modal triangle")
+    # Add process of gcm and lcm curves
+    if gcm_lcm is not None:
+        gcm = gcm_lcm[0]
+        lcm = gcm_lcm[1]
+        gcm, lcm = _strip_gcm_lcm(gcm, lcm)
+        gcm = np.unique(gcm)
+        dip_container.plot(X[gcm], gcm / N, "y--", linewidth=1.5, label="gcm")
+        lcm = np.unique(lcm)
+        dip_container.plot(X[lcm], lcm / N, "c--", linewidth=1.5, label="lcm")
+    if show_legend:
+        dip_container.legend(loc="lower right")
+    if show_plot:
+        plt.show()
 
 
 """

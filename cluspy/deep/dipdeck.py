@@ -1,3 +1,8 @@
+"""
+@authors:
+Collin Leiber
+"""
+
 from scipy.spatial.distance import cdist
 import numpy as np
 from cluspy.utils import dip_test, dip_pval
@@ -10,15 +15,74 @@ from sklearn.cluster import KMeans
 from sklearn.base import BaseEstimator, ClusterMixin
 
 
-def _dip_deck(X, n_clusters_start, dip_merge_threshold, cluster_loss_weight, n_clusters_max, n_clusters_min, batch_size,
-              pretrain_learning_rate, clustering_learning_rate, pretrain_epochs, clustering_epochs, optimizer_class,
-              loss_fn, autoencoder, embedding_size, max_cluster_size_diff_factor, debug):
+def _dip_deck(X: np.ndarray, n_clusters_start: int, dip_merge_threshold: float, cluster_loss_weight: float,
+              n_clusters_max: int, n_clusters_min: int, batch_size: int,
+              pretrain_learning_rate: float, clustering_learning_rate: float, pretrain_epochs: int,
+              clustering_epochs: int, optimizer_class: torch.optim.Optimizer,
+              loss_fn: torch.nn.modules.loss._Loss, autoencoder: torch.nn.Module, embedding_size: int,
+              max_cluster_size_diff_factor: float, debug: bool) -> (np.ndarray, int, np.ndarray, torch.nn.Module):
+    """
+    Start the actual DipDECK clustering procedure on the input data set.
+    First an autoencoder (AE) will be trained (will be skipped if input autoencoder is given).
+    Afterwards, KMeans identifies the initial clusters using an overestimated number of clusters.
+    Last, the AE will be optimized using the DipDECK loss function.
+    If any Dip-value exceeds the dip_merge_threshold, the corresponding clusters will be merged.
+
+    Parameters
+    ----------
+    X : np.ndarray / torch.Tensor
+        the given data set. Can be a np.ndarray or a torch.Tensor
+    n_clusters_start : int
+        initial number of clusters
+    dip_merge_threshold : float
+        threshold regarding the Dip-p-value that defines if two clusters should be merged. Must be bvetween 0 and 1
+    cluster_loss_weight : float
+        weight of the clustering loss compared to the reconstruction loss
+    n_clusters_max : int
+        maximum number of clusters. Must be larger than n_clusters_min. If the result has more clusters, a merge will be forced
+    n_clusters_min : int
+        minimum number of clusters. Must be larger than 0, smaller than n_clusters_max and smaller than n_clusters_start.
+        When this number of clusters is reached, all further merge processes will be hindered
+    batch_size : int
+        size of the data batches
+    pretrain_learning_rate : float
+        learning rate for the pretraining of the autoencoder
+    clustering_learning_rate : float
+        learning rate of the actual clustering procedure
+    pretrain_epochs : int
+        number of epochs for the pretraining of the autoencoder
+    clustering_epochs : int
+        number of epochs for the actual clustering procedure. Will reset after each merge
+    optimizer_class : torch.optim.Optimizer
+        the optimizer class
+    loss_fn : torch.nn.modules.loss._Loss
+        loss function for the reconstruction
+    autoencoder : torch.nn.Module
+        the input autoencoder. If None a new FlexibleAutoencoder will be created
+    embedding_size : int
+        size of the embedding within the autoencoder
+    max_cluster_size_diff_factor : float
+        The maximum size difference when comparing two clusters regarding the number of samples.
+        If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) closest samples will be used for the Dip calculation
+    debug : bool
+        If true, additional information will be printed to the console
+
+    Returns
+    -------
+    tuple : (np.ndarray, int, np.ndarray, torch.nn.Module)
+        The labels as identified by DipDECK,
+        The final number of clusters,
+        The cluster centers as identified by DipDECK,
+        The final autoencoder
+    """
     if n_clusters_max < n_clusters_min:
         raise Exception("n_clusters_max can not be smaller than n_clusters_min")
     if n_clusters_min <= 0:
         raise Exception("n_clusters_min must be greater than zero")
     if n_clusters_start < n_clusters_min:
         raise Exception("n_clusters can not be smaller than n_clusters_min")
+    if dip_merge_threshold < 0 or dip_merge_threshold > 1:
+        raise Exception("dip_merge_threshold must be between 0 and 1")
     device = detect_device()
     trainloader = get_dataloader(X, batch_size, True, False)
     testloader = get_dataloader(X, batch_size, False, False)
@@ -57,9 +121,69 @@ def _dip_deck(X, n_clusters_start, dip_merge_threshold, cluster_loss_weight, n_c
     return cluster_labels_cpu, n_clusters_current, centers_cpu, autoencoder
 
 
-def _dip_deck_training(X, n_clusters_current, dip_merge_threshold, cluster_loss_weight, centers_cpu, cluster_labels_cpu,
-                       dip_matrix_cpu, n_clusters_max, n_clusters_min, clustering_epochs, optimizer, loss_fn,
-                       autoencoder, device, trainloader, testloader, max_cluster_size_diff_factor, debug):
+def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_threshold: float, cluster_loss_weight: float,
+                       centers_cpu: np.ndarray, cluster_labels_cpu: np.ndarray,
+                       dip_matrix_cpu: np.ndarray, n_clusters_max: int, n_clusters_min: int, clustering_epochs,
+                       optimizer: torch.optim.Optimizer,
+                       loss_fn: torch.nn.modules.loss._Loss, autoencoder: torch.nn.Module, device: torch.device,
+                       trainloader: torch.utils.data.DataLoader, testloader: torch.utils.data.DataLoader,
+                       max_cluster_size_diff_factor: float, debug: bool) -> (
+        np.ndarray, int, np.ndarray, torch.nn.Module):
+    """
+    The training function of DipDECK. Contains most of the essential functionalities.
+
+    Parameters
+    ----------
+    X : np.ndarray / torch.Tensor
+        the given data set. Can be a np.ndarray or a torch.Tensor
+    n_clusters_current : int
+        current number of clusters. Is equal to n_clusters_start in the beginning
+    dip_merge_threshold : float
+        threshold regarding the Dip-p-value that defines if two clusters should be merged. Must be bvetween 0 and 1
+    cluster_loss_weight : float
+        weight of the clustering loss compared to the reconstruction loss
+    centers_cpu : np.ndarray
+        The current cluster centers, saved as numpy array (not torch.Tensor)
+        Equals the result of the initial KMeans clusters in the beginning.
+    cluster_labels_cpu : np.ndarray
+        The current cluster labels, saved as numpy array (not torch.Tensor)
+        Equals the result of the initial KMeans labels in the beginning.
+    dip_matrix_cpu : np.ndarray
+        The current dip matrix, saved as numpy array (not torch.Tensor).
+        Symmetric matrix containing the Dip-values between each pair of clusters.
+    n_clusters_max : int
+        maximum number of clusters. Must be larger than n_clusters_min. If the result has more clusters, a merge will be forced
+    n_clusters_min : int
+        minimum number of clusters. Must be larger than 0, smaller than n_clusters_max and smaller than n_clusters_start.
+        When this number of clusters is reached, all further merge processes will be hindered
+    clustering_epochs : int
+        number of epochs for the actual clustering procedure
+    optimizer : torch.optim.Optimizer
+        the optimizer object
+    loss_fn : torch.nn.modules.loss._Loss
+        loss function for the reconstruction
+    autoencoder : torch.nn.Module
+        the input autoencoder. If None a new FlexibleAutoencoder will be created
+    device : torch.device
+        device to be trained on
+    trainloader : torch.utils.data.DataLoader
+        dataloader to be used for training
+    testloader : torch.utils.data.DataLoader
+        dataloader to be used for update of the labels, centers and the dip matrix
+    max_cluster_size_diff_factor : float
+        The maximum size difference when comparing two clusters regarding the number of samples.
+        If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) closest samples will be used for the Dip calculation
+    debug : bool
+        If true, additional information will be printed to the console
+
+    Returns
+    -------
+    tuple : (np.ndarray, int, np.ndarray, torch.nn.Module)
+        The labels as identified by DipDECK,
+        The final number of clusters,
+        The cluster centers as identified by DipDECK,
+        The final autoencoder
+    """
     i = 0
     while i < clustering_epochs:
         cluster_labels_torch = torch.from_numpy(cluster_labels_cpu).long().to(device)
@@ -78,7 +202,7 @@ def _dip_deck_training(X, n_clusters_current, dip_merge_threshold, cluster_loss_
             # Reconstruction Loss
             ae_loss = loss_fn(reconstruction, batch_data)
             # Get distances between points and centers. Get nearest center
-            squared_diffs = squared_euclidean_distance(embedded_centers_torch, embedded)
+            squared_diffs = squared_euclidean_distance(embedded, embedded_centers_torch)
             # Update labels? Pause is needed, so cluster labels can adjust to the new structure
             if i != 0:
                 # Update labels
@@ -105,7 +229,6 @@ def _dip_deck_training(X, n_clusters_current, dip_merge_threshold, cluster_loss_
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-        # cluster_labels_cpu = cluster_labels_torch.detach().cpu().numpy()
         # Update centers
         embedded_data = encode_batchwise(testloader, autoencoder, device)
         embedded_centers_cpu = autoencoder.encode(centers_torch).detach().cpu().numpy()
@@ -184,8 +307,43 @@ def _dip_deck_training(X, n_clusters_current, dip_merge_threshold, cluster_loss_
     return cluster_labels_cpu, n_clusters_current, centers_cpu, autoencoder
 
 
-def _merge_by_dip_value(X, embedded_data, cluster_labels_cpu, dip_argmax, n_clusters_current, centers_cpu,
-                        embedded_centers_cpu, max_cluster_size_diff_factor):
+def _merge_by_dip_value(X: np.ndarray, embedded_data: np.ndarray, cluster_labels_cpu: np.ndarray,
+                        dip_argmax: np.ndarray, n_clusters_current: int, centers_cpu: np.ndarray,
+                        embedded_centers_cpu: np.ndarray, max_cluster_size_diff_factor: float) -> (
+        np.ndarray, np.ndarray, np.ndarray, np.ndarray):
+    """
+    Merge the clusters within dip_argmax because their Dip-value is larger than the threshold.
+    Sets the labels of the two cluster to n_clusters - 1. The other labels are adjusted accordingly.
+    Further, the centers, embedded centers and the dip matrix will be updated according to the new structure.
+
+    Parameters
+    ----------
+    X : np.ndarray
+        the given data set
+    embedded_data : np.ndarray
+        the embedded data set
+    cluster_labels_cpu : np.ndarray
+        The current cluster labels, saved as numpy array (not torch.Tensor)
+    dip_argmax : np.ndarray
+        The indices of the two clusters having the largest Dip-value within the dip matrix
+    n_clusters_current : int
+        current number of clusters. Is equal to n_clusters_start in the beginning
+    centers_cpu : np.ndarray
+        The current cluster centers, saved as numpy array (not torch.Tensor)
+    embedded_centers_cpu : np.ndarray
+        The embedded cluster centers, saved as numpy array (not torch.Tensor)
+    max_cluster_size_diff_factor : float
+        The maximum size difference when comparing two clusters regarding the number of samples.
+        If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) closest samples will be used for the Dip calculation
+
+    Returns
+    -------
+    tuple : (np.ndarray, np.ndarray, np.ndarray, np.ndarray)
+        The updated labels
+        The updated centers,
+        The updated embedded centers,
+        The updated dip matrix
+    """
     # Get points in clusters
     points_in_center_1 = len(cluster_labels_cpu[cluster_labels_cpu == dip_argmax[0]])
     points_in_center_2 = len(cluster_labels_cpu[cluster_labels_cpu == dip_argmax[1]])
@@ -216,15 +374,58 @@ def _merge_by_dip_value(X, embedded_data, cluster_labels_cpu, dip_argmax, n_clus
     return cluster_labels_cpu, centers_cpu, embedded_centers_cpu, dip_matrix_cpu
 
 
-def _get_nearest_points_to_optimal_centers(X, optimal_centers, embedded_data):
+def _get_nearest_points_to_optimal_centers(X: np.ndarray, optimal_centers: np.ndarray, embedded_data: np.ndarray) -> (
+        np.ndarray, np.ndarray):
+    """
+    Get the nearest embedded points within the dataset to a set of optimal centers.
+    Additionally, this method will return the corresponding point in the full dimensional space.
+
+    Parameters
+    ----------
+    X : np.ndarray
+        the given data set
+    optimal_centers : np.ndarray
+        the set of optimal centers
+    embedded_data : np.ndarray
+        the embedded data set
+
+    Returns
+    -------
+    tuple : (np.ndarray, np.ndarray)
+        The closest points as new centers in the full space,
+        The closest points as new centers in the embedded space
+    """
     best_center_points = np.argmin(cdist(optimal_centers, embedded_data), axis=1)
     centers_cpu = X[best_center_points, :]
     embedded_centers_cpu = embedded_data[best_center_points, :]
     return centers_cpu, embedded_centers_cpu
 
 
-def _get_nearest_points(points_in_larger_cluster, center, size_smaller_cluster, max_cluster_size_diff_factor,
-                        min_sample_size):
+def _get_nearest_points(points_in_larger_cluster: np.ndarray, center: np.ndarray, size_smaller_cluster: int,
+                        max_cluster_size_diff_factor: float, min_sample_size: int = 50) -> np.ndarray:
+    """
+    Get a subset of a cluster. The subset should contain those points that are closest to the cluster center of a second, smaller cluster.
+    This method is used when difference in size between the larger cluster and the smaller cluster is greater than max_cluster_size_diff_factor.
+
+    Parameters
+    ----------
+    points_in_larger_cluster : np.ndarray
+        The samples within the larger cluster
+    center : np.ndarray
+        The cluster center of the smaller cluster.
+    size_smaller_cluster : int
+        The size of the smaller cluster
+    max_cluster_size_diff_factor : float
+        The maximum size difference when comparing two clusters regarding the number of samples.
+        In the end the larger cluster will only contain the max_cluster_size_diff_factor*(size of smaller cluster) closest samples to the cluster center of the smaller cluster
+    min_sample_size : int
+        Minimum number of samples that should be considered (equals the combined number of samples) (default: 50)
+
+    Returns
+    -------
+    subset_all_points: np.ndarray
+        the subset of the larger cluster
+    """
     distances = cdist(points_in_larger_cluster, [center])
     nearest_points = np.argsort(distances, axis=0)
     # Check if more points should be taken because the other cluster is too small
@@ -235,14 +436,38 @@ def _get_nearest_points(points_in_larger_cluster, center, size_smaller_cluster, 
     return subset_all_points
 
 
-def _get_dip_matrix(data, dip_centers, dip_labels, n_clusters, max_cluster_size_diff_factor=2, min_sample_size=100):
+def _get_dip_matrix(embedded_data: np.ndarray, embedded_centers_cpu: np.ndarray, cluster_labels_cpu: np.ndarray,
+                    n_clusters: int, max_cluster_size_diff_factor: float) -> np.ndarray:
+    """
+    Calculate the dip matrix. Contains the pair-wise Dip-values between all cluster combinations.
+    Here, the objects from the two clusters will be projected onto the connection axis between ther cluster centers.
+
+    Parameters
+    ----------
+    embedded_data : np.ndarray
+        the embedded data set
+    embedded_centers_cpu : np.ndarray
+        The embedded cluster centers, saved as numpy array (not torch.Tensor)
+    cluster_labels_cpu : np.ndarray
+        The current cluster labels, saved as numpy array (not torch.Tensor)
+    n_clusters : int
+        The number of clusters
+    max_cluster_size_diff_factor : float
+        The maximum size difference when comparing two clusters regarding the number of samples.
+        If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) closest samples will be used for the Dip calculation
+
+    Returns
+    -------
+    dip_matrix : np.ndarray
+        The final dip matrix
+    """
     dip_matrix = np.zeros((n_clusters, n_clusters))
     # Loop over all combinations of centers
     for i in range(0, n_clusters - 1):
         for j in range(i + 1, n_clusters):
-            center_diff = dip_centers[i] - dip_centers[j]
-            points_in_i = data[dip_labels == i]
-            points_in_j = data[dip_labels == j]
+            center_diff = embedded_centers_cpu[i] - embedded_centers_cpu[j]
+            points_in_i = embedded_data[cluster_labels_cpu == i]
+            points_in_j = embedded_data[cluster_labels_cpu == j]
             points_in_i_or_j = np.append(points_in_i, points_in_j, axis=0)
             proj_points = np.dot(points_in_i_or_j, center_diff)
             dip_value = dip_test(proj_points)
@@ -251,11 +476,11 @@ def _get_dip_matrix(data, dip_centers, dip_labels, n_clusters, max_cluster_size_
             if points_in_i.shape[0] > points_in_j.shape[0] * max_cluster_size_diff_factor or \
                     points_in_j.shape[0] > points_in_i.shape[0] * max_cluster_size_diff_factor:
                 if points_in_i.shape[0] > points_in_j.shape[0] * max_cluster_size_diff_factor:
-                    points_in_i = _get_nearest_points(points_in_i, dip_centers[j], points_in_j.shape[0],
-                                                      max_cluster_size_diff_factor, min_sample_size)
+                    points_in_i = _get_nearest_points(points_in_i, embedded_centers_cpu[j], points_in_j.shape[0],
+                                                      max_cluster_size_diff_factor)
                 elif points_in_j.shape[0] > points_in_i.shape[0] * max_cluster_size_diff_factor:
-                    points_in_j = _get_nearest_points(points_in_j, dip_centers[i], points_in_i.shape[0],
-                                                      max_cluster_size_diff_factor, min_sample_size)
+                    points_in_j = _get_nearest_points(points_in_j, embedded_centers_cpu[i], points_in_i.shape[0],
+                                                      max_cluster_size_diff_factor)
                 points_in_i_or_j = np.append(points_in_i, points_in_j, axis=0)
                 proj_points = np.dot(points_in_i_or_j, center_diff)
                 dip_value_2 = dip_test(proj_points)
@@ -268,12 +493,78 @@ def _get_dip_matrix(data, dip_centers, dip_labels, n_clusters, max_cluster_size_
 
 
 class DipDECK(BaseEstimator, ClusterMixin):
+    """
+    The Deep Embedded Clustering with k-Estimation (DipDECK) algorithm.
 
-    def __init__(self, n_clusters_start=35, dip_merge_threshold=0.9, cluster_loss_weight=1, n_clusters_max=np.inf,
-                 n_clusters_min=1, batch_size=256, pretrain_learning_rate=1e-3, clustering_learning_rate=1e-4,
-                 pretrain_epochs=100, clustering_epochs=50, optimizer_class=torch.optim.Adam,
-                 loss_fn=torch.nn.MSELoss(), autoencoder=None, embedding_size=5, max_cluster_size_diff_factor=2,
-                 debug=False):
+    Parameters
+    ----------
+    n_clusters_start : int
+        initial number of clusters (default: 35)
+    dip_merge_threshold : float
+        threshold regarding the Dip-p-value that defines if two clusters should be merged. Must be bvetween 0 and 1 (default: 0.9)
+    cluster_loss_weight : float
+        weight of the clustering loss compared to the reconstruction loss (default: 1)
+    n_clusters_max : int
+        maximum number of clusters. Must be larger than n_clusters_min. If the result has more clusters, a merge will be forced (default: np.inf)
+    n_clusters_min : int
+        minimum number of clusters. Must be larger than 0, smaller than n_clusters_max and smaller than n_clusters_start.
+        When this number of clusters is reached, all further merge processes will be hindered (default: 1)
+    batch_size : int
+        size of the data batches (default: 256)
+    pretrain_learning_rate : float
+        learning rate for the pretraining of the autoencoder (default: 1e-3)
+    clustering_learning_rate : float
+        learning rate of the actual clustering procedure (default: 1e-4)
+    pretrain_epochs : int
+        number of epochs for the pretraining of the autoencoder (default: 100)
+    clustering_epochs : int
+        number of epochs for the actual clustering procedure. Will reset after each merge (default: 50)
+    optimizer_class : torch.optim.Optimizer
+        the optimizer class (default: torch.optim.Adam)
+    loss_fn : torch.nn.modules.loss._Loss
+        loss function for the reconstruction (default: torch.nn.MSELoss())
+    autoencoder : torch.nn.Module
+        the input autoencoder. If None a new FlexibleAutoencoder will be created (default: None)
+    embedding_size : int
+        size of the embedding within the autoencoder (default: 10)
+    max_cluster_size_diff_factor : float
+        The maximum size difference when comparing two clusters regarding the number of samples.
+        If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) closest samples will be used for the Dip calculation (default: 2)
+    debug : bool
+        If true, additional information will be printed to the console (default: False)
+
+    Attributes
+    ----------
+    labels_ : np.ndarray
+        The final labels
+    n_cluster : int
+        The final number of clusters
+    cluster_centers_ : np.ndarray
+        The final cluster centers
+    autoencoder : torch.nn.Module
+        The final autoencoder
+
+    Examples
+    ----------
+    from cluspy.data import load_mnist
+    from cluspy.deep import DipDECK
+    data, labels = load_mnist()
+    dipdeck = DipDECK()
+    dipdeck.fit(data)
+
+    References
+    ----------
+    Leiber, Collin, et al. "Dip-based deep embedded clustering with k-estimation."
+    Proceedings of the 27th ACM SIGKDD Conference on Knowledge Discovery & Data Mining. 2021.
+    """
+
+    def __init__(self, n_clusters_start: int = 35, dip_merge_threshold: float = 0.9, cluster_loss_weight: float = 1,
+                 n_clusters_max: int = np.inf, n_clusters_min: int = 1, batch_size: int = 256,
+                 pretrain_learning_rate: float = 1e-3, clustering_learning_rate: float = 1e-4,
+                 pretrain_epochs: int = 100, clustering_epochs: int = 50,
+                 optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
+                 loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), autoencoder: torch.nn.Module = None,
+                 embedding_size: int = 5, max_cluster_size_diff_factor: float = 2, debug: bool = False):
         self.n_clusters_start = n_clusters_start
         self.dip_merge_threshold = dip_merge_threshold
         self.cluster_loss_weight = cluster_loss_weight
@@ -291,7 +582,23 @@ class DipDECK(BaseEstimator, ClusterMixin):
         self.max_cluster_size_diff_factor = max_cluster_size_diff_factor
         self.debug = debug
 
-    def fit(self, X, y=None):
+    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DipDECK':
+        """
+        Initiate the actual clustering process on the input data set.
+        The resulting cluster labels are contained in the labels_ attribute.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            the given data set
+        y : np.ndarray
+            the labels (can be ignored)
+
+        Returns
+        -------
+        self : DipDECK
+            this instance of the DipDECK algorithm
+        """
         labels, n_clusters, centers, autoencoder = _dip_deck(X, self.n_clusters_start, self.dip_merge_threshold,
                                                              self.cluster_loss_weight, self.n_clusters_max,
                                                              self.n_clusters_min, self.batch_size,

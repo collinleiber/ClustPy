@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 
 
 def _rearrange(confusion_matrix):
+    # TODO: use scipy.optimize.linear_sum_assignment
     min_cm_shape = np.min(confusion_matrix.shape)
     new_order = [-1] * min_cm_shape
     # Find best possible diagonal by using maximum values in the confusion matrix
