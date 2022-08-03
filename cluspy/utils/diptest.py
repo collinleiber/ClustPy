@@ -16,9 +16,10 @@ import matplotlib.pyplot as plt
 from cluspy.utils.plots import plot_histogram
 
 
-def dip_test(X, just_dip=True, is_data_sorted=False, use_c=True, debug=False):
+def dip_test(X, just_dip=True, is_data_sorted=False, return_gcm_lcm_mn_mj=False, use_c=True, debug=False):
     assert X.ndim == 1, "Data must be 1-dimensional for the dip-test. Your shape:{0}".format(X.shape)
-    assert just_dip or is_data_sorted == True, "Data must be sorted if low-high tuple and/or modal triangle should be returned (else indices will not match)"
+    assert just_dip or is_data_sorted == True, "Data must be sorted if modal interval and/or modal triangle should be returned (else indices will not match)"
+    assert not return_gcm_lcm_mn_mj or not just_dip, "If GCM, LCM, mn and mj should be returned, 'just_dip' must be False"
     N = len(X)
     if not is_data_sorted:
         X = np.sort(X)
@@ -27,15 +28,18 @@ def dip_test(X, just_dip=True, is_data_sorted=False, use_c=True, debug=False):
         return d if just_dip else (d, (0, N - 1), None)
     if use_c:
         try:
-            dip_value, modal_interval, modal_triangle = _dip_c_port(X, debug)
+            dip_value, modal_interval, modal_triangle, _, _, mn, mj = _dip_c_port(X, debug)
         except Exception as e:
             print("[WARNING] C implementation can not be used for dip calculation.")
             print(e)
-            dip_value, modal_interval, modal_triangle = _dip_python_port(X, True, debug)
+            dip_value, modal_interval, modal_triangle, _, _, mn, mj = _dip_python_port(X, True, debug)
     else:
-        dip_value, modal_interval, modal_triangle = _dip_python_port(X, True, debug)
+        dip_value, modal_interval, modal_triangle, _, _, mn, mj = _dip_python_port(X, True, debug)
     if just_dip:
         return dip_value
+    elif return_gcm_lcm_mn_mj:
+        gcm, lcm = _get_complete_gcm_lcm(mn, mj, modal_interval)
+        return dip_value, modal_interval, modal_triangle, gcm, lcm, mn, mj
     else:
         return dip_value, modal_interval, modal_triangle
 
@@ -51,7 +55,8 @@ def _dip_c_port(X, debug):
     # Execute C function
     dip_value = c_diptest(X.astype(np.float64), modal_interval, modal_triangle, gcm, lcm, mn, mj, X.shape[0],
                           1 if debug else 0)
-    return dip_value, (modal_interval[0], modal_interval[1]), (modal_triangle[0], modal_triangle[1], modal_triangle[2])
+    return dip_value, (modal_interval[0], modal_interval[1]), (
+        modal_triangle[0], modal_triangle[1], modal_triangle[2]), gcm, lcm, mn, mj
 
 
 def _dip_python_port(X, is_data_sorted=False, debug=False):
@@ -245,7 +250,7 @@ def _dip_python_port(X, is_data_sorted=False, debug=False):
         low = gcm[ig]
         high = lcm[ih]
     dip_value /= (2 * N)
-    return dip_value, (low, high), (modaltriangle_i1, modaltriangle_i2, modaltriangle_i3)
+    return dip_value, (low, high), (modaltriangle_i1, modaltriangle_i2, modaltriangle_i3), gcm, lcm, mn, mj
 
 
 def dip_pval(dip_value, n_points, pval_strategy="table", n_boots=2000):
@@ -271,6 +276,33 @@ def dip_boot_samples(n_points, n_boots):
     boot_samples = np.random.rand(n_boots, n_points)
     boot_dips = np.array([dip_test(boot_s, just_dip=True, is_data_sorted=False) for boot_s in boot_samples])
     return boot_dips
+
+
+def _get_complete_gcm_lcm(mn, mj, modal_interval):
+    """
+    Complete the GCM and LCM returned by the Dip-test.
+
+    Adapted from: https://github.com/samhelmholtz/skinny-dip/blob/master/code/skinny-dip/RPackageDipTestCustom/diptest/R/dip.R
+    """
+    low = modal_interval[0]
+    high = modal_interval[1]
+    gcm = np.zeros(mn.shape[0], dtype=np.int32)
+    lcm = np.zeros(mn.shape[0], dtype=np.int32)
+    # Collect the gcm points from 0 to the upper end of the modal interval
+    i = 0
+    gcm[0] = high
+    while gcm[i] > 0:
+        gcm[i + 1] = mn[gcm[i]]
+        i += 1
+    gcm = gcm[:i + 1]
+    # Collect the lcm points from the lower end of the modal interval to the last point
+    i = 0
+    lcm[i] = low
+    while lcm[i] < X.shape[0] - 1:
+        lcm[i + 1] = mj[lcm[i]]
+        i += 1
+    lcm = lcm[:i + 1]
+    return gcm, lcm
 
 
 """
@@ -321,32 +353,10 @@ Plot
 """
 
 
-def _strip_gcm_lcm(gcm, lcm):
-    N = len(lcm)
-    # Check that indices decrease
-    gcm = list(gcm)
-    i = 1
-    while i < len(gcm):
-        if gcm[i] >= gcm[i - 1]:
-            del gcm[i]
-        else:
-            i += 1
-    # Check that indices increase
-    lcm = list(lcm)
-    i = 1
-    while i < len(lcm):
-        if lcm[i] < lcm[i - 1]:
-            del lcm[i]
-        else:
-            i += 1
-    if lcm[-1] != N - 1:
-        lcm.append(N - 1)
-    return (gcm, lcm)
-
-
 def plot_dip(X, is_data_sorted=False, dip_value=None, modal_interval=None, modal_triangle=None,
-             gcm_lcm=None, show_legend=True, add_histogram=True, histogram_labels=None, histogram_show_legend=True,
-             histogram_density=True, histogram_n_bins=100, height_ratio=(1, 2), show_plot=True):
+             gcm=None, lcm=None, show_legend=True, add_histogram=True, histogram_labels=None,
+             histogram_show_legend=True, histogram_density=True, histogram_n_bins=100, height_ratio=(1, 2),
+             show_plot=True):
     assert X.ndim == 1, "Data must be 1-dimensional for the dip-test. Your shape:{0}".format(X.shape)
     N = len(X)
     if not is_data_sorted:
@@ -354,7 +364,8 @@ def plot_dip(X, is_data_sorted=False, dip_value=None, modal_interval=None, modal
     if add_histogram:
         # Add histogram at the top of the plot (uses plot_histogram from cluspy.utils.plots)
         fig, (ax1, ax2) = plt.subplots(2, sharex=True, gridspec_kw={'height_ratios': height_ratio})
-        plot_histogram(X, histogram_labels, density=histogram_density, n_bins=histogram_n_bins, show_legend=histogram_show_legend,
+        plot_histogram(X, histogram_labels, density=histogram_density, n_bins=histogram_n_bins,
+                       show_legend=histogram_show_legend,
                        container=ax1, show_plot=False)
         if modal_interval is not None:
             ax1.plot([X[modal_interval[0]], X[modal_interval[0]]], ax1.get_ylim(), "g--")
@@ -365,7 +376,7 @@ def plot_dip(X, is_data_sorted=False, dip_value=None, modal_interval=None, modal
     else:
         dip_container = plt
     # Plot ECDF
-    dip_container.plot(X, np.arange(N) / N, "b", label="ECDF")
+    dip_container.plot(X, np.arange(N) / N, "b", label="eCDF")
     if dip_value is not None:
         # Add Dip range around ECDF
         dip_container.plot(X, np.arange(N) / N - dip_value * 2, "k:", alpha=0.7, label="2x dip")
@@ -380,13 +391,9 @@ def plot_dip(X, is_data_sorted=False, dip_value=None, modal_interval=None, modal
                            [modal_triangle[0] / N, modal_triangle[1] / N, modal_triangle[2] / N, modal_triangle[0] / N],
                            linewidth=1.5, c="r", label="modal triangle")
     # Add process of gcm and lcm curves
-    if gcm_lcm is not None:
-        gcm = gcm_lcm[0]
-        lcm = gcm_lcm[1]
-        gcm, lcm = _strip_gcm_lcm(gcm, lcm)
-        gcm = np.unique(gcm)
+    if gcm is not None:
         dip_container.plot(X[gcm], gcm / N, "y--", linewidth=1.5, label="gcm")
-        lcm = np.unique(lcm)
+    if lcm is not None:
         dip_container.plot(X[lcm], lcm / N, "c--", linewidth=1.5, label="lcm")
     if show_legend:
         dip_container.legend(loc="lower right")
