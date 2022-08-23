@@ -79,11 +79,11 @@ class NeighborEncoder(FlexibleAutoencoder):
                                               decoder_layers, decoder_output_fn)
         self.n_neighbors = n_neighbors
         self.decode_self = decode_self
-        neighbor_decoders = []
-        for i in range(n_neighbors):
-            neighbor_decoders.append(FullyConnectedBlock(layers=self.decoder.layers, batch_norm=batch_norm,
-                                                         dropout=dropout, activation_fn=activation_fn, bias=bias,
-                                                         output_fn=decoder_output_fn))
+        neighbor_decoders = torch.nn.ModuleList([FullyConnectedBlock(layers=self.decoder.layers, batch_norm=batch_norm,
+                                                                     dropout=dropout, activation_fn=activation_fn,
+                                                                     bias=bias,
+                                                                     output_fn=decoder_output_fn) for _ in
+                                                 range(n_neighbors)])
         self.neighbor_decoders = neighbor_decoders
 
     def decode(self, embedded: torch.Tensor) -> torch.Tensor:
@@ -104,13 +104,13 @@ class NeighborEncoder(FlexibleAutoencoder):
         assert embedded.shape[1] == self.decoder.layers[0], "Input layer of the decoder does not match input sample"
         n_decoded_objects = self.n_neighbors + 1 if self.decode_self else self.n_neighbors
         decoded_neighbors = torch.zeros((n_decoded_objects, embedded.shape[0], self.encoder.layers[0]))
-        for i in range(self.n_neighbors):
+        for i in range(self.n_neighbors):  # TODO: Maybe use functorch.vmap in the future for vectorization
             decoded_neighbors[i] = self.neighbor_decoders[i](embedded)
         if self.decode_self:
             decoded_neighbors[-1] = self.decoder(embedded)
         return decoded_neighbors
 
-    def loss(self, batch: list, loss_fn: torch.nn.modules.loss._Loss) -> torch.Tensor:
+    def loss(self, batch: list, loss_fn: torch.nn.modules.loss._Loss, device: torch.device) -> torch.Tensor:
         """
         Calculate the loss of a single batch of data.
         Corresponds to the sum of losses concerning each neighbor.
@@ -122,16 +122,19 @@ class NeighborEncoder(FlexibleAutoencoder):
             the different parts of a dataloader (id, samples, 1-nearest-neighbor, 2-nearest-neighbor, ...)
         loss_fn : torch.nn.modules.loss._Loss
             loss function to be used for reconstruction
+        device : torch.device
+            device to be trained on
 
         Returns
         -------
         loss : torch.Tensor
             returns the sum of the reconstruction losses of the input sample
         """
-        batch_data = batch[1]
+        assert type(batch) is list, "batch must come from a dataloader and therefore be of type list"
+        batch_data = batch[1].to(device)
         decoded_neighbors = self.forward(batch_data)
         loss = 0
-        for i in range(self.n_neighbors):
+        for i in range(self.n_neighbors):  # TODO: Maybe use functorch.vmap in the future for vectorization
             neighbors = batch[2 + i]
             loss = loss + loss_fn(decoded_neighbors[i], neighbors)
         if self.decode_self:
@@ -148,7 +151,7 @@ class NeighborEncoder(FlexibleAutoencoder):
             print_step: int = 0) -> 'NeighborEncoder':
         """
         Trains the NeighborEncoder in place.
-        Equal to fit function of the FelxibleAutoencoder but does only work with a dataloader (not with a regular data array).
+        Equal to fit function of the FlexibleAutoencoder but does only work with a dataloader (not with a regular data array).
         This is because the dataloader must contain the nearest neighbors of each point at the positions 2, 3, ....
 
         Parameters

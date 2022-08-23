@@ -16,7 +16,7 @@ def test_simple_neighbor_encoder_with_optdigits():
     dataloader = get_dataloader(data, 256, True, additional_inputs=neighbors)
     # Test fitting
     neighborencoder = NeighborEncoder(layers=[data.shape[1], 128, 64, embedding_dim], n_neighbors=n_neighbors,
-                                  decode_self=False)
+                                      decode_self=False)
     assert neighborencoder.fitted is False
     neighborencoder.fit(n_epochs=5, lr=1e-3, dataloader=dataloader)
     assert neighborencoder.fitted is True
@@ -33,8 +33,9 @@ def test_simple_neighbor_encoder_with_optdigits():
     assert torch.equal(decoded, forwarded)
 
     # Test fitting with self decoding
+    n_neighbors = 2
     neighborencoder_2 = NeighborEncoder(layers=[data.shape[1], 128, 64, embedding_dim], n_neighbors=n_neighbors,
-                                    decode_self=True)
+                                        decode_self=True)
     assert neighborencoder_2.fitted is False
     neighborencoder_2.fit(n_epochs=5, lr=1e-3, dataloader=dataloader)
     assert neighborencoder_2.fitted is True
