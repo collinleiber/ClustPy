@@ -2,7 +2,7 @@ from cluspy.data import load_optdigits
 from cluspy.deep._data_utils import _CluspyDataset, get_dataloader
 import torch
 
-def test_CluspyDataset_with_optidigits():
+def test_CluspyDataset_with_optdigits():
     data, labels = load_optdigits()
     data_torch = torch.from_numpy(data)
     labels_torch = torch.from_numpy(labels)

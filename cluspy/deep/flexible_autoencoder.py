@@ -79,6 +79,29 @@ class FullyConnectedBlock(torch.nn.Module):
         return forwarded
 
 
+def _to_device(batch: list, device: torch.device) -> list:
+    """
+    Copy all parts within batch, i.e. (id, data, ...), onto the specified device.
+    Batch must directly come out of a dataloader.
+
+    Parameters
+    ----------
+    batch : list
+        a batch from a dataloader
+    device : torch.device
+        device to be trained on
+
+    Returns
+    -------
+    batch : list
+        The input batch copied to the specified device
+    """
+    assert type(batch) is list, "batch must come from a dataloader and therefore be of type list"
+    for i in range(len(batch)):
+        batch[i] = batch[i].to(device)
+    return batch
+
+
 class FlexibleAutoencoder(torch.nn.Module):
     """
     A flexible feedforward autoencoder.
@@ -193,14 +216,14 @@ class FlexibleAutoencoder(torch.nn.Module):
         reconstruction = self.decode(embedded)
         return reconstruction
 
-    def loss(self, batch_data: torch.Tensor, loss_fn: torch.nn.modules.loss._Loss) -> torch.Tensor:
+    def loss(self, batch: list, loss_fn: torch.nn.modules.loss._Loss) -> torch.Tensor:
         """
         Calculate the loss of a single batch of data.
 
         Parameters
         ----------
-        batch_data : torch.Tensor
-            the samples
+        batch: list
+            the different parts of a dataloader (id, samples, ...)
         loss_fn : torch.nn.modules.loss._Loss
             loss function to be used for reconstruction
 
@@ -209,6 +232,7 @@ class FlexibleAutoencoder(torch.nn.Module):
         loss : torch.Tensor
             returns the reconstruction loss of the input sample
         """
+        batch_data = batch[1]
         reconstruction = self.forward(batch_data)
         loss = loss_fn(reconstruction, batch_data)
         return loss
@@ -236,8 +260,8 @@ class FlexibleAutoencoder(torch.nn.Module):
             self.eval()
             loss = 0
             for batch in dataloader:
-                batch_data = batch[1].to(device)
-                loss += self.loss(batch_data, loss_fn)
+                batch_on_device = _to_device(batch, device)
+                loss += self.loss(batch_on_device, loss_fn)
             loss /= len(dataloader)
         return loss
 
@@ -323,8 +347,8 @@ class FlexibleAutoencoder(torch.nn.Module):
         for epoch_i in range(n_epochs):
             self.train()
             for batch in dataloader:
-                batch_data = batch[1].to(device)
-                loss = self.loss(batch_data, loss_fn)
+                batch_on_device = _to_device(batch, device)
+                loss = self.loss(batch_on_device, loss_fn)
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
