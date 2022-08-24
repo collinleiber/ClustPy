@@ -4,7 +4,67 @@ Collin Leiber
 """
 
 import torch
+import numpy as np
+from scipy.spatial.distance import cdist
 from cluspy.deep.flexible_autoencoder import FullyConnectedBlock, FlexibleAutoencoder
+
+
+def get_neighbors_batchwise(X: np.ndarray, n_neighbors: int, metric: str = "sqeuclidean",
+                            batch_size: int = 10000) -> list:
+    """
+    For large datasets it is often not possible to determine the nearest neighbors in a trivial manner.
+    Therefore, here is an implementation that calculates the nearest neighbors in batches.
+    Ignores the objects themselves (with distance of 0) as nearest neighbors .
+    It reduces the memory consumption of a trivial nearest neighbor implementation from (data_size x data_size) to (batch_size x data_size).
+    A list is returned, which can be given as additional input into a DataLoader and is therefore directly compatible with the NeighborEncoder.
+    Due to runtime concerns it is still recommended to use a more complex nearest neighbor retrieval implementation (e.g. from sklearn.neighbor)!
+
+    Parameters
+    ----------
+    X : np.ndarray
+        The given data set
+    n_neighbors : int
+        The number of nearest neighbors to identify
+    metric : str
+        The distance metric to be used. See scipy.spatial.distance.cdist for more information (default: sqeuclidean)
+    batch_size : int
+        The size of the batches (default: 10000)
+
+    Returns
+    -------
+    nearest_neigbors : list
+        A list containing the nearest neighbors as torch.Tensors, i.e. [1-nearest-neighbor tensor, 2-nearest-neighbor tensor, ...]
+
+    Examples
+    --------
+    from cluspy.data import load_optdigits
+    from cluspy.deep import get_dataloader
+
+    X, L = load_optdigits()
+    n_neighbors = 3
+    neighbors = get_neighbors_batchwise(X, n_neighbors)
+    dataloader = get_dataloader(X, 256, True, additional_inputs=neighbors)
+    neighbor_encoder = NeighborEncoder(layers=[X.shape[1], 512, 256, 10], n_neighbors=n_neighbors)
+    neighbor_encoder.fit(dataloader=dataloader, n_epochs=100, lr=1e-3)
+    """
+    # batch_size should not be larger than the dataset
+    batch_size = min(X.shape[0], batch_size)
+    # Create list containing the nearest neighbors
+    nearest_neigbors = [np.zeros(X.shape) for _ in range(n_neighbors)]
+    # Check if last batch is a complete batch
+    add_one_batch = 0 if X.shape[0] % batch_size == 0 else 1
+    n_iterations = X.shape[0] // batch_size + add_one_batch
+    for i in range(n_iterations):
+        index_0 = i * batch_size
+        if i != n_iterations - 1 or add_one_batch == 0:
+            index_1 = index_0 + batch_size
+        else:
+            index_1 = index_0 + X.shape[0] % batch_size
+        distances = cdist(X[index_0:index_1], X, metric=metric)
+        arg_distances = np.argsort(distances, axis=1)
+        for k in range(n_neighbors):
+            nearest_neigbors[k][index_0:index_1] = X[arg_distances[:, k + 1]]
+    return nearest_neigbors
 
 
 class NeighborEncoder(FlexibleAutoencoder):
@@ -52,16 +112,18 @@ class NeighborEncoder(FlexibleAutoencoder):
     --------
     from cluspy.data import load_optdigits
     from cluspy.deep import get_dataloader
-    from scipy.spatial.distance import pdist, squareform
     from cluspy.deep._utils import detect_device
-    import numpy as np
+    from scipy.spatial.distance import pdist, squareform
 
     X, L = load_optdigits()
-    dist_matrix = squareform(pdist(X))
     device = detect_device()
     n_neighbors = 3
+
+    dist_matrix = squareform(pdist(X))
     neighbor_ids = np.argsort(dist_matrix, axis=1)
     neighbors = [X[neighbor_ids[:, 1 + i]] for i in range(n_neighbors)]
+    # Alternatively: neighbors = get_neighbors_batchwise(X, n_neighbors)
+
     dataloader = get_dataloader(X, 256, True, additional_inputs=neighbors)
     neighbor_encoder = NeighborEncoder(layers=[X.shape[1], 512, 256, 10], n_neighbors=n_neighbors, decode_self=False)
     neighbor_encoder.fit(dataloader=dataloader, device=device, n_epochs=100, lr=1e-3)
@@ -135,7 +197,7 @@ class NeighborEncoder(FlexibleAutoencoder):
         decoded_neighbors = self.forward(batch_data)
         loss = 0
         for i in range(self.n_neighbors):  # TODO: Maybe use functorch.vmap in the future for vectorization
-            neighbors = batch[2 + i]
+            neighbors = batch[2 + i].to(device)
             loss = loss + loss_fn(decoded_neighbors[i], neighbors)
         if self.decode_self:
             reconstruction = decoded_neighbors[-1]

@@ -1,6 +1,6 @@
 from cluspy.data import load_optdigits
-from cluspy.deep import NeighborEncoder
 from cluspy.deep import get_dataloader
+from cluspy.deep.neighbor_encoder import NeighborEncoder, get_neighbors_batchwise
 from scipy.spatial.distance import pdist, squareform
 import torch
 import numpy as np
@@ -42,3 +42,17 @@ def test_simple_neighbor_encoder_with_optdigits():
     # Test encoding
     forwarded = neighborencoder_2.forward(data_batch)
     assert forwarded.shape == (n_neighbors + 1, batch_size, data.shape[1])
+
+
+def test_get_neighbors_batchwise():
+    X = np.array([[1, 0], [2, 1], [3, 1], [6, 0], [10, 11], [10, 10], [9, 12]])
+    n_neighbors = 2
+    neighbors = get_neighbors_batchwise(X, n_neighbors)
+    result = [np.array([[2, 1], [3, 1], [2, 1], [3, 1], [10, 10], [10, 11], [10, 11]]),
+              np.array([[3, 1], [1, 0], [1, 0], [2, 1], [9, 12], [9, 12], [10, 10]])]
+    for i in range(len(result)):
+        assert np.array_equal(result[i], neighbors[i])
+    # Check if it also works with a smaller batch size
+    neighbors = get_neighbors_batchwise(X, n_neighbors, batch_size=2)
+    for i in range(len(result)):
+        assert np.array_equal(result[i], neighbors[i])
