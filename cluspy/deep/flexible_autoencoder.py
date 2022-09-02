@@ -193,22 +193,26 @@ class FlexibleAutoencoder(torch.nn.Module):
         reconstruction = self.decode(embedded)
         return reconstruction
 
-    def loss(self, batch_data: torch.Tensor, loss_fn: torch.nn.modules.loss._Loss) -> torch.Tensor:
+    def loss(self, batch: list, loss_fn: torch.nn.modules.loss._Loss, device: torch.device) -> torch.Tensor:
         """
         Calculate the loss of a single batch of data.
 
         Parameters
         ----------
-        batch_data : torch.Tensor
-            the samples
+        batch: list
+            the different parts of a dataloader (id, samples, ...)
         loss_fn : torch.nn.modules.loss._Loss
             loss function to be used for reconstruction
+        device : torch.device
+            device to be trained on
 
         Returns
         -------
         loss : torch.Tensor
             returns the reconstruction loss of the input sample
         """
+        assert type(batch) is list, "batch must come from a dataloader and therefore be of type list"
+        batch_data = batch[1].to(device)
         reconstruction = self.forward(batch_data)
         loss = loss_fn(reconstruction, batch_data)
         return loss
@@ -236,8 +240,7 @@ class FlexibleAutoencoder(torch.nn.Module):
             self.eval()
             loss = 0
             for batch in dataloader:
-                batch_data = batch[1].to(device)
-                loss += self.loss(batch_data, loss_fn)
+                loss += self.loss(batch, loss_fn, device)
             loss /= len(dataloader)
         return loss
 
@@ -323,8 +326,7 @@ class FlexibleAutoencoder(torch.nn.Module):
         for epoch_i in range(n_epochs):
             self.train()
             for batch in dataloader:
-                batch_data = batch[1].to(device)
-                loss = self.loss(batch_data, loss_fn)
+                loss = self.loss(batch, loss_fn, device)
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()

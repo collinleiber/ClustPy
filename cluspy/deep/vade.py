@@ -144,7 +144,8 @@ class _VaDE_VAE(VariationalAutoencoder):
             z, q_mean, q_logvar, reconstruction = super().forward(x)
         return z, q_mean, q_logvar, reconstruction
 
-    def loss(self, batch_data: torch.Tensor, loss_fn: torch.nn.modules.loss._Loss, beta: float = 1) -> torch.Tensor:
+    def loss(self, batch: list, loss_fn: torch.nn.modules.loss._Loss, device: torch.device,
+             beta: float = 1) -> torch.Tensor:
         """
         Calculate the loss of a single batch of data.
         Matches loss calculation from FlexibleAutoencoder for pretraining and from VariationalAutoencoder afterwards.
@@ -152,10 +153,12 @@ class _VaDE_VAE(VariationalAutoencoder):
 
         Parameters
         ----------
-        batch_data : torch.Tensor
-            the samples
+        batch: list
+            the different parts of a dataloader (id, samples, ...)
         loss_fn : torch.nn.modules.loss._Loss
             loss function to be used for reconstruction
+        device : torch.device
+            device to be trained on
         beta : float
             Not used at the moment
 
@@ -164,13 +167,15 @@ class _VaDE_VAE(VariationalAutoencoder):
         loss: torch.Tensor
             returns the loss of the input samples
         """
+        assert type(batch) is list, "batch must come from a dataloader and therefore be of type list"
         if not self.fitted:
             # While pretraining a loss similar to a regular autoencoder (FlexibleAutoencoder) should be used
+            batch_data = batch[1].to(device)
             _, _, _, reconstruction = self.forward(batch_data)
             loss = loss_fn(reconstruction, batch_data)
         else:
             # After pretraining the usual loss of a VAE should be used. Super() uses function from VariationalAutoencoder
-            loss = super().loss(batch_data, loss_fn, beta)
+            loss = super().loss(batch, loss_fn, beta)
         return loss
 
 

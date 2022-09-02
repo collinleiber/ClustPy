@@ -74,6 +74,7 @@ Remove cluspy via pip to avoid ambiguities during development, e.g., when changi
     - Flexible Autoencoder
     - Stacked Autoencoder
     - Variational Autoencoder
+    - Neighbor Encoder
     - DEC
     - IDEC
     - DCN
