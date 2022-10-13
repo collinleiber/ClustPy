@@ -42,6 +42,7 @@ def _plot_confusion_matrix(confusion_matrix, show_text=True, figsize=(10, 10), c
 class ConfusionMatrix():
 
     def __init__(self, labels_true, labels_pred):
+        assert labels_true.shape[0] == labels_pred.shape[0], "Number of true and predicted labels must match"
         self.true_clusters = np.unique(labels_true)
         self.pred_clusters = np.unique(labels_pred)
         conf_matrix = np.zeros((len(self.true_clusters), len(self.pred_clusters)), dtype=int)
@@ -58,6 +59,13 @@ class ConfusionMatrix():
         return str(self.confusion_matrix)
 
     def rearrange(self):
+        """
+        In place.
+
+        Returns
+        -------
+
+        """
         new_confusion_matrix = _rearrange(self.confusion_matrix)
         self.confusion_matrix = new_confusion_matrix
 

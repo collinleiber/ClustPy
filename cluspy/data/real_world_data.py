@@ -35,6 +35,10 @@ def _get_download_dir(downloads_path: str) -> str:
         downloads_path = DEFAULT_DOWNLOAD_PATH
     if not os.path.isdir(downloads_path):
         os.makedirs(downloads_path)
+        with open(downloads_path + "/info.txt", "w") as f:
+            f.write("This directory was created by the ClusPy python package to store real world data sets.\n"
+                    "The default directory is '[USER]/Downloads/cluspy_datafiles' and can be changed with the "
+                    "'downloads_path' parameter when loading a data set.")
     return downloads_path
 
 
@@ -90,8 +94,9 @@ def _load_data_file(filename_local: str, file_url: str, delimiter: str = ",", la
     return data, labels
 
 
-def _load_timeseries_classification_data(dataset_name: str, subset: str, labels_minus_one: bool,
-                                         downloads_path: str) -> (np.ndarray, np.ndarray):
+def _load_timeseries_classification_data(dataset_name: str, subset: str, labels_minus_one: bool, file_type: str,
+                                         last_column_are_labels: bool, downloads_path: str) -> (
+        np.ndarray, np.ndarray):
     """
     Helper function to load timeseries data from www.timeseriesclassification.com.
 
@@ -103,8 +108,13 @@ def _load_timeseries_classification_data(dataset_name: str, subset: str, labels_
         can be 'all', 'test' or 'train'. 'all' combines test and train data
     labels_minus_one : bool
         Convert labels from 1,... to 0,...
+    file_type : str
+        file type within the zip file. Currently supported are "txt" and "ts". Is usually "txt"
+    last_column_are_labels : bool
+        specifies if the last column contains the labels. If false labels should be contained in the first column
     downloads_path : str
-        path to the directory where the data is stored
+        path to the directory where the data is stored  If input was None this will be equal to
+        '[USER]/Downloads/cluspy_datafiles'
 
     Returns
     -------
@@ -125,17 +135,45 @@ def _load_timeseries_classification_data(dataset_name: str, subset: str, labels_
             zipf.extractall(directory)
     # Load data and labels
     if subset == "all" or subset == "train":
-        dataset = np.genfromtxt(directory + dataset_name + "_TRAIN.txt")
-        data = dataset[:, 1:]
-        labels = dataset[:, 0]
-    if subset == "all" or subset == "test":
-        test_dataset = np.genfromtxt(directory + dataset_name + "_TEST.txt")
-        if subset == "all":
-            data = np.r_[data, test_dataset[:, 1:]]
-            labels = np.r_[labels, test_dataset[:, 0]]
+        # Normally we have txt files
+        if file_type == "txt":
+            dataset = np.genfromtxt(directory + dataset_name + "_TRAIN.txt")
+        elif file_type == "ts":
+            # Ts files must be changed first
+            with open(directory + dataset_name + "_TRAIN.ts", "rb") as f:
+                clean_lines = (line.replace(b":", b",").replace(b"@", b"#") for line in f)
+                dataset = np.genfromtxt(clean_lines, delimiter=",", comments="#")
+        # Are labels in first or last column?
+        if last_column_are_labels:
+            data = dataset[:, :-1]
+            labels = dataset[:, -1]
         else:
-            data = test_dataset[:, 1:]
-            labels = test_dataset[:, 0]
+            data = dataset[:, 1:]
+            labels = dataset[:, 0]
+    if subset == "all" or subset == "test":
+        # Normally we have txt files
+        if file_type == "txt":
+            test_dataset = np.genfromtxt(directory + dataset_name + "_TEST.txt")
+        elif file_type == "ts":
+            # Ts files must be changed first
+            with open(directory + dataset_name + "_TEST.ts", "rb") as f:
+                clean_lines = (line.replace(b":", b",").replace(b"@", b"#") for line in f)
+                test_dataset = np.genfromtxt(clean_lines, delimiter=",", comments="#")
+        # Are labels in first or last column?
+        if last_column_are_labels:
+            if subset == "all":
+                data = np.r_[data, test_dataset[:, :-1]]
+                labels = np.r_[labels, test_dataset[:, -1]]
+            else:
+                data = test_dataset[:, :-1]
+                labels = test_dataset[:, -1]
+        else:
+            if subset == "all":
+                data = np.r_[data, test_dataset[:, 1:]]
+                labels = np.r_[labels, test_dataset[:, 0]]
+            else:
+                data = test_dataset[:, 1:]
+                labels = test_dataset[:, 0]
     if labels_minus_one:
         # Convert labels from 1,... to 0,...
         labels -= 1
@@ -820,7 +858,7 @@ def load_statlog_shuttle(subset: str = "all", downloads_path: str = None) -> (np
             # Unpack z-file
             success = _decompress_z_file(filename, directory)
             if not success:
-                # os.remove(filename)
+                os.remove(filename)
                 return None, None
         # Load data and labels
         dataset = np.genfromtxt(directory + "shuttle.trn")
@@ -1058,6 +1096,171 @@ def load_forest_types(subset: str = "all", downloads_path: str = None) -> (np.nd
     return data, labels
 
 
+def load_dermatology(downloads_path: str = None) -> (np.ndarray, np.ndarray):
+    """
+    Load the dermatology data set. It consists of 366 samples belonging to one of 6 classes.
+    8 samples contain '?' values and are therefore removed.
+    N=358, d=34, k=6.
+
+    Parameters
+    ----------
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+
+    Returns
+    -------
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (358 x 34), the labels numpy array (358)
+
+    References
+    -------
+    https://archive.ics.uci.edu/ml/datasets/dermatology
+    """
+    filename = _get_download_dir(downloads_path) + "/dermatology.data"
+    data, labels = _load_data_file(filename,
+                                   "https://archive.ics.uci.edu/ml/machine-learning-databases/dermatology/dermatology.data",
+                                   delimiter=",")
+    # Remove rows with nan
+    rows_with_nan = ~np.isnan(data).any(axis=1)
+    data = data[rows_with_nan]
+    labels = labels[rows_with_nan]
+    # Convert labels from 1,... to 0,...
+    labels -= 1
+    return data, labels
+
+
+def load_multiple_features(downloads_path: str = None) -> (np.ndarray, np.ndarray):
+    """
+    Load the multiple features data set. It consists of 2000 samples belonging to one of 10 classes.
+    Each class corresponds to handwritten numerals (0-9) extracted from a collection of Dutch utility maps.
+    N=2000, d=649, k=10.
+
+    Parameters
+    ----------
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+
+    Returns
+    -------
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (2000 x 649), the labels numpy array (2000)
+
+    References
+    -------
+    https://archive.ics.uci.edu/ml/datasets/Multiple+Features
+    """
+    directory = _get_download_dir(downloads_path) + "/MultipleFeatures/"
+    if not os.path.isdir(directory):
+        os.mkdir(directory)
+    data = np.zeros((2000, 0))
+    # Dataset consists of multiple .xls files
+    for file in ["mfeat-fac", "mfeat-fou", "mfeat-kar", "mfeat-mor", "mfeat-pix", "mfeat-zer"]:
+        filename = directory + file + ".xls"
+        if not os.path.isfile(filename):
+            _download_file("https://archive.ics.uci.edu/ml/machine-learning-databases/mfeat/" + file,
+                           filename)
+        data_tmp = np.genfromtxt(filename, delimiter=None)
+        data = np.c_[data, data_tmp]
+    # First 200 entries correspond to '0', next 200 to '1' and so on
+    labels = np.repeat(range(10), 200)
+    return data, labels
+
+
+def load_statlog_australian_credit_approval(downloads_path: str = None) -> (np.ndarray, np.ndarray):
+    """
+    Load the statlog Australian Credit Approval data set. It consists of 690 samples belonging to one of 2 classes.
+    N=690, d=14, k=2.
+
+    Parameters
+    ----------
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+
+    Returns
+    -------
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (690 x 14), the labels numpy array (690)
+
+    References
+    -------
+    https://archive.ics.uci.edu/ml/datasets/statlog+(australian+credit+approval)
+    """
+    filename = _get_download_dir(downloads_path) + "/australian.dat"
+    data, labels = _load_data_file(filename,
+                                   "https://archive.ics.uci.edu/ml/machine-learning-databases/statlog/australian/australian.dat",
+                                   delimiter=None)
+    return data, labels
+
+
+def load_breast_cancer_wisconsin_original(downloads_path: str = None) -> (np.ndarray, np.ndarray):
+    """
+    Load the original breast cancer Wisconsin data set. It consists of 699 samples belonging to one of 2 classes.
+    16 samples contain '?' values and will be removed.
+    N=683, d=9, k=2.
+
+    Parameters
+    ----------
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+
+    Returns
+    -------
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (683 x 9), the labels numpy array (683)
+
+    References
+    -------
+    https://archive.ics.uci.edu/ml/datasets/breast+cancer+wisconsin+%28original%29
+    """
+    filename = _get_download_dir(downloads_path) + "/breast-cancer-wisconsin.data"
+    data, labels = _load_data_file(filename,
+                                   "https://archive.ics.uci.edu/ml/machine-learning-databases/breast-cancer-wisconsin/breast-cancer-wisconsin.data",
+                                   delimiter=",")
+    # First column contains unique ids
+    data = data[:, 1:]
+    # Remove rows with nan
+    rows_with_nan = ~np.isnan(data).any(axis=1)
+    data = data[rows_with_nan]
+    labels = labels[rows_with_nan]
+    # labels are 2 or 4. Convert to 0 or 1
+    labels = labels / 2 - 1
+    return data, labels
+
+
+def load_semeion(downloads_path: str = None) -> (np.ndarray, np.ndarray):
+    """
+    Load the semeion data set. It consists of 1593 samples belonging to one of 10 classes.
+    Each sample corresponds to a grayscale 16x16 scan of handwritten digits originating from about 80 different persons.
+    Further, each pixel was converted to a boolean value using a fixed threshold.
+    N=1593, d=256, k=10.
+
+    Parameters
+    ----------
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+
+    Returns
+    -------
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (1593 x 256), the labels numpy array (1593)
+
+    References
+    -------
+    https://archive.ics.uci.edu/ml/datasets/semeion+handwritten+digit
+    """
+    filename = _get_download_dir(downloads_path) + "/semeion.data"
+    if not os.path.isfile(filename):
+        _download_file("https://archive.ics.uci.edu/ml/machine-learning-databases/semeion/semeion.data",
+                       filename)
+    datafile = np.genfromtxt(filename)
+    # Last columns each correspond to one label (one-hot encoding)
+    data = datafile[:, :-10]
+    labels = np.zeros(data.shape[0])
+    for i in range(1, 10):
+        labels[datafile[:, -10 + i] == 1] = i
+    return data, labels
+
+
 """
 Load timeseries classification data
 """
@@ -1085,7 +1288,7 @@ def load_motestrain(subset: str = "all", downloads_path: str = None) -> (np.ndar
     -------
     http://www.timeseriesclassification.com/description.php?Dataset=MoteStrain
     """
-    data, labels = _load_timeseries_classification_data("MoteStrain", subset, True, downloads_path)
+    data, labels = _load_timeseries_classification_data("MoteStrain", subset, True, "txt", False, downloads_path)
     return data, labels
 
 
@@ -1111,7 +1314,8 @@ def load_proximal_phalanx_outline(subset: str = "all", downloads_path: str = Non
     -------
     http://www.timeseriesclassification.com/description.php?Dataset=ProximalPhalanxOutlineCorrect
     """
-    data, labels = _load_timeseries_classification_data("DistalPhalanxOutlineCorrect", subset, False, downloads_path)
+    data, labels = _load_timeseries_classification_data("DistalPhalanxOutlineCorrect", subset, False, "txt", False,
+                                                        downloads_path)
     return data, labels
 
 
@@ -1137,7 +1341,8 @@ def load_diatom_size_reduction(subset: str = "all", downloads_path: str = None) 
     -------
     http://www.timeseriesclassification.com/description.php?Dataset=DiatomSizeReduction
     """
-    data, labels = _load_timeseries_classification_data("DiatomSizeReduction", subset, True, downloads_path)
+    data, labels = _load_timeseries_classification_data("DiatomSizeReduction", subset, True, "txt", False,
+                                                        downloads_path)
     return data, labels
 
 
@@ -1163,7 +1368,7 @@ def load_symbols(subset: str = "all", downloads_path: str = None) -> (np.ndarray
     -------
     http://www.timeseriesclassification.com/description.php?Dataset=Symbols
     """
-    data, labels = _load_timeseries_classification_data("Symbols", subset, True, downloads_path)
+    data, labels = _load_timeseries_classification_data("Symbols", subset, True, "txt", False, downloads_path)
     return data, labels
 
 
@@ -1189,7 +1394,7 @@ def load_olive_oil(subset: str = "all", downloads_path: str = None) -> (np.ndarr
     -------
     http://www.timeseriesclassification.com/description.php?Dataset=OliveOil
     """
-    data, labels = _load_timeseries_classification_data("OliveOil", subset, True, downloads_path)
+    data, labels = _load_timeseries_classification_data("OliveOil", subset, True, "txt", False, downloads_path)
     return data, labels
 
 
@@ -1215,5 +1420,87 @@ def load_plane(subset: str = "all", downloads_path: str = None) -> (np.ndarray, 
     -------
     http://www.timeseriesclassification.com/description.php?Dataset=Plane
     """
-    data, labels = _load_timeseries_classification_data("Plane", subset, True, downloads_path)
+    data, labels = _load_timeseries_classification_data("Plane", subset, True, "txt", False, downloads_path)
+    return data, labels
+
+
+def load_sony_aibo_robot_surface(subset: str = "all", downloads_path: str = None) -> (np.ndarray, np.ndarray):
+    """
+    Load the Sony AIBO Robot Surface 1 data set. It consists of 621 samples belonging to one of 2 classes.
+    The data set is composed of 20 training and 601 test samples.
+    N=621, d=70, k=2.
+
+    Parameters
+    ----------
+    subset : str
+        can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+
+    Returns
+    -------
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (621 x 70), the labels numpy array (621)
+
+    References
+    -------
+    http://www.timeseriesclassification.com/description.php?Dataset=SonyAIBORobotSurface1
+    """
+    data, labels = _load_timeseries_classification_data("SonyAIBORobotSurface1", subset, True, "txt", False,
+                                                        downloads_path)
+    return data, labels
+
+
+def load_two_patterns(subset: str = "all", downloads_path: str = None) -> (np.ndarray, np.ndarray):
+    """
+    Load the two patterns data set. It consists of 5000 samples belonging to one of 4 classes.
+    The data set is composed of 1000 training and 4000 test samples.
+    N=5000, d=128, k=4.
+
+    Parameters
+    ----------
+    subset : str
+        can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+
+    Returns
+    -------
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (5000 x 128), the labels numpy array (5000)
+
+    References
+    -------
+    http://www.timeseriesclassification.com/description.php?Dataset=TwoPatterns
+    """
+    data, labels = _load_timeseries_classification_data("TwoPatterns", subset, True, "txt", False, downloads_path)
+    return data, labels
+
+
+def load_lsst(subset: str = "all", downloads_path: str = None) -> (np.ndarray, np.ndarray):
+    """
+    Load the LSST data set. It consists of 4925 samples belonging to one of 14 classes.
+    The data set is composed of 2459 training and 2466 test samples.
+    N=4925, d=216, k=14.
+
+    Parameters
+    ----------
+    subset : str
+        can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
+
+    Returns
+    -------
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (4925 x 216), the labels numpy array (4925)
+
+    References
+    -------
+    http://www.timeseriesclassification.com/description.php?Dataset=LSST
+    """
+    data, labels = _load_timeseries_classification_data("LSST", subset, True, "ts", True, downloads_path)
+    # Current labels are: 5, 14, 15, 41, 51, 52, ... -> change to: 0, 1, 2, 3, 4, ...
+    for i, l in enumerate(np.unique(labels)):
+        labels[labels==l] = i
     return data, labels

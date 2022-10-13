@@ -111,14 +111,37 @@ def plot_1d_data(X, labels=None, centers=None, true_labels=None, show_plot=True)
         plt.show()
 
 
-def plot_image(img_data, black_and_white=True, image_shape=None, show_plot=True):
-    assert img_data.ndim <= 3, "Image data can have more than 3 dimensions."
+def plot_image(img_data:np.ndarray, black_and_white:bool=False, image_shape:tuple=None, max_value: float=None, min_value:float=None, show_plot:bool=True):
+    """
+    Expects a color image to occur in the HWC representation (height, width, color channels).
+
+    Parameters
+    ----------
+    img_data : np.ndarray
+    black_and_white : bool
+    image_shape : tuple
+        (height, width) for grayscale images or (height, width, number of channels) for color images
+    max_value : float
+        maximum pixel value, used for min-max normalization. Is often 255, if None the maximum value in the data set will be used (default: None)
+    min_value : float
+        maximum pixel value, used for min-max normalization. Is often 0, if None the minimum value in the data set will be used (default: 255)
+    show_plot : bool
+
+    Returns
+    -------
+
+    """
+    assert img_data.ndim <= 3, "Image data can not have more than 3 dimensions."
+    # Data range must match float between [0..1] or int between [0..255] -> use min-max transform
+    if max_value is None:
+        max_value = np.max(img_data)
+    if min_value is None:
+        min_value = np.min(img_data)
+    img_data = (img_data - min_value) / (max_value - min_value)
+    # Reshape array data
     if img_data.ndim == 1:
-        if image_shape is None:
-            sqrt_of_data = int(math.sqrt(len(img_data)))
-            assert len(img_data) == sqrt_of_data ** 2, "Image shape must be specified or image must be square."
-            image_shape = (sqrt_of_data, sqrt_of_data)
         img_data = img_data.reshape(image_shape)
+    # Plot original image or a black-and-white version
     if black_and_white:
         plt.imshow(img_data, cmap="Greys")
     else:
@@ -202,7 +225,8 @@ def plot_scatter_matrix(X, labels=None, centers=None, true_labels=None, density=
                     # Second plot for actual histogram
                     twin_axis = ax.twinx()
                     twin_axis.yaxis.set_visible(False)
-                    plot_histogram(X[:, i], labels, density, n_bins, show_legend=False, container=twin_axis, show_plot=False)
+                    plot_histogram(X[:, i], labels, density, n_bins, show_legend=False, container=twin_axis,
+                                   show_plot=False)
                 else:
                     # Scatter plot
                     if true_labels is None:

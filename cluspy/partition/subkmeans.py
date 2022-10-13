@@ -36,16 +36,19 @@ def _get_n_clusters(X, max_n_clusters, repetitions, mdl_for_noisespace,
 
 class SubKmeans(BaseEstimator, ClusterMixin):
 
-    def __init__(self, n_clusters, mdl_for_noisespace=False, outliers=False, max_iter=300, random_state=None):
+    def __init__(self, n_clusters, mdl_for_noisespace=False, outliers=False, max_iter=300,
+                 threshold_negative_eigenvalue= -1e-7, random_state=None):
         self.n_clusters = [n_clusters, 1]
         self.mdl_for_noisespace = mdl_for_noisespace
         self.outliers = outliers
         self.max_iter = max_iter
+        self.threshold_negative_eigenvalue = threshold_negative_eigenvalue
         self.random_state = random_state
 
     def fit(self, X, y=None):
         nrkmeans = NrKmeans(self.n_clusters, mdl_for_noisespace=self.mdl_for_noisespace, outliers=self.outliers,
-                            max_iter=self.max_iter, random_state=self.random_state)
+                            max_iter=self.max_iter, threshold_negative_eigenvalue=self.threshold_negative_eigenvalue,
+                            random_state=self.random_state)
         nrkmeans.fit(X)
         if len(nrkmeans.P) == 2:
             self.V = nrkmeans.V[:, np.r_[nrkmeans.P[0], nrkmeans.P[1]]]

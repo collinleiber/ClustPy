@@ -20,11 +20,10 @@ import cluspy.utils._mdlcosts as mdl
 from cluspy.utils._wrapper_methods import _kmeans_plus_plus as kpp
 
 _ACCEPTED_NUMERICAL_ERROR = 1e-6
-_NOISE_SPACE_THRESHOLD = -1e-7
 
 
-def _nrkmeans(X, n_clusters, V, m, P, centers, mdl_for_noisespace, outliers, max_iter, max_distance, precision,
-              random_state, debug):
+def _nrkmeans(X, n_clusters, V, m, P, centers, mdl_for_noisespace, outliers, max_iter, threshold_negative_eigenvalue,
+              max_distance, precision, random_state, debug):
     """
     Execute the nrkmeans algorithm. The algorithm will search for the optimal cluster subspaces and assignments
     depending on the input number of clusters and subspaces. The number of subspaces will automatically be traced by the
@@ -78,6 +77,7 @@ def _nrkmeans(X, n_clusters, V, m, P, centers, mdl_for_noisespace, outliers, max
             for j in range(i + 1, subspaces):
                 # Do rotation calculations
                 P_1_new, P_2_new, V_new = _update_rotation(X, V, i, j, n_clusters, P, scatter_matrices, labels,
+                                                           threshold_negative_eigenvalue,
                                                            mdl_for_noisespace, outliers, n_outliers,
                                                            max_distance, precision)
                 # Update V, m, P
@@ -296,8 +296,8 @@ def _remove_empty_cluster(n_clusters_subspace, centers_subspace, scatter_matrice
     return n_clusters_subspace, centers_subspace, scatter_matrices_subspace, labels_subspace
 
 
-def _update_rotation(X, V, first_index, second_index, n_clusters, P, scatter_matrices, labels, mdl_for_noisespace,
-                     outliers, n_outliers, max_distance, precision):
+def _update_rotation(X, V, first_index, second_index, n_clusters, P, scatter_matrices, labels, threshold_negative_eigenvalue,
+                     mdl_for_noisespace, outliers, n_outliers, max_distance, precision):
     """
     Update the rotation of the subspaces. Updates V and m and P for the input subspaces.
     :param X: input data
@@ -356,7 +356,7 @@ def _update_rotation(X, V, first_index, second_index, n_clusters, P, scatter_mat
                                                         scatter_matrices, labels, outliers, n_outliers,
                                                         max_distance, precision)
         else:
-            n_negative_e = len(e[e < _NOISE_SPACE_THRESHOLD])
+            n_negative_e = len(e[e < threshold_negative_eigenvalue])
             P_1_new, P_2_new = _update_projections(P_combined, n_negative_e)
     else:
         P_1_new, P_2_new = _update_projections(P_combined, n_negative_e)
@@ -733,7 +733,8 @@ def _get_precision(X):
 
 class NrKmeans(BaseEstimator, ClusterMixin):
     def __init__(self, n_clusters, V=None, m=None, P=None, input_centers=None, mdl_for_noisespace=False, outliers=False,
-                 max_iter=300, max_distance=None, precision=None, random_state=None, debug=False):
+                 max_iter=300, threshold_negative_eigenvalue = -1e-7, max_distance=None, precision=None,
+                 random_state=None, debug=False):
         """
         Create new NrKmeans instance. Gives the opportunity to use the fit() method to cluster a dataset.
         :param n_clusters: list containing number of clusters for each subspace_nr
@@ -750,6 +751,7 @@ class NrKmeans(BaseEstimator, ClusterMixin):
         self.input_n_clusters = n_clusters.copy()
         self.max_iter = max_iter
         self.random_state = random_state
+        self.threshold_negative_eigenvalue = threshold_negative_eigenvalue
         self.mdl_for_noisespace = mdl_for_noisespace
         self.outliers = outliers
         self.max_distance = max_distance
@@ -773,6 +775,7 @@ class NrKmeans(BaseEstimator, ClusterMixin):
                                                                            self.P, self.input_centers,
                                                                            self.mdl_for_noisespace,
                                                                            self.outliers, self.max_iter,
+                                                                           self.threshold_negative_eigenvalue,
                                                                            self.max_distance, self.precision,
                                                                            self.random_state, self.debug)
         # Update class variables

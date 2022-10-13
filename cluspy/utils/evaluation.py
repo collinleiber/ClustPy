@@ -26,8 +26,9 @@ def _preprocess_dataset(X, preprocess_methods, preprocess_params):
     return X_processed
 
 
-def evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=None, gt=None, repetitions=10, add_average=True,
-                     add_std=True, add_runtime=True, add_n_clusters=False, save_path=None, ignore_algorithms=[]):
+def evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=None, gt=None, repetitions=10,
+                     aggregation_functions=[np.mean, np.std],
+                     add_runtime=True, add_n_clusters=False, save_path=None, ignore_algorithms=[]):
     assert evaluation_metrics is not None or add_runtime or add_n_clusters, \
         "Either evaluation metrics must be defined or add_runtime/add_n_clusters must be True"
     if type(evaluation_algorithms) is not list:
@@ -87,13 +88,9 @@ def evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=None, gt=None,
                     df.at[rep, (eval_algo.name, "runtime")] = runtime
                     print("-- runtime: {0}".format(runtime))
                 if add_n_clusters:
-                    all_n_clusters = _get_n_clusters_from_algo(algo_obj)
-                    n_clusters = all_n_clusters if eval_algo.label_column is None else all_n_clusters[
-                        eval_algo.label_column]
+                    n_clusters = _get_n_clusters_from_algo(algo_obj)
                     df.at[rep, (eval_algo.name, "n_clusters")] = n_clusters
                     print("-- n_clusters: {0}".format(n_clusters))
-                labels = algo_obj.labels_ if eval_algo.label_column is None else algo_obj.labels_[:,
-                                                                                 eval_algo.label_column]
                 # Get result of all metrics
                 if evaluation_metrics is not None:
                     for eval_metric in evaluation_metrics:
@@ -102,10 +99,10 @@ def evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=None, gt=None,
                             # Check if metric uses ground truth (e.g. NMI, ACC, ...)
                             if eval_metric.use_gt:
                                 assert gt is not None, "Ground truth can not be None if it is used for the chosen metric"
-                                result = eval_metric.method(gt, labels, **eval_metric.params)
+                                result = eval_metric.method(gt, algo_obj.labels_, **eval_metric.params)
                             else:
                                 # Metric does not use ground truth (e.g. Silhouette, ...)
-                                result = eval_metric.method(X, labels, **eval_metric.params)
+                                result = eval_metric.method(X, algo_obj.labels_, **eval_metric.params)
                             df.at[rep, (eval_algo.name, eval_metric.name)] = result
                             print("-- {0}: {1}".format(eval_metric.name, result))
                         except Exception as e:
@@ -119,25 +116,24 @@ def evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=None, gt=None,
                         df.at[np.arange(1, repetitions), (eval_algo.name, "n_clusters")] = df.at[
                             0, (eval_algo.name, "n_clusters")]
                     for eval_metric in evaluation_metrics:
-                        df.at[np.arange(1,repetitions), (eval_algo.name, eval_metric.name)] = df.at[0, (eval_algo.name, eval_metric.name)]
+                        df.at[np.arange(1, repetitions), (eval_algo.name, eval_metric.name)] = df.at[
+                            0, (eval_algo.name, eval_metric.name)]
                     break
         except Exception as e:
             print("Algorithm {0} raised an exception and will be skipped".format(eval_algo.name))
             print(e)
         if automatically_set_n_clusters:
             eval_algo.params["n_clusters"] = None
-    if add_average:
-        df.loc["avg"] = np.mean(df.values, axis=0)
-    if add_std:
-        df.loc["std"] = np.std(df.values, axis=0)
+    for agg in aggregation_functions:
+        df.loc[agg.__name__] = agg(df.values, axis=0)
     if save_path is not None:
         df.to_csv(save_path)
     return df
 
 
 def evaluate_multiple_datasets(evaluation_datasets, evaluation_algorithms, evaluation_metrics=None, repetitions=10,
-                               add_average=True, add_std=True, add_runtime=True, add_n_clusters=False, save_path=None,
-                               save_intermediate_results=False):
+                               aggregation_functions=[np.mean, np.std], add_runtime=True, add_n_clusters=False,
+                               save_path=None, save_intermediate_results=False):
     """
     Example:
     from cluspy.evaluation import *
@@ -201,7 +197,7 @@ def evaluate_multiple_datasets(evaluation_datasets, evaluation_algorithms, evalu
                                                                                               eval_data.name,
                                                                                               save_path.split(".")[1])
             df = evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=evaluation_metrics, gt=gt,
-                                  repetitions=repetitions, add_average=add_average, add_std=add_std,
+                                  repetitions=repetitions, aggregation_functions=aggregation_functions,
                                   add_runtime=add_runtime, add_n_clusters=add_n_clusters, save_path=inner_save_path,
                                   ignore_algorithms=eval_data.ignore_algorithms)
             df_list.append(df)
@@ -216,15 +212,15 @@ def evaluate_multiple_datasets(evaluation_datasets, evaluation_algorithms, evalu
 
 class EvaluationDataset():
 
-    def __init__(self, name, data, gt_columns=None, file_reader_params={}, preprocess_methods=None, preprocess_params={},
-                 ignore_algorithms=[]):
+    def __init__(self, name, data, gt_columns=None, file_reader_params={}, preprocess_methods=None,
+                 preprocess_params={}, ignore_algorithms=[]):
         assert type(name) is str, "name must be a string"
         self.name = name
         assert type(data) is np.ndarray or type(data) is str or callable(data), "data must be a numpy array, a string " \
                                                                                 "containing the path to a data file or a " \
                                                                                 "function returning a data and a labels array"
         self.data = data
-        assert gt_columns is None or type(gt_columns) is int or type(gt_columns) is list or type(gt_columns) is\
+        assert gt_columns is None or type(gt_columns) is int or type(gt_columns) is list or type(gt_columns) is \
                np.ndarray, "gt_columns must be an int, a list, a numpy array or None"
         self.gt_columns = gt_columns
         assert type(file_reader_params) is dict, "file_reader_params must be a dict"
@@ -254,7 +250,7 @@ class EvaluationMetric():
 
 class EvaluationAlgorithm():
 
-    def __init__(self, name, obj, params={}, deterministic=False, preprocess_methods=None, preprocess_params={}, label_column=None):
+    def __init__(self, name, obj, params={}, deterministic=False, preprocess_methods=None, preprocess_params={}):
         assert type(name) is str, "name must be a string"
         self.name = name
         assert type(obj) is type, "name must be Algorithm class"
@@ -269,5 +265,3 @@ class EvaluationAlgorithm():
         assert type(preprocess_params) is dict or type(
             preprocess_methods) is list, "preprocess_params must be a dict or a list of dicts"
         self.preprocess_params = preprocess_params
-        assert label_column is None or type(label_column) is int, "label_column must be None or int"
-        self.label_column = label_column

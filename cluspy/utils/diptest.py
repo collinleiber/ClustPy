@@ -20,12 +20,11 @@ def dip_test(X, just_dip=True, is_data_sorted=False, return_gcm_lcm_mn_mj=False,
     assert X.ndim == 1, "Data must be 1-dimensional for the dip-test. Your shape:{0}".format(X.shape)
     assert just_dip or is_data_sorted == True, "Data must be sorted if modal interval and/or modal triangle should be returned (else indices will not match)"
     assert not return_gcm_lcm_mn_mj or not just_dip, "If GCM, LCM, mn and mj should be returned, 'just_dip' must be False"
-    N = len(X)
     if not is_data_sorted:
         X = np.sort(X)
-    if N < 4 or X[0] == X[-1]:
+    if X.shape[0] < 4 or X[0] == X[-1]:
         d = 0.0
-        return d if just_dip else (d, (0, N - 1), None)
+        return d if just_dip else (d, (0, X.shape[0] - 1), None)
     if use_c:
         try:
             dip_value, modal_interval, modal_triangle, _, _, mn, mj = _dip_c_port(X, debug)
@@ -76,7 +75,7 @@ def _dip_python_port(X, is_data_sorted=False, debug=False):
     modaltriangle_i2 = None
     modaltriangle_i3 = None
 
-    # Establish the indices mn[1..n] over which combination is necessary for the convex MINORANT (GCM) fit.
+    # Establish the indices mn[0..n-1] over which combination is necessary for the convex MINORANT (GCM) fit.
     mn = np.zeros(N, dtype=int)
     mn[0] = 0
     for j in range(1, N):
@@ -87,7 +86,7 @@ def _dip_python_port(X, is_data_sorted=False, debug=False):
             if mnj == 0 or (X[j] - X[mnj]) * (mnj - mnmnj) < (X[mnj] - X[mnmnj]) * (j - mnj):
                 break
             mn[j] = mnmnj
-    # Establish the indices   mj[1..n]  over which combination is necessary for the concave MAJORANT (LCM) fit.
+    # Establish the indices   mj[0..n-1]  over which combination is necessary for the concave MAJORANT (LCM) fit.
     mj = np.zeros(N, dtype=int)
     mj[N - 1] = N - 1
     for k in range(N - 2, -1, -1):
@@ -287,7 +286,7 @@ def _get_complete_gcm_lcm(mn, mj, modal_interval):
     low = modal_interval[0]
     high = modal_interval[1]
     gcm = np.zeros(mn.shape[0], dtype=np.int32)
-    lcm = np.zeros(mn.shape[0], dtype=np.int32)
+    lcm = np.zeros(mj.shape[0], dtype=np.int32)
     # Collect the gcm points from 0 to the upper end of the modal interval
     i = 0
     gcm[0] = high
@@ -298,7 +297,7 @@ def _get_complete_gcm_lcm(mn, mj, modal_interval):
     # Collect the lcm points from the lower end of the modal interval to the last point
     i = 0
     lcm[i] = low
-    while lcm[i] < X.shape[0] - 1:
+    while lcm[i] < mj.shape[0] - 1:
         lcm[i + 1] = mj[lcm[i]]
         i += 1
     lcm = lcm[:i + 1]
@@ -338,12 +337,11 @@ def dip_pval_gradient(X, x_proj, sorted_indices, modal_triangle, dip_value):
         return np.zeros(X.shape[1])
     dip_grad = dip_gradient(X, x_proj, sorted_indices, modal_triangle)
 
-    b = 17.34238413 * np.sqrt(X.shape[1]) + 12.09073478
-    exponent = np.exp(-b * dip_value + 6.53)
-    quotient = (0.648 * (1 + 1.58 * exponent) ** (1 / 1.58) + 0.352 * (1 + 0.18 * exponent) ** (1/0.18)) ** 2
-    grad_factor = (0.648 * (1 + 1.58 * exponent) ** (1 / 1.58 - 1) + 0.352 * (1 + 0.18 * exponent) ** (1/0.18-1)) / quotient
+    b = 17.30784022 * np.sqrt(X.shape[0]) + 12.04917889
+    exponent = np.exp(-b * dip_value + 6.5)
+    quotient = (0.6 * (1 + 1.6 * exponent) ** (0.625) + 0.4 * (1 + 0.2 * exponent) ** 5) ** 2
+    grad_factor = (0.6 * (1 + 1.6 * exponent) ** (-0.375)  + 0.4 * (1 + 0.2 * exponent) ** 4) / quotient
     grad_factor *= exponent * (-b)
-
     pval_grad = grad_factor * dip_grad
     return pval_grad
 
@@ -360,7 +358,10 @@ def plot_dip(X, is_data_sorted=False, dip_value=None, modal_interval=None, modal
     assert X.ndim == 1, "Data must be 1-dimensional for the dip-test. Your shape:{0}".format(X.shape)
     N = len(X)
     if not is_data_sorted:
-        X = np.sort(X)
+        argsorted_X = np.argsort(X)
+        X = X[argsorted_X]
+        if histogram_labels is not None:
+            histogram_labels = histogram_labels[argsorted_X]
     if add_histogram:
         # Add histogram at the top of the plot (uses plot_histogram from cluspy.utils.plots)
         fig, (ax1, ax2) = plt.subplots(2, sharex=True, gridspec_kw={'height_ratios': height_ratio})
@@ -431,9 +432,9 @@ def _dip_pval_table(dip_value, n_points):
 
 
 def _dip_pval_function(dip_value, n_points):
-    b = 17.34238413 * np.sqrt(n_points) + 12.09073478
-    exponent = np.exp(-b * dip_value + 6.53)
-    pval = 1 - 1 / (0.648 * (1 + 1.58 * exponent) ** (1 / 1.58) + 0.352 * (1 + 0.18 * exponent) ** (1/0.18))
+    b = 17.30784022 * np.sqrt(n_points) + 12.04917889
+    exponent = np.exp(-b * dip_value + 6.5)
+    pval = 1 - 1 / (0.6 * (1 + 1.6 * exponent) ** (0.625) + 0.4 * (1 + 0.2 * exponent) ** 5)
     return pval
 
 

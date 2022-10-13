@@ -1,3 +1,8 @@
+"""
+@authors:
+Lukas Miklautz
+"""
+
 import torch
 import torch.nn.functional as F
 from cluspy.deep._utils import window

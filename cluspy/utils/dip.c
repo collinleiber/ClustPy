@@ -73,7 +73,7 @@ double fast_diptest(const double x[], int *low_high, int *modaltriangle,
     double dipvalue = 0.;
     if (n < 4 || x[n - 1] == x[0])      goto L_END;
 
-/* Establish the indices   mn[1..n]  over which combination is necessary
+/* Establish the indices   mn[0..n-1]  over which combination is necessary
    for the convex MINORANT (GCM) fit.
 */
     mn[0] = 0;
@@ -89,7 +89,7 @@ double fast_diptest(const double x[], int *low_high, int *modaltriangle,
     }
     }
 
-/* Establish the indices   mj[1..n]  over which combination is necessary
+/* Establish the indices   mj[0..n-1]  over which combination is necessary
    for the concave MAJORANT (LCM) fit.
 */
     mj[n - 1] = n - 1;
