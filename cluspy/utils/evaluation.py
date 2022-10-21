@@ -122,6 +122,7 @@ def evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=None, gt=None,
         except Exception as e:
             print("Algorithm {0} raised an exception and will be skipped".format(eval_algo.name))
             print(e)
+        # Prepare eval_algo params for next dataset
         if automatically_set_n_clusters:
             eval_algo.params["n_clusters"] = None
     for agg in aggregation_functions:

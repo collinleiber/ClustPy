@@ -1,6 +1,6 @@
 """
 @authors:
-Lukas Miklautz
+Dominik Mautz
 """
 
 import torch
