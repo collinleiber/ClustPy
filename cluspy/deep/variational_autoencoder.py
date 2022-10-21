@@ -74,7 +74,7 @@ class VariationalAutoencoder(FlexibleAutoencoder):
 
     def __init__(self, layers: list, batch_norm: bool = False, dropout: float = None,
                  activation_fn: torch.nn.Module = torch.nn.LeakyReLU,
-                 bias: bool = True, decoder_layers=None, decoder_output_fn: torch.nn.Module = torch.nn.Sigmoid):
+                 bias: bool = True, decoder_layers: list = None, decoder_output_fn: torch.nn.Module = torch.nn.Sigmoid):
         super(VariationalAutoencoder, self).__init__(layers, batch_norm, dropout, activation_fn, bias,
                                                      decoder_layers, decoder_output_fn)
         # Get size of embedding from last dimension of layers
@@ -131,16 +131,19 @@ class VariationalAutoencoder(FlexibleAutoencoder):
         reconstruction = self.decode(z)
         return z, q_mean, q_logvar, reconstruction
 
-    def loss(self, batch_data: torch.Tensor, loss_fn: torch.nn.modules.loss._Loss, beta: float = 1) -> torch.Tensor:
+    def loss(self, batch: list, loss_fn: torch.nn.modules.loss._Loss, device: torch.device,
+             beta: float = 1) -> torch.Tensor:
         """
         Calculate the loss of a single batch of data.
 
         Parameters
         ----------
-        batch_data : torch.Tensor
-            the samples
+        batch: list
+            the different parts of a dataloader (id, samples, ...)
         loss_fn : torch.nn.modules.loss._Loss
             loss function to be used for reconstruction
+        device : torch.device
+            device to be trained on
         beta : float
             weighting of the KL loss (default: 1)
 
@@ -149,6 +152,8 @@ class VariationalAutoencoder(FlexibleAutoencoder):
         total_loss: torch.Tensor
             the reconstruction loss of the input sample
         """
+        assert type(batch) is list, "batch must come from a dataloader and therefore be of type list"
+        batch_data = batch[1].to(device)
         _, q_mean, q_logvar, reconstruction = self.forward(batch_data)
         rec_loss = loss_fn(reconstruction, batch_data)
 
