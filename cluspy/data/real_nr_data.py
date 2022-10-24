@@ -1,6 +1,6 @@
 import numpy as np
 import os
-from cluspy.data.real_world_data import _get_download_dir, _download_file
+from cluspy.data._utils import _get_download_dir, _download_file
 import tarfile
 import re
 from sklearn.feature_extraction.text import TfidfTransformer, CountVectorizer

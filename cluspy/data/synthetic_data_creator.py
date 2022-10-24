@@ -106,10 +106,9 @@ def create_nr_data(n_samples: int = 1000, n_clusters: tuple = (3, 3, 1), subspac
         n_samples = [n_samples] + [np.sum(n_samples) + n_outliers[0] - n_outliers[i] for i in range(1, len(n_clusters))]
     assert len(n_clusters) == len(
         n_samples), "inconsistent number of subspaces between n_clusters and n_samples"
-    overall_samples = (n_samples[0] if type(n_samples[0]) is int else np.sum(n_samples[0])) + n_outliers[0]
-    assert all([(n_samples[i] + n_outliers[i]) == overall_samples if type(n_samples[i]) is int else (np.sum(
-        n_samples[i]) + n_outliers[i]) == overall_samples for i in range(len(
-        n_clusters))]), "samples in each subspace must be equal (sum of cluster objects and outliers)"
+    overall_samples = np.sum(n_samples[0]) + n_outliers[0]
+    assert all([np.sum(n_samples[i]) + n_outliers[i] == overall_samples for i in
+                range(len(n_clusters))]), "samples in each subspace must be equal (sum of cluster objects and outliers)"
     assert all([type(n_samples[i]) is int or type(n_samples[i]) is np.int32 or n_clusters[i] == len(
         n_samples[i]) for i in range(len(n_clusters))]), "number of clusters in n_samples does not match n_clusters"
     # Transform cluster_features to list
