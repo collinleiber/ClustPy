@@ -6,7 +6,7 @@ from .dipmeans import DipMeans
 from .projected_dipmeans import ProjectedDipMeans
 from .dipext import DipExt, DipInit
 from .skinnydip import SkinnyDip, UniDip
-from .subkmeans import SubKmeans, MDLSubKmeans
+from .subkmeans import SubKmeans
 from .ldakmeans import LDAKmeans
 
 __all__ = ['GMeans',
@@ -20,5 +20,4 @@ __all__ = ['GMeans',
            'SkinnyDip',
            'UniDip',
            'SubKmeans',
-           'MDLSubKmeans',
            'LDAKmeans']

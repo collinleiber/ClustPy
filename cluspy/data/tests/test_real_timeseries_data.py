@@ -1,5 +1,6 @@
 from cluspy.data.tests.test_real_world_data import _helper_test_data_loader
-from cluspy.data.real_timeseries_data import *
+from cluspy.data import load_motestrain, load_proximal_phalanx_outline, load_diatom_size_reduction, load_symbols, \
+    load_olive_oil, load_plane, load_sony_aibo_robot_surface, load_two_patterns, load_lsst
 from pathlib import Path
 import os
 import shutil

@@ -23,10 +23,6 @@ def _dip_deck(X: np.ndarray, n_clusters_start: int, dip_merge_threshold: float, 
               max_cluster_size_diff_factor: float, debug: bool) -> (np.ndarray, int, np.ndarray, torch.nn.Module):
     """
     Start the actual DipDECK clustering procedure on the input data set.
-    First an autoencoder (AE) will be trained (will be skipped if input autoencoder is given).
-    Afterwards, KMeans identifies the initial clusters using an overestimated number of clusters.
-    Last, the AE will be optimized using the DipDECK loss function.
-    If any Dip-value exceeds the dip_merge_threshold, the corresponding clusters will be merged.
 
     Parameters
     ----------
@@ -495,6 +491,10 @@ def _get_dip_matrix(embedded_data: np.ndarray, embedded_centers_cpu: np.ndarray,
 class DipDECK(BaseEstimator, ClusterMixin):
     """
     The Deep Embedded Clustering with k-Estimation (DipDECK) algorithm.
+    First, an autoencoder (AE) will be trained (will be skipped if input autoencoder is given).
+    Afterwards, KMeans identifies the initial clusters using an overestimated number of clusters.
+    Last, the AE will be optimized using the DipDECK loss function.
+    If any Dip-value exceeds the dip_merge_threshold, the corresponding clusters will be merged.
 
     Parameters
     ----------

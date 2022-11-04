@@ -21,9 +21,6 @@ def _dec(X: np.ndarray, n_clusters: int, alpha: float, batch_size: int, pretrain
          cluster_loss_weight: float) -> (np.ndarray, np.ndarray, np.ndarray, np.ndarray, torch.nn.Module):
     """
     Start the actual DEC clustering procedure on the input data set.
-    First an autoencoder (AE) will be trained (will be skipped if input autoencoder is given).
-    Afterwards, KMeans identifies the initial clusters.
-    Last, the AE will be optimized using the DEC loss function from the _DEC_Module.
 
     Parameters
     ----------
@@ -301,6 +298,9 @@ class _DEC_Module(torch.nn.Module):
 class DEC(BaseEstimator, ClusterMixin):
     """
     The Deep Embedded Clustering (DEC) algorithm.
+    First, an autoencoder (AE) will be trained (will be skipped if input autoencoder is given).
+    Afterwards, KMeans identifies the initial clusters.
+    Last, the AE will be optimized using the DEC loss function.
 
     Parameters
     ----------
@@ -354,9 +354,8 @@ class DEC(BaseEstimator, ClusterMixin):
 
     References
     ----------
-    Xie, Junyuan, Ross Girshick, and Ali Farhadi. "Unsupervised
-    deep embedding for clustering analysis." International
-    conference on machine learning. 2016.
+    Xie, Junyuan, Ross Girshick, and Ali Farhadi. "Unsupervised deep embedding for clustering analysis."
+    International conference on machine learning. 2016.
     """
 
     def __init__(self, n_clusters: int, alpha: float = 1.0, batch_size: int = 256, pretrain_learning_rate: float = 1e-3,
@@ -468,8 +467,7 @@ class IDEC(DEC):
 
     References
     ----------
-    Guo, Xifeng, et al. "Improved deep embedded clustering with
-    local structure preservation." IJCAI. 2017.
+    Guo, Xifeng, et al. "Improved deep embedded clustering with local structure preservation." IJCAI. 2017.
     """
 
     def __init__(self, n_clusters: int, alpha: float = 1.0, batch_size: int = 256, pretrain_learning_rate: float = 1e-3,

@@ -85,6 +85,8 @@ def _load_timeseries_classification_data(dataset_name: str, subset: str, labels_
             else:
                 data = test_dataset[:, 1:]
                 labels = test_dataset[:, 0]
+    # Convert labels to int32 format
+    labels = labels.astype(np.int32)
     if labels_minus_one:
         # Convert labels from 1,... to 0,...
         labels -= 1

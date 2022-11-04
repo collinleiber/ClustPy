@@ -30,6 +30,8 @@ def _load_nr_data(file_name: str, n_labels: int) -> (np.ndarray, np.ndarray):
     dataset = np.genfromtxt(path, delimiter=",")
     data = dataset[:, n_labels:]
     labels = dataset[:, :n_labels]
+    # Convert labels to int32 format
+    labels = labels.astype(np.int32)
     return data, labels
 
 
@@ -174,7 +176,7 @@ def load_cmu_faces(downloads_path: str = None) -> (np.ndarray, np.ndarray):
             # Save data and labels
             data_list.append(image_data_vector)
             label_list.append(label_data)
-    labels = np.array(label_list)
+    labels = np.array(label_list, dtype=np.int32)
     data = np.array(data_list)
     return data, labels
 
@@ -245,7 +247,7 @@ def load_webkb(use_universities: tuple = ("cornell", "texas", "washington", "wis
                         for line in lines:
                             output.write(line)
     texts = []
-    labels = np.empty((0, 2), dtype=np.int)
+    labels = np.empty((0, 2), dtype=np.int32)
     hmtl_tags = re.compile(r'<[^>]+>')
     head_tags = re.compile(r'MIME-Version:[:,./\-\w\s]+<html>')
     number_tags = re.compile(r'\d*')

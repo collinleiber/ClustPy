@@ -465,9 +465,6 @@ def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size:
     """
     Start the actual DipEncoder procedure on the input data set.
     If labels_gt is None this method will act as a clustering algorithm else it will only be used to learn an embedding.
-    First an autoencoder (AE) will be trained (will be skipped if input autoencoder is given).
-    Afterwards, KMeans identifies the initial clusters.
-    Last, the AE will be optimized using the DipEncoder loss function.
 
     Parameters
     ----------
@@ -621,6 +618,9 @@ class DipEncoder(BaseEstimator, ClusterMixin):
     """
     The DipEncoder.
     Can be used either as a clustering procedure if no ground truth labels are given or as a supervised dimensionality reduction technique.
+    First, an autoencoder (AE) will be trained (will be skipped if input autoencoder is given).
+    Afterwards, KMeans identifies the initial clusters.
+    Last, the AE will be optimized using the DipEncoder loss function.
 
     Parameters
     ----------

@@ -1,5 +1,5 @@
 from cluspy.data.tests.test_real_world_data import _helper_test_data_loader
-from cluspy.data.real_nr_data import *
+from cluspy.data import load_aloi_small, load_fruit, load_nrletters, load_stickfigures, load_cmu_faces, load_webkb
 from pathlib import Path
 import os
 import shutil

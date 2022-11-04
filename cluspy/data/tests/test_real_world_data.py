@@ -1,5 +1,10 @@
-from cluspy.data.real_world_data import *
+from cluspy.data import load_iris, load_wine, load_breast_cancer, load_newsgroups, load_reuters, load_banknotes, \
+    load_spambase, load_seeds, load_skin, load_soybean_small, load_soybean_large, load_optdigits, load_pendigits, \
+    load_ecoli, load_htru2, load_letterrecognition, load_har, load_statlog_shuttle, load_mice_protein, \
+    load_user_knowledge, load_breast_tissue, load_forest_types, load_dermatology, load_multiple_features, \
+    load_statlog_australian_credit_approval, load_breast_cancer_wisconsin_original, load_semeion
 from pathlib import Path
+import numpy as np
 import os
 import shutil
 import pytest
@@ -17,18 +22,40 @@ def run_around_tests():
     shutil.rmtree(TEST_DOWNLOAD_PATH)
 
 
-def _helper_test_data_loader(data, labels, N, d, k):
+def _helper_test_data_loader(data, labels, N, d, k, outliers=False):
+    """
+    Test loading of datasets.
+
+    Parameters
+    ----------
+    data : np.ndarray
+        The data array
+    labels : np.ndarray
+        The labels array
+    N : int
+        The number of data objects
+    d : int
+        The dimensionality of the dataset
+    k : int
+        The number of clusters. Should be a list for datasets with multiple labelings
+    outliers : bool
+        Defines if outliers are contained in the dataset. Should be a list for datasets with multiple labelings (default: False)
+    """
     assert data.shape == (N, d)
+    assert labels.dtype == np.int32
     if type(k) is int:
         assert labels.shape == (N,)
-        assert np.array_equal(np.unique(labels), range(k))
+        assert np.array_equal(np.unique(labels), range(k) if not outliers else range(-1, k))
     else:
+        if type(outliers) is bool:
+            outliers = [outliers] * len(k)
         # In case of datasets for alternative clusterings
         assert labels.shape == (N, len(k))
         unique_labels = [np.unique(labels[:, i]) for i in range(labels.shape[1])]
-        assert [len(l) for l in unique_labels] == k  # Checks that number of labels is correct
-        for ul in unique_labels:
-            assert np.array_equal(ul, range(len(ul)))  # Checks that labels go from 0 to k
+        assert [len(l) for l in unique_labels] == [k[i] if not outliers[i] else k[i] + 1 for i in
+                                                   range(labels.shape[1])]  # Checks that number of labels is correct
+        for i, ul in enumerate(unique_labels):
+            assert np.array_equal(ul, range(k[i]) if not outliers[i] else range(-1, k[i]))  # Checks that labels go from 0 to k
 
 
 def test_load_iris():

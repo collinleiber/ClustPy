@@ -1,9 +1,6 @@
 """
-Ashour, Wesam, and Saad Sunoallah. "Multi density DBSCAN."
-International Conference on Intelligent Data Engineering and
-Automated Learning. Springer, Berlin, Heidelberg, 2011.
-
-@authors Collin Leiber
+@authors:
+Collin Leiber
 """
 
 from scipy.spatial.distance import squareform, pdist
@@ -11,7 +8,32 @@ import numpy as np
 from sklearn.base import BaseEstimator, ClusterMixin
 
 
-def _multi_density_dbscan(X, k, var, min_cluster_size, always_sort_densities):
+def _multi_density_dbscan(X: np.ndarray, k: int, var: float, min_cluster_size: int, always_sort_densities: bool) -> (
+        int, np.ndarray, list):
+    """
+    Start the actual Multiple Density DBSCAN clustering procedure on the input data set.
+
+    Parameters
+    ----------
+    X : np.ndarray
+        the given data set
+    k : int
+        the number of neighbors to consider
+    var : float
+        Defines the factor that the density of a point may deviate from the average cluster density
+    min_cluster_size : int
+        The minimum cluster size (if a cluster is smaller, all contained points will be labeled as noise)
+    always_sort_densities : bool
+        If true, the neighbors in the current queue will be sorted every time new points are added to the queue (the original paper does not specify this behaviour)
+
+    Returns
+    -------
+    tuple : (int, np.ndarray, list)
+        The identified number of clusters
+        The cluster labels
+        The final cluster densities
+    """
+    assert k <= X.shape[0], "The number of nearest neighbors k can not be larger than the number of data points"
     assert var >= 1, "var must be >= 1"
     assert min_cluster_size > 1, "min_cluster_size must be > 1"
     # Calculate distance matrix
@@ -42,7 +64,35 @@ def _multi_density_dbscan(X, k, var, min_cluster_size, always_sort_densities):
     return n_clusters, labels, cluster_densities
 
 
-def _gather(p1, c_id, densities, knns, labels, var, always_sort_densities):
+def _gather(p1: int, c_id: int, densities: list, knns: np.ndarray, labels: np.ndarray, var: float,
+            always_sort_densities: bool) -> (list, float):
+    """
+    Expand the current cluster (consisting of a single most dense point).
+    Check each added point's neighbors to see if their density is low enough to add them the cluster.
+
+    Parameters
+    ----------
+    p1 : int
+        The id of the starting point of the cluster (most dense point)
+    c_id : int
+        The cluster id of the current cluster
+    densities : list
+        The densities of all points
+    knns : np.ndarray
+        The k-nearest neighbors of all points
+    labels : np.ndarray
+        The current labels
+    var : float
+        Defines the factor that the density of a point may deviate from the average cluster density
+    always_sort_densities : bool
+        If true, the neighbors in the current queue will be sorted every time new points are added to the queue (the original paper does not specify this behaviour)
+
+    Returns
+    -------
+    tuple : (list, float)
+        The ids of the points in this cluster
+        The density of the cluster
+    """
     # Add point to cluster and assign Label
     cluster_points = [p1]
     labels[p1] = c_id
@@ -70,20 +120,83 @@ def _gather(p1, c_id, densities, knns, labels, var, always_sort_densities):
     return cluster_points, cluster_density
 
 
-def _sort_neighbors_by_densities(neighbors, densities):
+def _sort_neighbors_by_densities(neighbors: list, densities: list) -> list:
+    """
+    Sort the available neighbors by their densities. Sort in ascending order.
+
+    Parameters
+    ----------
+    neighbors : list
+        the ids of the neighbors
+    densities : list
+        the densities
+
+    Returns
+    -------
+    neighbors : list
+        the ids of the neighbors sorted by densities
+    """
     neighbors = sorted(neighbors, key=lambda x: densities[x])
     return neighbors
 
 
 class MultiDensityDBSCAN(BaseEstimator, ClusterMixin):
+    """
+    The Multi Density DBSCAN algorithm.
+    First, the densities of all data points will be calculated.
+    Afterwards, clusters will be expanded starting with the most dense point.
+    Density is defined as the average distance to the k-nearest neighbors.
 
-    def __init__(self, k, var=2.5, min_cluster_size=2, always_sort_densities=False):
+    Parameters
+    ----------
+    k : int
+        The number of nearest neighbors (default: 15)
+    var : float
+        Defines the factor that the density of a point may deviate from the average cluster density (default: 2.5)
+    min_cluster_size : int
+        The minimum cluster size (if a cluster is smaller, all contained points will be labeled as noise) (default: 2)
+    always_sort_densities : bool
+        If true, the neighbors in the current queue will be sorted every time new points are added to the queue (the original paper does not specify this behaviour) (default: True)
+
+    Attributes
+    ----------
+    n_clusters_ : int
+        The identified number of clusters
+    labels_ : np.ndarray
+        The final labels
+    cluster_densities_ : list
+        The final cluster densities
+
+    References
+    ----------
+    Ashour, Wesam, and Saad Sunoallah. "Multi density DBSCAN."
+    International Conference on Intelligent Data Engineering and
+    Automated Learning. Springer, Berlin, Heidelberg, 2011.
+    """
+
+    def __init__(self, k: int = 15, var: float = 2.5, min_cluster_size: int = 2, always_sort_densities: bool = True):
         self.k = k
         self.var = var
         self.min_cluster_size = min_cluster_size
         self.always_sort_densities = always_sort_densities
 
-    def fit(self, X, y=None):
+    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'MultiDensityDBSCAN':
+        """
+        Initiate the actual clustering process on the input data set.
+        The resulting cluster labels are contained in the labels_ attribute.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            the given data set
+        y : np.ndarray
+            the labels (can be ignored)
+
+        Returns
+        -------
+        self : MultiDensityDBSCAN
+            this instance of the Multi Density DBSCAN algorithm
+        """
         n_clusters, labels, cluster_densities = _multi_density_dbscan(X, self.k, self.var, self.min_cluster_size,
                                                                       self.always_sort_densities)
         self.n_clusters_ = n_clusters

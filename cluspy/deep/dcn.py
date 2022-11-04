@@ -21,9 +21,6 @@ def _dcn(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_learning_rate
          degree_of_space_preservation: float) -> (np.ndarray, np.ndarray, np.ndarray, np.ndarray, torch.nn.Module):
     """
     Start the actual DCN clustering procedure on the input data set.
-    First an autoencoder (AE) will be trained (will be skipped if input autoencoder is given).
-    Afterwards, KMeans identifies the initial clusters.
-    Last, the AE will be optimized using the DCN loss function from the _DCN_Module.
 
     Parameters
     ----------
@@ -301,6 +298,9 @@ class _DCN_Module(torch.nn.Module):
 class DCN(BaseEstimator, ClusterMixin):
     """
     The Deep Clustering Network (DCN) algorithm.
+    First, an autoencoder (AE) will be trained (will be skipped if input autoencoder is given).
+    Afterwards, KMeans identifies the initial clusters.
+    Last, the AE will be optimized using the DCN loss function.
 
     Parameters
     ----------

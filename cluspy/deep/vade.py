@@ -22,9 +22,6 @@ def _vade(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_learning_rat
         np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, torch.nn.Module):
     """
     Start the actual VaDE clustering procedure on the input data set.
-    First an variational autoencoder (VAE) will be trained (will be skipped if input autoencoder is given).
-    Afterwards, a GMM will be fit to identify the initial clustering structures.
-    Last, the VAE will be optimized using the VaDE loss function from the _VaDE_Module.
 
     Parameters
     ----------
@@ -457,6 +454,9 @@ def _compute_vade_loss(pi: torch.Tensor, p_mean: torch.Tensor, p_var: torch.Tens
 class VaDE(BaseEstimator, ClusterMixin):
     """
     The Variational Deep Embedding (VaDE) algorithm.
+    First, an variational autoencoder (VAE) will be trained (will be skipped if input autoencoder is given).
+    Afterwards, a GMM will be fit to identify the initial clustering structures.
+    Last, the VAE will be optimized using the VaDE loss function.
 
     Parameters
     ----------

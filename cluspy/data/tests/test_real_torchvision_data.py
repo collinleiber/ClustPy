@@ -1,10 +1,11 @@
 from cluspy.data.tests.test_real_world_data import _helper_test_data_loader
-from cluspy.data.real_torchvision_data import *
+from cluspy.data import load_usps, load_mnist, load_fmnist, load_kmnist, load_cifar10, load_svhn, load_stl10
+import torchvision.datasets
+import numpy as np
 from pathlib import Path
 import os
 import shutil
 import pytest
-import torchvision.datasets
 
 TEST_DOWNLOAD_PATH = str(Path.home() / "Downloads/cluspy_testfiles_torchvision")
 

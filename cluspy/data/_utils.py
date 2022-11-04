@@ -84,6 +84,8 @@ def _load_data_file(filename_local: str, file_url: str, delimiter: str = ",", la
     else:
         data = datafile[:, 1:]
         labels = datafile[:, 0]
+    # Convert labels to int32 format
+    labels = labels.astype(np.int32)
     return data, labels
 
 

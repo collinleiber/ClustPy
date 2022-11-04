@@ -1,6 +1,9 @@
 from cluspy.data.tests.test_real_world_data import _helper_test_data_loader
 from cluspy.data.tests.test_real_torchvision_data import _check_normalized_channels
-from cluspy.data.real_medical_mnist_data import *
+from cluspy.data import load_path_mnist, load_chest_mnist, load_derma_mnist, load_oct_mnist, load_pneumonia_mnist, \
+    load_retina_mnist, load_breast_mnist, load_blood_mnist, load_tissue_mnist, load_organ_a_mnist, load_organ_c_mnist, \
+    load_organ_s_mnist, load_organ_mnist_3d, load_nodule_mnist_3d, load_adrenal_mnist_3d, load_fracture_mnist_3d, \
+    load_vessel_mnist_3d, load_synapse_mnist_3d
 from pathlib import Path
 import os
 import shutil

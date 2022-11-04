@@ -76,6 +76,8 @@ def _load_medical_mnist_data(dataset_name: str, subset: str, normalize_channels:
     if labels.ndim != 1 and not multiple_labelings:
         assert labels.shape[1] == 1, "Data should only contain a single labeling"
         labels = labels[:, 0]
+    # Convert labels to int32 format
+    labels = labels.astype(np.int32)
     return data, labels
 
 

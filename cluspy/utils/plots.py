@@ -111,7 +111,8 @@ def plot_1d_data(X, labels=None, centers=None, true_labels=None, show_plot=True)
         plt.show()
 
 
-def plot_image(img_data:np.ndarray, black_and_white:bool=False, image_shape:tuple=None, max_value: float=None, min_value:float=None, show_plot:bool=True):
+def plot_image(img_data: np.ndarray, black_and_white: bool = False, image_shape: tuple = None, max_value: float = None,
+               min_value: float = None, show_plot: bool = True):
     """
     Expects a color image to occur in the HWC representation (height, width, color channels).
 

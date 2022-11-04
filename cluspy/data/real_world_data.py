@@ -361,7 +361,7 @@ def load_soybean_large(subset: str = "all", downloads_path: str = None) -> (np.n
             data = df_test.values
             labels_raw = labels_test
     # Transform data to numerical array
-    data = np.array(data, dtype=np.int)
+    data = np.array(data, dtype=int)
     LE = LabelEncoder()
     labels = LE.fit_transform(labels_raw)
     return data, labels
@@ -493,6 +493,8 @@ def load_ecoli(ignore_small_clusters: bool = False, downloads_path: str = None) 
         labels_raw = [l for i, l in enumerate(labels_raw) if keep_labels[i]]
     LE = LabelEncoder()
     labels = LE.fit_transform(labels_raw)
+    # Convert labels to int32 format
+    labels = labels.astype(np.int32)
     return data, labels
 
 
@@ -531,6 +533,8 @@ def load_htru2(downloads_path: str = None) -> (np.ndarray, np.ndarray):
     dataset = np.genfromtxt(directory + "HTRU_2.csv", delimiter=",")
     data = dataset[:, :-1]
     labels = dataset[:, -1]
+    # Convert labels to int32 format
+    labels = labels.astype(np.int32)
     return data, labels
 
 
@@ -573,6 +577,8 @@ def load_letterrecognition(downloads_path: str = None) -> (np.ndarray, np.ndarra
     datafile = np.fromstring(file_text, sep=",").reshape(-1, 17)
     data = datafile[:, 1:]
     labels = datafile[:, 0]
+    # Convert labels to int32 format
+    labels = labels.astype(np.int32)
     return data, labels
 
 
@@ -626,6 +632,8 @@ def load_har(subset: str = "all", downloads_path: str = None) -> (np.ndarray, np
         else:
             data = test_data
             labels = test_labels
+    # Convert labels to int32 format
+    labels = labels.astype(np.int32)
     # Convert labels from 1,... to 0,...
     labels = labels - 1
     return data, labels
@@ -689,6 +697,8 @@ def load_statlog_shuttle(subset: str = "all", downloads_path: str = None) -> (np
         else:
             data = test_data
             labels = test_labels
+    # Convert labels to int32 format
+    labels = labels.astype(np.int32)
     # Convert labels from 1,... to 0,...
     labels -= 1
     return data, labels
@@ -754,6 +764,8 @@ def load_mice_protein(return_additional_labels: bool = False, downloads_path: st
         LE = LabelEncoder()
         genotype_labels = LE.fit_transform(genotypes_raw)
         labels = np.c_[labels, id_labels, bahaviors_labels, treatment_labels, genotype_labels]
+    # Convert labels to int32 format
+    labels = labels.astype(np.int32)
     # Remove rows also from labels (3 cases)
     labels = labels[n_of_nans_per_row < 43]
     return data, labels
@@ -814,6 +826,8 @@ def load_user_knowledge(subset: str = "all", downloads_path: str = None) -> (np.
     # Transform labels
     LE = LabelEncoder()
     labels = LE.fit_transform(labels_raw)
+    # Convert labels to int32 format
+    labels = labels.astype(np.int32)
     data = np.array(data, dtype=np.float64)
     return data, labels
 
@@ -1036,6 +1050,8 @@ def load_breast_cancer_wisconsin_original(downloads_path: str = None) -> (np.nda
     labels = labels[rows_with_nan]
     # labels are 2 or 4. Convert to 0 or 1
     labels = labels / 2 - 1
+    # Convert labels to int32 format
+    labels = labels.astype(np.int32)
     return data, labels
 
 
@@ -1067,7 +1083,7 @@ def load_semeion(downloads_path: str = None) -> (np.ndarray, np.ndarray):
     datafile = np.genfromtxt(filename)
     # Last columns each correspond to one label (one-hot encoding)
     data = datafile[:, :-10]
-    labels = np.zeros(data.shape[0])
+    labels = np.zeros(data.shape[0], dtype=np.int32)
     for i in range(1, 10):
         labels[datafile[:, -10 + i] == 1] = i
     return data, labels
