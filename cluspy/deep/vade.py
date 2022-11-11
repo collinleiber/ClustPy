@@ -86,7 +86,7 @@ def _vade(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_learning_rat
     # Do reclustering with GMM
     embedded_data = _vade_encode_batchwise(testloader, autoencoder, device)
     gmm = GaussianMixture(n_components=n_clusters, covariance_type='diag', n_init=100)
-    gmm_labels = gmm.fit_predict(embedded_data)
+    gmm_labels = gmm.fit_predict(embedded_data).astype(np.int32)
     # Return results
     return gmm_labels, gmm.means_, gmm.covariances_, vade_labels, vade_centers, vade_covariances, autoencoder
 
@@ -533,7 +533,7 @@ class VaDE(BaseEstimator, ClusterMixin):
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'VaDE':
         """
         Initiate the actual clustering process on the input data set.
-        The resulting cluster labels are contained in the labels_ attribute.
+        The resulting cluster labels will be stored in the labels_ attribute.
 
         Parameters
         ----------

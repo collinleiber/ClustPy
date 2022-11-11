@@ -182,7 +182,7 @@ def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_thresho
     """
     i = 0
     while i < clustering_epochs:
-        cluster_labels_torch = torch.from_numpy(cluster_labels_cpu).long().to(device)
+        cluster_labels_torch = torch.from_numpy(cluster_labels_cpu).int().to(device)
         centers_torch = torch.from_numpy(centers_cpu).float().to(device)
         dip_matrix_torch = torch.from_numpy(dip_matrix_cpu).float().to(device)
         # Get dip costs matrix
@@ -228,7 +228,7 @@ def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_thresho
         # Update centers
         embedded_data = encode_batchwise(testloader, autoencoder, device)
         embedded_centers_cpu = autoencoder.encode(centers_torch).detach().cpu().numpy()
-        cluster_labels_cpu = np.argmin(cdist(embedded_centers_cpu, embedded_data), axis=0)
+        cluster_labels_cpu = np.argmin(cdist(embedded_centers_cpu, embedded_data), axis=0).astype(np.int32)
         optimal_centers = np.array([np.mean(embedded_data[cluster_labels_cpu == cluster_id], axis=0) for cluster_id in
                                     range(n_clusters_current)])
         centers_cpu, embedded_centers_cpu = _get_nearest_points_to_optimal_centers(X, optimal_centers, embedded_data)
@@ -585,7 +585,7 @@ class DipDECK(BaseEstimator, ClusterMixin):
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DipDECK':
         """
         Initiate the actual clustering process on the input data set.
-        The resulting cluster labels are contained in the labels_ attribute.
+        The resulting cluster labels will be stored in the labels_ attribute.
 
         Parameters
         ----------

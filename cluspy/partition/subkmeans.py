@@ -178,7 +178,7 @@ class SubKmeans(BaseEstimator, ClusterMixin):
     def fit(self, X, y=None) -> 'SubKmeans':
         """
         Initiate the actual clustering process on the input data set.
-        The resulting cluster labels are contained in the labels_ attribute.
+        The resulting cluster labels will be stored in the labels_ attribute.
 
         X : np.ndarray
             the given data set
@@ -299,7 +299,7 @@ class SubKmeans(BaseEstimator, ClusterMixin):
         Returns
         -------
         tuple : (float, float, list)
-            The total costs,
+            The total costs (global costs + sum of subspace costs),
             The global costs,
             The subspace specific costs (one entry for each subspace)
         """
@@ -308,8 +308,10 @@ class SubKmeans(BaseEstimator, ClusterMixin):
         P = _transform_subkmeans_P_to_nrkmeans_P(self.m, self.V.shape[0])
         scatter_matrices = _transform_subkmeans_scatters_to_nrkmeans_scatters(X, self.scatter_matrices_)
         labels = np.c_[self.labels_, np.zeros(self.labels_.shape[0])]
-        return _mdl_costs(X, [self.n_clusters, 1], m, P, self.V, scatter_matrices, labels,
-                          self.outliers, self.max_distance, self.precision)
+        total_costs, global_costs, all_subspace_costs = _mdl_costs(X, [self.n_clusters, 1], m, P, self.V,
+                                                                   scatter_matrices, labels,
+                                                                   self.outliers, self.max_distance, self.precision)
+        return total_costs, global_costs, all_subspace_costs
 
     def calculate_cost_function(self, X) -> float:
         """

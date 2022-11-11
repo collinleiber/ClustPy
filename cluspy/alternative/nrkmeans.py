@@ -80,7 +80,8 @@ def _nrkmeans(X: np.ndarray, n_clusters: list, V: np.ndarray, m: list, P: list, 
     for iteration in range(max_iter):
         # Execute basic kmeans steps
         for i in range(subspaces):
-            if n_clusters[i] != 1 or iteration == 0 or outliers:
+            # Center and scatter matrix stays the same for the noise space if not outliers are present
+            if n_clusters[i] != 1 or iteration == 0 or n_outliers[i] > 0:
                 # Assign each point to closest cluster center
                 labels[:, i] = _assign_labels(X, V, centers[i], P[i])
                 # Update centers and scatter matrices depending on cluster assignments
@@ -793,7 +794,7 @@ class NrKmeans(BaseEstimator, ClusterMixin):
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'NrKmeans':
         """
         Initiate the actual clustering process on the input data set.
-        The resulting cluster labels are contained in the labels_ attribute.
+        The resulting cluster labels will be stored in the labels_ attribute.
 
         Parameters
         ----------
@@ -993,13 +994,15 @@ class NrKmeans(BaseEstimator, ClusterMixin):
         Returns
         -------
         tuple : (float, float, list)
-            The total costs,
+            The total costs (global costs + sum of subspace costs),
             The global costs,
             The subspace specific costs (one entry for each subspace)
         """
         assert self.labels_ is not None, "The NrKmeans algorithm has not run yet. Use the fit() function first."
-        return _mdl_costs(X, self.n_clusters, self.m, self.P, self.V, self.scatter_matrices_, self.labels,
-                          self.outliers, self.max_distance, self.precision)
+        total_costs, global_costs, all_subspace_costs = _mdl_costs(X, self.n_clusters, self.m, self.P, self.V,
+                                                                   self.scatter_matrices_, self.labels_, self.outliers,
+                                                                   self.max_distance, self.precision)
+        return total_costs, global_costs, all_subspace_costs
 
     def calculate_cost_function(self) -> float:
         """
@@ -1268,7 +1271,7 @@ def _mdl_costs(X: np.ndarray, n_clusters: list, m: list, P: list, V: np.ndarray,
     Returns
     -------
     tuple : (float, float, list)
-        The total costs,
+        The total costs (global costs + sum of subspace costs),
         The global costs,
         The subspace specific costs (one entry for each subspace)
     """

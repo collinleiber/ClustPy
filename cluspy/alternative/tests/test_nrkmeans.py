@@ -62,9 +62,7 @@ def test_is_matrix_orthogonal():
     orthogonal_matrix = np.array(
         [[1.0, 0.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]])
     assert _is_matrix_orthogonal(orthogonal_matrix)
-
-
-def test_is_matrix_orthogonal_false():
+    # ----------- Test equals to False
     # First test - wrong dimensionality
     not_orthogonal_matrix = np.array([[-1.0, 0.0], [0.0, 1.0], [1.0, 0.0]])
     assert not _is_matrix_orthogonal(not_orthogonal_matrix)
@@ -88,9 +86,7 @@ def test_is_matrix_symmetric():
          [0.123414, 0.456364, 0.23452, 0.23423],
          [0.74573, 0.123, 0.23423, 0.26]])
     assert _is_matrix_symmetric(symmetric_matrix)
-
-
-def test_is_matrix_symmetric_false():
+    # ----------- Test equals to False
     # First test - wrong dimensionality
     not_symmetric_matrix = np.array([[1.0, 0.0], [0.0, 1.0], [1.0, 0.0]])
     assert not _is_matrix_symmetric(not_symmetric_matrix)
@@ -162,7 +158,7 @@ def test_remove_empty_cluster():
     assert np.array_equal(np.array([1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4]), labels_subspace_new)
 
 
-def test_remove_empty_subsace():
+def test_remove_empty_subspace():
     n_clusters = [5, 4, 3, 2, 1]
     m = [1, 0, 2, 0, 5]
     P = [np.array([0]), np.array([]), np.array([1, 2]), np.array([]), np.array([3, 4, 5, 6, 7])]
@@ -226,6 +222,7 @@ def test_simple_nrkmeans_with_fruit():
     nrk = NrKmeans([3, 1], random_state=1, mdl_for_noisespace=False)
     assert not hasattr(nrk, "labels_")
     nrk.fit(X)
+    assert nrk.labels_.dtype == np.int32
     assert nrk.labels_.shape == labels.shape
     # Check if random state is working
     nrk_2 = NrKmeans([3, 1], random_state=1, mdl_for_noisespace=False)
@@ -298,3 +295,19 @@ def test_transform_subspace():
     assert np.array_equal(X_transformed, np.c_[np.zeros(25), np.zeros(25) + 3])
     X_transformed = nrk.transform_subspace(X, 1)
     assert np.array_equal(X_transformed, np.c_[np.zeros(25) + 2, np.zeros(25) + 1])
+
+
+def test_calculate_mdl_costs():
+    X = np.c_[np.zeros(30), np.r_[np.zeros(10), np.zeros(10) + 1, np.zeros(10) + 2], np.zeros(30) + 3]
+    nrk = NrKmeans([4, 1], max_iter=1)
+    nrk.fit(X)
+    nrk.V = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+    nrk.P = [np.array([2, 0]), np.array([1])]
+    nrk.scatter_matrices_ = [np.array([[[1, 1, 1], [2, 2, 2], [3, 3, 3]],
+                                       [[4, 4, 4], [5, 5, 5], [6, 6, 6]],
+                                       [[11, 11, 11], [12, 12, 12], [13, 13, 13]],
+                                       [[14, 14, 14], [15, 15, 15], [16, 16, 16]]]),
+                             np.array([[[1, 1, 1], [2, 2, 2], [3, 3, 3]],
+                                       [[31, 32, 33], [34, 35, 36], [37, 38, 39]]])]
+    costs = nrk.calculate_cost_function()
+    assert 68 + 37 == costs

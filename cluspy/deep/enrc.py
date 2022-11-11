@@ -659,7 +659,7 @@ def enrc_predict(z: torch.Tensor, V: torch.Tensor, centers: list, subspace_betas
         else:
             weighted_squared_diff = squared_euclidean_distance(z_rot, centers_i, weights=subspace_betas[i, :])
         labels_sub = weighted_squared_diff.argmin(1)
-        labels_sub = labels_sub.detach().cpu().numpy()
+        labels_sub = labels_sub.detach().cpu().numpy().astype(np.int32)
         labels.append(labels_sub)
     return np.stack(labels).transpose()
 
@@ -899,9 +899,9 @@ def nrkmeans_init(data: np.ndarray, n_clusters: list, rounds: int = 10, max_iter
     best = None
     lowest = np.inf
     for i in range(rounds):
-        nrkmeans = NrKmeans(n_clusters=n_clusters, input_centers=input_centers, P=P, V=V, max_iter=max_iter)
+        nrkmeans = NrKmeans(n_clusters=n_clusters, cluster_centers=input_centers, P=P, V=V, max_iter=max_iter)
         nrkmeans.fit(X=data)
-        centers_i, P_i, V_i, scatter_matrices_i = nrkmeans.cluster_centers_, nrkmeans.P, nrkmeans.V, nrkmeans.scatter_matrices_
+        centers_i, P_i, V_i, scatter_matrices_i = nrkmeans.cluster_centers, nrkmeans.P, nrkmeans.V, nrkmeans.scatter_matrices_
         if len(P_i) != len(n_clusters):
             if verbose:
                 print(
@@ -1670,6 +1670,7 @@ class ENRC(BaseEstimator, ClusterMixin):
         """
         Cluster the input dataset with the ENRC algorithm. Saves the labels, centers, V, m, Betas, and P
         in the ENRC object.
+        The resulting cluster labels will be stored in the labels_ attribute.
 
         Parameters
         ----------
@@ -1831,7 +1832,6 @@ class ENRC(BaseEstimator, ClusterMixin):
         plot_scatter_matrix(self.transform_subspace(X, subspace_index), labels,
                             self.cluster_centers_[subspace_index] if plot_centers else None,
                             true_labels=gt, equal_axis=equal_axis)
-
 
     def reconstruct_subspace_centroids(self, subspace_index: int) -> np.ndarray:
         """

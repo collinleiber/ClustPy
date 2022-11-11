@@ -51,11 +51,12 @@ Tests regarding the SubKmeans object
 """
 
 
-def test_simple_nrkmeans_with_fruit():
+def test_simple_nrkmeans_with_wine():
     X, labels = load_wine()
     subkm = SubKmeans(3)
     assert not hasattr(subkm, "labels_")
     subkm.fit(X)
+    assert subkm.labels_.dtype == np.int32
     assert subkm.labels_.shape == labels.shape
     # Check if input parameters are working
     subkm_2 = SubKmeans(3, random_state=1, m=4, cluster_centers=np.ones((3, X.shape[1])))

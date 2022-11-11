@@ -10,6 +10,7 @@ def test_simple_MutliDensityDBSCAN_with_wine():
     md_dbscan = MultiDensityDBSCAN()
     assert not hasattr(md_dbscan, "labels_")
     md_dbscan.fit(X)
+    assert md_dbscan.labels_.dtype == np.int32
     assert md_dbscan.labels_.shape == labels.shape
     # Without additional queue sorting
     md_dbscan = MultiDensityDBSCAN(always_sort_densities=False)

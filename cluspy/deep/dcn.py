@@ -379,7 +379,7 @@ class DCN(BaseEstimator, ClusterMixin):
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DCN':
         """
         Initiate the actual clustering process on the input data set.
-        The resulting cluster labels are contained in the labels_ attribute.
+        The resulting cluster labels will be stored in the labels_ attribute.
 
         Parameters
         ----------

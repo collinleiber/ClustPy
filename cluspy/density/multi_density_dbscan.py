@@ -3,7 +3,7 @@
 Collin Leiber
 """
 
-from scipy.spatial.distance import squareform, pdist
+from sklearn.neighbors import NearestNeighbors
 import numpy as np
 from sklearn.base import BaseEstimator, ClusterMixin
 
@@ -36,12 +36,11 @@ def _multi_density_dbscan(X: np.ndarray, k: int, var: float, min_cluster_size: i
     assert k <= X.shape[0], "The number of nearest neighbors k can not be larger than the number of data points"
     assert var >= 1, "var must be >= 1"
     assert min_cluster_size > 1, "min_cluster_size must be > 1"
-    # Calculate distance matrix
-    dist_matrix = squareform(pdist(X))
-    # Get k nearest neighbors ids for each point
-    knns = np.argsort(dist_matrix, axis=1)[:, 1:k + 1]  # First is the same object
-    # Calculate densities (mean knn dist)
-    densities = np.array([np.mean(dist_matrix[i, knns[i, :]]) for i in range(X.shape[0])])
+    # Get k nearest neighbors and densities for each point
+    nearest_neighbors = NearestNeighbors(n_neighbors=k + 1).fit(X)
+    densities, knns = nearest_neighbors.kneighbors(X, n_neighbors=k + 1)
+    knns = knns[:, 1:]
+    densities = np.mean(densities[:, 1:], axis=1)
     # Order densities
     order = np.argsort(densities)
     # Start parameters
@@ -150,7 +149,7 @@ class MultiDensityDBSCAN(BaseEstimator, ClusterMixin):
     Parameters
     ----------
     k : int
-        The number of nearest neighbors (default: 15)
+        The number of nearest neighbors. Does not include the objects itself (default: 15)
     var : float
         Defines the factor that the density of a point may deviate from the average cluster density (default: 2.5)
     min_cluster_size : int
@@ -170,8 +169,7 @@ class MultiDensityDBSCAN(BaseEstimator, ClusterMixin):
     References
     ----------
     Ashour, Wesam, and Saad Sunoallah. "Multi density DBSCAN."
-    International Conference on Intelligent Data Engineering and
-    Automated Learning. Springer, Berlin, Heidelberg, 2011.
+    International Conference on Intelligent Data Engineering and Automated Learning. Springer, Berlin, Heidelberg, 2011.
     """
 
     def __init__(self, k: int = 15, var: float = 2.5, min_cluster_size: int = 2, always_sort_densities: bool = True):
@@ -183,7 +181,7 @@ class MultiDensityDBSCAN(BaseEstimator, ClusterMixin):
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'MultiDensityDBSCAN':
         """
         Initiate the actual clustering process on the input data set.
-        The resulting cluster labels are contained in the labels_ attribute.
+        The resulting cluster labels will be stored in the labels_ attribute.
 
         Parameters
         ----------

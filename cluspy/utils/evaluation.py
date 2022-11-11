@@ -31,6 +31,7 @@ def evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=None, gt=None,
                      add_runtime=True, add_n_clusters=False, save_path=None, ignore_algorithms=[]):
     assert evaluation_metrics is not None or add_runtime or add_n_clusters, \
         "Either evaluation metrics must be defined or add_runtime/add_n_clusters must be True"
+    assert type(aggregation_functions) is list, "aggregation_functions must be list"
     if type(evaluation_algorithms) is not list:
         evaluation_algorithms = [evaluation_algorithms]
     if type(evaluation_metrics) is not list and evaluation_metrics is not None:
