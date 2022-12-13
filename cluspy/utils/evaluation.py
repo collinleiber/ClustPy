@@ -3,6 +3,7 @@ import numpy as np
 import time
 from cluspy.utils._wrapper_methods import _get_n_clusters_from_algo
 import random
+from sklearn.utils import check_random_state
 
 
 def _preprocess_dataset(X, preprocess_methods, preprocess_params):
@@ -28,7 +29,8 @@ def _preprocess_dataset(X, preprocess_methods, preprocess_params):
 
 def evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=None, gt=None, repetitions=10,
                      aggregation_functions=[np.mean, np.std],
-                     add_runtime=True, add_n_clusters=False, save_path=None, ignore_algorithms=[]):
+                     add_runtime=True, add_n_clusters=False, save_path=None, ignore_algorithms=[],
+                     random_state=None):
     assert evaluation_metrics is not None or add_runtime or add_n_clusters, \
         "Either evaluation metrics must be defined or add_runtime/add_n_clusters must be True"
     assert type(aggregation_functions) is list, "aggregation_functions must be list"
@@ -37,7 +39,8 @@ def evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=None, gt=None,
     if type(evaluation_metrics) is not list and evaluation_metrics is not None:
         evaluation_metrics = [evaluation_metrics]
     # Use same seed for each algorithm
-    seeds = random.sample(range(1000), repetitions)
+    random_state = check_random_state(random_state)
+    seeds = random_state.choice(10000, repetitions, replace=False)
     algo_names = [a.name for a in evaluation_algorithms]
     metric_names = [] if evaluation_metrics is None else [m.name for m in evaluation_metrics]
     if add_runtime:
@@ -135,7 +138,7 @@ def evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=None, gt=None,
 
 def evaluate_multiple_datasets(evaluation_datasets, evaluation_algorithms, evaluation_metrics=None, repetitions=10,
                                aggregation_functions=[np.mean, np.std], add_runtime=True, add_n_clusters=False,
-                               save_path=None, save_intermediate_results=False):
+                               save_path=None, save_intermediate_results=False, random_state=None):
     """
     Example:
     from cluspy.evaluation import *
@@ -201,7 +204,7 @@ def evaluate_multiple_datasets(evaluation_datasets, evaluation_algorithms, evalu
             df = evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=evaluation_metrics, gt=gt,
                                   repetitions=repetitions, aggregation_functions=aggregation_functions,
                                   add_runtime=add_runtime, add_n_clusters=add_n_clusters, save_path=inner_save_path,
-                                  ignore_algorithms=eval_data.ignore_algorithms)
+                                  ignore_algorithms=eval_data.ignore_algorithms, random_state=random_state)
             df_list.append(df)
         except Exception as e:
             print("Dataset {0} raised an exception and will be skipped".format(eval_data.name))

@@ -39,9 +39,8 @@ def variation_of_information(labels_true, labels_pred):
 
     References
     -------
-    Meilă, Marina. "Comparing clusterings by the variation of
-    information." Learning theory and kernel machines. Springer,
-    Berlin, Heidelberg, 2003. 173-187.
+    Meilă, Marina. "Comparing clusterings by the variation of information."
+    Learning theory and kernel machines. Springer, Berlin, Heidelberg, 2003. 173-187.
     """
     _check_number_of_points(labels_true, labels_pred)
     n = len(labels_true)
@@ -79,9 +78,8 @@ def unsupervised_clustering_accuracy(labels_true, labels_pred):
 
     References
     -------
-    Yang, Yi, et al. "Image clustering using local discriminant
-    models and global integration." IEEE Transactions on Image
-    Processing 19.10 (2010): 2761-2773.
+    Yang, Yi, et al. "Image clustering using local discriminant models and global integration."
+    IEEE Transactions on Image Processing 19.10 (2010): 2761-2773.
     """
     _check_number_of_points(labels_true, labels_pred)
     max_label = int(max(labels_pred.max(), labels_true.max()) + 1)

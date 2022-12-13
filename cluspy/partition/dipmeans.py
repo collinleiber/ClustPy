@@ -12,9 +12,11 @@ import numpy as np
 from scipy.spatial.distance import pdist, squareform
 from cluspy.utils import dip_test, dip_pval, dip_boot_samples
 from sklearn.base import BaseEstimator, ClusterMixin
+from sklearn.utils import check_random_state
 
 
-def _dipmeans(X, pval_threshold, split_viewers_threshold, pval_strategy, n_boots, n_new_centers, max_n_clusters):
+def _dipmeans(X, pval_threshold, split_viewers_threshold, pval_strategy, n_boots, n_new_centers, max_n_clusters,
+              random_state):
     # Calculate distance matrix
     data_dist_matrix = squareform(pdist(X, 'euclidean'))
     # Initialize parameters
@@ -37,11 +39,11 @@ def _dipmeans(X, pval_threshold, split_viewers_threshold, pval_strategy, n_boots
             # Calculate p-values
             if pval_strategy == "bootstrap":
                 # Bootstrap values here so it is not needed for each pval separately
-                boot_dips = dip_boot_samples(ids_in_cluster.shape[0], n_boots)
+                boot_dips = dip_boot_samples(ids_in_cluster.shape[0], n_boots, random_state)
                 cluster_pvals = np.array([np.mean(point_dip <= boot_dips) for point_dip in cluster_dips])
             else:
-                cluster_pvals = np.array([dip_pval(point_dip, ids_in_cluster.shape[0], pval_strategy=pval_strategy)
-                                          for point_dip in cluster_dips])
+                cluster_pvals = np.array([dip_pval(point_dip, ids_in_cluster.shape[0], pval_strategy=pval_strategy,
+                                                   random_state=random_state) for point_dip in cluster_dips])
             # Get split viewers (points with dip of distances <= threshold)
             split_viewers = cluster_dips[cluster_pvals <= pval_threshold]
             # Check if percentage share of split viewers in cluster is larger than threshold
@@ -54,7 +56,7 @@ def _dipmeans(X, pval_threshold, split_viewers_threshold, pval_strategy, n_boots
         if cluster_scores[cluster_id_to_split] > 0:
             # Split cluster using bisecting kmeans
             km = _execute_bisecting_kmeans(X, ids_in_each_cluster, cluster_id_to_split, centers,
-                                           n_new_centers)
+                                           n_new_centers, random_state)
             labels = km.labels_
             centers = km.cluster_centers_
         else:
@@ -62,7 +64,7 @@ def _dipmeans(X, pval_threshold, split_viewers_threshold, pval_strategy, n_boots
     return n_clusters, centers, labels
 
 
-def _execute_bisecting_kmeans(X, ids_in_each_cluster, cluster_id_to_split, centers, n_new_centers):
+def _execute_bisecting_kmeans(X, ids_in_each_cluster, cluster_id_to_split, centers, n_new_centers, random_state):
     # Prepare cluster for splitting
     old_center = centers[cluster_id_to_split, :]
     reduced_centers = np.delete(centers, cluster_id_to_split, axis=0)
@@ -72,12 +74,12 @@ def _execute_bisecting_kmeans(X, ids_in_each_cluster, cluster_id_to_split, cente
     min_squared_dist = np.inf
     for i in range(n_new_centers):
         # Get random point in cluster as new center
-        random_center = X[np.random.choice(ids_in_cluster), :].reshape(1, -1)
+        random_center = X[random_state.choice(ids_in_cluster), :].reshape(1, -1)
         # Calculate second new center as: new2 = old - (new1 - old)
         adjusted_center = (old_center - (random_center - old_center)).reshape(1, -1)
         # Run kmeans with new centers
         tmp_centers = np.r_[reduced_centers, random_center, adjusted_center]
-        km = KMeans(n_clusters=tmp_centers.shape[0], init=tmp_centers, n_init=1)
+        km = KMeans(n_clusters=tmp_centers.shape[0], init=tmp_centers, n_init=1, random_state=random_state)
         km.fit(X)
         # Check squared distances to find best kmeans result
         if km.inertia_ < min_squared_dist:
@@ -89,18 +91,19 @@ def _execute_bisecting_kmeans(X, ids_in_each_cluster, cluster_id_to_split, cente
 class DipMeans(BaseEstimator, ClusterMixin):
 
     def __init__(self, pval_threshold=0.01, split_viewers_threshold=0.01, pval_strategy="table", n_boots=2000,
-                 n_new_centers=10, max_n_clusters=np.inf):
+                 n_new_centers=10, max_n_clusters=np.inf, random_state=None):
         self.pval_threshold = pval_threshold
         self.split_viewers_threshold = split_viewers_threshold
         self.pval_strategy = pval_strategy
         self.n_boots = n_boots
         self.n_new_centers = n_new_centers
         self.max_n_clusters = max_n_clusters
+        self.random_state = check_random_state(random_state)
 
     def fit(self, X, y=None):
         n_clusters, centers, labels = _dipmeans(X, self.pval_threshold, self.split_viewers_threshold,
                                                 self.pval_strategy, self.n_boots, self.n_new_centers,
-                                                self.max_n_clusters)
+                                                self.max_n_clusters, self.random_state)
         self.n_clusters_ = n_clusters
         self.cluster_centers_ = centers
         self.labels_ = labels

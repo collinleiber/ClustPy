@@ -70,7 +70,7 @@ def _nrkmeans(X: np.ndarray, n_clusters: list, V: np.ndarray, m: list, P: list, 
         The number of clusters for each subspace (usually the same as the input),
         The scatter matrices
     """
-    V, m, P, centers, random_state, subspaces, labels, scatter_matrices = \
+    V, m, P, centers, subspaces, labels, scatter_matrices = \
         _initialize_nrkmeans_parameters(
             X, n_clusters, V, m, P, centers, mdl_for_noisespace, outliers, max_iter, random_state)
     # Check if labels stay the same (break condition)
@@ -175,7 +175,6 @@ def _initialize_nrkmeans_parameters(X: np.ndarray, n_clusters: list, V: np.ndarr
         The precision will be equal to the average minimum feature-wise distance between two objects
     """
     data_dimensionality = X.shape[1]
-    random_state = check_random_state(random_state)
     # Check if n_clusters is a list
     if not type(n_clusters) is list:
         raise ValueError(
@@ -204,7 +203,7 @@ def _initialize_nrkmeans_parameters(X: np.ndarray, n_clusters: list, V: np.ndarr
     if m is None and P is None:
         m = [int(data_dimensionality / subspaces)] * subspaces
         if data_dimensionality % subspaces != 0:
-            choices = random_state.choice(range(subspaces), data_dimensionality - np.sum(m))
+            choices = random_state.choice(subspaces, data_dimensionality - np.sum(m), replace=False)
             for choice in choices:
                 m[choice] += 1
     # If m is None but P is defined use P's dimensionality
@@ -272,7 +271,7 @@ def _initialize_nrkmeans_parameters(X: np.ndarray, n_clusters: list, V: np.ndarr
         raise ValueError(
             "Noise space (number of clusters = 1) must be the last entry in n_clusters.\nYour input:\n" + str(
                 n_clusters))
-    return V, m, P, centers, random_state, subspaces, labels, scatter_matrices
+    return V, m, P, centers, subspaces, labels, scatter_matrices
 
 
 def _assign_labels(X: np.ndarray, V: np.ndarray, centers_subspace: np.ndarray, P_subspace: np.ndarray) -> np.ndarray:
@@ -775,7 +774,6 @@ class NrKmeans(BaseEstimator, ClusterMixin):
         # Fixed attributes
         self.input_n_clusters = n_clusters.copy()
         self.max_iter = max_iter
-        self.random_state = random_state
         self.n_init = n_init
         self.cost_type = cost_type
         self.threshold_negative_eigenvalue = threshold_negative_eigenvalue
@@ -784,6 +782,7 @@ class NrKmeans(BaseEstimator, ClusterMixin):
         self.max_distance = max_distance
         self.precision = precision
         self.debug = debug
+        self.random_state = check_random_state(random_state)
         # Variables
         self.n_clusters = n_clusters
         self.cluster_centers = cluster_centers
@@ -815,18 +814,18 @@ class NrKmeans(BaseEstimator, ClusterMixin):
             self.max_distance = np.max(pdist(X))
         if self.mdl_for_noisespace and self.precision is None:
             self.precision = _get_precision(X)
-        random_state = check_random_state(self.random_state)
-        all_random_states = random_state.randint(0, 10000, self.n_init)
+        all_random_states = self.random_state.choice(10000, self.n_init, replace=False)
         # Get best result
         best_costs = np.inf
         for i in range(self.n_init):
+            local_random_state = check_random_state(all_random_states[i])
             labels, centers, V, m, P, n_clusters, scatter_matrices = _nrkmeans(X, self.n_clusters, self.V, self.m,
                                                                                self.P, self.cluster_centers,
                                                                                self.mdl_for_noisespace,
                                                                                self.outliers, self.max_iter,
                                                                                self.threshold_negative_eigenvalue,
                                                                                self.max_distance, self.precision,
-                                                                               all_random_states[i], self.debug)
+                                                                               local_random_state, self.debug)
             if cost_type == "default":
                 costs = _get_total_cost_function(V, P, scatter_matrices)
             else:  # in case of cost_type == "mdl"

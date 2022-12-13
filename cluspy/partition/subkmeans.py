@@ -7,6 +7,7 @@ from cluspy.alternative.nrkmeans import NrKmeans, _get_total_cost_function, _mdl
 import numpy as np
 from sklearn.base import BaseEstimator, ClusterMixin
 from cluspy.utils.plots import plot_scatter_matrix
+from sklearn.utils import check_random_state
 
 
 def _transform_subkmeans_m_to_nrkmeans_m(m: int, dims: int) -> list:
@@ -138,7 +139,7 @@ class SubKmeans(BaseEstimator, ClusterMixin):
     ----------
     labels_ : np.ndarray
         The final labels
-    scatter_matrix_ : : np.ndarray
+    scatter_matrix_ : np.ndarray
         The final scatter matrix
 
     References
@@ -160,7 +161,6 @@ class SubKmeans(BaseEstimator, ClusterMixin):
                  random_state: np.random.RandomState = None, debug: bool = False):
         # Fixed attributes
         self.max_iter = max_iter
-        self.random_state = random_state
         self.n_init = n_init
         self.cost_type = cost_type
         self.threshold_negative_eigenvalue = threshold_negative_eigenvalue
@@ -169,6 +169,7 @@ class SubKmeans(BaseEstimator, ClusterMixin):
         self.max_distance = max_distance
         self.precision = precision
         self.debug = debug
+        self.random_state = check_random_state(random_state)
         # Variables
         self.n_clusters = n_clusters
         self.cluster_centers = cluster_centers

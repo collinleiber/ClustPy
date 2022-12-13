@@ -11,9 +11,11 @@ from cluspy.partition.dipmeans import _execute_bisecting_kmeans
 from sklearn.decomposition import PCA
 from cluspy.utils import dip_test, dip_pval
 from sklearn.base import BaseEstimator, ClusterMixin
+from sklearn.utils import check_random_state
 
 
-def _proj_dipmeans(X, pval_threshold, n_random_projections, pval_strategy, n_boots, n_new_centers, max_n_clusters):
+def _proj_dipmeans(X, pval_threshold, n_random_projections, pval_strategy, n_boots, n_new_centers, max_n_clusters,
+                   random_state):
     # Initialize parameters
     n_clusters = 0
     centers = np.mean(X, axis=0).reshape(1, -1)
@@ -27,12 +29,13 @@ def _proj_dipmeans(X, pval_threshold, n_random_projections, pval_strategy, n_boo
             ids_in_cluster = np.where(labels == c)[0]
             ids_in_each_cluster.append(ids_in_cluster)
             # Get projections
-            projections = _get_projected_data(X[ids_in_cluster], n_random_projections)
+            projections = _get_projected_data(X[ids_in_cluster], n_random_projections, random_state)
             # Calculate dip values for the distances of each point
             cluster_dips = np.array([dip_test(projections[:, p], just_dip=True, is_data_sorted=False) for p in
                                      range(projections.shape[1])])
             # Calculate p-values of maximum dip
-            pval = dip_pval(np.max(cluster_dips), ids_in_cluster.shape[0], pval_strategy=pval_strategy, n_boots=n_boots)
+            pval = dip_pval(np.max(cluster_dips), ids_in_cluster.shape[0], pval_strategy=pval_strategy, n_boots=n_boots,
+                            random_state=random_state)
             # Calculate cluster score
             cluster_scores[c] = pval
         # Get cluster with minimum pval
@@ -41,7 +44,7 @@ def _proj_dipmeans(X, pval_threshold, n_random_projections, pval_strategy, n_boo
         if cluster_scores[cluster_id_to_split] <= pval_threshold:
             # Split cluster using bisecting kmeans
             km = _execute_bisecting_kmeans(X, ids_in_each_cluster, cluster_id_to_split, centers,
-                                           n_new_centers)
+                                           n_new_centers, random_state)
             labels = km.labels_
             centers = km.cluster_centers_
         else:
@@ -49,7 +52,7 @@ def _proj_dipmeans(X, pval_threshold, n_random_projections, pval_strategy, n_boo
     return n_clusters, centers, labels
 
 
-def _get_projected_data(X, n_random_projections):
+def _get_projected_data(X, n_random_projections, random_state):
     # Execute PCA
     pca = PCA()
     pca_X = pca.fit_transform(X) if X.shape[0] > 1 else np.empty((X.shape[0], 0))
@@ -57,7 +60,7 @@ def _get_projected_data(X, n_random_projections):
     random_projections = np.zeros((X.shape[0], n_random_projections))
     for i in range(n_random_projections):
         # Add random vector
-        projection_vector = np.random.rand(X.shape[1])
+        projection_vector = random_state.rand(X.shape[1])
         projected_X = np.dot(X, projection_vector)
         random_projections[:, i] = projected_X
     projections = np.c_[X, pca_X, random_projections]
@@ -66,19 +69,20 @@ def _get_projected_data(X, n_random_projections):
 
 class ProjectedDipMeans(BaseEstimator, ClusterMixin):
 
-    def __init__(self, pval_threshold=0.01, n_random_projections=10, pval_strategy="table", n_boots=2000,
-                 n_new_centers=10, max_n_clusters=np.inf):
+    def __init__(self, pval_threshold=0.01, n_random_projections=0, pval_strategy="table", n_boots=2000,
+                 n_new_centers=10, max_n_clusters=np.inf, random_state=None):
         self.pval_threshold = pval_threshold
         self.n_random_projections = n_random_projections
         self.pval_strategy = pval_strategy
         self.n_boots = n_boots
         self.n_new_centers = n_new_centers
         self.max_n_clusters = max_n_clusters
+        self.random_state = check_random_state(random_state)
 
     def fit(self, X, y=None):
         n_clusters, centers, labels = _proj_dipmeans(X, self.pval_threshold, self.n_random_projections,
                                                      self.pval_strategy, self.n_boots, self.n_new_centers,
-                                                     self.max_n_clusters)
+                                                     self.max_n_clusters, self.random_state)
         self.n_clusters_ = n_clusters
         self.cluster_centers_ = centers
         self.labels_ = labels

@@ -51,7 +51,7 @@ Tests regarding the SubKmeans object
 """
 
 
-def test_simple_nrkmeans_with_wine():
+def test_simple_subkmeans_with_wine():
     X, labels = load_wine()
     subkm = SubKmeans(3)
     assert not hasattr(subkm, "labels_")
@@ -65,8 +65,8 @@ def test_simple_nrkmeans_with_wine():
     assert subkm_2.labels_.shape == labels.shape
 
 
-@patch("matplotlib.pyplot.figure")  # Used to test plots (show will not be called)
-def test_plot_nrkmeans_result_with_fruit(mock_fig):
+@patch("matplotlib.pyplot.show")  # Used to test plots (show will not be called)
+def test_plot_subkmeans_result_with_fruit(mock_fig):
     X, labels = load_wine()
     subkm = SubKmeans(3, max_iter=1)
     subkm.fit(X)

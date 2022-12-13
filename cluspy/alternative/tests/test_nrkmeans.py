@@ -244,7 +244,7 @@ def test_simple_nrkmeans_with_fruit():
     assert nrk_4.labels_.shape == labels.shape
 
 
-@patch("matplotlib.pyplot.figure")  # Used to test plots (show will not be called)
+@patch("matplotlib.pyplot.show")  # Used to test plots (show will not be called)
 def test_plot_nrkmeans_result_with_fruit(mock_fig):
     X, labels = load_fruit()
     nrk = NrKmeans([3, 1], max_iter=1)

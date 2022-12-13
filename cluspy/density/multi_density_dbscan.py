@@ -113,7 +113,7 @@ def _gather(p1: int, c_id: int, densities: list, knns: np.ndarray, labels: np.nd
                 # Update Cluster density
                 cluster_density = (cluster_density * (len(cluster_points) - 1) + density_p2) / len(cluster_points)
                 # Add new neighbors
-                neighbors += [kn for kn in knns[p2, :] if labels[kn] == -1]
+                neighbors += [kn for kn in knns[p2, :] if labels[kn] == -1] # TODO: dont add duplicates (use set?) - use sorted list
                 if always_sort_densities:
                     neighbors = _sort_neighbors_by_densities(neighbors, densities)
     return cluster_points, cluster_density
