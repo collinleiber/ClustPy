@@ -208,6 +208,7 @@ class Diana(BaseEstimator, ClusterMixin):
         labels, tree = _diana(X, self.n_clusters, self.distance_threshold, self.construct_full_tree, self.metric)
         self.labels_ = labels
         self.tree_ = tree
+        return self
 
     def prune_tree(self, level):
         """

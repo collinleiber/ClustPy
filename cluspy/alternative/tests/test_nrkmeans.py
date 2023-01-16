@@ -242,6 +242,11 @@ def test_simple_nrkmeans_with_fruit():
     assert not hasattr(nrk_4, "labels_")
     nrk_4.fit(X)
     assert nrk_4.labels_.shape == labels.shape
+    # Test predict
+    assert np.array_equal(nrk.labels_, nrk.predict(X))
+    assert np.array_equal(nrk_2.labels_[:-1], nrk_2.predict(X[:-1]))
+    assert np.array_equal(nrk_3.labels_[:-2], nrk_3.predict(X[:-2]))
+    assert np.array_equal(nrk_4.labels_[:-3], nrk_4.predict(X[:-3]))
 
 
 @patch("matplotlib.pyplot.show")  # Used to test plots (show will not be called)

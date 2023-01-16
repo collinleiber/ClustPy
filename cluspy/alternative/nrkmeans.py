@@ -97,7 +97,7 @@ def _nrkmeans(X: np.ndarray, n_clusters: list, V: np.ndarray, m: list, P: list, 
             if outliers:
                 labels[:, i], n_outliers[i] = _check_for_outliers(X, V, centers[i], labels[:, i],
                                                                   scatter_matrices[i], m[i], P[i],
-                                                                  max_distance)
+                                                                  X.shape[0], max_distance)
                 # Again update centers and scatter matrices
                 centers[i], scatter_matrices[i] = _update_centers_and_scatter_matrices(X, n_clusters[i], labels[:, i])
         # Check if labels have not changed
@@ -178,7 +178,7 @@ def _initialize_nrkmeans_parameters(X: np.ndarray, n_clusters: list, V: np.ndarr
     # Check if n_clusters is a list
     if not type(n_clusters) is list:
         raise ValueError(
-            "Number of clusters must be specified for each subspace_nr and therefore be a list.\nYour input:\n" + str(
+            "Number of clusters must be specified for each subspace and therefore be a list.\nYour input:\n" + str(
                 n_clusters))
     # Check if n_clusters contains negative values
     if len([x for x in n_clusters if x < 1]) > 0:
@@ -210,7 +210,7 @@ def _initialize_nrkmeans_parameters(X: np.ndarray, n_clusters: list, V: np.ndarr
     elif m is None:
         m = [len(x) for x in P]
     if not type(m) is list or not len(m) is subspaces:
-        raise ValueError("A dimensionality list m must be specified for each subspace_nr.\nYour input:\n" + str(m))
+        raise ValueError("A dimensionality list m must be specified for each subspace.\nYour input:\n" + str(m))
     # Calculate projections P
     if P is None:
         possible_projections = list(range(data_dimensionality))
@@ -220,7 +220,7 @@ def _initialize_nrkmeans_parameters(X: np.ndarray, n_clusters: list, V: np.ndarr
             P.append(choices)
             possible_projections = list(set(possible_projections) - set(choices))
     if not type(P) is list or not len(P) is subspaces:
-        raise ValueError("Projection lists must be specified for each subspace_nr.\nYour input:\n" + str(P))
+        raise ValueError("Projection lists must be specified for each subspace.\nYour input:\n" + str(P))
     else:
         # Check if the length of entries in P matches values of m
         used_dimensionalities = []
@@ -234,11 +234,11 @@ def _initialize_nrkmeans_parameters(X: np.ndarray, n_clusters: list, V: np.ndarr
         if sorted(used_dimensionalities) != list(range(data_dimensionality)):
             raise ValueError("Projections P must include all dimensionalities.\nYour used dimensionalities:\n" + str(
                 used_dimensionalities))
-    # Define initial cluster centers with kmeans++ for each subspace_nr
+    # Define initial cluster centers with kmeans++ for each subspace
     if centers is None:
         centers = [kpp(X, k, row_norms(X, squared=True), random_state=random_state) for k in n_clusters]
     if not type(centers) is list or not len(centers) is subspaces:
-        raise ValueError("Cluster centers must be specified for each subspace_nr.\nYour input:\n" + str(centers))
+        raise ValueError("Cluster centers must be specified for each subspace.\nYour input:\n" + str(centers))
     else:
         # Check if number of centers for subspaces matches value in n_clusters
         for i, subspace_centers in enumerate(centers):
@@ -265,7 +265,7 @@ def _initialize_nrkmeans_parameters(X: np.ndarray, n_clusters: list, V: np.ndarr
     nr_noise_spaces = len([x for x in n_clusters if x == 1])
     if nr_noise_spaces > 1:
         raise ValueError(
-            "Only one subspace_nr can be the noise space (number of clusters = 1).\nYour input:\n" + str(n_clusters))
+            "Only one subspace can be the noise space (number of clusters = 1).\nYour input:\n" + str(n_clusters))
     # Check if noise space is not the last member in n_clusters
     if 1 in n_clusters and n_clusters[-1] != 1:
         raise ValueError(
@@ -433,7 +433,7 @@ def _update_rotation(X: np.ndarray, V: np.ndarray, first_index: int, second_inde
         The new projections for the second subspace,
         The new orthonormal rotation matrix
     """
-    # Check if second subspace_nr is the noise space
+    # Check if second subspace is the noise space
     is_noise_space = (n_clusters[second_index] == 1)
     # Get combined projections and combined_cropped_V
     P_1 = P[first_index]
@@ -843,50 +843,36 @@ class NrKmeans(BaseEstimator, ClusterMixin):
                 self.scatter_matrices_ = scatter_matrices
         return self
 
-    # def predict(self, X):
-    #     """
-    #     Predict the labels of an input dataset. For this method the results from the NrKmeans fit() method will be used.
-    #     If Nr-Kmeans was fitted with a defined outlier strategy this will also be applied here.
-    #     :param X: input data
-    #     :return: Array with the labels of the points for each subspace_nr
-    #     """
-    #     # Check if Nr-Kmeans model was created
-    #     if self.labels is None:
-    #         raise Exception("The NrKmeans algorithm has not run yet. Use the fit() function first.")
-    #     predicted_labels = [None] * len(self.n_clusters)
-    #     # Get labels for each subspace_nr
-    #     for sub in range(len(self.n_clusters)):
-    #         # Predict the labels
-    #         predicted_labels[sub] = _assign_labels(X, self.V, self.centers[sub], self.P[sub])
-    #         # Check for outliers
-    #         if self.outliers:
-    #             n_points = X.shape[0]
-    #             # Get basic cluster parameters for this subspace_nr
-    #             rotation = self.V[:, self.P[sub]]
-    #             # Get original costs encoding the points
-    #             sum_scatter_matrices = np.sum(self.scatter_matrices[sub], 0)
-    #             cluster_costs = mdl._calculate_single_cluster_costs_single_variance(rotation, n_points,
-    #                                                                                 sum_scatter_matrices, self.m[sub])
-    #             # Get costs for single outlier in this subspace_nr
-    #             outlier_coding_cost = mdl.single_outlier_costs(X, rotation)
-    #             # Check each point separately if it is an outlier
-    #             for i, x in enumerate(X):
-    #                 # Get costs for additional point in this cluster
-    #                 old_label = predicted_labels[sub][i]
-    #                 # Get outer product of point to center
-    #                 distance = x - self.centers[sub][old_label]
-    #                 outer = np.outer(distance, distance)
-    #                 # Add outer product to original scatter matrix
-    #                 scatter_matrix_cluster_tmp = self.scatter_matrices[sub][old_label] + outer
-    #                 # Calculate new costs
-    #                 new_pdf_costs = mdl._calculate_single_cluster_costs_single_variance(rotation, n_points + 1,
-    #                                                                                     scatter_matrix_cluster_tmp,
-    #                                                                                     self.m[sub])
-    #                 # Check if coding costs would be lower
-    #                 if outlier_coding_cost + cluster_costs < new_pdf_costs:
-    #                     predicted_labels[sub][i] = -1
-    #     # Return the predicted labels
-    #     return predicted_labels
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """
+        Predict the labels of an input dataset. For this method the results from the NrKmeans fit() method will be used.
+        If NrKmeans was fitted using a outlier strategy this will also be applied here.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            the given data set
+
+        Returns
+        -------
+        predicted_labels : np.ndarray
+            the predicted labels of the input data set for each subspace
+        """
+        # Check if NrKmeans has run
+        assert self.labels_ is not None, "The NrKmeans algorithm has not run yet. Use the fit() function first."
+        predicted_labels = np.zeros((X.shape[0], len(self.n_clusters)), dtype=np.int32)
+        # Get labels for each subspace
+        for sub in range(len(self.n_clusters)):
+            # Predict the labels
+            predicted_labels[:, sub] = _assign_labels(X, self.V, self.cluster_centers[sub], self.P[sub])
+            # (Optional) Check for outliers
+            if self.outliers:
+                predicted_labels[:, sub], _ = _check_for_outliers(X, self.V, self.cluster_centers[sub],
+                                                                  predicted_labels[:, sub],
+                                                                  self.scatter_matrices_[sub], self.m[sub], self.P[sub],
+                                                                  self.labels_.shape[0], self.max_distance)
+        # Return the predicted labels
+        return predicted_labels
 
     def transform_full_space(self, X: np.ndarray) -> np.ndarray:
         """
@@ -1167,12 +1153,12 @@ def _mdl_m_dependant_subspace_costs(X: np.ndarray, V: np.ndarray, cluster_index:
 
 def _check_for_outliers(X: np.ndarray, V: np.ndarray, centers_subspace: np.ndarray, labels_subspace: np.ndarray,
                         scatter_matrices_subspace: np.ndarray, m_subspace: int, P_subspace: np.ndarray,
-                        max_distance: float) -> (np.ndarray, int):
+                        n_points: int, max_distance: float) -> (np.ndarray, int):
     """
     Check for each point if it should be interpreted as an outlier in this subspace. Outliers are defined by the cost
     difference when this point is removed from its cluster. If it is cheaper to encode the point separately it is an outlier.
     For each outlier the label will be set to -1. Afterwards, the cluster centers will be updated and the distance
-    of this point to its old center will be subtracted from the scatter matrix.
+    of this point to its old center will be subtracted from the scatter matrix (does not happen within this method).
     See 'Automatic Parameter Selection for Non-Redundant Clustering' for more information.
 
     Parameters
@@ -1191,6 +1177,8 @@ def _check_for_outliers(X: np.ndarray, V: np.ndarray, centers_subspace: np.ndarr
         the dimensionality of this subspace
     P_subspace : np.ndarray
         the relevant dimensions (projections) in this subspace
+    n_points : int
+        the number of objects. Used for the calculation of the MDL costs (since the method should also work for predictions, it can not be obtained from X)
     max_distance : float
         distance used to encode the outliers
 
@@ -1200,8 +1188,8 @@ def _check_for_outliers(X: np.ndarray, V: np.ndarray, centers_subspace: np.ndarr
         The new cluster labels for this subspace,
         The number of outliers in this subspace
     """
+    assert X.shape[0] == labels_subspace.shape[0], "Number of objects must match number of labels"
     cropped_V = V[:, P_subspace]
-    n_points = X.shape[0]
     # Copy labels to update theses based on new outliers
     labels_subspace_copy = labels_subspace.copy()
     # Calculate points distances to respective centers
@@ -1287,41 +1275,41 @@ def _mdl_costs(X: np.ndarray, n_clusters: list, m: list, P: list, V: np.ndarray,
     # global_costs += mdl.mdl_costs_orthogonal_matrix(n_points, mdl.mdl_costs_float_value(n_points))
     # Costs of number of subspaces
     global_costs += mdl.mdl_costs_integer_value(subspaces)
-    # Costs for each subspace_nr
+    # Costs for each subspace
     all_subspace_costs = []
-    for subspace_nr in range(subspaces):
-        cropped_V = V[:, P[subspace_nr]]
+    for subspace in range(subspaces):
+        cropped_V = V[:, P[subspace]]
         # Calculate costs
         model_costs = 0
         # Costs for dimensionality
-        model_costs += mdl.mdl_costs_integer_value(m[subspace_nr])
-        # Number of clusters in subspace_nr
-        model_costs += mdl.mdl_costs_integer_value(n_clusters[subspace_nr])
+        model_costs += mdl.mdl_costs_integer_value(m[subspace])
+        # Number of clusters in this subspace
+        model_costs += mdl.mdl_costs_integer_value(n_clusters[subspace])
         # Costs for cluster centers
-        model_costs += n_clusters[subspace_nr] * \
-                       _mdl_reference_vector(m[subspace_nr], max_distance, precision)
+        model_costs += n_clusters[subspace] * \
+                       _mdl_reference_vector(m[subspace], max_distance, precision)
         # Coding costs for outliers
         outlier_costs = 0
         if outliers:
             # Encode number of outliers
-            n_outliers = len(labels[:, subspace_nr][labels[:, subspace_nr] == -1])
+            n_outliers = len(labels[:, subspace][labels[:, subspace] == -1])
             model_costs += mdl.mdl_costs_integer_value(n_outliers)
             # Encode coding costs of outliers
             outlier_costs += n_outliers * np.log2(n_points)
-            outlier_costs += n_outliers * _mdl_costs_uniform_pdf(m[subspace_nr], max_distance)
+            outlier_costs += n_outliers * _mdl_costs_uniform_pdf(m[subspace], max_distance)
         # Cluster assignment (is 0 for noise space)
         assignment_costs = (n_points - n_outliers) * mdl.mdl_costs_discrete_probability(
-            1 / n_clusters[subspace_nr])
+            1 / n_clusters[subspace])
         # Subspace Variance costs
         model_costs += mdl.mdl_costs_bic(n_points)
         # Coding costs for each point
-        coding_costs = mdl.mdl_costs_gmm_single_covariance(m[subspace_nr],
-                                                           scatter_matrices[subspace_nr],
+        coding_costs = mdl.mdl_costs_gmm_single_covariance(m[subspace],
+                                                           scatter_matrices[subspace],
                                                            n_points - n_outliers, cropped_V)
-        coding_costs += n_points * _mdl_costs_precision(m[subspace_nr], precision)
-        # Save this subspace_nr costs
+        coding_costs += n_points * _mdl_costs_precision(m[subspace], precision)
+        # Save this subspace costs
         all_subspace_costs.append(model_costs + outlier_costs + assignment_costs + coding_costs)
-    # return full and single subspace_nr costs
+    # return full and single subspace costs
     total_costs = global_costs + sum(all_subspace_costs)
     return total_costs, global_costs, all_subspace_costs
 

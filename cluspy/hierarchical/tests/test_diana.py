@@ -44,7 +44,7 @@ def test_split_cluster():
 
 
 """
-Tests regarding the NrKmeans object
+Tests regarding the DIANA object
 """
 
 

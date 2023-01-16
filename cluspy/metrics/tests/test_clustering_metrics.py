@@ -1,6 +1,6 @@
 import numpy as np
-from cluspy.metrics.clustering_metrics import unsupervised_clustering_accuracy, variation_of_information, \
-    _check_number_of_points
+from cluspy.metrics import unsupervised_clustering_accuracy, variation_of_information
+from cluspy.metrics.clustering_metrics import _check_number_of_points
 import pytest
 
 
