@@ -60,7 +60,7 @@ def test_simple_autonr_with_fruit():
     assert not hasattr(autonr, "labels_")
     autonr.fit(X)
     assert autonr.labels_.dtype == np.int32
-    assert autonr.labels_.shape.shape[0] == labels.shape.shape[0]
+    assert autonr.labels_.shape[0] == labels.shape[0]
     # Check if random state is working
     autonr_2 = AutoNR(random_state=1, mdl_for_noisespace=False)
     assert not hasattr(autonr_2, "labels_")
@@ -79,3 +79,43 @@ def test_plot_autonr_mdl_costs_progress_with_fruit(mock_fig):
     autonr = AutoNR(max_subspaces=2, max_n_clusters=2)
     autonr.fit(X)
     assert None == autonr.plot_mdl_progress()
+
+
+def test_dissolve_noise_space_with_fruit():
+    X, _ = load_fruit()
+    autonr = AutoNR(random_state=4, max_subspaces=4, max_n_clusters=4)
+    autonr.fit(X)
+    # Save original parameters
+    n_clusters_copy = autonr.nrkmeans_.n_clusters.copy()
+    m_copy = autonr.nrkmeans_.m.copy()
+    P_copy = autonr.nrkmeans_.P.copy()
+    scatter_matrices_copy = autonr.nrkmeans_.scatter_matrices_.copy()
+    cluster_centers_copy = autonr.nrkmeans_.cluster_centers.copy()
+    labels_copy = autonr.nrkmeans_.labels_.copy()
+    # Random feature assignment or MDL-based feature assignment
+    for strategy in [True, False]:
+        if strategy == False:
+            # Revert to original parameters
+            autonr.nrkmeans_.n_clusters = n_clusters_copy.copy()
+            autonr.nrkmeans_.m = m_copy.copy()
+            autonr.nrkmeans_.P = P_copy.copy()
+            autonr.nrkmeans_.scatter_matrices_ = scatter_matrices_copy.copy()
+            autonr.nrkmeans_.cluster_centers = cluster_centers_copy.copy()
+            autonr.nrkmeans_.labels_ = labels_copy.copy()
+        autonr.dissolve_noise_space(X, random_feature_assignment=strategy)
+        assert np.array_equal(autonr.nrkmeans_.n_clusters, n_clusters_copy[:-1])
+        assert len(autonr.nrkmeans_.scatter_matrices_) == len(scatter_matrices_copy) - 1
+        for i in range(len(autonr.nrkmeans_.scatter_matrices_)):
+            assert np.array_equal(autonr.nrkmeans_.scatter_matrices_[i], scatter_matrices_copy[i])
+        assert len(autonr.nrkmeans_.cluster_centers) == len(cluster_centers_copy) - 1
+        for i in range(len(autonr.nrkmeans_.cluster_centers)):
+            assert np.array_equal(autonr.nrkmeans_.cluster_centers[i], cluster_centers_copy[i])
+        assert np.array_equal(autonr.nrkmeans_.labels_, labels_copy[:, :-1])
+        assert len(autonr.nrkmeans_.m) == len(n_clusters_copy) - 1
+        assert np.sum(autonr.nrkmeans_.m) == X.shape[1]
+        assert len(autonr.nrkmeans_.P) == len(n_clusters_copy) - 1
+        check_P = []
+        for i in range(len(autonr.nrkmeans_.P)):
+            assert len(autonr.nrkmeans_.P[i]) == autonr.nrkmeans_.m[i]
+            check_P += autonr.nrkmeans_.P[i].tolist()
+        assert np.array_equal(np.sort(check_P), np.arange(X.shape[1]))

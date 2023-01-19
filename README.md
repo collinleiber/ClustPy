@@ -4,21 +4,26 @@
 [![codecov](https://codecov.io/github/collinleiber/ClusPy/branch/master/graphs/badge.svg)](https://codecov.io/github/collinleiber/ClusPy) 
 
 The package provides a simple way to cluster data in Python.
-For this purpose it provides a variety of algorithms. 
-Additionally, methods that are often needed for research purposes, such as loading frequently used datasets 
-(e.g. from the [UCI repository](https://archive.ics.uci.edu/ml/index.php)), are largely automated. 
+For this purpose it provides a variety of algorithms from different domains. 
+Additionally, ClusPy includes methods that are often needed for research purposes, such as plots, clustering metrics or evaluation methods.
+Further, it integrates various frequently used datasets (e.g. from the [UCI repository](https://archive.ics.uci.edu/ml/index.php)) through largely automated loading options. 
 
 The focus of the ClusPy package is not on efficiency (here we recommend e.g. [pyclustering](https://pyclustering.github.io/)), 
 but on the possibility to try out a wide range of modern scientific methods.
 In particular, this should also make lesser-known methods accessible in a simple and convenient way.
 
-It can be combined with all algorithms from [sklearn clustering](https://scikit-learn.org/stable/modules/clustering.html) 
-and other packages (see below).
-Furthermore, it contains wrappers for [pyclustering](https://pyclustering.github.io/) implementations.
+Since it largely follows the implementation conventions of [sklearn clustering](https://scikit-learn.org/stable/modules/clustering.html), 
+it can be combined with many other packages (see below).
 
 ## Installation
 
 ### For Users
+
+#### Stable Version
+
+Stay tuned for the 'pip' release
+
+#### Development Version
 
 The package can be installed directly from git by executing:
 
@@ -58,7 +63,7 @@ Remove cluspy via pip to avoid ambiguities during development, e.g., when changi
     - Dip-Means
     - Projected Dip-Means
     - DipExt & DipInit
-    - SkinnyDip & UniDip
+    - SkinnyDip & UniDip & TailoredDip
     - SubKmeans
     - Fuzzy-C-Means (from [pyclustering](https://pyclustering.github.io/docs/0.10.0/html/de/df0/namespacepyclustering_1_1cluster_1_1fcm.html))
     - X-Means (from [pyclustering](https://pyclustering.github.io/docs/0.10.0/html/d2/d8b/namespacepyclustering_1_1cluster_1_1xmeans.html))
@@ -94,12 +99,14 @@ Remove cluspy via pip to avoid ambiguities during development, e.g., when changi
 - Utils
     - Hartigans Dip-test
     - Various plots
-    - Evaluation methods
+    - Automoatic evaluation methods
 - Datasets
     - Synthetic dataset creator for subspace and alternative clustering 
     - Various real-world datasets (e.g. Iris, Wine, Mice protein, Optdigits, MNIST, ...)
     
 ## Compatible packages
+
+We stick as close as possible to the implementation details of sklean clustering. Therefore, our methods are compatible with many other packages. Examples are:
 
 - [sklearn clustering](https://scikit-learn.org/stable/modules/clustering.html) 
     - K-Means
@@ -123,7 +130,7 @@ Remove cluspy via pip to avoid ambiguities during development, e.g., when changi
 - [Density Peak Clustering](https://github.com/colinwke/dpca)
     - DPC
 
-## Examples
+## Coding Examples
 
 ### 1)
 

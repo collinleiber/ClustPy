@@ -50,13 +50,12 @@ def _autonr(X: np.ndarray, nrkmeans_repetitions: int, outliers: bool, max_subspa
         The final MDL costs,
         A list of type _Nrkmeans_Mdl_Costs containing all intermediate MDL costs
     """
-    max_subspaces, max_n_clusters, max_distance, precision, random_state = _check_input_parameters(X,
-                                                                                                   nrkmeans_repetitions,
-                                                                                                   max_subspaces,
-                                                                                                   max_n_clusters,
-                                                                                                   max_distance,
-                                                                                                   precision,
-                                                                                                   random_state)
+    max_subspaces, max_n_clusters, max_distance, precision = _check_input_parameters(X,
+                                                                                     nrkmeans_repetitions,
+                                                                                     max_subspaces,
+                                                                                     max_n_clusters,
+                                                                                     max_distance,
+                                                                                     precision)
     all_mdl_costs = []
     # Default number of clusters
     n_clusters = [1]
@@ -185,8 +184,7 @@ def _autonr(X: np.ndarray, nrkmeans_repetitions: int, outliers: bool, max_subspa
 
 
 def _check_input_parameters(X: np.ndarray, nrkmeans_repetitions: int, max_subspaces: int, max_n_clusters: int,
-                            max_distance: float, precision: float, random_state: np.random.RandomState) -> (
-        int, int, float, float, np.random.RandomState):
+                            max_distance: float, precision: float) -> (int, int, float, float):
     """
     Check the input parameters for AutoNR. Further, all input values which are None will be defined.
 
@@ -204,19 +202,15 @@ def _check_input_parameters(X: np.ndarray, nrkmeans_repetitions: int, max_subspa
         distance used to encode cluster centers and outliers
     precision : float
         precision used to convert probability densities to actual probabilities
-    random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int
 
     Returns
     -------
-    tuple : (int, int, float, float, np.random.RandomState)
+    tuple : (int, int, float, float)
         The maximum number of subspaces,
         The maximum number of clusters for each subspace,
         The distance used to encode cluster centers and outliers,
-        The precision used to convert probability densities to actual probabilities,
-        The random state to initialize random variables
+        The precision used to convert probability densities to actual probabilities
     """
-    random_state = check_random_state(random_state)
     # Check nrkmeans execution count
     if nrkmeans_repetitions is None or nrkmeans_repetitions < 1:
         raise ValueError(
@@ -251,7 +245,7 @@ def _check_input_parameters(X: np.ndarray, nrkmeans_repetitions: int, max_subspa
         max_distance = np.max(cdist(X, X))
     if precision is None:
         precision = _get_precision(X)
-    return max_subspaces, max_n_clusters, max_distance, precision, random_state
+    return max_subspaces, max_n_clusters, max_distance, precision
 
 
 def _execute_nrkmeans(X: np.ndarray, n_clusters: list, nrkmeans_repetitions: int,
@@ -1014,14 +1008,12 @@ def _get_full_space_parameters_merge(X: np.ndarray, best_nrkmeans: NrKmeans, nrk
     del n_clusters_new[subspace_2]
     del n_clusters_new[subspace_1]
     n_clusters_new += nrkmeans_merge.n_clusters
-    n_clusters_new = np.array(n_clusters_new)
     # Update the projecitons by replacing the projections from the new subspace_nr with the ones from the original spaces
     P_new = best_nrkmeans.P.copy()
     P_from_subspace = [np.append(P_new[subspace_1], P_new[subspace_2])]
     del P_new[subspace_2]
     del P_new[subspace_1]
     P_new += P_from_subspace
-    P_new = np.array(P_new)
     # Remove centers from splitted subspace_nr and add the new ones reversed turned
     centers_new = best_nrkmeans.cluster_centers.copy()
     del centers_new[subspace_2]
@@ -1030,12 +1022,11 @@ def _get_full_space_parameters_merge(X: np.ndarray, best_nrkmeans: NrKmeans, nrk
         [np.mean(X[nrkmeans_merge.labels_[:, i] == j], axis=0) for j in range(nrkmeans_merge.n_clusters[i])] for i in
         range(nrkmeans_merge.labels_.shape[1])]
     centers_new += centers_from_subspace
-    centers_new = np.array(centers_new)
     # Order the subspaces with the one with the most clusters first
-    order = np.argsort(-n_clusters_new)
-    n_clusters_new = list(n_clusters_new[order])
-    centers_new = list(centers_new[order])
-    P_new = list(P_new[order])
+    order = order = np.argsort(n_clusters_new)[::-1]
+    n_clusters_new = [n_clusters_new[o] for o in order]
+    centers_new = [centers_new[o] for o in order]
+    P_new = [P_new[o] for o in order]
     # Remove possible double noise space
     n_clusters_new, centers_new, P_new = _remove_multiple_noise_spaces(n_clusters_new, centers_new, P_new)
     # Return parameters for the full space execution
@@ -1179,7 +1170,7 @@ class AutoNR(BaseEstimator, ClusterMixin):
         self.max_distance = max_distance
         self.precision = precision
         self.similarity_threshold = similarity_threshold
-        self.random_state = random_state
+        self.random_state = check_random_state(random_state)
         self.debug = debug
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'AutoNR':
@@ -1251,3 +1242,66 @@ class AutoNR(BaseEstimator, ClusterMixin):
                            Line2D([0], [0], marker="o", color="green", markersize=7, label="Best result")]
         ax.legend(handles=legend_elements, loc="upper right")
         plt.show()
+
+    def dissolve_noise_space(self, X: np.ndarray = None, random_feature_assignment: bool = True) -> NrKmeans:
+        """
+        Using this method an optional noise space (n_clusters=1) can be removed from the resulting NrKmeans result which showed the lowest MDL costs.
+        This is useful if the noise space is no longer relevant for subsequent processing steps.
+        Only the NrKmeans parameters 'm' and 'P' will be changed. All other parameters remain the same.
+        There are two strategies to resolve the noise space.
+        In the first case, the features are randomly distributed to the different cluster spaces.
+        In the second, the features of the noise space are successively checked as to which cluster space they are added in order to increase the MDL costs as little as possible.
+        Accordingly, the runtime is significantly longer using the second method.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            the given data set. Only used to calculate MDL costs. Therefore, can be None if random_feature_assignment is True (default: None)
+        random_feature_assignment : bool
+            If true, the random strategy to distribute the noise space features is used (default: True)
+
+        Returns
+        -------
+        self.nrkmeans_ : NrKmeans
+            The final updated NrKmeans object
+        """
+        # nothing to do if no noise space is present
+        if 1 not in self.nrkmeans_.n_clusters or len(self.nrkmeans_.n_clusters) == 1:
+            return self.nrkmeans_
+        n_cluster_spaces = len(self.nrkmeans_.n_clusters) - 1
+        if random_feature_assignment:
+            # assign each features of the noise space to one cluster space
+            projection_assignments = self.random_state.randint(0, n_cluster_spaces, size=self.nrkmeans_.m[-1])
+            for subspace_id in range(n_cluster_spaces):
+                relevant_entries = np.where(projection_assignments == subspace_id)[0]
+                # Update m and P
+                self.nrkmeans_.P[subspace_id] = np.r_[
+                    self.nrkmeans_.P[subspace_id], self.nrkmeans_.P[-1][relevant_entries]]
+                self.nrkmeans_.m[subspace_id] += len(relevant_entries)
+        else:
+            for proj in self.nrkmeans_.P[-1]:
+                best_match_id = None
+                best_mdl_costs = np.inf
+                for subspace_id in range(n_cluster_spaces):
+                    # Update m and P
+                    self.nrkmeans_.P[subspace_id] = np.r_[self.nrkmeans_.P[subspace_id], [proj]]
+                    self.nrkmeans_.m[subspace_id] += 1
+                    # Get mdl costs
+                    mdl_costs, _, _ = self.nrkmeans_.calculate_mdl_costs(X)
+                    if mdl_costs < best_mdl_costs:
+                        best_mdl_costs = mdl_costs
+                        best_match_id = subspace_id
+                    # Revert changes of m and P
+                    self.nrkmeans_.P[subspace_id] = np.delete(self.nrkmeans_.P[subspace_id], -1)
+                    self.nrkmeans_.m[subspace_id] -= 1
+                # Permanently add the noise space dimension to the best matching cluster space
+                self.nrkmeans_.P[best_match_id] = np.r_[self.nrkmeans_.P[best_match_id], [proj]]
+                self.nrkmeans_.m[best_match_id] += 1
+        # Remove all entries of the noise space
+        del self.nrkmeans_.n_clusters[-1]
+        del self.nrkmeans_.P[-1]
+        del self.nrkmeans_.m[-1]
+        del self.nrkmeans_.scatter_matrices_[-1]
+        del self.nrkmeans_.cluster_centers[-1]
+        self.nrkmeans_.labels_ = self.nrkmeans_.labels_[:, :-1]
+        return self.nrkmeans_

@@ -734,7 +734,7 @@ class NrKmeans(BaseEstimator, ClusterMixin):
         number of times NrKmeans is executed using different seeds. The final result will be the one with lowest costs.
         Costs can be the standard NrKmeans costs or MDL costs (defined by the cost_type parameter) (default: 1)
     cost_type : str
-        Can be "default" or "mdl" and defines whether the the standard NrKmeans cost function or MDL costs should be considered to identify the best result.
+        Can be "default" or "mdl" and defines whether the standard NrKmeans cost function or MDL costs should be considered to identify the best result.
         Only relevant if n_init is larger than 1 (default: "default")
     threshold_negative_eigenvalue : float
         threshold to consider an eigenvalue as negative. Used for the update of the subspace dimensions (default: -1e-7)

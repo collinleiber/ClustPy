@@ -233,12 +233,12 @@ def test_simple_nrkmeans_with_fruit():
     assert all([np.array_equal(nrk_2.cluster_centers[i], nrk.cluster_centers[i]) for i in range(2)])
     assert all([np.array_equal(nrk_2.scatter_matrices_[i], nrk.scatter_matrices_[i]) for i in range(2)])
     # Check result with mdl_for_noisespace and n_init=3 and outliers
-    nrk_3 = NrKmeans([3, 1], mdl_for_noisespace=True, n_init=3, outliers=True)
+    nrk_3 = NrKmeans([3, 1], random_state=2, mdl_for_noisespace=True, n_init=3, outliers=True)
     assert not hasattr(nrk_3, "labels_")
     nrk_3.fit(X)
     assert nrk_3.labels_.shape == labels.shape
     # Check result with mdl_for_noisespace and n_init=3 and cost_type = mdl
-    nrk_4 = NrKmeans([3, 1], mdl_for_noisespace=True, n_init=3, cost_type="mdl")
+    nrk_4 = NrKmeans([3, 1], random_state=3, mdl_for_noisespace=True, n_init=3, cost_type="mdl")
     assert not hasattr(nrk_4, "labels_")
     nrk_4.fit(X)
     assert nrk_4.labels_.shape == labels.shape
