@@ -44,15 +44,15 @@ Tests regarding the ConfusionMatrix object
 
 def test_confusion_matrix_object():
     # First test
-    labels_pred = np.array([0, 0, 1, 1, 2, 2, 3, 3])
     labels_true = np.array([0, 0, 0, 0, 1, 1, 1, 1])
+    labels_pred = np.array([0, 0, 1, 1, 2, 2, 3, 3])
     cm = ConfusionMatrix(labels_true, labels_pred)
     expected_cm = np.array([[2, 2, 0, 0],
                             [0, 0, 2, 2]])
     assert np.array_equal(cm.confusion_matrix, expected_cm)
     # Second test
-    labels_pred = np.array([0, 0, 1, 1, 2, 2, 3, 3])
     labels_true = np.array([0, 1, 2, 3, 0, 1, 2, 3])
+    labels_pred = np.array([0, 0, 1, 1, 2, 2, 3, 3])
     cm = ConfusionMatrix(labels_true, labels_pred)
     expected_cm = np.array([[1, 0, 1, 0],
                             [1, 0, 1, 0],
@@ -62,8 +62,8 @@ def test_confusion_matrix_object():
 
 
 def test_confusion_matrix_rearrange():
-    labels_pred = np.array([0, 0, 1, 1, 2, 2, 3, 3])
     labels_true = np.array([0, 1, 2, 3, 0, 1, 2, 3])
+    labels_pred = np.array([0, 0, 1, 1, 2, 2, 3, 3])
     cm = ConfusionMatrix(labels_true, labels_pred)
     cm_copy = cm.confusion_matrix.copy()
     rearranged_cm = cm.rearrange(inplace=False)
@@ -79,7 +79,7 @@ def test_confusion_matrix_rearrange():
 
 @patch("matplotlib.pyplot.show")  # Used to test plots (show will not be called)
 def test_confusion_matrix_plot(mock_fig):
-    labels_pred = np.array([0, 0, 1, 1, 2, 2, 3, 3])
     labels_true = np.array([0, 0, 0, 0, 1, 1, 1, 1])
+    labels_pred = np.array([0, 0, 1, 1, 2, 2, 3, 3])
     cm = ConfusionMatrix(labels_true, labels_pred)
     assert None == cm.plot()

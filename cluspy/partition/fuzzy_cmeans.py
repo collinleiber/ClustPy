@@ -1,8 +1,3 @@
-"""
-Hamerly, Greg, and Charles Elkan. "Learning the k in k-means."
-Advances in neural information processing systems. 2004.
-"""
-
 from pyclustering.cluster.fcm import fcm
 from cluspy.utils._wrapper_methods import pyclustering_adjust_labels, _kmeans_plus_plus as kpp
 from sklearn.utils.extmath import row_norms

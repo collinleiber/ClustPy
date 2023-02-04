@@ -1036,7 +1036,7 @@ def _get_full_space_parameters_merge(X: np.ndarray, best_nrkmeans: NrKmeans, nrk
 def _remove_multiple_noise_spaces(n_clusters: list, centers: list, P: list) -> (list, list, list):
     """
     In rare cases additional noise spaces (subspaces with a single cluster) can occur. This is not desired.
-    Therefore, if this happens we combine the all noise spaces into a single noise space.
+    Therefore, if this happens we combine all noise spaces into a single noise space.
 
     Parameters
     ----------
@@ -1142,7 +1142,7 @@ class AutoNR(BaseEstimator, ClusterMixin):
     Attributes
     ----------
     labels_ : np.ndarray
-        The final labels
+        The final labels. Shape equals (n_samples x n_subspaces)
     nrkmeans_ : NrKmeans
         The final NrKmeans result
     mdl_costs_ : float
@@ -1246,12 +1246,7 @@ class AutoNR(BaseEstimator, ClusterMixin):
     def dissolve_noise_space(self, X: np.ndarray = None, random_feature_assignment: bool = True) -> NrKmeans:
         """
         Using this method an optional noise space (n_clusters=1) can be removed from the resulting NrKmeans result which showed the lowest MDL costs.
-        This is useful if the noise space is no longer relevant for subsequent processing steps.
-        Only the NrKmeans parameters 'm' and 'P' will be changed. All other parameters remain the same.
-        There are two strategies to resolve the noise space.
-        In the first case, the features are randomly distributed to the different cluster spaces.
-        In the second, the features of the noise space are successively checked as to which cluster space they are added in order to increase the MDL costs as little as possible.
-        Accordingly, the runtime is significantly longer using the second method.
+        For more information see 'NrKmeans.dissolve_noise_space()'
 
         Parameters
         ----------
@@ -1265,43 +1260,4 @@ class AutoNR(BaseEstimator, ClusterMixin):
         self.nrkmeans_ : NrKmeans
             The final updated NrKmeans object
         """
-        # nothing to do if no noise space is present
-        if 1 not in self.nrkmeans_.n_clusters or len(self.nrkmeans_.n_clusters) == 1:
-            return self.nrkmeans_
-        n_cluster_spaces = len(self.nrkmeans_.n_clusters) - 1
-        if random_feature_assignment:
-            # assign each features of the noise space to one cluster space
-            projection_assignments = self.random_state.randint(0, n_cluster_spaces, size=self.nrkmeans_.m[-1])
-            for subspace_id in range(n_cluster_spaces):
-                relevant_entries = np.where(projection_assignments == subspace_id)[0]
-                # Update m and P
-                self.nrkmeans_.P[subspace_id] = np.r_[
-                    self.nrkmeans_.P[subspace_id], self.nrkmeans_.P[-1][relevant_entries]]
-                self.nrkmeans_.m[subspace_id] += len(relevant_entries)
-        else:
-            for proj in self.nrkmeans_.P[-1]:
-                best_match_id = None
-                best_mdl_costs = np.inf
-                for subspace_id in range(n_cluster_spaces):
-                    # Update m and P
-                    self.nrkmeans_.P[subspace_id] = np.r_[self.nrkmeans_.P[subspace_id], [proj]]
-                    self.nrkmeans_.m[subspace_id] += 1
-                    # Get mdl costs
-                    mdl_costs, _, _ = self.nrkmeans_.calculate_mdl_costs(X)
-                    if mdl_costs < best_mdl_costs:
-                        best_mdl_costs = mdl_costs
-                        best_match_id = subspace_id
-                    # Revert changes of m and P
-                    self.nrkmeans_.P[subspace_id] = np.delete(self.nrkmeans_.P[subspace_id], -1)
-                    self.nrkmeans_.m[subspace_id] -= 1
-                # Permanently add the noise space dimension to the best matching cluster space
-                self.nrkmeans_.P[best_match_id] = np.r_[self.nrkmeans_.P[best_match_id], [proj]]
-                self.nrkmeans_.m[best_match_id] += 1
-        # Remove all entries of the noise space
-        del self.nrkmeans_.n_clusters[-1]
-        del self.nrkmeans_.P[-1]
-        del self.nrkmeans_.m[-1]
-        del self.nrkmeans_.scatter_matrices_[-1]
-        del self.nrkmeans_.cluster_centers[-1]
-        self.nrkmeans_.labels_ = self.nrkmeans_.labels_[:, :-1]
-        return self.nrkmeans_
+        return self.nrkmeans_.dissolve_noise_space(X, random_feature_assignment)

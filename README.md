@@ -25,7 +25,7 @@ Stay tuned for the 'pip' release
 
 #### Development Version
 
-The package can be installed directly from git by executing:
+The current development version can be installed directly from git by executing:
 
 `sudo pip3 install git+https://github.com/collinleiber/ClusPy.git`
 
@@ -58,48 +58,51 @@ Remove cluspy via pip to avoid ambiguities during development, e.g., when changi
 ### Algorithms
 
 - Partition-based clustering
-    - LDA-K-Means
-    - PG-Means
-    - Dip-Means
-    - Projected Dip-Means
-    - DipExt & DipInit
-    - SkinnyDip & UniDip & TailoredDip
-    - SubKmeans
-    - Fuzzy-C-Means (from [pyclustering](https://pyclustering.github.io/docs/0.10.0/html/de/df0/namespacepyclustering_1_1cluster_1_1fcm.html))
-    - X-Means (from [pyclustering](https://pyclustering.github.io/docs/0.10.0/html/d2/d8b/namespacepyclustering_1_1cluster_1_1xmeans.html))
-    - G-Means (from [pyclustering](https://pyclustering.github.io/docs/0.10.0/html/dc/d86/namespacepyclustering_1_1cluster_1_1gmeans.html))
+    - [DipExt + DipInit](https://link.springer.com/chapter/10.1007/978-3-030-67658-2_6)
+    - [Dip-Means](https://proceedings.neurips.cc/paper/2012/hash/a8240cb8235e9c493a0c30607586166c-Abstract.html)
+    - [Fuzzy-C-Means](https://link.springer.com/book/10.1007/978-1-4757-0450-1) (from [pyclustering](https://pyclustering.github.io/docs/0.10.0/html/de/df0/namespacepyclustering_1_1cluster_1_1fcm.html))    
+    - [G-Means](https://proceedings.neurips.cc/paper/2003/hash/234833147b97bb6aed53a8f4f1c7a7d8-Abstract.html) (from [pyclustering](https://pyclustering.github.io/docs/0.10.0/html/dc/d86/namespacepyclustering_1_1cluster_1_1gmeans.html))
+    - [LDA-K-Means](https://dl.acm.org/doi/abs/10.1145/1273496.1273562)
+    - [PG-Means](https://proceedings.neurips.cc/paper/2006/hash/a9986cb066812f440bc2bb6e3c13696c-Abstract.html)
+    - [Projected Dip-Means](https://dl.acm.org/doi/abs/10.1145/3200947.3201008)
+    - [SkinnyDip + UniDip](https://dl.acm.org/doi/abs/10.1145/2939672.2939740) & TailoredDip
+    - [SubKmeans](https://dl.acm.org/doi/abs/10.1145/3097983.3097989)
+    - [X-Means](https://web.cs.dal.ca/~shepherd/courses/csci6403/clustering/xmeans.pdf) (from [pyclustering](https://pyclustering.github.io/docs/0.10.0/html/d2/d8b/namespacepyclustering_1_1cluster_1_1xmeans.html))
 - Density-based clustering
-    - Multi Density DBSCAN
+    - [Multi Density DBSCAN](https://link.springer.com/chapter/10.1007/978-3-642-23878-9_53)
 - Hierarchical clustering
-    - Diana
-- Alternative clustering (Non-redundant clustering)
-    - NR-Kmeans
-    - AutoNR
+    - [Diana](https://www.jstor.org/stable/2290430?origin=crossref)
+- Alternative clustering / Non-redundant clustering
+    - [AutoNR](https://epubs.siam.org/doi/abs/10.1137/1.9781611977172.26)
+    - [NR-Kmeans](https://dl.acm.org/doi/abs/10.1145/3219819.3219945)
 - Deep clustering
-    - Flexible Autoencoder
-    - Stacked Autoencoder
-    - Variational Autoencoder
-    - Neighbor Encoder
-    - DEC
-    - IDEC
-    - DCN
-    - VaDE
-    - DipDECK
-    - DipEncoder
-    - ENRC
+    - Autoencoder
+        - [Flexible Autoencoder](https://www.aaai.org/Library/AAAI/1987/aaai87-050.php)
+        - [Neighbor Encoder](https://arxiv.org/abs/1811.01557)
+        - [Stacked Autoencoder](https://www.jmlr.org/papers/volume11/vincent10a/vincent10a.pdf?ref=https://githubhelp.com)
+        - [Variational Autoencoder](https://arxiv.org/abs/1312.6114)
+    - [DCN](https://dl.acm.org/doi/abs/10.5555/3305890.3306080)
+    - [DEC](https://dl.acm.org/doi/abs/10.5555/3045390.3045442)
+    - [DipDECK](https://dl.acm.org/doi/10.1145/3447548.3467316)
+    - [DipEncoder](https://dl.acm.org/doi/10.1145/3534678.3539407)
+    - [ENRC](https://ojs.aaai.org/index.php/AAAI/article/view/5961)
+    - [IDEC](https://dl.acm.org/doi/abs/10.5555/3172077.3172131)
+    - [VaDE](https://dl.acm.org/doi/abs/10.5555/3172077.3172161)
     
 ### Other implementations
 
 - Metrics
-    - Unsupervised Clustering Accuracy
-    - Variation of information
     - Confusion Matrix
-    - Pair Counting Scores (f1, rand, jaccard, recall, precision)
+    - [Pair Counting Scores (f1, rand, jaccard, recall, precision)](https://link.springer.com/article/10.1007/s10115-008-0150-6)
+    - [Unsupervised Clustering Accuracy](https://ieeexplore.ieee.org/abstract/document/5454426)
+    - [Variation of information](https://link.springer.com/chapter/10.1007/978-3-540-45167-9_14)
     - Scores for multiple labelings (see alternative clustering algorithms)
+        - Multiple Labelings Confusion Matrix
+        - [Multiple Labelings Pair Counting Scores](https://ieeexplore.ieee.org/abstract/document/6228189)
 - Utils
-    - Hartigans Dip-test
-    - Various plots
     - Automoatic evaluation methods
+    - [Hartigans Dip-test](https://www.jstor.org/stable/2241144)
+    - Various plots
 - Datasets
     - Synthetic dataset creator for subspace and alternative clustering 
     - Various real-world datasets (e.g. Iris, Wine, Mice protein, Optdigits, MNIST, ...)

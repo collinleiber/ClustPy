@@ -20,7 +20,7 @@ def _rearrange(confusion_matrix: np.ndarray) -> np.ndarray:
     -------
     rearranged_confusion_matrix : np.ndarray
         The rearranged confusion matrix.
-        If number of ground truth labels is larer than the number of predicted labels, the resulting confusion matrix will be quadradic with multiple 0 columns.
+        If number of ground truth labels is larger than the number of predicted labels, the resulting confusion matrix will be quadradic with multiple 0 columns.
     """
     # Change order using the Hungarian Method
     max_number_labels = max(confusion_matrix.shape)
@@ -40,7 +40,7 @@ def _rearrange(confusion_matrix: np.ndarray) -> np.ndarray:
 
 
 def _plot_confusion_matrix(confusion_matrix: np.ndarray, show_text: bool, figsize: tuple, cmap: str, textcolor: str,
-                           vmin: int, vmax: int) -> None:
+                           vmin: float, vmax: float) -> None:
     """
     Plot the confusion matrix.
 
@@ -56,11 +56,11 @@ def _plot_confusion_matrix(confusion_matrix: np.ndarray, show_text: bool, figsiz
         Colormap used for the plot
     textcolor : str
         Color of the text. Only relevant if show_text is True
-    vmin : int
+    vmin : float
         Minimum possible value within a cell of the confusion matrix.
         If None, it will be set as the minimum value within the confusion matrix.
         Used to choose the color from the colormap
-    vmax : int
+    vmax : float
         Maximum possible value within a cell of the confusion matrix.
         If None, it will be set as the maximum value within the confusion matrix.
         Used to choose the color from the colormap

@@ -3,6 +3,11 @@
 Dominik Mautz
 """
 
+"""
+Vincent, Pascal, et al. "Stacked denoising autoencoders: Learning useful representations in a deep network with a local denoising criterion."
+Journal of machine learning research 11.12 (2010).
+"""
+
 import torch
 import torch.nn.functional as F
 from cluspy.deep._utils import window
@@ -247,8 +252,7 @@ class StackedAutoencoder(torch.nn.Module):
                 continue
             break  # Break while loop here
 
-
-    def start_training(self, trainloader, device, steps_per_layer = 10000, refine_training_steps=20000, dropout_rate=0.2):
+    def start_training(self, trainloader, device, steps_per_layer=10000, refine_training_steps=20000, dropout_rate=0.2):
         self.pretrain(trainloader, device=device, rounds_per_layer=steps_per_layer, dropout_rate=dropout_rate)
         self.refine_training(trainloader, rouns=refine_training_steps, device=device)
         return self
