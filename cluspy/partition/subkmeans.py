@@ -176,7 +176,7 @@ class SubKmeans(BaseEstimator, ClusterMixin):
         self.V = V
         self.m = m
 
-    def fit(self, X, y=None) -> 'SubKmeans':
+    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'SubKmeans':
         """
         Initiate the actual clustering process on the input data set.
         The resulting cluster labels will be stored in the labels_ attribute.
@@ -224,7 +224,7 @@ class SubKmeans(BaseEstimator, ClusterMixin):
         self.n_clusters = nrkmeans.n_clusters[0]
         return self
 
-    def transform_full_space(self, X):
+    def transform_full_space(self, X: np.ndarray) -> np.ndarray:
         """
         Transform the input dataset with the orthonormal rotation matrix identified by the fit function.
 
@@ -238,11 +238,11 @@ class SubKmeans(BaseEstimator, ClusterMixin):
         rotated_data : np.ndarray
             The rotated dataset
         """
-        assert self.labels_ is not None, "The SubKmeans algorithm has not run yet. Use the fit() function first."
+        assert hasattr(self, "labels_"), "The SubKmeans algorithm has not run yet. Use the fit() function first."
         rotated_data = np.matmul(X, self.V)
         return rotated_data
 
-    def transform_clustered_space(self, X):
+    def transform_clustered_space(self, X: np.ndarray) -> np.ndarray:
         """
         Transform the input dataset with the orthonormal rotation matrix identified by the fit function and
         project it into the clustered space.
@@ -257,7 +257,7 @@ class SubKmeans(BaseEstimator, ClusterMixin):
         rotated_data : np.ndarray
             The rotated and projected dataset
         """
-        assert self.labels_ is not None, "The SubKmeans algorithm has not run yet. Use the fit() function first."
+        assert hasattr(self, "labels_"), "The SubKmeans algorithm has not run yet. Use the fit() function first."
         clustered_space_V = self.V[:, :self.m]
         rotated_data = np.matmul(X, clustered_space_V)
         return rotated_data
@@ -280,7 +280,7 @@ class SubKmeans(BaseEstimator, ClusterMixin):
         equal_axis : bool
             defines whether the axes should be scaled equally
         """
-        assert self.labels_ is not None, "The SubKmeans algorithm has not run yet. Use the fit() function first."
+        assert hasattr(self, "labels_"), "The SubKmeans algorithm has not run yet. Use the fit() function first."
         if labels is None:
             labels = self.labels_
         assert X.shape[0] == labels.shape[0], "Number of data objects must match the number of labels."
@@ -304,7 +304,7 @@ class SubKmeans(BaseEstimator, ClusterMixin):
             The global costs,
             The subspace specific costs (one entry for each subspace)
         """
-        assert self.labels_ is not None, "The SubKmeans algorithm has not run yet. Use the fit() function first."
+        assert hasattr(self, "labels_"), "The SubKmeans algorithm has not run yet. Use the fit() function first."
         m = _transform_subkmeans_m_to_nrkmeans_m(self.m, X.shape[1])
         P = _transform_subkmeans_P_to_nrkmeans_P(self.m, self.V.shape[0])
         scatter_matrices = _transform_subkmeans_scatters_to_nrkmeans_scatters(X, self.scatter_matrices_)
@@ -314,18 +314,23 @@ class SubKmeans(BaseEstimator, ClusterMixin):
                                                                    self.outliers, self.max_distance, self.precision)
         return total_costs, global_costs, all_subspace_costs
 
-    def calculate_cost_function(self, X) -> float:
+    def calculate_cost_function(self, X: np.ndarray) -> float:
         """
         Calculate the result of the SubKmeans loss function. Depends on the rotation and the scatter matrix.
         Calculates for both subspaces j:
         P_j^T*V^T*S_j*V*P_j
+
+        Parameters
+        ----------
+        X : np.ndarray
+            the given data set
 
         Returns
         -------
         costs : float
             The total loss of this SubKmeans object
         """
-        assert self.labels_ is not None, "The SubKmeans algorithm has not run yet. Use the fit() function first."
+        assert hasattr(self, "labels_"), "The SubKmeans algorithm has not run yet. Use the fit() function first."
         P = _transform_subkmeans_P_to_nrkmeans_P(self.m, self.V.shape[0])
         scatter_matrices = _transform_subkmeans_scatters_to_nrkmeans_scatters(X, self.scatter_matrices_)
         costs = _get_total_cost_function(self.V, P, scatter_matrices)

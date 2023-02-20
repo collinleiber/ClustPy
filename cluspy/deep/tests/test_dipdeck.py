@@ -57,7 +57,8 @@ def test_get_dip_matrix():
     cluster_labels = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2])
     dip_matrix = _get_dip_matrix(embedded_data=embedded_data, embedded_centers_cpu=embedded_centers,
                                  cluster_labels_cpu=cluster_labels,
-                                 n_clusters=3, max_cluster_size_diff_factor=2)
+                                 n_clusters=3, max_cluster_size_diff_factor=2, pval_strategy="table", n_boots=1000,
+                                 random_state=1)
     assert dip_matrix.shape == (3, 3)
     assert np.array_equal(dip_matrix.diagonal(), np.array([0, 0, 0]))
     dip_matrix_tmp = dip_matrix + np.identity(3) * 0.1

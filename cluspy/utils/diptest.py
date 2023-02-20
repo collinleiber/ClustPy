@@ -14,9 +14,27 @@ from cluspy.utils.dipModule import c_diptest  # noqa - Import from C file (could
 import numpy as np
 import matplotlib.pyplot as plt
 from cluspy.utils.plots import plot_histogram
+from sklearn.utils import check_random_state
 
 
 def dip_test(X, just_dip=True, is_data_sorted=False, return_gcm_lcm_mn_mj=False, use_c=True, debug=False):
+    """
+
+    Modal_triangle can be (-1,-1,-1) if the triangle could not be determined correctly.
+
+    Parameters
+    ----------
+    X
+    just_dip
+    is_data_sorted
+    return_gcm_lcm_mn_mj
+    use_c
+    debug
+
+    Returns
+    -------
+
+    """
     assert X.ndim == 1, "Data must be 1-dimensional for the dip-test. Your shape:{0}".format(X.shape)
     assert just_dip or is_data_sorted == True, "Data must be sorted if modal interval and/or modal triangle should be returned (else indices will not match)"
     assert not return_gcm_lcm_mn_mj or not just_dip, "If GCM, LCM, mn and mj should be returned, 'just_dip' must be False"
@@ -71,9 +89,9 @@ def _dip_python_port(X, is_data_sorted=False, debug=False):
     high = N - 1
     dip_value = 0.0
 
-    modaltriangle_i1 = None
-    modaltriangle_i2 = None
-    modaltriangle_i3 = None
+    modaltriangle_i1 = -1
+    modaltriangle_i2 = -1
+    modaltriangle_i3 = -1
 
     # Establish the indices mn[0..n-1] over which combination is necessary for the convex MINORANT (GCM) fit.
     mn = np.zeros(N, dtype=int)
@@ -252,7 +270,7 @@ def _dip_python_port(X, is_data_sorted=False, debug=False):
     return dip_value, (low, high), (modaltriangle_i1, modaltriangle_i2, modaltriangle_i3), gcm, lcm, mn, mj
 
 
-def dip_pval(dip_value, n_points, pval_strategy="table", n_boots=2000):
+def dip_pval(dip_value, n_points, pval_strategy="table", n_boots=2000, random_state=None):
     assert type(pval_strategy) is str, "pval_stratgegy must be of type string"
     pval_strategy = pval_strategy.lower()
     assert pval_strategy in ["bootstrap", "table",
@@ -261,7 +279,7 @@ def dip_pval(dip_value, n_points, pval_strategy="table", n_boots=2000):
     if n_points < 4:
         pval = 1.0
     elif pval_strategy == "bootstrap":
-        boot_dips = dip_boot_samples(int(n_points), n_boots)
+        boot_dips = dip_boot_samples(int(n_points), n_boots, random_state)
         pval = np.mean(dip_value <= boot_dips)
     elif pval_strategy == "table":
         pval = _dip_pval_table(dip_value, n_points)
@@ -270,9 +288,10 @@ def dip_pval(dip_value, n_points, pval_strategy="table", n_boots=2000):
     return pval
 
 
-def dip_boot_samples(n_points, n_boots):
+def dip_boot_samples(n_points, n_boots, random_state=None):
     # random uniform vectors
-    boot_samples = np.random.rand(n_boots, n_points)
+    random_state = check_random_state(random_state)
+    boot_samples = random_state.rand(n_boots, n_points)
     boot_dips = np.array([dip_test(boot_s, just_dip=True, is_data_sorted=False) for boot_s in boot_samples])
     return boot_dips
 
@@ -335,13 +354,15 @@ def dip_gradient(X, x_proj, sorted_indices, modal_triangle):
 def dip_pval_gradient(X, x_proj, sorted_indices, modal_triangle, dip_value):
     if modal_triangle is None or modal_triangle[0] == -1:
         return np.zeros(X.shape[1])
+    # Calculate gradient of dip-value
     dip_grad = dip_gradient(X, x_proj, sorted_indices, modal_triangle)
-
-    b = 17.30784022 * np.sqrt(X.shape[0]) + 12.04917889
+    # Get factor for that gradient from p-value gradeint
+    b = _dip_pval_function_get_b(X.shape[0])
     exponent = np.exp(-b * dip_value + 6.5)
     quotient = (0.6 * (1 + 1.6 * exponent) ** (0.625) + 0.4 * (1 + 0.2 * exponent) ** 5) ** 2
-    grad_factor = (0.6 * (1 + 1.6 * exponent) ** (-0.375)  + 0.4 * (1 + 0.2 * exponent) ** 4) / quotient
-    grad_factor *= exponent * (-b)
+    grad_factor = (0.6 * (1 + 1.6 * exponent) ** (-0.375) + 0.4 * (1 + 0.2 * exponent) ** 4) / quotient
+    grad_factor *= exponent * -b
+    # Combine values
     pval_grad = grad_factor * dip_grad
     return pval_grad
 
@@ -432,10 +453,15 @@ def _dip_pval_table(dip_value, n_points):
 
 
 def _dip_pval_function(dip_value, n_points):
-    b = 17.30784022 * np.sqrt(n_points) + 12.04917889
+    b = _dip_pval_function_get_b(n_points)
     exponent = np.exp(-b * dip_value + 6.5)
     pval = 1 - 1 / (0.6 * (1 + 1.6 * exponent) ** (0.625) + 0.4 * (1 + 0.2 * exponent) ** 5)
     return pval
+
+
+def _dip_pval_function_get_b(n_points):
+    b = 17.30784022 * np.sqrt(n_points) + 12.04917889
+    return b
 
 
 def _dip_table_values():

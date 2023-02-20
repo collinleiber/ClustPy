@@ -15,12 +15,13 @@ from sklearn.cluster import KMeans
 from sklearn.base import BaseEstimator, ClusterMixin
 
 
-def _dip_deck(X: np.ndarray, n_clusters_start: int, dip_merge_threshold: float, cluster_loss_weight: float,
-              n_clusters_max: int, n_clusters_min: int, batch_size: int,
+def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, cluster_loss_weight: float,
+              max_n_clusters: int, min_n_clusters: int, batch_size: int,
               pretrain_learning_rate: float, clustering_learning_rate: float, pretrain_epochs: int,
               clustering_epochs: int, optimizer_class: torch.optim.Optimizer,
               loss_fn: torch.nn.modules.loss._Loss, autoencoder: torch.nn.Module, embedding_size: int,
-              max_cluster_size_diff_factor: float, debug: bool) -> (np.ndarray, int, np.ndarray, torch.nn.Module):
+              max_cluster_size_diff_factor: float, pval_strategy: str, n_boots: int,
+              random_state: np.random.RandomState, debug: bool) -> (np.ndarray, int, np.ndarray, torch.nn.Module):
     """
     Start the actual DipDECK clustering procedure on the input data set.
 
@@ -28,16 +29,16 @@ def _dip_deck(X: np.ndarray, n_clusters_start: int, dip_merge_threshold: float, 
     ----------
     X : np.ndarray / torch.Tensor
         the given data set. Can be a np.ndarray or a torch.Tensor
-    n_clusters_start : int
+    n_clusters_init : int
         initial number of clusters
     dip_merge_threshold : float
         threshold regarding the Dip-p-value that defines if two clusters should be merged. Must be bvetween 0 and 1
     cluster_loss_weight : float
         weight of the clustering loss compared to the reconstruction loss
-    n_clusters_max : int
-        maximum number of clusters. Must be larger than n_clusters_min. If the result has more clusters, a merge will be forced
-    n_clusters_min : int
-        minimum number of clusters. Must be larger than 0, smaller than n_clusters_max and smaller than n_clusters_start.
+    max_n_clusters : int
+        maximum number of clusters. Must be larger than min_n_clusters. If the result has more clusters, a merge will be forced
+    min_n_clusters : int
+        minimum number of clusters. Must be larger than 0, smaller than max_n_clusters and smaller than n_clusters_init.
         When this number of clusters is reached, all further merge processes will be hindered
     batch_size : int
         size of the data batches
@@ -58,8 +59,14 @@ def _dip_deck(X: np.ndarray, n_clusters_start: int, dip_merge_threshold: float, 
     embedding_size : int
         size of the embedding within the autoencoder
     max_cluster_size_diff_factor : float
-        The maximum size difference when comparing two clusters regarding the number of samples.
+        The maximum different in size when comparing two clusters regarding the number of samples.
         If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) closest samples will be used for the Dip calculation
+    pval_strategy : str
+        Defines which strategy to use to receive dip-p-vales. Possibilities are 'table', 'function' and 'bootstrap'
+    n_boots : int
+        Number of bootstraps used to calculate dip-p-values. Only necessary if pval_strategy is 'bootstrap'
+    random_state : np.random.RandomState
+        use a fixed random state to get a repeatable solution. Can also be of type int
     debug : bool
         If true, additional information will be printed to the console
 
@@ -71,12 +78,12 @@ def _dip_deck(X: np.ndarray, n_clusters_start: int, dip_merge_threshold: float, 
         The cluster centers as identified by DipDECK,
         The final autoencoder
     """
-    if n_clusters_max < n_clusters_min:
-        raise Exception("n_clusters_max can not be smaller than n_clusters_min")
-    if n_clusters_min <= 0:
-        raise Exception("n_clusters_min must be greater than zero")
-    if n_clusters_start < n_clusters_min:
-        raise Exception("n_clusters can not be smaller than n_clusters_min")
+    if max_n_clusters < min_n_clusters:
+        raise Exception("max_n_clusters can not be smaller than min_n_clusters")
+    if min_n_clusters <= 0:
+        raise Exception("min_n_clusters must be greater than zero")
+    if n_clusters_init < min_n_clusters:
+        raise Exception("n_clusters can not be smaller than min_n_clusters")
     if dip_merge_threshold < 0 or dip_merge_threshold > 1:
         raise Exception("dip_merge_threshold must be between 0 and 1")
     device = detect_device()
@@ -86,44 +93,46 @@ def _dip_deck(X: np.ndarray, n_clusters_start: int, dip_merge_threshold: float, 
                                           optimizer_class, loss_fn, X.shape[1], embedding_size, autoencoder)
     # Execute kmeans in embedded space - initial clustering
     embedded_data = encode_batchwise(testloader, autoencoder, device)
-    kmeans = KMeans(n_clusters=n_clusters_start)
+    kmeans = KMeans(n_clusters=n_clusters_init)
     kmeans.fit(embedded_data)
     init_centers = kmeans.cluster_centers_
     cluster_labels_cpu = kmeans.labels_
     # Get nearest points to optimal centers
     centers_cpu, embedded_centers_cpu = _get_nearest_points_to_optimal_centers(X, init_centers, embedded_data)
     # Initial dip values
-    dip_matrix_cpu = _get_dip_matrix(embedded_data, embedded_centers_cpu, cluster_labels_cpu, n_clusters_start,
-                                     max_cluster_size_diff_factor)
+    dip_matrix_cpu = _get_dip_matrix(embedded_data, embedded_centers_cpu, cluster_labels_cpu, n_clusters_init,
+                                     max_cluster_size_diff_factor, pval_strategy, n_boots, random_state)
     # Use DipDECK learning_rate (usually pretrain_learning_rate reduced by a magnitude of 10)
     optimizer = optimizer_class(autoencoder.parameters(), lr=clustering_learning_rate)
     # Start training
-    cluster_labels_cpu, n_clusters_current, centers_cpu, autoencoder = _dip_deck_training(X, n_clusters_start,
+    cluster_labels_cpu, n_clusters_current, centers_cpu, autoencoder = _dip_deck_training(X, n_clusters_init,
                                                                                           dip_merge_threshold,
                                                                                           cluster_loss_weight,
                                                                                           centers_cpu,
                                                                                           cluster_labels_cpu,
                                                                                           dip_matrix_cpu,
-                                                                                          n_clusters_max,
-                                                                                          n_clusters_min,
+                                                                                          max_n_clusters,
+                                                                                          min_n_clusters,
                                                                                           clustering_epochs,
                                                                                           optimizer, loss_fn,
                                                                                           autoencoder,
                                                                                           device, trainloader,
                                                                                           testloader,
                                                                                           max_cluster_size_diff_factor,
-                                                                                          debug)
+                                                                                          pval_strategy, n_boots,
+                                                                                          random_state, debug)
     # Return results
     return cluster_labels_cpu, n_clusters_current, centers_cpu, autoencoder
 
 
 def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_threshold: float, cluster_loss_weight: float,
                        centers_cpu: np.ndarray, cluster_labels_cpu: np.ndarray,
-                       dip_matrix_cpu: np.ndarray, n_clusters_max: int, n_clusters_min: int, clustering_epochs,
+                       dip_matrix_cpu: np.ndarray, max_n_clusters: int, min_n_clusters: int, clustering_epochs,
                        optimizer: torch.optim.Optimizer,
                        loss_fn: torch.nn.modules.loss._Loss, autoencoder: torch.nn.Module, device: torch.device,
                        trainloader: torch.utils.data.DataLoader, testloader: torch.utils.data.DataLoader,
-                       max_cluster_size_diff_factor: float, debug: bool) -> (
+                       max_cluster_size_diff_factor: float, pval_strategy: str, n_boots: int,
+                       random_state: np.random.RandomState, debug: bool) -> (
         np.ndarray, int, np.ndarray, torch.nn.Module):
     """
     The training function of DipDECK. Contains most of the essential functionalities.
@@ -133,7 +142,7 @@ def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_thresho
     X : np.ndarray / torch.Tensor
         the given data set. Can be a np.ndarray or a torch.Tensor
     n_clusters_current : int
-        current number of clusters. Is equal to n_clusters_start in the beginning
+        current number of clusters. Is equal to n_clusters_init in the beginning
     dip_merge_threshold : float
         threshold regarding the Dip-p-value that defines if two clusters should be merged. Must be bvetween 0 and 1
     cluster_loss_weight : float
@@ -147,10 +156,10 @@ def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_thresho
     dip_matrix_cpu : np.ndarray
         The current dip matrix, saved as numpy array (not torch.Tensor).
         Symmetric matrix containing the Dip-values between each pair of clusters.
-    n_clusters_max : int
-        maximum number of clusters. Must be larger than n_clusters_min. If the result has more clusters, a merge will be forced
-    n_clusters_min : int
-        minimum number of clusters. Must be larger than 0, smaller than n_clusters_max and smaller than n_clusters_start.
+    max_n_clusters : int
+        maximum number of clusters. Must be larger than min_n_clusters. If the result has more clusters, a merge will be forced
+    min_n_clusters : int
+        minimum number of clusters. Must be larger than 0, smaller than max_n_clusters and smaller than n_clusters_init.
         When this number of clusters is reached, all further merge processes will be hindered
     clustering_epochs : int
         number of epochs for the actual clustering procedure
@@ -167,8 +176,14 @@ def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_thresho
     testloader : torch.utils.data.DataLoader
         dataloader to be used for update of the labels, centers and the dip matrix
     max_cluster_size_diff_factor : float
-        The maximum size difference when comparing two clusters regarding the number of samples.
+        The maximum different in size when comparing two clusters regarding the number of samples.
         If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) closest samples will be used for the Dip calculation
+    pval_strategy : str
+        Defines which strategy to use to receive dip-p-vales. Possibilities are 'table', 'function' and 'bootstrap'
+    n_boots : int
+        Number of bootstraps used to calculate dip-p-values. Only necessary if pval_strategy is 'bootstrap'
+    random_state : np.random.RandomState
+        use a fixed random state to get a repeatable solution. Can also be of type int
     debug : bool
         If true, additional information will be printed to the console
 
@@ -234,7 +249,7 @@ def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_thresho
         centers_cpu, embedded_centers_cpu = _get_nearest_points_to_optimal_centers(X, optimal_centers, embedded_data)
         # Update Dips
         dip_matrix_cpu = _get_dip_matrix(embedded_data, embedded_centers_cpu, cluster_labels_cpu, n_clusters_current,
-                                         max_cluster_size_diff_factor)
+                                         max_cluster_size_diff_factor, pval_strategy, n_boots, random_state)
 
         if debug:
             print(
@@ -247,7 +262,7 @@ def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_thresho
         # Start merging procedure
         dip_argmax = np.unravel_index(np.argmax(dip_matrix_cpu, axis=None), dip_matrix_cpu.shape)
         # Is merge possible?
-        while dip_matrix_cpu[dip_argmax] >= dip_merge_threshold and n_clusters_current > n_clusters_min:
+        while dip_matrix_cpu[dip_argmax] >= dip_merge_threshold and n_clusters_current > min_n_clusters:
             if debug:
                 print("Start merging in iteration {0}.\nMerging clusters {1} with dip value {2}.".format(i,
                                                                                                          dip_argmax,
@@ -258,10 +273,11 @@ def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_thresho
             n_clusters_current -= 1
             cluster_labels_cpu, centers_cpu, embedded_centers_cpu, dip_matrix_cpu = \
                 _merge_by_dip_value(X, embedded_data, cluster_labels_cpu, dip_argmax, n_clusters_current, centers_cpu,
-                                    embedded_centers_cpu, max_cluster_size_diff_factor)
+                                    embedded_centers_cpu, max_cluster_size_diff_factor, pval_strategy, n_boots,
+                                    random_state)
             dip_argmax = np.unravel_index(np.argmax(dip_matrix_cpu, axis=None), dip_matrix_cpu.shape)
         # Optional: Force merging of clusters
-        if i == clustering_epochs and n_clusters_current > n_clusters_max:
+        if i == clustering_epochs and n_clusters_current > max_n_clusters:
             # Get smallest cluster
             _, cluster_sizes = np.unique(cluster_labels_cpu, return_counts=True)
             smallest_cluster_id = np.argmin(cluster_sizes)
@@ -286,7 +302,8 @@ def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_thresho
                                                                                            embedded_data)
                 # Update dip values
                 dip_matrix_cpu = _get_dip_matrix(embedded_data, embedded_centers_cpu, cluster_labels_cpu,
-                                                 n_clusters_current, max_cluster_size_diff_factor)
+                                                 n_clusters_current, max_cluster_size_diff_factor, pval_strategy,
+                                                 n_boots, random_state)
             else:
                 # Else: merge clusters with hightest dip
                 if debug:
@@ -295,7 +312,8 @@ def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_thresho
 
                 cluster_labels_cpu, centers_cpu, _, dip_matrix_cpu = \
                     _merge_by_dip_value(X, embedded_data, cluster_labels_cpu, dip_argmax, n_clusters_current,
-                                        centers_cpu, embedded_centers_cpu, max_cluster_size_diff_factor)
+                                        centers_cpu, embedded_centers_cpu, max_cluster_size_diff_factor, pval_strategy,
+                                        n_boots, random_state)
         if n_clusters_current == 1:
             if debug:
                 print("Only one cluster left")
@@ -305,7 +323,8 @@ def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_thresho
 
 def _merge_by_dip_value(X: np.ndarray, embedded_data: np.ndarray, cluster_labels_cpu: np.ndarray,
                         dip_argmax: np.ndarray, n_clusters_current: int, centers_cpu: np.ndarray,
-                        embedded_centers_cpu: np.ndarray, max_cluster_size_diff_factor: float) -> (
+                        embedded_centers_cpu: np.ndarray, max_cluster_size_diff_factor: float, pval_strategy: str,
+                        n_boots: int, random_state: np.random.RandomState) -> (
         np.ndarray, np.ndarray, np.ndarray, np.ndarray):
     """
     Merge the clusters within dip_argmax because their Dip-value is larger than the threshold.
@@ -323,14 +342,20 @@ def _merge_by_dip_value(X: np.ndarray, embedded_data: np.ndarray, cluster_labels
     dip_argmax : np.ndarray
         The indices of the two clusters having the largest Dip-value within the dip matrix
     n_clusters_current : int
-        current number of clusters. Is equal to n_clusters_start in the beginning
+        current number of clusters. Is equal to n_clusters_init in the beginning
     centers_cpu : np.ndarray
         The current cluster centers, saved as numpy array (not torch.Tensor)
     embedded_centers_cpu : np.ndarray
         The embedded cluster centers, saved as numpy array (not torch.Tensor)
     max_cluster_size_diff_factor : float
-        The maximum size difference when comparing two clusters regarding the number of samples.
+        The maximum different in size when comparing two clusters regarding the number of samples.
         If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) closest samples will be used for the Dip calculation
+    pval_strategy : str
+        Defines which strategy to use to receive dip-p-vales. Possibilities are 'table', 'function' and 'bootstrap'
+    n_boots : int
+        Number of bootstraps used to calculate dip-p-values. Only necessary if pval_strategy is 'bootstrap'
+    random_state : np.random.RandomState
+        use a fixed random state to get a repeatable solution. Can also be of type int
 
     Returns
     -------
@@ -366,7 +391,8 @@ def _merge_by_dip_value(X: np.ndarray, embedded_data: np.ndarray, cluster_labels
     embedded_centers_cpu = np.append(embedded_centers_cpu_tmp, new_embedded_center_cpu, axis=0)
     # Update dip values
     dip_matrix_cpu = _get_dip_matrix(embedded_data, embedded_centers_cpu, cluster_labels_cpu,
-                                     n_clusters_current, max_cluster_size_diff_factor)
+                                     n_clusters_current, max_cluster_size_diff_factor, pval_strategy, n_boots,
+                                     random_state)
     return cluster_labels_cpu, centers_cpu, embedded_centers_cpu, dip_matrix_cpu
 
 
@@ -412,7 +438,7 @@ def _get_nearest_points(points_in_larger_cluster: np.ndarray, center: np.ndarray
     size_smaller_cluster : int
         The size of the smaller cluster
     max_cluster_size_diff_factor : float
-        The maximum size difference when comparing two clusters regarding the number of samples.
+        The maximum different in size when comparing two clusters regarding the number of samples.
         In the end the larger cluster will only contain the max_cluster_size_diff_factor*(size of smaller cluster) closest samples to the cluster center of the smaller cluster
     min_sample_size : int
         Minimum number of samples that should be considered (equals the combined number of samples) (default: 50)
@@ -433,7 +459,8 @@ def _get_nearest_points(points_in_larger_cluster: np.ndarray, center: np.ndarray
 
 
 def _get_dip_matrix(embedded_data: np.ndarray, embedded_centers_cpu: np.ndarray, cluster_labels_cpu: np.ndarray,
-                    n_clusters: int, max_cluster_size_diff_factor: float) -> np.ndarray:
+                    n_clusters: int, max_cluster_size_diff_factor: float, pval_strategy: str, n_boots: int,
+                    random_state: np.random.RandomState) -> np.ndarray:
     """
     Calculate the dip matrix. Contains the pair-wise Dip-values between all cluster combinations.
     Here, the objects from the two clusters will be projected onto the connection axis between ther cluster centers.
@@ -449,8 +476,14 @@ def _get_dip_matrix(embedded_data: np.ndarray, embedded_centers_cpu: np.ndarray,
     n_clusters : int
         The number of clusters
     max_cluster_size_diff_factor : float
-        The maximum size difference when comparing two clusters regarding the number of samples.
+        The maximum different in size when comparing two clusters regarding the number of samples.
         If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) closest samples will be used for the Dip calculation
+    pval_strategy : str
+        Defines which strategy to use to receive dip-p-vales. Possibilities are 'table', 'function' and 'bootstrap'
+    n_boots : int
+        Number of bootstraps used to calculate dip-p-values. Only necessary if pval_strategy is 'bootstrap'
+    random_state : np.random.RandomState
+        use a fixed random state to get a repeatable solution. Can also be of type int
 
     Returns
     -------
@@ -467,7 +500,7 @@ def _get_dip_matrix(embedded_data: np.ndarray, embedded_centers_cpu: np.ndarray,
             points_in_i_or_j = np.append(points_in_i, points_in_j, axis=0)
             proj_points = np.dot(points_in_i_or_j, center_diff)
             dip_value = dip_test(proj_points)
-            dip_p_value = dip_pval(dip_value, proj_points.shape[0], pval_strategy="table")
+            dip_p_value = dip_pval(dip_value, proj_points.shape[0], pval_strategy, n_boots, random_state)
             # Check if clusters sizes differ heavily
             if points_in_i.shape[0] > points_in_j.shape[0] * max_cluster_size_diff_factor or \
                     points_in_j.shape[0] > points_in_i.shape[0] * max_cluster_size_diff_factor:
@@ -480,7 +513,7 @@ def _get_dip_matrix(embedded_data: np.ndarray, embedded_centers_cpu: np.ndarray,
                 points_in_i_or_j = np.append(points_in_i, points_in_j, axis=0)
                 proj_points = np.dot(points_in_i_or_j, center_diff)
                 dip_value_2 = dip_test(proj_points)
-                dip_p_value_2 = dip_pval(dip_value_2, proj_points.shape[0], pval_strategy="table")
+                dip_p_value_2 = dip_pval(dip_value_2, proj_points.shape[0], pval_strategy, n_boots, random_state)
                 dip_p_value = min(dip_p_value, dip_p_value_2)
             # Add pval to dip matrix
             dip_matrix[i][j] = dip_p_value
@@ -498,16 +531,16 @@ class DipDECK(BaseEstimator, ClusterMixin):
 
     Parameters
     ----------
-    n_clusters_start : int
+    n_clusters_init : int
         initial number of clusters (default: 35)
     dip_merge_threshold : float
         threshold regarding the Dip-p-value that defines if two clusters should be merged. Must be bvetween 0 and 1 (default: 0.9)
     cluster_loss_weight : float
         weight of the clustering loss compared to the reconstruction loss (default: 1)
-    n_clusters_max : int
-        maximum number of clusters. Must be larger than n_clusters_min. If the result has more clusters, a merge will be forced (default: np.inf)
-    n_clusters_min : int
-        minimum number of clusters. Must be larger than 0, smaller than n_clusters_max and smaller than n_clusters_start.
+    max_n_clusters : int
+        maximum number of clusters. Must be larger than min_n_clusters. If the result has more clusters, a merge will be forced (default: np.inf)
+    min_n_clusters : int
+        minimum number of clusters. Must be larger than 0, smaller than max_n_clusters and smaller than n_clusters_init.
         When this number of clusters is reached, all further merge processes will be hindered (default: 1)
     batch_size : int
         size of the data batches (default: 256)
@@ -528,8 +561,14 @@ class DipDECK(BaseEstimator, ClusterMixin):
     embedding_size : int
         size of the embedding within the autoencoder (default: 10)
     max_cluster_size_diff_factor : float
-        The maximum size difference when comparing two clusters regarding the number of samples.
+        The maximum different in size when comparing two clusters regarding the number of samples.
         If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) closest samples will be used for the Dip calculation (default: 2)
+    pval_strategy : str
+        Defines which strategy to use to receive dip-p-vales. Possibilities are 'table', 'function' and 'bootstrap' (default: 'table')
+    n_boots : int
+        Number of bootstraps used to calculate dip-p-values. Only necessary if pval_strategy is 'bootstrap' (default: 1000)
+    random_state : np.random.RandomState
+        use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
     debug : bool
         If true, additional information will be printed to the console (default: False)
 
@@ -537,7 +576,7 @@ class DipDECK(BaseEstimator, ClusterMixin):
     ----------
     labels_ : np.ndarray
         The final labels
-    n_cluster : int
+    n_clusters_ : int
         The final number of clusters
     cluster_centers_ : np.ndarray
         The final cluster centers
@@ -558,18 +597,19 @@ class DipDECK(BaseEstimator, ClusterMixin):
     Proceedings of the 27th ACM SIGKDD Conference on Knowledge Discovery & Data Mining. 2021.
     """
 
-    def __init__(self, n_clusters_start: int = 35, dip_merge_threshold: float = 0.9, cluster_loss_weight: float = 1,
-                 n_clusters_max: int = np.inf, n_clusters_min: int = 1, batch_size: int = 256,
+    def __init__(self, n_clusters_init: int = 35, dip_merge_threshold: float = 0.9, cluster_loss_weight: float = 1,
+                 max_n_clusters: int = np.inf, min_n_clusters: int = 1, batch_size: int = 256,
                  pretrain_learning_rate: float = 1e-3, clustering_learning_rate: float = 1e-4,
                  pretrain_epochs: int = 100, clustering_epochs: int = 50,
                  optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), autoencoder: torch.nn.Module = None,
-                 embedding_size: int = 5, max_cluster_size_diff_factor: float = 2, debug: bool = False):
-        self.n_clusters_start = n_clusters_start
+                 embedding_size: int = 5, max_cluster_size_diff_factor: float = 2, pval_strategy: str = "table",
+                 n_boots: int = 1000, random_state: np.random.RandomState = None, debug: bool = False):
+        self.n_clusters_init = n_clusters_init
         self.dip_merge_threshold = dip_merge_threshold
         self.cluster_loss_weight = cluster_loss_weight
-        self.n_clusters_max = n_clusters_max
-        self.n_clusters_min = n_clusters_min
+        self.max_n_clusters = max_n_clusters
+        self.min_n_clusters = min_n_clusters
         self.batch_size = batch_size
         self.pretrain_learning_rate = pretrain_learning_rate
         self.clustering_learning_rate = clustering_learning_rate
@@ -580,6 +620,9 @@ class DipDECK(BaseEstimator, ClusterMixin):
         self.autoencoder = autoencoder
         self.embedding_size = embedding_size
         self.max_cluster_size_diff_factor = max_cluster_size_diff_factor
+        self.pval_strategy = pval_strategy
+        self.n_boots = n_boots
+        self.random_state = random_state
         self.debug = debug
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DipDECK':
@@ -599,14 +642,15 @@ class DipDECK(BaseEstimator, ClusterMixin):
         self : DipDECK
             this instance of the DipDECK algorithm
         """
-        labels, n_clusters, centers, autoencoder = _dip_deck(X, self.n_clusters_start, self.dip_merge_threshold,
-                                                             self.cluster_loss_weight, self.n_clusters_max,
-                                                             self.n_clusters_min, self.batch_size,
+        labels, n_clusters, centers, autoencoder = _dip_deck(X, self.n_clusters_init, self.dip_merge_threshold,
+                                                             self.cluster_loss_weight, self.max_n_clusters,
+                                                             self.min_n_clusters, self.batch_size,
                                                              self.pretrain_learning_rate, self.clustering_learning_rate,
                                                              self.pretrain_epochs, self.clustering_epochs,
-                                                             self.optimizer_class,
-                                                             self.loss_fn, self.autoencoder, self.embedding_size,
-                                                             self.max_cluster_size_diff_factor, self.debug)
+                                                             self.optimizer_class, self.loss_fn, self.autoencoder,
+                                                             self.embedding_size, self.max_cluster_size_diff_factor,
+                                                             self.pval_strategy, self.n_boots, self.random_state,
+                                                             self.debug)
         self.labels_ = labels
         self.n_clusters_ = n_clusters
         self.cluster_centers_ = centers

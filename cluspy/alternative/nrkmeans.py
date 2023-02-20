@@ -12,8 +12,59 @@ from sklearn.metrics.pairwise import pairwise_distances_argmin_min
 from sklearn.metrics import normalized_mutual_info_score as nmi
 from sklearn.base import BaseEstimator, ClusterMixin
 from cluspy.utils.plots import plot_scatter_matrix
-import cluspy.utils._mdlcosts as mdl
-from cluspy.utils._wrapper_methods import _kmeans_plus_plus as kpp
+import cluspy.utils._information_theory as mdl
+
+"""
+Output and naming of kmeans++ in Sklearn changed multiple times. This wrapper can work with multiple versions
+"""
+try:
+    # Sklearn version >= 0.24.X
+    from sklearn.cluster import kmeans_plusplus as kpp
+except:
+    try:
+        # Old sklearn versions
+        from sklearn.cluster._kmeans import _kmeans_plusplus as kpp
+    except:
+        # Very old sklearn versions
+        from sklearn.cluster._kmeans import _k_init as kpp
+
+
+def _kmeans_plus_plus(X: np.ndarray, n_clusters: int, x_squared_norms: np.ndarray = None,
+                      random_state: np.random.RandomState = None, n_local_trials: int = None):
+    """
+    Initializes the cluster centers for Kmeans using the kmeans++ procedure.
+    This method is only a wrapper for the Sklearn kmeans++ implementation.
+    Output and naming of kmeans++ in Sklearn changed multiple times. This wrapper can work with multiple versions.
+
+    Parameters
+    ----------
+    X : np.ndarray
+        the given data set
+    n_clusters : int
+        list containing number of clusters for each subspace
+    x_squared_norms : np.ndarray
+        Row-wise (squared) Euclidean norm of X. See sklearn.utils.extmath.row_norms
+    random_state : np.random.RandomState
+        use a fixed random state to get a repeatable solution. Can also be of type int
+    n_local_trials : int
+        Number of local trials.
+
+    Returns
+    -------
+    centers : np.ndarray
+        The resulting initial cluster centers.
+
+    References
+    ----------
+    Arthur, D. and Vassilvitskii, S. "k-means++: the advantages of careful seeding".
+    ACM-SIAM symposium on Discrete algorithms. 2007
+    """
+    centers = kpp(X, n_clusters, x_squared_norms=x_squared_norms, random_state=random_state,
+                  n_local_trials=n_local_trials)
+    if type(centers) is tuple:
+        centers = centers[0]
+    return centers
+
 
 """
 Defines the numerical error that is accepted to consider a matrix as orthogonal or symmetric.
@@ -236,7 +287,7 @@ def _initialize_nrkmeans_parameters(X: np.ndarray, n_clusters: list, V: np.ndarr
                 used_dimensionalities))
     # Define initial cluster centers with kmeans++ for each subspace
     if centers is None:
-        centers = [kpp(X, k, row_norms(X, squared=True), random_state=random_state) for k in n_clusters]
+        centers = [_kmeans_plus_plus(X, k, row_norms(X, squared=True), random_state=random_state) for k in n_clusters]
     if not type(centers) is list or not len(centers) is subspaces:
         raise ValueError("Cluster centers must be specified for each subspace.\nYour input:\n" + str(centers))
     else:
@@ -1186,7 +1237,7 @@ def _mdl_m_dependant_subspace_costs(X: np.ndarray, V: np.ndarray, cluster_index:
     # ==== Costs of cluster space ====
     cropped_V_cluster = V[:, P_cluster]
     # Costs for cluster dimensionality
-    cluster_costs = mdl.mdl_costs_integer_value(m_cluster)
+    cluster_costs = mdl.coding_costs_integer(m_cluster)
     # Costs for centers
     cluster_costs += n_clusters[cluster_index] * _mdl_reference_vector(m_cluster, max_distance, precision)
     # Costs for point encoding
@@ -1199,7 +1250,7 @@ def _mdl_m_dependant_subspace_costs(X: np.ndarray, V: np.ndarray, cluster_index:
     # ==== Costs of noise space ====
     cropped_V_noise = V[:, P_noise]
     # Costs for noise dimensionality
-    noise_costs = mdl.mdl_costs_integer_value(m_noise)
+    noise_costs = mdl.coding_costs_integer(m_noise)
     # Costs for centers
     noise_costs += n_clusters[noise_index] * _mdl_reference_vector(m_noise, max_distance, precision)
     # Costs for point encoding
@@ -1337,7 +1388,7 @@ def _mdl_costs(X: np.ndarray, n_clusters: list, m: list, P: list, V: np.ndarray,
     # Costs of matrix V
     # global_costs += mdl.mdl_costs_orthogonal_matrix(n_points, mdl.mdl_costs_float_value(n_points))
     # Costs of number of subspaces
-    global_costs += mdl.mdl_costs_integer_value(subspaces)
+    global_costs += mdl.coding_costs_integer(subspaces)
     # Costs for each subspace
     all_subspace_costs = []
     for subspace in range(subspaces):
@@ -1345,9 +1396,9 @@ def _mdl_costs(X: np.ndarray, n_clusters: list, m: list, P: list, V: np.ndarray,
         # Calculate costs
         model_costs = 0
         # Costs for dimensionality
-        model_costs += mdl.mdl_costs_integer_value(m[subspace])
+        model_costs += mdl.coding_costs_integer(m[subspace])
         # Number of clusters in this subspace
-        model_costs += mdl.mdl_costs_integer_value(n_clusters[subspace])
+        model_costs += mdl.coding_costs_integer(n_clusters[subspace])
         # Costs for cluster centers
         model_costs += n_clusters[subspace] * \
                        _mdl_reference_vector(m[subspace], max_distance, precision)
@@ -1356,7 +1407,7 @@ def _mdl_costs(X: np.ndarray, n_clusters: list, m: list, P: list, V: np.ndarray,
         if outliers:
             # Encode number of outliers
             n_outliers = len(labels[:, subspace][labels[:, subspace] == -1])
-            model_costs += mdl.mdl_costs_integer_value(n_outliers)
+            model_costs += mdl.coding_costs_integer(n_outliers)
             # Encode coding costs of outliers
             outlier_costs += n_outliers * np.log2(n_points)
             outlier_costs += n_outliers * _mdl_costs_uniform_pdf(m[subspace], max_distance)
@@ -1364,7 +1415,7 @@ def _mdl_costs(X: np.ndarray, n_clusters: list, m: list, P: list, V: np.ndarray,
         assignment_costs = (n_points - n_outliers) * mdl.mdl_costs_discrete_probability(
             1 / n_clusters[subspace])
         # Subspace Variance costs
-        model_costs += mdl.mdl_costs_bic(n_points)
+        model_costs += mdl.bic_costs(n_points)
         # Coding costs for each point
         coding_costs = mdl.mdl_costs_gmm_single_covariance(m[subspace],
                                                            scatter_matrices[subspace],

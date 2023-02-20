@@ -1,4 +1,3 @@
-from .fuzzy_cmeans import FuzzyCMeans
 from .pgmeans import PGMeans
 from .xmeans import XMeans
 from .gmeans import GMeans
@@ -8,11 +7,12 @@ from .dipext import DipExt, DipInit
 from .skinnydip import SkinnyDip, UniDip
 from .subkmeans import SubKmeans
 from .ldakmeans import LDAKmeans
+from .dipnsub import DipNSub
+from .gapstatistic import GapStatistic
 
 __all__ = ['GMeans',
            'PGMeans',
            'XMeans',
-           'FuzzyCMeans',
            'DipMeans',
            'ProjectedDipMeans',
            'DipExt',
@@ -20,4 +20,6 @@ __all__ = ['GMeans',
            'SkinnyDip',
            'UniDip',
            'SubKmeans',
-           'LDAKmeans']
+           'LDAKmeans',
+           'DipNSub',
+           'GapStatistic']

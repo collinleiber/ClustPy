@@ -450,7 +450,7 @@ class MultipleLabelingsConfusionMatrix(ConfusionMatrix):
             - "permut-max": Assign each ground truth labeling one predicted labeling, so that the sum of the combinations is maximzed (prediction labeling can only be assigned to one ground truth labeling).
             - "permut-min": Assign each ground truth labeling one predicted labeling, so that the sum of the combinations is minimized (prediction labeling can only be assigned to one ground truth labeling).
             - "mean": Calculate the mean value of all values in the confusion matrix.
-            - "mean_wo_diag": Calculate mean value ignoring the diagonal. E.g. used to calculate average redundancy. Note: Confusion matrix must be quadratic with all diagonal values equal to 0.
+            - "mean_wo_diag": Calculate mean value ignoring the diagonal. E.g. used to calculate average redundancy. Note: Confusion matrix must be quadratic!
         In the end all results (except for 'mean') are divided by the number of ground truth labelings.
 
         Parameters
@@ -513,8 +513,7 @@ class MultipleLabelingsConfusionMatrix(ConfusionMatrix):
         elif aggregation_strategy == "mean_wo_diag":
             assert self.confusion_matrix.shape[0] == self.confusion_matrix.shape[
                 1], "Confusion matrix must be quadratic."
-            assert np.all(self.confusion_matrix.diagonal() == 0), "All values of the diagonal must be 0."
-            score = np.sum(self.confusion_matrix)
+            score = np.sum(self.confusion_matrix) - np.sum(self.confusion_matrix.diagonal())
             score /= (self.confusion_matrix.shape[0] * (self.confusion_matrix.shape[0] - 1))
         return score
 

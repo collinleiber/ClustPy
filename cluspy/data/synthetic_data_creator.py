@@ -27,9 +27,9 @@ def create_subspace_data(n_samples: int = 1000, n_clusters: int = 3, subspace_fe
         Number of outliers for each subspace. Overall number of samples will be n_samples + n_outliers.
         Beware that n_samples + n_outliers must be equal for both subspaces (default: (0, 0))
     std : float
-        Standard deviation of the Gaussian clusters (default: 1.)
+        Standard deviation of the Gaussian clusters. Can be a list specifying an individual value for each subspace (default: 1.)
     box : tuple
-        The bounding box of the cluster centers (default: (-10, 10))
+        The bounding box of the cluster centers. Can be a list specifying an individual value for each subspace (default: (-10, 10))
     rotate_space : bool
         Specifies whether the feature space should be rotated by an orthonormal matrix (default: True)
     random_state: int / np.random.RandomState
@@ -76,9 +76,9 @@ def create_nr_data(n_samples: int = 1000, n_clusters: tuple = (3, 3, 1), subspac
         Number of outliers for each subspace. Overall number of samples will be n_samples + n_outliers.
         Beware that n_samples + n_outliers must be equal for each subspace (default: (0, 0, 0))
     std : float
-        Standard deviation of the Gaussian clusters (default: 1.)
+        Standard deviation of the Gaussian clusters. Can be a list specifying an individual value for each subspace (default: 1.)
     box : tuple
-        The bounding box of the cluster centers (default: (-10, 10))
+        The bounding box of the cluster centers. Can be a list specifying an individual value for each subspace (default: (-10, 10))
     rotate_space : bool
         Specifies whether the feature space should be rotated by an orthonormal matrix (default: True)
     random_state: int / np.random.RandomState

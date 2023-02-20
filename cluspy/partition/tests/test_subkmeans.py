@@ -66,7 +66,7 @@ def test_simple_subkmeans_with_wine():
 
 
 @patch("matplotlib.pyplot.show")  # Used to test plots (show will not be called)
-def test_plot_subkmeans_result_with_fruit(mock_fig):
+def test_plot_subkmeans_result_with_wine(mock_fig):
     X, labels = load_wine()
     subkm = SubKmeans(3, max_iter=1)
     subkm.fit(X)

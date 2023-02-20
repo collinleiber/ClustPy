@@ -1153,8 +1153,7 @@ class AutoNR(BaseEstimator, ClusterMixin):
     References
     ----------
     Leiber, Collin, et al. "Automatic Parameter Selection for Non-Redundant Clustering."
-    Proceedings of the 2022 SIAM International Conference on Data Mining (SDM).
-    Society for Industrial and Applied Mathematics, 2022.
+    Proceedings of the 2022 SIAM International Conference on Data Mining (SDM). Society for Industrial and Applied Mathematics, 2022.
     """
 
     def __init__(self, nrkmeans_repetitions: int = 15, outliers: bool = True, max_subspaces: int = None,
