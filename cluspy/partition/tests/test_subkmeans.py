@@ -1,7 +1,7 @@
 import numpy as np
 from cluspy.partition import SubKmeans
 from cluspy.partition.subkmeans import _transform_subkmeans_P_to_nrkmeans_P, \
-    _transform_subkmeans_scatters_to_nrkmeans_scatters, _transform_subkmeans_centers_to_nrkmeans_centers, \
+    _transform_subkmeans_scatter_to_nrkmeans_scatters, _transform_subkmeans_centers_to_nrkmeans_centers, \
     _transform_subkmeans_m_to_nrkmeans_m
 from cluspy.data import load_wine
 from unittest.mock import patch
@@ -9,16 +9,13 @@ from unittest.mock import patch
 
 def test_transform_subkmeans_scatters_to_nrkmeans_scatters():
     X = np.c_[np.ones(25), np.ones(25), np.ones(25)]
-    scatter_matrices = np.array([[[1, 1, 1], [2, 2, 2], [3, 3, 3]],
-                                 [[4, 4, 4], [5, 5, 5], [6, 6, 6]],
-                                 [[11, 11, 11], [12, 12, 12], [13, 13, 13]],
-                                 [[14, 14, 14], [15, 15, 15], [16, 16, 16]]])
-    transformed_scatter_matrices = _transform_subkmeans_scatters_to_nrkmeans_scatters(X, scatter_matrices)
+    scatter_matrix = np.array([[30, 30, 30], [34, 34, 34], [35, 35, 35]])
+    transformed_scatter_matrices = _transform_subkmeans_scatter_to_nrkmeans_scatters(X, scatter_matrix)
     assert len(transformed_scatter_matrices) == 2
-    assert np.array_equal(transformed_scatter_matrices[0], scatter_matrices)
-    assert np.array_equal(transformed_scatter_matrices[1], np.array([[[0., 0., 0.],
-                                                                      [0., 0., 0.],
-                                                                      [0., 0., 0.]]]))
+    assert np.array_equal(transformed_scatter_matrices[0], scatter_matrix)
+    assert np.array_equal(transformed_scatter_matrices[1], np.array([[0., 0., 0.],
+                                                                     [0., 0., 0.],
+                                                                     [0., 0., 0.]]))
 
 
 def test_transform_subkmeans_P_to_nrkmeans_P():
@@ -100,9 +97,6 @@ def test_calculate_cost_function():
     subkm.fit(X)
     subkm.V = np.array([[0, 1, 0], [0, 0, 1], [1, 0, 0]])
     subkm.m = 2
-    subkm.scatter_matrices_ = np.array([[[1, 1, 1], [2, 2, 2], [3, 3, 3]],
-                                        [[4, 4, 4], [5, 5, 5], [6, 6, 6]],
-                                        [[11, 11, 11], [12, 12, 12], [13, 13, 13]],
-                                        [[14, 14, 14], [15, 15, 15], [16, 16, 16]]])
+    subkm.scatter_matrix_ = np.array([[30, 30, 30], [34, 34, 34], [38, 38, 38]])
     costs = subkm.calculate_cost_function(X)
     assert costs == 68 + 20

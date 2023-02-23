@@ -104,13 +104,10 @@ def _get_projected_data(X: np.ndarray, n_random_projections: int, random_state: 
     pca = PCA()
     pca_X = pca.fit_transform(X) if X.shape[0] > 1 else np.empty((X.shape[0], 0))
     # Add random projections
-    random_projections = np.zeros((X.shape[0], n_random_projections))
-    for i in range(n_random_projections):
-        # Add random vector
-        projection_vector = random_state.rand(X.shape[1])
-        projected_X = np.dot(X, projection_vector)
-        random_projections[:, i] = projected_X
-    projected_data = np.c_[X, pca_X, random_projections]
+    random_projections = random_state.rand(X.shape[1], n_random_projections)
+    random_X = np.matmul(X, random_projections)
+    # Combine data
+    projected_data = np.c_[X, pca_X, random_X]
     return projected_data
 
 

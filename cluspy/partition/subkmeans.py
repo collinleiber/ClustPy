@@ -70,26 +70,26 @@ def _transform_subkmeans_centers_to_nrkmeans_centers(X: np.ndarray, centers: np.
     return nrkmeans_centers
 
 
-def _transform_subkmeans_scatters_to_nrkmeans_scatters(X: np.ndarray, scatter_matrices: np.ndarray) -> list:
+def _transform_subkmeans_scatter_to_nrkmeans_scatters(X: np.ndarray, scatter_matrix: np.ndarray) -> list:
     """
-    Transform the scatter matrices of SubKmeans to the representation of NrKmeans which includes the noise space.
+    Transform the scatter matrix of SubKmeans to the representation of NrKmeans which includes the noise space.
 
     Parameters
     ----------
     X : np.ndarray
         the given data set
-    centers : np.ndarray
-        The scatter matrices of the subspace of SubKmeans
+    scatter_matrix : np.ndarray
+        The scatter matrix of the subspace of SubKmeans
 
     Returns
     -------
     nrkmeans_scatter_matrices : list
-        The scatter matrices of the subspace of SubKmeans and the noise space
+        The scatter matrix of the subspace of SubKmeans and the noise space
     """
     noise_center = np.mean(X, axis=0)
     centered_points = X - noise_center
     noise_scatter_matrix = np.matmul(centered_points.T, centered_points)
-    nrkmeans_scatter_matrices = [scatter_matrices, np.array([noise_scatter_matrix])]
+    nrkmeans_scatter_matrices = [scatter_matrix, noise_scatter_matrix]
     return nrkmeans_scatter_matrices
 
 
@@ -220,7 +220,7 @@ class SubKmeans(BaseEstimator, ClusterMixin):
             self.labels_ = nrkmeans.labels_[:, 0]
         self.cluster_centers = nrkmeans.cluster_centers[0]
         self.m = nrkmeans.m[0]
-        self.scatter_matrices_ = nrkmeans.scatter_matrices_[0]
+        self.scatter_matrix_ = nrkmeans.scatter_matrices_[0]
         self.n_clusters = nrkmeans.n_clusters[0]
         return self
 
@@ -307,7 +307,7 @@ class SubKmeans(BaseEstimator, ClusterMixin):
         assert hasattr(self, "labels_"), "The SubKmeans algorithm has not run yet. Use the fit() function first."
         m = _transform_subkmeans_m_to_nrkmeans_m(self.m, X.shape[1])
         P = _transform_subkmeans_P_to_nrkmeans_P(self.m, self.V.shape[0])
-        scatter_matrices = _transform_subkmeans_scatters_to_nrkmeans_scatters(X, self.scatter_matrices_)
+        scatter_matrices = _transform_subkmeans_scatter_to_nrkmeans_scatters(X, self.scatter_matrix_)
         labels = np.c_[self.labels_, np.zeros(self.labels_.shape[0])]
         total_costs, global_costs, all_subspace_costs = _mdl_costs(X, [self.n_clusters, 1], m, P, self.V,
                                                                    scatter_matrices, labels,
@@ -316,7 +316,7 @@ class SubKmeans(BaseEstimator, ClusterMixin):
 
     def calculate_cost_function(self, X: np.ndarray) -> float:
         """
-        Calculate the result of the SubKmeans loss function. Depends on the rotation and the scatter matrix.
+        Calculate the result of the SubKmeans cost function. Depends on the rotation and the scatter matrix.
         Calculates for both subspaces j:
         P_j^T*V^T*S_j*V*P_j
 
@@ -332,6 +332,6 @@ class SubKmeans(BaseEstimator, ClusterMixin):
         """
         assert hasattr(self, "labels_"), "The SubKmeans algorithm has not run yet. Use the fit() function first."
         P = _transform_subkmeans_P_to_nrkmeans_P(self.m, self.V.shape[0])
-        scatter_matrices = _transform_subkmeans_scatters_to_nrkmeans_scatters(X, self.scatter_matrices_)
+        scatter_matrices = _transform_subkmeans_scatter_to_nrkmeans_scatters(X, self.scatter_matrix_)
         costs = _get_total_cost_function(self.V, P, scatter_matrices)
         return costs

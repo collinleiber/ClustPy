@@ -8,8 +8,7 @@ import numpy as np
 from sklearn.base import BaseEstimator, ClusterMixin
 
 
-def _multi_density_dbscan(X: np.ndarray, k: int, var: float, min_cluster_size: int, always_sort_densities: bool) -> (
-        int, np.ndarray, list):
+def _multi_density_dbscan(X: np.ndarray, k: int, var: float, min_cluster_size: int) -> (int, np.ndarray, list):
     """
     Start the actual Multiple Density DBSCAN clustering procedure on the input data set.
 
@@ -23,8 +22,6 @@ def _multi_density_dbscan(X: np.ndarray, k: int, var: float, min_cluster_size: i
         Defines the factor that the density of a point may deviate from the average cluster density
     min_cluster_size : int
         The minimum cluster size (if a cluster is smaller, all contained points will be labeled as noise)
-    always_sort_densities : bool
-        If true, the neighbors in the current queue will be sorted every time new points are added to the queue (the original paper does not specify this behaviour)
 
     Returns
     -------
@@ -52,7 +49,7 @@ def _multi_density_dbscan(X: np.ndarray, k: int, var: float, min_cluster_size: i
         if labels[p1] != -1:
             # Point is already assigned to a cluster
             continue
-        cluster_points, cluster_density = _gather(p1, c_id, densities, knns, labels, var, always_sort_densities)
+        cluster_points, cluster_density = _gather(p1, c_id, densities, knns, labels, var)
         # Check if cluster is large enough
         if len(cluster_points) >= min_cluster_size:
             c_id += 1
@@ -63,8 +60,8 @@ def _multi_density_dbscan(X: np.ndarray, k: int, var: float, min_cluster_size: i
     return n_clusters, labels, cluster_densities
 
 
-def _gather(p1: int, c_id: int, densities: list, knns: np.ndarray, labels: np.ndarray, var: float,
-            always_sort_densities: bool) -> (list, float):
+def _gather(p1: int, c_id: int, densities: np.ndarray, knns: np.ndarray, labels: np.ndarray, var: float) -> (
+        list, float):
     """
     Expand the current cluster (consisting of a single most dense point).
     Check each added point's neighbors to see if their density is low enough to add them the cluster.
@@ -75,16 +72,14 @@ def _gather(p1: int, c_id: int, densities: list, knns: np.ndarray, labels: np.nd
         The id of the starting point of the cluster (most dense point)
     c_id : int
         The cluster id of the current cluster
-    densities : list
+    densities : np.ndarray
         The densities of all points
     knns : np.ndarray
         The k-nearest neighbors of all points
     labels : np.ndarray
-        The current labels
+        The current cluster labels
     var : float
         Defines the factor that the density of a point may deviate from the average cluster density
-    always_sort_densities : bool
-        If true, the neighbors in the current queue will be sorted every time new points are added to the queue (the original paper does not specify this behaviour)
 
     Returns
     -------
@@ -97,8 +92,7 @@ def _gather(p1: int, c_id: int, densities: list, knns: np.ndarray, labels: np.nd
     labels[p1] = c_id
     # Get neighbors of point 1
     neighbors = [kn for kn in knns[p1, :] if labels[kn] == -1]
-    if always_sort_densities:
-        neighbors = _sort_neighbors_by_densities(neighbors, densities)
+    neighbors = _sort_neighbors_by_densities(neighbors, densities)
     # Set start density of the cluster
     cluster_density = densities[p1]
     while len(neighbors) > 0:
@@ -113,13 +107,14 @@ def _gather(p1: int, c_id: int, densities: list, knns: np.ndarray, labels: np.nd
                 # Update Cluster density
                 cluster_density = (cluster_density * (len(cluster_points) - 1) + density_p2) / len(cluster_points)
                 # Add new neighbors
-                neighbors += [kn for kn in knns[p2, :] if labels[kn] == -1] # TODO: dont add duplicates (use set?) - use sorted list
-                if always_sort_densities:
-                    neighbors = _sort_neighbors_by_densities(neighbors, densities)
+                # neighbors += [kn for kn in knns[p2, :] if
+                #               labels[kn] == -1]
+                # neighbors = _sort_neighbors_by_densities(neighbors, densities)
+                neighbors = _add_neighbors_to_neighbor_list(densities, labels, neighbors, knns[p2, :])
     return cluster_points, cluster_density
 
 
-def _sort_neighbors_by_densities(neighbors: list, densities: list) -> list:
+def _sort_neighbors_by_densities(neighbors: list, densities: np.ndarray) -> list:
     """
     Sort the available neighbors by their densities. Sort in ascending order.
 
@@ -127,7 +122,7 @@ def _sort_neighbors_by_densities(neighbors: list, densities: list) -> list:
     ----------
     neighbors : list
         the ids of the neighbors
-    densities : list
+    densities : np.ndarray
         the densities
 
     Returns
@@ -137,6 +132,53 @@ def _sort_neighbors_by_densities(neighbors: list, densities: list) -> list:
     """
     neighbors = sorted(neighbors, key=lambda x: densities[x])
     return neighbors
+
+
+def _add_neighbors_to_neighbor_list(densities: np.ndarray, labels: np.ndarray, current_neighbors: list,
+                                    new_neighbors: np.ndarray) -> list:
+    """
+    Add the new neighbors to the neighboring list.
+    Make sure that they are correctly sorted according to their density.
+
+    Parameters
+    ----------
+    densities : np.ndarray
+        The densities of all points
+    labels : np.ndarray
+        The current cluster labels
+    current_neighbors : list
+        The current list of neighbors of cluster objects
+    new_neighbors : list
+        The new neighbors that should be added to the neighbor list
+
+    Returns
+    -------
+    current_neighbors : list
+        The updated neighbor list
+    """
+    # ignore points that are already assigned
+    new_neighbors = new_neighbors[labels[new_neighbors] == -1]
+    # Sort new neighbors by density
+    sorted_new_neighbors = _sort_neighbors_by_densities(new_neighbors, densities)
+    # Get densities of current neighbors
+    densities_current_neighbors = densities[current_neighbors]
+    start_comparison_index = 0
+    for p in sorted_new_neighbors:
+        adding_indices = np.where(densities[p] > densities_current_neighbors)[0]
+        if len(adding_indices) == 0:  # is smaller than all others
+            # Insert at first position if object not already contained
+            if len(densities_current_neighbors) == 0 or current_neighbors[start_comparison_index] != p:
+                current_neighbors.insert(start_comparison_index, p)
+                start_comparison_index += 1  # move pointer one position higher
+        else:
+            adding_index = adding_indices[-1] + 1  # Get first position where object has smaller or equal density
+            if start_comparison_index + adding_index == len(current_neighbors) or current_neighbors[
+                start_comparison_index + adding_index] != p:  # Do not add a point twice
+                current_neighbors.insert(start_comparison_index + adding_index, p)
+                # Dont regard objects with less density in following iterations
+                densities_current_neighbors = densities_current_neighbors[adding_index:]
+                start_comparison_index += adding_index + 1  # move pointer one position higher than added object
+    return current_neighbors
 
 
 class MultiDensityDBSCAN(BaseEstimator, ClusterMixin):
@@ -154,8 +196,6 @@ class MultiDensityDBSCAN(BaseEstimator, ClusterMixin):
         Defines the factor that the density of a point may deviate from the average cluster density (default: 2.5)
     min_cluster_size : int
         The minimum cluster size (if a cluster is smaller, all contained points will be labeled as noise) (default: 2)
-    always_sort_densities : bool
-        If true, the neighbors in the current queue will be sorted every time new points are added to the queue (the original paper does not specify this behaviour) (default: True)
 
     Attributes
     ----------
@@ -172,11 +212,10 @@ class MultiDensityDBSCAN(BaseEstimator, ClusterMixin):
     International Conference on Intelligent Data Engineering and Automated Learning. Springer, Berlin, Heidelberg, 2011.
     """
 
-    def __init__(self, k: int = 15, var: float = 2.5, min_cluster_size: int = 2, always_sort_densities: bool = True):
+    def __init__(self, k: int = 15, var: float = 2.5, min_cluster_size: int = 2):
         self.k = k
         self.var = var
         self.min_cluster_size = min_cluster_size
-        self.always_sort_densities = always_sort_densities
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'MultiDensityDBSCAN':
         """
@@ -195,8 +234,7 @@ class MultiDensityDBSCAN(BaseEstimator, ClusterMixin):
         self : MultiDensityDBSCAN
             this instance of the Multi Density DBSCAN algorithm
         """
-        n_clusters, labels, cluster_densities = _multi_density_dbscan(X, self.k, self.var, self.min_cluster_size,
-                                                                      self.always_sort_densities)
+        n_clusters, labels, cluster_densities = _multi_density_dbscan(X, self.k, self.var, self.min_cluster_size)
         self.n_clusters_ = n_clusters
         self.labels_ = labels
         self.cluster_densities_ = cluster_densities

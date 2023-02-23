@@ -63,8 +63,7 @@ def _dip_n_sub(X: np.ndarray, significance: float, threshold: float, step_size: 
                                                                                  step_size, momentum,
                                                                                  n_starting_vectors,
                                                                                  cluster_sizes, consider_duplicates,
-                                                                                 random_state,
-                                                                                 debug)
+                                                                                 random_state, debug)
         # Check how many objects are contained in multimodal axes on the identified axis
         amount_multimodal_objects = np.sum((pvalues < significance) * cluster_sizes) / X.shape[0]
         if amount_multimodal_objects >= threshold:
@@ -186,7 +185,7 @@ def _find_min_dippvalue_by_grouped_sgd(X: np.ndarray, labels: np.ndarray, n_clus
                 start_projection = np.zeros(X.shape[1])
                 start_projection[argsorted_dimensions[i]] = 1
             else:
-                start_projection = pca.components_[i, :]
+                start_projection = pca.components_[i]
             pvalues, projection, projected_data, sum_weighted_pvalues = _find_min_dippvalue_by_grouped_sgd_with_start(X,
                                                                                                                       labels,
                                                                                                                       n_clusters,

@@ -1,3 +1,8 @@
+"""
+@authors:
+Collin Leiber
+"""
+
 import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.base import BaseEstimator, ClusterMixin
@@ -7,7 +12,7 @@ import matplotlib.pyplot as plt
 from scipy.spatial.distance import pdist
 
 
-def _gap_statistic(X: np.ndarray, min_n_clusters: int, max_n_clusters: int, n_samplings: int,
+def _gap_statistic(X: np.ndarray, min_n_clusters: int, max_n_clusters: int, n_boots: int,
                    use_principal_components: bool, use_log: bool, random_state: np.random.RandomState) -> (
         int, np.ndarray, np.ndarray, np.ndarray, np.ndarray):
     """
@@ -21,7 +26,7 @@ def _gap_statistic(X: np.ndarray, min_n_clusters: int, max_n_clusters: int, n_sa
         Minimum number of clusters. Must be smaller than max_n_clusters
     max_n_clusters : int
         Maximum number of clusters. Must be larger than min_n_clusters
-    n_samplings : int
+    n_boots : int
         Number of random data sets that should be created to calculate Gap Statistic
     use_principal_components : bool
         True, if the random data sets should be created using the feature-wise minimum and maximum value of the Principle Components.
@@ -42,7 +47,7 @@ def _gap_statistic(X: np.ndarray, min_n_clusters: int, max_n_clusters: int, n_sa
         The sk values
     """
     assert max_n_clusters >= min_n_clusters, "max_n_clusters can not be smaller than min_n_clusters"
-    assert n_samplings > 0, "n_samplings must be larger than 0"
+    assert n_boots > 0, "n_boots must be larger than 0"
     # Get min and max values for each dimension
     if use_principal_components:
         pca = PCA(n_components=X.shape[1])
@@ -57,22 +62,22 @@ def _gap_statistic(X: np.ndarray, min_n_clusters: int, max_n_clusters: int, n_sa
     sks = np.zeros(max_n_clusters + 2 - min_n_clusters)
     all_labels = np.zeros((X.shape[0], max_n_clusters + 2 - min_n_clusters), dtype=np.int32)
     random_datasets = [_generate_random_data(X.shape, mins, maxs, pca, random_state) for _ in
-                       range(n_samplings)]
+                       range(n_boots)]
     for n_clusters in range(min_n_clusters, max_n_clusters + 2):  # +1 because we need to calculate Gap(k+1)
         # Execute KMeans on the original data
         labels, W_k = _execute_kmeans(X, n_clusters, use_log, random_state)
         # Save labels
         all_labels[:, n_clusters - min_n_clusters] = labels
         # Create random data
-        W_kbs = np.zeros(n_samplings)
-        for b in range(n_samplings):
+        W_kbs = np.zeros(n_boots)
+        for b in range(n_boots):
             # Execute KMeans on random data
             labels, W_kb = _execute_kmeans(random_datasets[b], n_clusters, use_log, random_state)
             # Save within cluster dispersion
             W_kbs[b] = W_kb
         # Calculate Gap Statistic
         gaps[n_clusters - min_n_clusters] = np.mean(W_kbs) - W_k
-        sks[n_clusters - min_n_clusters] = np.std(W_kbs) * np.sqrt(1 + 1 / n_samplings)
+        sks[n_clusters - min_n_clusters] = np.std(W_kbs) * np.sqrt(1 + 1 / n_boots)
     # Check if any result fulfills gap condition
     fulfills_gap = gaps[:-1] >= gaps[1:] - sks[1:]
     # Prepare final result
@@ -169,7 +174,7 @@ class GapStatistic(BaseEstimator, ClusterMixin):
         Minimum number of clusters. Must be smaller than max_n_clusters (default: 1)
     max_n_clusters : int
         Maximum number of clusters. Must be larger than min_n_clusters (default: 10)
-    n_samplings : int
+    n_boots : int
         Number of random data sets that should be created to calculate Gap Statistic (default: 10)
     use_principal_components : bool
         True, if the random data sets should be created using the feature-wise minimum and maximum value of the Principle Components.
@@ -213,12 +218,12 @@ class GapStatistic(BaseEstimator, ClusterMixin):
     arXiv preprint arXiv:1103.4767 (2011).
     """
 
-    def __init__(self, min_n_clusters: int = 1, max_n_clusters: int = 10, n_samplings: int = 10,
+    def __init__(self, min_n_clusters: int = 1, max_n_clusters: int = 10, n_boots: int = 10,
                  use_principal_components: bool = True, use_log: bool = True,
                  random_state: np.random.RandomState = None):
         self.min_n_clusters = min_n_clusters
         self.max_n_clusters = max_n_clusters
-        self.n_samplings = n_samplings
+        self.n_boots = n_boots
         self.use_principal_components = use_principal_components
         self.use_log = use_log
         self.random_state = check_random_state(random_state)
@@ -241,7 +246,7 @@ class GapStatistic(BaseEstimator, ClusterMixin):
             this instance of the GapStatistic algorithm
         """
         n_clusters, labels, centers, gaps, sks = _gap_statistic(X, self.min_n_clusters, self.max_n_clusters,
-                                                                self.n_samplings,
+                                                                self.n_boots,
                                                                 self.use_principal_components, self.use_log,
                                                                 self.random_state)
         self.n_clusters_ = n_clusters
@@ -259,8 +264,7 @@ class GapStatistic(BaseEstimator, ClusterMixin):
         assert hasattr(self, "gaps_"), "The Gap Statistic algorithm has not run yet. Use the fit() function first."
         plt.plot(np.arange(self.min_n_clusters, self.max_n_clusters + 1), self.gaps_[:-1])
         plt.errorbar(np.arange(self.min_n_clusters, self.max_n_clusters + 1), self.gaps_[:-1], self.sks_[:-1],
-                     capsize=3,
-                     linestyle='None')
+                     capsize=3, linestyle='None')
         plt.ylabel("Gap Statistic")
         plt.xlabel("n_clusters")
         plt.show()

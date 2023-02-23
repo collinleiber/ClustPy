@@ -1,7 +1,7 @@
 import numpy as np
 from cluspy.alternative import NrKmeans
 from cluspy.alternative.nrkmeans import _assign_labels, _are_labels_equal, _is_matrix_orthogonal, _is_matrix_symmetric, \
-    _create_full_rotation_matrix, _update_projections, _update_centers_and_scatter_matrices, _remove_empty_cluster, \
+    _create_full_rotation_matrix, _update_projections, _update_centers_and_scatter_matrix, _remove_empty_cluster, \
     _get_cost_function_of_subspace, _get_total_cost_function, _remove_empty_subspace, _get_precision
 from cluspy.data import load_fruit
 from unittest.mock import patch
@@ -13,14 +13,11 @@ def test_update_centers_and_scatter_matrices():
     n_clusters_subspace = 4
     labels_subspace = np.array([0, 0, 0, 1, 1, 1, 3, 3, 3, 3])
     expected_centers = np.array([[3, 2, 1], [1, 3, 2], [np.nan, np.nan, np.nan], [6, 6, 6]])
-    expected_scatter_matrices = np.array([[[24, 0, 0], [0, 2, 0], [0, 0, 0]],
-                                          [[0, 0, 0], [0, 24, 0], [0, 0, 2]],
-                                          [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
-                                          [[10, 10, 10], [10, 10, 10], [10, 10, 10]]])
-    calculated_centers, calculated_scatter_matrices = _update_centers_and_scatter_matrices(X, n_clusters_subspace,
-                                                                                           labels_subspace)
+    expected_scatter_matrix = np.array([[34, 10, 10], [10, 36, 10], [10, 10, 12]])
+    calculated_centers, calculated_scatter_matrices = _update_centers_and_scatter_matrix(X, n_clusters_subspace,
+                                                                                         labels_subspace)
     assert np.array_equal(expected_centers, calculated_centers, equal_nan=True)
-    assert np.array_equal(expected_scatter_matrices, calculated_scatter_matrices)
+    assert np.array_equal(expected_scatter_matrix, calculated_scatter_matrices)
 
 
 def test_assign_labels():
@@ -141,20 +138,11 @@ def test_update_projections():
 def test_remove_empty_cluster():
     n_clusters_subspace = 5
     centers_subspace = np.array([[1, 1, 1], [2, 2, 2], [3, 3, 3], [np.nan, np.nan, np.nan], [5, 5, 5]])
-    scatter_matrices_subspace = np.array([[[1, 1, 1], [1, 1, 1], [1, 1, 1]],
-                                          [[2, 2, 2], [2, 2, 2], [2, 2, 2]],
-                                          [[3, 3, 3], [3, 3, 3], [3, 3, 3]],
-                                          [[4, 4, 4], [4, 4, 4], [4, 4, 4]],
-                                          [[5, 5, 5], [5, 5, 5], [5, 5, 5]]])
     labels_subspace = np.array([1, 1, 1, 2, 2, 2, 3, 3, 3, 5, 5, 5])
-    n_clusters_subspace_new, centers_subspace_new, scatter_matrices_subspace_new, labels_subspace_new = _remove_empty_cluster(
-        n_clusters_subspace, centers_subspace, scatter_matrices_subspace, labels_subspace, False)
+    n_clusters_subspace_new, centers_subspace_new, labels_subspace_new = _remove_empty_cluster(
+        n_clusters_subspace, centers_subspace, labels_subspace, False)
     assert 4 == n_clusters_subspace_new
     assert np.array_equal(np.array([[1, 1, 1], [2, 2, 2], [3, 3, 3], [5, 5, 5]]), centers_subspace_new)
-    assert np.array_equal(np.array([[[1, 1, 1], [1, 1, 1], [1, 1, 1]],
-                                    [[2, 2, 2], [2, 2, 2], [2, 2, 2]],
-                                    [[3, 3, 3], [3, 3, 3], [3, 3, 3]],
-                                    [[5, 5, 5], [5, 5, 5], [5, 5, 5]]]), scatter_matrices_subspace_new)
     assert np.array_equal(np.array([1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4]), labels_subspace_new)
 
 
@@ -185,10 +173,7 @@ def test_remove_empty_subspace():
 
 def test_get_cost_function_of_subspace():
     cropped_V = np.array([[0, 1], [0, 0], [1, 0]])
-    scatter_matrices_subspace = np.array([[[1, 1, 1], [2, 2, 2], [3, 3, 3]],
-                                          [[4, 4, 4], [5, 5, 5], [6, 6, 6]],
-                                          [[11, 11, 11], [12, 12, 12], [13, 13, 13]],
-                                          [[14, 14, 14], [15, 15, 15], [16, 16, 16]]])
+    scatter_matrices_subspace = np.array([[30, 30, 30], [34, 34, 34], [38, 38, 38]])
     costs = _get_cost_function_of_subspace(cropped_V, scatter_matrices_subspace)
     assert 68 == costs
 
@@ -196,12 +181,8 @@ def test_get_cost_function_of_subspace():
 def test_get_total_cost_function():
     V = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
     P = [np.array([2, 0]), np.array([1])]
-    scatter_matrices = [np.array([[[1, 1, 1], [2, 2, 2], [3, 3, 3]],
-                                  [[4, 4, 4], [5, 5, 5], [6, 6, 6]],
-                                  [[11, 11, 11], [12, 12, 12], [13, 13, 13]],
-                                  [[14, 14, 14], [15, 15, 15], [16, 16, 16]]]),
-                        np.array([[[1, 1, 1], [2, 2, 2], [3, 3, 3]],
-                                  [[31, 32, 33], [34, 35, 36], [37, 38, 39]]])]
+    scatter_matrices = [np.array([[30, 30, 30], [34, 34, 34], [38, 38, 38]]),
+                        np.array([[32, 33, 34], [36, 37, 38], [40, 41, 42]])]
     costs = _get_total_cost_function(V, P, scatter_matrices)
     assert 68 + 37 == costs
 
@@ -245,7 +226,8 @@ def test_simple_nrkmeans_with_fruit():
     # Test predict
     assert np.array_equal(nrk.labels_, nrk.predict(X))
     assert np.array_equal(nrk_2.labels_[:-1], nrk_2.predict(X[:-1]))
-    assert np.array_equal(nrk_3.labels_[:-2], nrk_3.predict(X[:-2]))
+    assert X.shape[0] - np.sum(nrk_3.labels_[:-2] == nrk_3.predict(X[:-2])) < X.shape[
+        0] * 0.01  # Some points can change labels when running with outliers=True
     assert np.array_equal(nrk_4.labels_[:-3], nrk_4.predict(X[:-3]))
 
 
@@ -308,11 +290,7 @@ def test_calculate_mdl_costs():
     nrk.fit(X)
     nrk.V = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
     nrk.P = [np.array([2, 0]), np.array([1])]
-    nrk.scatter_matrices_ = [np.array([[[1, 1, 1], [2, 2, 2], [3, 3, 3]],
-                                       [[4, 4, 4], [5, 5, 5], [6, 6, 6]],
-                                       [[11, 11, 11], [12, 12, 12], [13, 13, 13]],
-                                       [[14, 14, 14], [15, 15, 15], [16, 16, 16]]]),
-                             np.array([[[1, 1, 1], [2, 2, 2], [3, 3, 3]],
-                                       [[31, 32, 33], [34, 35, 36], [37, 38, 39]]])]
+    nrk.scatter_matrices_ = [np.array([[30, 30, 30], [34, 34, 34], [38, 38, 38]]),
+                             np.array([[32, 33, 34], [36, 37, 38], [40, 41, 42]])]
     costs = nrk.calculate_cost_function()
     assert 68 + 37 == costs

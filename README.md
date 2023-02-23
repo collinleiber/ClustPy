@@ -241,7 +241,7 @@ algorithms = [
 metrics = [EvaluationMetric("NMI", nmi), EvaluationMetric("ACC", acc),
            EvaluationMetric("Silhouette", silhouette_score, use_gt=False)]
 
-df = evaluate_multiple_datasets(datasets, algorithms, metrics, repetitions=5,
+df = evaluate_multiple_datasets(datasets, algorithms, metrics, n_repetitions=5,
                                 aggregation_functions=[np.mean, np.std, np.max, np.min],
                                 add_runtime=True, add_n_clusters=True, save_path=None,
                                 save_intermediate_results=False)

@@ -441,19 +441,24 @@ def _split_noise_space(X_subspace: np.ndarray, subspace_nr: int, best_nrkmeans: 
             noise_stays_similar = False
             centers = None
         else:
+            # Get scatter matrix for each cluster
+            all_cluster_scatter_matrices = np.zeros((nrkmeans.n_clusters[0], X_subspace.shape[1], X_subspace.shape[1]))
+            for cluster_id in range(nrkmeans.n_clusters[0]):
+                centered_points = X_subspace[nrkmeans.labels_[:, 0] == cluster_id] - nrkmeans.cluster_centers[0][cluster_id]
+                all_cluster_scatter_matrices[cluster_id] = np.matmul(centered_points.T, centered_points)
             # Split cluster with largest variance
             if len(nrkmeans.n_clusters) == 2:
                 centers = [
                     _split_largest_cluster(nrkmeans.V, nrkmeans.m[0], nrkmeans.P[0],
                                            nrkmeans.cluster_centers[0],
-                                           nrkmeans.scatter_matrices_[0],
+                                           all_cluster_scatter_matrices,
                                            nrkmeans.labels_[:, 0]),
                     nrkmeans.cluster_centers[1]]
             else:
                 centers = [
                     _split_largest_cluster(nrkmeans.V, nrkmeans.m[0], nrkmeans.P[0],
                                            nrkmeans.cluster_centers[0],
-                                           nrkmeans.scatter_matrices_[0],
+                                           all_cluster_scatter_matrices,
                                            nrkmeans.labels_[:, 0])]
         n_clusters[0] += 1
     return nrkmeans_split, mdl_total_split, mdl_threshold_split, subspace_costs_split
@@ -834,7 +839,7 @@ def _split_largest_cluster(V: np.ndarray, m_subspace: int, P_subspace: np.ndarra
     centers_subspace : np.ndarray
         the centers of the subspace
     scatter_matrices_subspace : np.ndarray
-        the scatter matrices of the subspace
+        the scatter matrices of each cluster within this subspace
     labels_subspace : np.ndarray
         the labels of the subspace
 
