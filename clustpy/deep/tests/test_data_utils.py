@@ -1,9 +1,9 @@
-from clustpy.data import load_optdigits
 from clustpy.deep._data_utils import _ClustpyDataset, get_dataloader
+from clustpy.deep.tests._helpers_for_tests import _load_single_label_nrletters
 import torch
 
-def test_ClustpyDataset_with_optdigits():
-    data, labels = load_optdigits()
+def test_ClustpyDataset_with_nrletters():
+    data, labels = _load_single_label_nrletters()
     data_torch = torch.from_numpy(data)
     labels_torch = torch.from_numpy(labels)
     dataset = _ClustpyDataset(data_torch, labels_torch)
@@ -19,7 +19,7 @@ def test_ClustpyDataset_with_optdigits():
     assert dataset[100][2] == labels_torch[100]
 
 def test_get_datalaoder():
-    data, labels = load_optdigits()
+    data, labels = _load_single_label_nrletters()
     data_torch = torch.from_numpy(data).float()
     labels_torch = torch.from_numpy(labels).float()
     # Numpy entry, shuffle=False and no additional input

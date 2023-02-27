@@ -397,6 +397,7 @@ def _split_noise_space(X_subspace: np.ndarray, subspace_nr: int, best_nrkmeans: 
     subspace_costs_split = None
     nrkmeans_split = None
     centers = None
+    nrkmeans = None
     # If noise space stays the same, change strategy: only run once with the largest cluster splitted
     noise_stays_similar = False
     if best_nrkmeans.m[subspace_nr] > 1:

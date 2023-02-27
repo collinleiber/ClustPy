@@ -1,6 +1,5 @@
 # ClustPy
 
-[![Build Status](https://app.travis-ci.com/collinleiber/ClustPy.svg?branch=master)](https://app.travis-ci.com/collinleiber/ClustPy)
 [![codecov](https://codecov.io/github/collinleiber/ClustPy/branch/master/graphs/badge.svg)](https://codecov.io/github/collinleiber/ClustPy) 
 
 The package provides a simple way to cluster data in Python.

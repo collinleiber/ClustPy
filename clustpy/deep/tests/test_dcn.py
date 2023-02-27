@@ -1,13 +1,13 @@
-from clustpy.data import load_optdigits
+from clustpy.deep.tests._helpers_for_tests import _load_single_label_nrletters
 from clustpy.deep import DCN
 from clustpy.deep.dcn import _compute_centroids
 import torch
 import numpy as np
 
 
-def test_simple_dcn_with_optdigits():
-    X, labels = load_optdigits()
-    dcn = DCN(10, pretrain_epochs=10, clustering_epochs=10)
+def test_simple_dcn_with_load_nrletters():
+    X, labels = _load_single_label_nrletters()
+    dcn = DCN(6, pretrain_epochs=3, clustering_epochs=3)
     assert not hasattr(dcn, "labels_")
     dcn.fit(X)
     assert dcn.labels_.dtype == np.int32

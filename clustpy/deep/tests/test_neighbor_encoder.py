@@ -1,4 +1,4 @@
-from clustpy.data import load_optdigits
+from clustpy.deep.tests._helpers_for_tests import _load_single_label_nrletters
 from clustpy.deep import get_dataloader, NeighborEncoder
 from clustpy.deep.neighbor_encoder import get_neighbors_batchwise
 from scipy.spatial.distance import pdist, squareform
@@ -6,8 +6,8 @@ import torch
 import numpy as np
 
 
-def test_simple_neighbor_encoder_with_optdigits():
-    data, _ = load_optdigits()
+def test_simple_neighbor_encoder_with_nrletters():
+    data, _ = _load_single_label_nrletters()
     embedding_dim = 10
     n_neighbors = 3
     dist_matrix = squareform(pdist(data))

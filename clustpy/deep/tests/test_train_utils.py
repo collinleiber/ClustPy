@@ -1,7 +1,6 @@
-from clustpy.data import load_optdigits
 from clustpy.deep import FlexibleAutoencoder, VariationalAutoencoder
 from clustpy.deep._train_utils import get_trained_autoencoder, _get_default_layers
-from clustpy.deep.tests._helpers_for_tests import _get_test_dataloader
+from clustpy.deep.tests._helpers_for_tests import _get_test_dataloader, _load_single_label_nrletters
 import numpy as np
 import torch
 
@@ -19,7 +18,7 @@ def test_get_default_layers():
 
 def test_get_trained_autoencoder():
     # Load dataset
-    data, _ = load_optdigits()
+    data, _ = _load_single_label_nrletters()
     dataloader = _get_test_dataloader(data, 256, True, False)
     # Get AE using the default AE class
     device = torch.device('cpu')
@@ -33,7 +32,7 @@ def test_get_trained_autoencoder():
 
 def test_get_trained_autoencoder_with_custom_ae_class():
     # Load dataset
-    data, _ = load_optdigits()
+    data, _ = _load_single_label_nrletters()
     dataloader = _get_test_dataloader(data, 256, True, False)
     # Get AE using a custom AE class
     device = torch.device('cpu')
@@ -48,7 +47,7 @@ def test_get_trained_autoencoder_with_custom_ae_class():
 
 def test_get_trained_autoencoder_with_custom_ae():
     # Load dataset
-    data, _ = load_optdigits()
+    data, _ = _load_single_label_nrletters()
     dataloader = _get_test_dataloader(data, 256, True, False)
     # Get trained version of custom AE
     device = torch.device('cpu')
@@ -69,7 +68,7 @@ def test_get_trained_autoencoder_with_custom_ae():
 
 def test_get_trained_autoencoder_with_custom_pretrained_ae():
     # Load dataset
-    data, _ = load_optdigits()
+    data, _ = _load_single_label_nrletters()
     dataloader = _get_test_dataloader(data, 256, True, False)
     # Get same pretrained version out of get_trained_autoencoder
     device = torch.device('cpu')

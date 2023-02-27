@@ -5,7 +5,7 @@ import numpy as np
 
 def test_simple_enrc_with_nrletters():
     X, labels = load_nrletters()
-    enrc = ENRC([6, 4, 3], pretrain_epochs=10, clustering_epochs=10)
+    enrc = ENRC([6, 4, 3], pretrain_epochs=3, clustering_epochs=3)
     assert not hasattr(enrc, "labels_")
     enrc.fit(X)
     assert enrc.labels_.dtype == np.int32

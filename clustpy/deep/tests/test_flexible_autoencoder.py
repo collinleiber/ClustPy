@@ -1,10 +1,10 @@
-from clustpy.data import load_optdigits
+from clustpy.deep.tests._helpers_for_tests import _load_single_label_nrletters
 from clustpy.deep import FlexibleAutoencoder
 import torch
 
 
-def test_simple_flexible_autoencoder_with_optdigits():
-    data, _ = load_optdigits()
+def test_simple_flexible_autoencoder_with_nrletters():
+    data, _ = _load_single_label_nrletters()
     embedding_dim = 10
     # Test fitting
     autoencoder = FlexibleAutoencoder(layers=[data.shape[1], 128, 64, embedding_dim])

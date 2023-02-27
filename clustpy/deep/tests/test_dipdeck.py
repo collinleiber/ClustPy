@@ -1,12 +1,12 @@
-from clustpy.data import load_optdigits
+from clustpy.deep.tests._helpers_for_tests import _load_single_label_nrletters
 from clustpy.deep import DipDECK
 from clustpy.deep.dipdeck import _get_nearest_points_to_optimal_centers, _get_nearest_points, _get_dip_matrix
 import numpy as np
 
 
-def test_simple_dipdeck_with_optdigits():
-    X, labels = load_optdigits()
-    dipdeck = DipDECK(pretrain_epochs=10, clustering_epochs=10)
+def test_simple_dipdeck_with_nrletters():
+    X, labels = _load_single_label_nrletters()
+    dipdeck = DipDECK(pretrain_epochs=3, clustering_epochs=3)
     assert not hasattr(dipdeck, "labels_")
     dipdeck.fit(X)
     assert dipdeck.labels_.dtype == np.int32

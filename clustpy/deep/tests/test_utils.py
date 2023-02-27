@@ -1,7 +1,6 @@
-from clustpy.data import load_optdigits
 from clustpy.deep._utils import squared_euclidean_distance, detect_device, encode_batchwise, predict_batchwise, window, \
     int_to_one_hot
-from clustpy.deep.tests._helpers_for_tests import _get_test_dataloader, _TestAutoencoder, _TestClusterModule
+from clustpy.deep.tests._helpers_for_tests import _get_test_dataloader, _TestAutoencoder, _TestClusterModule, _load_single_label_nrletters
 import torch
 import numpy as np
 
@@ -33,7 +32,7 @@ def test_detect_device():
 
 def test_encode_batchwise():
     # Load dataset
-    data, _ = load_optdigits()
+    data, _ = _load_single_label_nrletters()
     embedding_size = 5
     device = torch.device('cpu')
     dataloader = _get_test_dataloader(data, 256, False, False)
@@ -47,7 +46,7 @@ def test_encode_batchwise():
 
 def test_predict_batchwise():
     # Load dataset
-    data, _ = load_optdigits()
+    data, _ = _load_single_label_nrletters()
     threshold = np.mean(np.sum(data, axis=1))
     embedding_size = 5
     device = torch.device('cpu')

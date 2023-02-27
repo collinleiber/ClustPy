@@ -1,12 +1,12 @@
-from clustpy.data import load_optdigits
+from clustpy.deep.tests._helpers_for_tests import _load_single_label_nrletters
 from clustpy.deep import DipEncoder
 from clustpy.deep.dipencoder import plot_dipencoder_embedding
 import numpy as np
 
 
-def test_simple_dipencoder_with_optdigits():
-    X, labels = load_optdigits()
-    dipencoder = DipEncoder(10, pretrain_epochs=10, clustering_epochs=10)
+def test_simple_dipencoder_with_nrletters():
+    X, labels = _load_single_label_nrletters()
+    dipencoder = DipEncoder(6, pretrain_epochs=3, clustering_epochs=3)
     assert not hasattr(dipencoder, "labels_")
     dipencoder.fit(X)
     assert dipencoder.labels_.dtype == np.int32
