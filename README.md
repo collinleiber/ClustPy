@@ -101,7 +101,7 @@ Remove cluspy via pip to avoid ambiguities during development, e.g., when changi
         - Multiple Labelings Confusion Matrix
         - [Multiple Labelings Pair Counting Scores](https://ieeexplore.ieee.org/abstract/document/6228189)
 - Utils
-    - Automoatic evaluation methods
+    - Automatic evaluation methods
     - [Hartigans Dip-test](https://www.jstor.org/stable/2241144)
     - Various plots
 - Datasets

@@ -107,9 +107,6 @@ def _gather(p1: int, c_id: int, densities: np.ndarray, knns: np.ndarray, labels:
                 # Update Cluster density
                 cluster_density = (cluster_density * (len(cluster_points) - 1) + density_p2) / len(cluster_points)
                 # Add new neighbors
-                # neighbors += [kn for kn in knns[p2, :] if
-                #               labels[kn] == -1]
-                # neighbors = _sort_neighbors_by_densities(neighbors, densities)
                 neighbors = _add_neighbors_to_neighbor_list(densities, labels, neighbors, knns[p2, :])
     return cluster_points, cluster_density
 
@@ -117,6 +114,7 @@ def _gather(p1: int, c_id: int, densities: np.ndarray, knns: np.ndarray, labels:
 def _sort_neighbors_by_densities(neighbors: list, densities: np.ndarray) -> list:
     """
     Sort the available neighbors by their densities. Sort in ascending order.
+    If densities are equal samples will be sorted by their id.
 
     Parameters
     ----------
@@ -130,7 +128,7 @@ def _sort_neighbors_by_densities(neighbors: list, densities: np.ndarray) -> list
     neighbors : list
         the ids of the neighbors sorted by densities
     """
-    neighbors = sorted(neighbors, key=lambda x: densities[x])
+    neighbors = sorted(neighbors, key=lambda x: (densities[x], x))
     return neighbors
 
 
@@ -139,6 +137,10 @@ def _add_neighbors_to_neighbor_list(densities: np.ndarray, labels: np.ndarray, c
     """
     Add the new neighbors to the neighboring list.
     Make sure that they are correctly sorted according to their density.
+    Result should be equal to:
+    current_neighbors += [kn for kn in new_neighbors if labels[kn] == -1]
+    current_neighbors = list(set(current_neighbors))
+    current_neighbors = _sort_neighbors_by_densities(neighbors, densities)
 
     Parameters
     ----------
@@ -161,23 +163,14 @@ def _add_neighbors_to_neighbor_list(densities: np.ndarray, labels: np.ndarray, c
     # Sort new neighbors by density
     sorted_new_neighbors = _sort_neighbors_by_densities(new_neighbors, densities)
     # Get densities of current neighbors
-    densities_current_neighbors = densities[current_neighbors]
-    start_comparison_index = 0
+    index = 0
     for p in sorted_new_neighbors:
-        adding_indices = np.where(densities[p] > densities_current_neighbors)[0]
-        if len(adding_indices) == 0:  # is smaller than all others
-            # Insert at first position if object not already contained
-            if len(densities_current_neighbors) == 0 or current_neighbors[start_comparison_index] != p:
-                current_neighbors.insert(start_comparison_index, p)
-                start_comparison_index += 1  # move pointer one position higher
-        else:
-            adding_index = adding_indices[-1] + 1  # Get first position where object has smaller or equal density
-            if start_comparison_index + adding_index == len(current_neighbors) or current_neighbors[
-                start_comparison_index + adding_index] != p:  # Do not add a point twice
-                current_neighbors.insert(start_comparison_index + adding_index, p)
-                # Dont regard objects with less density in following iterations
-                densities_current_neighbors = densities_current_neighbors[adding_index:]
-                start_comparison_index += adding_index + 1  # move pointer one position higher than added object
+        while index < len(current_neighbors) and (densities[p] > densities[current_neighbors[index]] or (
+                densities[p] == densities[current_neighbors[index]] and p > current_neighbors[index])):
+            index += 1
+        if index == len(current_neighbors) or current_neighbors[index] != p:
+            current_neighbors.insert(index, p)  # Add new neighbor, ignore if point already in neighbor list
+        index += 1
     return current_neighbors
 
 

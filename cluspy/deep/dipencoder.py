@@ -14,6 +14,7 @@ from cluspy.deep._data_utils import get_dataloader
 from cluspy.deep._train_utils import get_trained_autoencoder
 import matplotlib.pyplot as plt
 from cluspy.utils import plot_scatter_matrix
+from sklearn.utils import check_random_state
 
 """
 Dip module - holds backward functions
@@ -461,7 +462,7 @@ def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size:
                 optimizer_class: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss, clustering_epochs: int,
                 clustering_learning_rate: float, pretrain_batch_size: int, pretrain_epochs: int,
                 pretrain_learning_rate: float, autoencoder: torch.nn.Module, max_cluster_size_diff_factor: float,
-                labels_gt: np.ndarray, debug: bool) -> (
+                labels_gt: np.ndarray, random_state: np.random.RandomState, debug: bool) -> (
         np.ndarray, np.ndarray, dict, torch.nn.Module):
     """
     Start the actual DipEncoder procedure on the input data set.
@@ -498,6 +499,8 @@ def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size:
         If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) closest samples will be used
     labels_gt : no.ndarray
         Ground truth labels. If None, the DipEncoder will be used for clustering
+    random_state : np.random.RandomState
+        use a fixed random state to get a repeatable solution
     debug : bool
         If true, additional information will be printed to the console
 
@@ -534,7 +537,7 @@ def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size:
     X_embed = encode_batchwise(testloader, autoencoder, device)
     if labels_gt is None:
         # Execute kmeans to get initial clusters
-        km = KMeans(n_clusters)
+        km = KMeans(n_clusters, random_state=random_state)
         km.fit(X_embed)
         labels = km.labels_
         centers = km.cluster_centers_
@@ -654,6 +657,8 @@ class DipEncoder(BaseEstimator, ClusterMixin):
     max_cluster_size_diff_factor : float
         The maximum different in size when comparing two clusters regarding the number of samples.
         If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) closest samples will be used (default: 3)
+    random_state : np.random.RandomState
+        use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
     debug : bool
         If true, additional information will be printed to the console (default: False)
 
@@ -688,7 +693,8 @@ class DipEncoder(BaseEstimator, ClusterMixin):
                  pretrain_epochs: int = 100, clustering_epochs: int = 100,
                  optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), autoencoder: torch.nn.Module = None,
-                 embedding_size: int = 10, max_cluster_size_diff_factor: float = 3, debug: bool = False):
+                 embedding_size: int = 10, max_cluster_size_diff_factor: float = 3,
+                 random_state: np.random.RandomState = None, debug: bool = False):
         self.n_clusters = n_clusters
         self.pretrain_batch_size = pretrain_batch_size
         if batch_size is None:
@@ -703,6 +709,8 @@ class DipEncoder(BaseEstimator, ClusterMixin):
         self.autoencoder = autoencoder
         self.embedding_size = embedding_size
         self.max_cluster_size_diff_factor = max_cluster_size_diff_factor
+        self.random_state = check_random_state(random_state)
+        torch.manual_seed(self.random_state.get_state()[1][0])
         self.debug = debug
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DipEncoder':
@@ -732,7 +740,7 @@ class DipEncoder(BaseEstimator, ClusterMixin):
                                                                        self.pretrain_epochs,
                                                                        self.pretrain_learning_rate, self.autoencoder,
                                                                        self.max_cluster_size_diff_factor,
-                                                                       y, self.debug)
+                                                                       y, self.random_state, self.debug)
         self.labels_ = labels
         self.projection_axes_ = projection_axes
         self.index_dict_ = index_dict

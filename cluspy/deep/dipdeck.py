@@ -13,6 +13,7 @@ from cluspy.deep._data_utils import get_dataloader
 from cluspy.deep._train_utils import get_trained_autoencoder
 from sklearn.cluster import KMeans
 from sklearn.base import BaseEstimator, ClusterMixin
+from sklearn.utils import check_random_state
 
 
 def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, cluster_loss_weight: float,
@@ -66,7 +67,7 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
     n_boots : int
         Number of bootstraps used to calculate dip-p-values. Only necessary if pval_strategy is 'bootstrap'
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int
+        use a fixed random state to get a repeatable solution
     debug : bool
         If true, additional information will be printed to the console
 
@@ -93,7 +94,7 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
                                           optimizer_class, loss_fn, X.shape[1], embedding_size, autoencoder)
     # Execute kmeans in embedded space - initial clustering
     embedded_data = encode_batchwise(testloader, autoencoder, device)
-    kmeans = KMeans(n_clusters=n_clusters_init)
+    kmeans = KMeans(n_clusters=n_clusters_init, random_state=random_state)
     kmeans.fit(embedded_data)
     init_centers = kmeans.cluster_centers_
     cluster_labels_cpu = kmeans.labels_
@@ -622,7 +623,8 @@ class DipDECK(BaseEstimator, ClusterMixin):
         self.max_cluster_size_diff_factor = max_cluster_size_diff_factor
         self.pval_strategy = pval_strategy
         self.n_boots = n_boots
-        self.random_state = random_state
+        self.random_state = check_random_state(random_state)
+        torch.manual_seed(self.random_state.get_state()[1][0])
         self.debug = debug
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DipDECK':

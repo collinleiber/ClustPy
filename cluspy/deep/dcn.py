@@ -12,13 +12,15 @@ import torch
 import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.base import BaseEstimator, ClusterMixin
+from sklearn.utils import check_random_state
 
 
 def _dcn(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_learning_rate: float,
          clustering_learning_rate: float, pretrain_epochs: int,
          clustering_epochs: int, optimizer_class: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss,
          autoencoder: torch.nn.Module, embedding_size: int, degree_of_space_distortion: float,
-         degree_of_space_preservation: float) -> (np.ndarray, np.ndarray, np.ndarray, np.ndarray, torch.nn.Module):
+         degree_of_space_preservation: float, random_state: np.random.RandomState) -> (
+        np.ndarray, np.ndarray, np.ndarray, np.ndarray, torch.nn.Module):
     """
     Start the actual DCN clustering procedure on the input data set.
 
@@ -50,6 +52,8 @@ def _dcn(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_learning_rate
         weight of the reconstruction loss
     degree_of_space_preservation : float
         weight of the clustering loss
+    random_state : np.random.RandomState
+        use a fixed random state to get a repeatable solution
 
     Returns
     -------
@@ -67,7 +71,7 @@ def _dcn(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_learning_rate
                                           optimizer_class, loss_fn, X.shape[1], embedding_size, autoencoder)
     # Execute kmeans in embedded space
     embedded_data = encode_batchwise(testloader, autoencoder, device)
-    kmeans = KMeans(n_clusters=n_clusters)
+    kmeans = KMeans(n_clusters=n_clusters, random_state=random_state)
     kmeans.fit(embedded_data)
     init_centers = kmeans.cluster_centers_
     # Setup DCN Module
@@ -82,7 +86,7 @@ def _dcn(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_learning_rate
     dcn_centers = dcn_module.centers.detach().cpu().numpy()
     # Do reclustering with Kmeans
     embedded_data = encode_batchwise(testloader, autoencoder, device)
-    kmeans = KMeans(n_clusters=n_clusters)
+    kmeans = KMeans(n_clusters=n_clusters, random_state=random_state)
     kmeans.fit(embedded_data)
     return kmeans.labels_, kmeans.cluster_centers_, dcn_labels, dcn_centers, autoencoder
 
@@ -328,6 +332,8 @@ class DCN(BaseEstimator, ClusterMixin):
         the input autoencoder. If None a new FlexibleAutoencoder will be created (default: None)
     embedding_size : int
         size of the embedding within the autoencoder (default: 10)
+    random_state : np.random.RandomState
+        use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Attributes
     ----------
@@ -362,7 +368,7 @@ class DCN(BaseEstimator, ClusterMixin):
                  optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), degree_of_space_distortion: float = 0.05,
                  degree_of_space_preservation: float = 1.0, autoencoder: torch.nn.Module = None,
-                 embedding_size: int = 10):
+                 embedding_size: int = 10, random_state: np.random.RandomState = None):
         self.n_clusters = n_clusters
         self.batch_size = batch_size
         self.pretrain_learning_rate = pretrain_learning_rate
@@ -375,6 +381,8 @@ class DCN(BaseEstimator, ClusterMixin):
         self.degree_of_space_preservation = degree_of_space_preservation
         self.autoencoder = autoencoder
         self.embedding_size = embedding_size
+        self.random_state = check_random_state(random_state)
+        torch.manual_seed(self.random_state.get_state()[1][0])
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DCN':
         """
@@ -402,7 +410,8 @@ class DCN(BaseEstimator, ClusterMixin):
                                                                                    self.autoencoder,
                                                                                    self.embedding_size,
                                                                                    self.degree_of_space_distortion,
-                                                                                   self.degree_of_space_preservation)
+                                                                                   self.degree_of_space_preservation,
+                                                                                   self.random_state)
         self.labels_ = kmeans_labels
         self.cluster_centers_ = kmeans_centers
         self.dcn_labels_ = dcn_labels
