@@ -1,5 +1,5 @@
 from setuptools import setup, find_packages, Extension
-import cluspy
+import clustpy
 import numpy as np
 
 
@@ -15,16 +15,16 @@ def _load_readme():
     return readme
 
 
-dip_extension = Extension('cluspy.utils.dipModule',
+dip_extension = Extension('clustpy.utils.dipModule',
                           include_dirs=[np.get_include()],
-                          sources=['cluspy/utils/dip.c'])
+                          sources=['clustpy/utils/dip.c'])
 
 setup(
-    name='cluspy',
-    version=cluspy.__version__,
+    name='clustpy',
+    version=clustpy.__version__,
     packages=find_packages(),
-    package_data={'cluspy': ['data/datasets/*.data']},
-    url='https://github.com/collinleiber/ClusPy',
+    package_data={'clustpy': ['data/datasets/*.data']},
+    url='https://github.com/collinleiber/ClustPy',
     license='BSD-3-Clause License',
     author='Collin Leiber',
     author_email='leiber@dbs.ifi.lmu.de',

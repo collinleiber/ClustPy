@@ -1,14 +1,14 @@
-# ClusPy
+# ClustPy
 
-[![Build Status](https://app.travis-ci.com/collinleiber/ClusPy.svg?branch=master)](https://app.travis-ci.com/collinleiber/ClusPy)
-[![codecov](https://codecov.io/github/collinleiber/ClusPy/branch/master/graphs/badge.svg)](https://codecov.io/github/collinleiber/ClusPy) 
+[![Build Status](https://app.travis-ci.com/collinleiber/ClustPy.svg?branch=master)](https://app.travis-ci.com/collinleiber/ClustPy)
+[![codecov](https://codecov.io/github/collinleiber/ClustPy/branch/master/graphs/badge.svg)](https://codecov.io/github/collinleiber/ClustPy) 
 
 The package provides a simple way to cluster data in Python.
 For this purpose it provides a variety of algorithms from different domains. 
-Additionally, ClusPy includes methods that are often needed for research purposes, such as plots, clustering metrics or evaluation methods.
+Additionally, ClustPy includes methods that are often needed for research purposes, such as plots, clustering metrics or evaluation methods.
 Further, it integrates various frequently used datasets (e.g. from the [UCI repository](https://archive.ics.uci.edu/ml/index.php)) through largely automated loading options. 
 
-The focus of the ClusPy package is not on efficiency (here we recommend e.g. [pyclustering](https://pyclustering.github.io/)), 
+The focus of the ClustPy package is not on efficiency (here we recommend e.g. [pyclustering](https://pyclustering.github.io/)), 
 but on the possibility to try out a wide range of modern scientific methods.
 In particular, this should also make lesser-known methods accessible in a simple and convenient way.
 
@@ -27,7 +27,7 @@ Stay tuned for the 'pip' release
 
 The current development version can be installed directly from git by executing:
 
-`sudo pip3 install git+https://github.com/collinleiber/ClusPy.git`
+`sudo pip3 install git+https://github.com/collinleiber/ClustPy.git`
 
 Alternatively, clone the repository, go to the directory and execute:
 
@@ -49,9 +49,9 @@ Copy compiled C files to correct file location:
 
 `python setup.py build_ext --inplace`
 
-Remove cluspy via pip to avoid ambiguities during development, e.g., when changing files in the code:
+Remove clustpy via pip to avoid ambiguities during development, e.g., when changing files in the code:
 
-`pip3 uninstall cluspy`
+`pip3 uninstall clustpy`
 
 ## Components
 
@@ -142,9 +142,9 @@ In this first example, the subspace algorithm SubKmeans is run on a synthetic su
 Afterwards, the clustering accuracy is calculated to evaluate the result.
 
 ```python
-from cluspy.partition import SubKmeans
-from cluspy.data import create_subspace_data
-from cluspy.metrics import unsupervised_clustering_accuracy as acc
+from clustpy.partition import SubKmeans
+from clustpy.data import create_subspace_data
+from clustpy.metrics import unsupervised_clustering_accuracy as acc
 
 data, labels = create_subspace_data(1000, n_clusters=4, subspace_features=[2,5])
 sk = SubKmeans(4)
@@ -162,9 +162,9 @@ Therefore, we calculate the confusion matrix by comparing each combination of la
 The confusion matrix will be printed and finally the best matching nmi will be stated for each set of labels.
 
 ```python
-from cluspy.alternative import NrKmeans
-from cluspy.data import load_cmu_faces
-from cluspy.metrics import MultipleLabelingsConfusionMatrix
+from clustpy.alternative import NrKmeans
+from clustpy.data import load_cmu_faces
+from clustpy.metrics import MultipleLabelingsConfusionMatrix
 from sklearn.metrics import normalized_mutual_info_score as nmi
 import numpy as np
 
@@ -179,13 +179,13 @@ print(np.max(mlcm.confusion_matrix, axis=1))
 
 ### 3)
 
-One mentionable feature of the ClusPy package is the ability to run various modern deep clustering algorithms out of the box. 
+One mentionable feature of the ClustPy package is the ability to run various modern deep clustering algorithms out of the box. 
 For example, the following code runs the DEC algorithm on the Optdigits dataset. 
 To evaluate the result, we compute the adjusted RAND index (ari).
 
 ```python
-from cluspy.deep import DEC
-from cluspy.data import load_optdigits
+from clustpy.deep import DEC
+from clustpy.data import load_optdigits
 from sklearn.metrics import adjusted_rand_score as ari
 
 data, labels = load_optdigits()
@@ -197,17 +197,17 @@ print(my_ari)
 
 ### 4)
 
-In this more complex example, we use ClusPy's evaluation functions, 
+In this more complex example, we use ClustPy's evaluation functions, 
 which automatically run the specified algorithms multiple times on previously defined datasets.
 All results of the given metrics are stored in a Pandas dataframe.
 
 ```python
-from cluspy.utils import EvaluationDataset, EvaluationAlgorithm, EvaluationMetric, evaluate_multiple_datasets
-from cluspy.partition import ProjectedDipMeans, SubKmeans
+from clustpy.utils import EvaluationDataset, EvaluationAlgorithm, EvaluationMetric, evaluate_multiple_datasets
+from clustpy.partition import ProjectedDipMeans, SubKmeans
 from sklearn.metrics import normalized_mutual_info_score as nmi, silhouette_score
 from sklearn.cluster import KMeans, DBSCAN
-from cluspy.data import load_breast_cancer, load_iris, load_wine
-from cluspy.metrics import unsupervised_clustering_accuracy as acc
+from clustpy.data import load_breast_cancer, load_iris, load_wine
+from clustpy.metrics import unsupervised_clustering_accuracy as acc
 from sklearn.decomposition import PCA
 import numpy as np
 
