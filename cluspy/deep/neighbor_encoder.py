@@ -14,7 +14,7 @@ def get_neighbors_batchwise(X: np.ndarray, n_neighbors: int, metric: str = "sqeu
     """
     For large datasets it is often not possible to determine the nearest neighbors in a trivial manner.
     Therefore, here is an implementation that calculates the nearest neighbors in batches.
-    Ignores the objects themselves (with distance of 0) as nearest neighbors .
+    Ignores the objects themselves (with distance of 0) as nearest neighbors.
     It reduces the memory consumption of a trivial nearest neighbor implementation from (data_size x data_size) to (batch_size x data_size).
     A list is returned, which can be given as additional input into a DataLoader and is therefore directly compatible with the NeighborEncoder.
     Due to runtime concerns it is still recommended to use a more complex nearest neighbor retrieval implementation (e.g. from sklearn.neighbor)!

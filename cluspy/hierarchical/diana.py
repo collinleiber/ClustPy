@@ -1,248 +1,234 @@
 """
-Kaufman, Rousseeuw "Divisive Analysis (Program DIANA)" Chapter six from Finding Groups in Data:
-An Introduction to Cluster Analysis. 1990.
-
-@authors Stephan Breimann
+@authors:
+Collin Leiber
 """
 
-import time
-import os
-import pandas as pd
-import operator
-from sklearn.metrics import pairwise_distances
 from sklearn.base import BaseEstimator, ClusterMixin
-from sklearn.utils import check_array
-from sklearn.cluster import AgglomerativeClustering
-
-pd.set_option('expand_frame_repr', False)
+import numpy as np
+from scipy.spatial.distance import pdist, squareform
 
 
-# I Helper Functions
-class _Diana:
-    """Internal class for Divisive clustering algorithm (Top-Down)"""
-    def __init__(self, X, n_clusters=None, metric="euclidean", compute_full_tree=False, distance_threshold=0):
-        self.distance_threshold = distance_threshold
-        self.compute_full_tree = compute_full_tree
-        self.X = X
-        self.metric = metric
-        self.dict_n_clusters = {}
-        self.n_clusters = n_clusters
+def _diana(X: np.ndarray, n_clusters: int, distance_threshold: float, construct_full_tree: bool, metric: str) -> (
+        np.ndarray, list):
+    """
+    Start the actual DIANA clustering procedure on the input data set.
+    
+    Parameters
+    ----------
+    X : np.ndarray
+        the given data set
+    n_clusters : int
+        The number of clusters (can be None)
+    distance_threshold : float
+        The distance thresholds defines the minimum diameter that is considered (can be 0)
+    construct_full_tree : bool
+        Defines whether the full tree should be constructed after n_clusters has been reached
+    metric : str
+        Metric used to compute the dissimilarity. Can be "euclidean", "l1", "l2", "manhattan", "cosine", or "precomputed" (see scipy.spatial.distance.pdist)
 
-    def _update_dict_n_clusters(self, list_clusters):
-        """Update dict for each round of clustering"""
-        self.dict_n_clusters[len(list_clusters)] = list_clusters.copy()
-
-    def _average_dissimilarity(self, X=None, list_index=None):
-        """Calculate average dissimilarity for every sample in dissimilarity_matrix"""
-        if X is not None and len(X) > 1:
-            dis_matrix = pairwise_distances(X, metric=self.metric)
-            list_mean_dis = [val.sum() / (len(dis_matrix) - 1) for val in dis_matrix]
-            dict_id_mean_dis = dict(zip(list_index, list_mean_dis))
-            return dict_id_mean_dis
+    Returns
+    -------
+    tuple : (np.ndarray, list)
+        The final cluster labels,
+        The resulting tree containing the cluster hierarchy
+    """
+    labels = np.zeros(X.shape[0], dtype=np.int32)
+    final_labels = np.zeros(X.shape[0], dtype=np.int32)
+    # Calculate pairwise distances (must only be done once)
+    global_distance_matrix = squareform(pdist(X, metric=metric))
+    # Start with a single cluster
+    current_n_clusters = 1
+    tree = []
+    while current_n_clusters < n_clusters or construct_full_tree:
+        # Get cluster with maximum diameter (largest distance between two poinst within a cluster)
+        split_cluster_id, cluster_distance_matrix = _get_cluster_with_max_diameter(
+            global_distance_matrix, labels, current_n_clusters, distance_threshold)
+        # Check if we only have clusters of size one or only clusters with diameter < distance_threshold
+        if split_cluster_id is None:
+            break
         else:
-            return None
-
-    def _diameter(self, X=None):
-        """Calculate diameter of cluster, i.e. 'largest dissimilarity between two of its objects'"""
-        dis_matrix = pairwise_distances(X, metric=self.metric)
-        if X is None:
-            return 0
-        elif len(X) > 1:
-            return dis_matrix.max()
-        else:
-            return 0
-
-    def _max_diameter_cluster(self, list_index_clusters=None):
-        """Get biggest cluster of list, i.e. cluster with largest diameter.
-        Diameter of 0 means that all objects are similiar)"""
-        list_diameter = [self._diameter(X=self.X[index_cluster]) for index_cluster in list_index_clusters]
-        max_diameter = max(list_diameter)
-        index_max_diameter = list_diameter.index(max_diameter)
-        list_max_diameter_cluster = list_index_clusters[index_max_diameter]
-        return list_max_diameter_cluster, max_diameter
-
-    def _split_clust(self, list_cluster_a=None, list_cluster_b=None):
-        """Split cluster a in cluster a and cluster b (splinter group) based on average dissimilarity."""
-        # Set list_cluster_a and X_a
-        if list_cluster_a is None:
-            X_a = self.X
-            list_cluster_a = list(range(0, len(X_a)))
-        else:
-            X_a = self.X[list_cluster_a]
-        # Get dict with average dissimilarity for each sample (given as index)
-        dict_id_mean_dis = self._average_dissimilarity(X=X_a, list_index=list_cluster_a)
-        # Recursive call if cluster a contains more than two objects
-        if len(list_cluster_a) > 2:
-            # Select index with maximum dissimilarity
-            index_max_dis = max(dict_id_mean_dis.items(), key=operator.itemgetter(1))[0]
-            index_selected_a = [i for i in list_cluster_a if i != index_max_dis]
-            if list_cluster_b is None:
-                index_selected_b = [index_max_dis]
-            else:
-                index_selected_b = list_cluster_b + [index_max_dis]
-            # Calculate diameter (max dissimilarity between two objects in cluster)
-            diameter_a = self._diameter(X=self.X[index_selected_a])
-            diameter_b = self._diameter(X=self.X[index_selected_b])
-            # Recursive call of split clust if diameter of cluster a is higher than for cluster b
-            if diameter_a >= diameter_b and len(X_a) > 1:
-                return self._split_clust(list_cluster_a=index_selected_a, list_cluster_b=index_selected_b)
-            else:
-                return list_cluster_a, list_cluster_b
-        # Return both clusters if they exist
-        elif len(list_cluster_a) == 2 and list_cluster_b is not None:
-            return list_cluster_a, list_cluster_b
-        # Split cluster a if no object in cluster b
-        elif len(list_cluster_a) == 2:
-            return [list_cluster_a[0]], [list_cluster_a[1]]
-        else:
-            return [list_cluster_a]
-
-    def recursive_clustering(self, list_clusters=None):
-        """Recursive clustering algorithm of diana"""
-        # Initiate clustering
-        if list_clusters is None:
-            index_cluster_a, index_cluster_b = self._split_clust()
-            list_clusters = [index_cluster_a, index_cluster_b]
-            self._update_dict_n_clusters(list_clusters)
-        # Split biggest cluster from list of clusters and insert new clusters
-        list_max_diameter_cluster, max_diameter = self._max_diameter_cluster(list_index_clusters=list_clusters)
-        index_remove = list_clusters.index(list_max_diameter_cluster)
-        list_clusters.pop(index_remove)
-        list_split_clusters = self._split_clust(list_cluster_a=list_max_diameter_cluster)
-        list_clusters.insert(index_remove, list_split_clusters[0])
-        if len(list_split_clusters) > 1:
-            list_clusters.append(list_split_clusters[1])
-        # Recursive call until max_n_clusters is reached or max diameter is 0
-        # (i.e. cluster with largest dissimilarity contains just similar objects)
-        if self.n_clusters is not None and len(self.dict_n_clusters) + 1 == self.n_clusters:
-            return list_clusters
-        elif self.compute_full_tree and round(max_diameter, 5) == self.distance_threshold:
-            return list_clusters
-        else:
-            # Save cluster level
-            self._update_dict_n_clusters(list_clusters)
-            return self.recursive_clustering(list_clusters=list_clusters)
+            # Split cluster by updating labels and tree
+            labels_new = _split_cluster(cluster_distance_matrix, split_cluster_id, current_n_clusters)
+            labels[labels == split_cluster_id] = labels_new
+            tree.append((split_cluster_id, current_n_clusters))
+            current_n_clusters += 1
+        if current_n_clusters == n_clusters:
+            # Save current labels in final labels -> relevant if n_clusters is specified and construct_full_tree is True
+            final_labels = labels.copy()
+    return final_labels, tree
 
 
-def _get_labels_hierarchy(n_dict_clusters):
-    """Convert dict_n_clusters into df with cluster labels for each element and each clustering level"""
-    dict_dict_cluster_ids = {}
-    for i in n_dict_clusters:
-        dict_cluster_ids = {}
-        for j, clusters in enumerate(n_dict_clusters[i]):
-            for scale in clusters:
-                dict_cluster_ids[scale] = j + 1
-        dict_dict_cluster_ids[i] = dict_cluster_ids
-    df = pd.DataFrame.from_dict(dict_dict_cluster_ids, orient="index")
-    labels_hierarchy = df[sorted(df)].transpose() # Sort columns to match y (samples)
-    return labels_hierarchy
-
-
-# II Main Functions
-class Diana(BaseEstimator, ClusterMixin):
-    """Divisive clustering algorithm (Top-Down) based on pairwise dissimilarity of objects
-
-    Recursively splitting clusters with maximum dissimilarity
-    measured by distance metric (e.g., Euclidean distance).
+def _get_cluster_with_max_diameter(global_distance_matrix: np.ndarray, labels: np.ndarray, n_clusters: int,
+                                   distance_threshold: float) -> (int, np.ndarray):
+    """
+    Identify the cluster with the largest diameter, i.e. with the largest distance between two objects assigned to this cluster.
+    Here, only diameters which are larger than distance_threshold are taken into account.
+    If only clusters of size one occur or all diameters are below distance_threshold, all return values will be None.
 
     Parameters
     ----------
-    n_clusters : int or None, default=2
-        The number of clusters to find. It must be None if
-        'distance_threshold' is not None.
+    global_distance_matrix : np.ndarray
+        The global distance matrix containing the pairwise distances of all objects
+    labels : np.ndarray
+        The current cluster labels
+    n_clusters : int
+        The current number of clusters
+    distance_threshold : float
+        The distance thresholds defines the minimum diameter that is considered
 
-    metric : str or callable, default='euclidean'
-        Metric used to compute the dissimilarity. Can be "euclidean", "l1", "l2",
-        "manhattan", "cosine", or "precomputed".
+    Returns
+    -------
+    tuple: (int, np.ndarray)
+        The id of the cluster that should be split,
+        The pariwise distances of all points within that cluster
+    """
+    max_diameter = -1
+    split_cluster_id = None
+    resulting_cluster_distance_matrix = None
+    # Search cluster with largest diamter (two objects within a cluster with largest distance)
+    for cluster_id in range(n_clusters):
+        points = labels == cluster_id
+        # Cluster must contain more than one object
+        if np.sum(points) > 1:
+            # Get pairwise distances of all points within cluster
+            cluster_distance_matrix = global_distance_matrix[np.ix_(points, points)]
+            diameter = np.max(cluster_distance_matrix)
+            if diameter > max_diameter and diameter >= distance_threshold:
+                # Save parameters of current cluster with largest diameter
+                max_diameter = diameter
+                split_cluster_id = cluster_id
+                resulting_cluster_distance_matrix = cluster_distance_matrix
+    return split_cluster_id, resulting_cluster_distance_matrix
 
-    distance_threshold : float, default=None
-        Minimum of dissimilarity above which clusters will be split. For the Diana clustering algorithm,
-        dissimilarity is given as the maximum diameter, which is the largest dissimilarity between two
-        objects within a cluster.
-        If None, 'n_clusters' must not be None. If not None, 'compute_full_tree' must be True.
 
-    compute_full_tree : bool, default=False
-        If False, stop early the construction of the clustering tree at n_clusters,
-        which is the equal to the tree level.
-        If True, clustering will stop when 'distance_threshold' (needs to be given) is reached.
-        This is useful to decrease computation time if the number of clusters is not small compared to
-        the number of samples.
+def _split_cluster(cluster_distance_matrix: np.ndarray, split_cluster_id: int, new_cluster_id: int) -> np.ndarray:
+    """
+    Split the specified cluster into two.
+    Therefore, it repeatedly calculates the average dissimilarity of the objects to the two subclusters.
+    If the subclusters do not change for an iteration the splitting procedure terminates.
+
+    Parameters
+    ----------
+    cluster_distance_matrix : np.ndarray
+        The distance matrix of the specified cluster containing the pairwise distances of respective objects
+    split_cluster_id: int
+        The id of the cluster that should be split
+    new_cluster_id : int
+        The resulting id of the new cluster
+
+    Returns
+    -------
+    labels_new : np.ndarray
+        The updated cluster labels
+    """
+    # Create labels
+    labels_new = np.zeros(cluster_distance_matrix.shape[0], dtype=np.int32) + split_cluster_id
+    # Initialize sum of distances for second subcluster
+    sum_distances_1 = np.sum(cluster_distance_matrix, axis=1)
+    sum_distances_2 = np.zeros(cluster_distance_matrix.shape[0])
+    splinter_group = np.array([np.argmax(sum_distances_1)])
+    # Start splitting procedure
+    size_group_1 = cluster_distance_matrix.shape[0] - 1
+    size_group_2 = 0
+    while splinter_group.shape[0] > 0:
+        # Update labels
+        labels_new[splinter_group] = new_cluster_id
+        # Update sum of distances for each subcluster
+        size_group_1 -= splinter_group.shape[0]
+        size_group_2 += splinter_group.shape[0]
+        sum_splinter_group = np.sum(cluster_distance_matrix[:, splinter_group], axis=1)
+        sum_distances_1 -= sum_splinter_group
+        sum_distances_2 += sum_splinter_group
+        if size_group_1 > 0:
+            # Get new splinter group (only checks objects of the original cluster)
+            splinter_group = np.where((labels_new == split_cluster_id) &
+                                      (sum_distances_1 / size_group_1 > sum_distances_2 / size_group_2))[0]
+        else:
+            break
+    return labels_new
+
+
+class Diana(BaseEstimator, ClusterMixin):
+    """
+    The DIvisive ANAlysis (DIANA) clustering algorithm.
+    DIANA build a top-down clustering hierarchy by considering pairwise dissimilarity of objects.
+    It recursively splits the clusters with maximum dissimilarity, whereby the dissimilarity is based on a specified distance metric (e.g., Euclidean distance).
+
+    Parameters
+    ----------
+    n_clusters : int
+        The number of clusters. If n_clusters is None the tree will be constructed until the max diamater is below distance_threshold (default: None)
+    distance_threshold : float
+        The distance thresholds defines the minimum diameter that is considered. Must be 0 if n_clusters is specified (default: 0)
+    construct_full_tree : bool
+        Defines whether the full tree should be constructed after n_clusters has been reached (default: False)
+    metric : str
+        Metric used to compute the dissimilarity. Can be "euclidean", "l1", "l2", "manhattan", "cosine", or "precomputed" (see scipy.spatial.distance.pdist) (default: euclidean)
 
     Attributes
     ----------
-    labels_ : ndarray of shape (n_samples)
-        cluster labels for each sample for given 'n_cluster'
+    labels_ : np.ndarray
+        The final labels
+    tree_ : list
+        The resulting cluster tree
 
-    labels_hierarchy_: ndarray of shape (n_samples, n_clusters)
-        cluster labels for each samples (rows) and all cluster levels (columns)
-
+    References
+    ----------
+    Kaufman, Rousseeuw "Divisive Analysis (Program DIANA)"
+    Chapter six from Finding Groups in Data: An Introduction to Cluster Analysis. 1990.
     """
-    def __init__(self, n_clusters=2, metric="euclidean", compute_full_tree=False, distance_threshold=None):
-        self.n_clusters = n_clusters
-        self.metric = metric
-        self.distance_threshold = distance_threshold
-        self.compute_full_tree = compute_full_tree
 
-    def fit(self, X, y = None):
-        """Fit hierarchical clustering from features.
+    def __init__(self, n_clusters: int = None, distance_threshold: float = 0, construct_full_tree: bool = False,
+                 metric: str = "euclidean"):
+        self.n_clusters = n_clusters
+        self.distance_threshold = distance_threshold
+        self.construct_full_tree = construct_full_tree
+        self.metric = metric
+
+    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'Diana':
+        """
+        Initiate the actual clustering process on the input data set.
+        The resulting cluster labels will be stored in the labels_ attribute.
 
         Parameters
         ----------
-        X: array-like, shape (n_samples, n_features) or (n_samples, n_samples)
-            Training instances to cluster
-        y: Ignored (samples)
-            Not used, present here for API consistency by convention.
+        X : np.ndarray
+            the given data set
+        y : np.ndarray
+            the labels (can be ignored)
+
+        Returns
+        -------
+        self : Diana
+            this instance of the Diana algorithm
         """
-        # Check parameters
-        if self.n_clusters is not None and self.n_clusters <= 0:
-            raise ValueError("n_clusters should be an integer greater than 0."
-                             " %s was provided." % str(self.n_clusters))
-        if self.n_clusters is not None and self.compute_full_tree:
-            raise ValueError("Either 'n_clusters' or 'compute_full_tree' has to be set, "
-                             " the other needs to be None or False, respectively.")
-        if self.compute_full_tree and self.distance_threshold is None:
-            raise ValueError("If 'compute_full_tree' is True, "
-                             "'distance_threshold' must be  set.")
-        if self.distance_threshold is None or self.distance_threshold < 0:
-            # Set distance_threshold to theoretical minimum if not given or below
-            self.distance_threshold = 0
-        X = check_array(X, ensure_min_samples=2, estimator=self)
-        # Hierarchical clustering
-        diana = _Diana(X=X, n_clusters=self.n_clusters,
-                       metric=self.metric,
-                       distance_threshold=self.distance_threshold,
-                       compute_full_tree=self.compute_full_tree)
-        diana.recursive_clustering()
-        labels_hierarchy = _get_labels_hierarchy(diana.dict_n_clusters)
-        self.labels_hierarchy_ = labels_hierarchy.values
-        self.labels_ = labels_hierarchy[self.n_clusters].values
+        assert self.n_clusters is None or self.distance_threshold == 0, "If n_clusters is set, distance_threshold must be 0. Else the number of identified clusters can be incorrect"
+        if self.n_clusters is None or self.n_clusters > X.shape[0]:
+            self.n_clusters = X.shape[0]
+        labels, tree = _diana(X, self.n_clusters, self.distance_threshold, self.construct_full_tree, self.metric)
+        self.labels_ = labels
+        self.tree_ = tree
+        return self
 
+    def prune_tree(self, level):
+        """
+        Prune the tree at a specified cluster hierarchy level.
+        Returns labels as if the clustering procedure would have stopped at the specified level.
+        The resulting number of clusters will be level + 1.
 
-# III Test/Caller Functions
-def diana_caller():
-    """"""
-    # TODO will be removed (just for testing)
-    folder_data = os.path.dirname(os.path.realpath(__file__)).replace("/hierarchical", "/data/")
-    df = pd.read_excel(folder_data + "All_Scales_Norm_Modified.xlsx", index_col=0)
-    df_t = df.transpose().sample(300, random_state=1)
-    samples = df_t.index.to_list()
-    array = df_t.values
-    diana = Diana(n_clusters=200)
-    diana.fit(X=array, y=samples)
-    df = pd.DataFrame(diana.labels_hierarchy_, index=samples)
-    df.columns = list(range(2, len(list(df))+2))
-    print(df)
-    #df1 = pd.read_excel("test.xlsx")
-    #print(df1)
+        Parameters
+        ----------
+        level : int
+            The level at which the tree should be pruned. Must be larger than 0
 
-
-# IV Main
-def main():
-    t0 = time.time()
-    diana_caller()
-    t1 = time.time()
-    print("Time:", t1 - t0)
-
-
-if __name__ == "__main__":
-    main()
+        Returns
+        -------
+        labels_pruned : np.ndarray
+            The pruned cluster labels
+        """
+        assert level > 0, "level must be an integer larger than 0 and below the number of entities in the input dataset"
+        assert self.labels_ is not None, "The DIANA algorithm has not run yet. Use the fit() function first."
+        labels_pruned = self.labels_.copy()
+        for lower_id, higher_id in reversed(self.tree_[level:]):
+            labels_pruned[labels_pruned == higher_id] = lower_id
+        return labels_pruned

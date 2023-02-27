@@ -1,6 +1,6 @@
 from cluspy.data import load_optdigits
-from cluspy.deep import get_dataloader
-from cluspy.deep.neighbor_encoder import NeighborEncoder, get_neighbors_batchwise
+from cluspy.deep import get_dataloader, NeighborEncoder
+from cluspy.deep.neighbor_encoder import get_neighbors_batchwise
 from scipy.spatial.distance import pdist, squareform
 import torch
 import numpy as np

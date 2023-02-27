@@ -12,18 +12,17 @@ import torch
 import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.base import BaseEstimator, ClusterMixin
+from sklearn.utils import check_random_state
 
 
 def _dec(X: np.ndarray, n_clusters: int, alpha: float, batch_size: int, pretrain_learning_rate: float,
          clustering_learning_rate: float, pretrain_epochs: int, clustering_epochs: int,
          optimizer_class: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss,
          autoencoder: torch.nn.Module, embedding_size: int, use_reconstruction_loss: bool,
-         cluster_loss_weight: float) -> (np.ndarray, np.ndarray, np.ndarray, np.ndarray, torch.nn.Module):
+         cluster_loss_weight: float, random_state: np.random.RandomState) -> (
+        np.ndarray, np.ndarray, np.ndarray, np.ndarray, torch.nn.Module):
     """
     Start the actual DEC clustering procedure on the input data set.
-    First an autoencoder (AE) will be trained (will be skipped if input autoencoder is given).
-    Afterwards, KMeans identifies the initial clusters.
-    Last, the AE will be optimized using the DEC loss function from the _DEC_Module.
 
     Parameters
     ----------
@@ -55,6 +54,8 @@ def _dec(X: np.ndarray, n_clusters: int, alpha: float, batch_size: int, pretrain
         defines whether the reconstruction loss will be used during clustering training
     cluster_loss_weight : float
         weight of the clustering loss compared to the reconstruction loss
+    random_state : np.random.RandomState
+        use a fixed random state to get a repeatable solution
 
     Returns
     -------
@@ -74,7 +75,7 @@ def _dec(X: np.ndarray, n_clusters: int, alpha: float, batch_size: int, pretrain
 
     # Execute kmeans in embedded space - initial clustering
     embedded_data = encode_batchwise(testloader, autoencoder, device)
-    kmeans = KMeans(n_clusters=n_clusters)
+    kmeans = KMeans(n_clusters=n_clusters, random_state=random_state)
     kmeans.fit(embedded_data)
     init_centers = kmeans.cluster_centers_
     # Setup DEC Module
@@ -90,7 +91,7 @@ def _dec(X: np.ndarray, n_clusters: int, alpha: float, batch_size: int, pretrain
     dec_centers = dec_module.centers.detach().cpu().numpy()
     # Do reclustering with Kmeans
     embedded_data = encode_batchwise(testloader, autoencoder, device)
-    kmeans = KMeans(n_clusters=n_clusters)
+    kmeans = KMeans(n_clusters=n_clusters, random_state=random_state)
     kmeans.fit(embedded_data)
     return kmeans.labels_, kmeans.cluster_centers_, dec_labels, dec_centers, autoencoder
 
@@ -301,6 +302,9 @@ class _DEC_Module(torch.nn.Module):
 class DEC(BaseEstimator, ClusterMixin):
     """
     The Deep Embedded Clustering (DEC) algorithm.
+    First, an autoencoder (AE) will be trained (will be skipped if input autoencoder is given).
+    Afterwards, KMeans identifies the initial clusters.
+    Last, the AE will be optimized using the DEC loss function.
 
     Parameters
     ----------
@@ -330,6 +334,8 @@ class DEC(BaseEstimator, ClusterMixin):
         defines whether the reconstruction loss will be used during clustering training (default: False)
     cluster_loss_weight : float
         weight of the clustering loss compared to the reconstruction loss (default: 1)
+    random_state : np.random.RandomState
+        use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Attributes
     ----------
@@ -354,16 +360,16 @@ class DEC(BaseEstimator, ClusterMixin):
 
     References
     ----------
-    Xie, Junyuan, Ross Girshick, and Ali Farhadi. "Unsupervised
-    deep embedding for clustering analysis." International
-    conference on machine learning. 2016.
+    Xie, Junyuan, Ross Girshick, and Ali Farhadi. "Unsupervised deep embedding for clustering analysis."
+    International conference on machine learning. 2016.
     """
 
     def __init__(self, n_clusters: int, alpha: float = 1.0, batch_size: int = 256, pretrain_learning_rate: float = 1e-3,
                  clustering_learning_rate: float = 1e-4, pretrain_epochs: int = 100, clustering_epochs: int = 150,
                  optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), autoencoder: torch.nn.Module = None,
-                 embedding_size: int = 10, use_reconstruction_loss: bool = False, cluster_loss_weight: float = 1):
+                 embedding_size: int = 10, use_reconstruction_loss: bool = False, cluster_loss_weight: float = 1,
+                 random_state: np.random.RandomState = None):
         self.n_clusters = n_clusters
         self.alpha = alpha
         self.batch_size = batch_size
@@ -377,11 +383,13 @@ class DEC(BaseEstimator, ClusterMixin):
         self.embedding_size = embedding_size
         self.use_reconstruction_loss = use_reconstruction_loss
         self.cluster_loss_weight = cluster_loss_weight
+        self.random_state = check_random_state(random_state)
+        torch.manual_seed(self.random_state.get_state()[1][0])
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DEC':
         """
         Initiate the actual clustering process on the input data set.
-        The resulting cluster labels are contained in the labels_ attribute.
+        The resulting cluster labels will be stored in the labels_ attribute.
 
         Parameters
         ----------
@@ -405,7 +413,8 @@ class DEC(BaseEstimator, ClusterMixin):
                                                                                    self.autoencoder,
                                                                                    self.embedding_size,
                                                                                    self.use_reconstruction_loss,
-                                                                                   self.cluster_loss_weight)
+                                                                                   self.cluster_loss_weight,
+                                                                                   self.random_state)
         self.labels_ = kmeans_labels
         self.cluster_centers_ = kmeans_centers
         self.dec_labels_ = dec_labels
@@ -444,6 +453,8 @@ class IDEC(DEC):
         the input autoencoder. If None a new FlexibleAutoencoder will be created (default: None)
     embedding_size : int
         size of the embedding within the autoencoder (default: 10)
+    random_state : np.random.RandomState
+        use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Attributes
     ----------
@@ -468,15 +479,14 @@ class IDEC(DEC):
 
     References
     ----------
-    Guo, Xifeng, et al. "Improved deep embedded clustering with
-    local structure preservation." IJCAI. 2017.
+    Guo, Xifeng, et al. "Improved deep embedded clustering with local structure preservation." IJCAI. 2017.
     """
 
     def __init__(self, n_clusters: int, alpha: float = 1.0, batch_size: int = 256, pretrain_learning_rate: float = 1e-3,
                  clustering_learning_rate: float = 1e-4, pretrain_epochs: int = 100, clustering_epochs: int = 150,
                  optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), autoencoder: torch.nn.Module = None,
-                 embedding_size: int = 10):
+                 embedding_size: int = 10, random_state: np.random.RandomState = None):
         super().__init__(n_clusters, alpha, batch_size, pretrain_learning_rate, clustering_learning_rate,
-                         pretrain_epochs,
-                         clustering_epochs, optimizer_class, loss_fn, autoencoder, embedding_size, True, 0.1)
+                         pretrain_epochs, clustering_epochs, optimizer_class, loss_fn, autoencoder, embedding_size,
+                         True, 0.1, random_state)

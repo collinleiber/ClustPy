@@ -3,7 +3,6 @@ scipy
 scikit-learn
 pandas
 matplotlib
-pyclustering
 torch
 torchvision
 xlrd

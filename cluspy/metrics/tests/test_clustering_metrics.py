@@ -1,6 +1,6 @@
 import numpy as np
-from cluspy.metrics.clustering_metrics import unsupervised_clustering_accuracy, variation_of_information, \
-    _check_number_of_points
+from cluspy.metrics import unsupervised_clustering_accuracy, variation_of_information
+from cluspy.metrics.clustering_metrics import _check_number_of_points
 import pytest
 
 
@@ -28,3 +28,9 @@ def test_variation_of_information():
     l1 = np.array([0, 0, 1, 1, 2, 2, 3, 3, 4, 4])
     l2 = np.array([0, 0, 1, 1, 2, 2, 3, 3, 4, 4])
     assert variation_of_information(l1, l2) == 0.0
+    l1 = np.array([0, 0, 0, 0, 0, 1, 1, 1, 1, 1])
+    l2 = np.array([1, 1, 1, 1, 1, 0, 0, 0, 0, 0])
+    assert variation_of_information(l1, l2) == 0.0
+    l1 = np.array([1, 1, 1, 1, 0, 0, 0, 0])
+    l2 = np.array([0, 0, 1, 1, 1, 1, 1, 1])
+    assert np.isclose(variation_of_information(l1, l2), 0.82395922)

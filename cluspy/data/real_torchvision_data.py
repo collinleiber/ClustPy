@@ -2,7 +2,7 @@ import torchvision
 import torch
 import numpy as np
 import ssl
-from cluspy.data.real_world_data import _get_download_dir
+from cluspy.data._utils import _get_download_dir
 
 """
 Load torchvision datasets
@@ -10,10 +10,11 @@ Load torchvision datasets
 
 
 def _load_torch_image_data(data_source: torchvision.datasets.VisionDataset, subset: str, normalize_channels: bool,
-                           uses_train_param: bool, downloads_path: str) -> (
+                           uses_train_param: bool, downloads_path: str, is_color_channel_last: bool) -> (
         np.ndarray, np.ndarray):
     """
     Helper function to load a data set from the torchvision package.
+    All data sets will be returned as a two-dimensional tensor, created out of the HWC (height, width, color channels) image representation.
 
     Parameters
     ----------
@@ -27,15 +28,20 @@ def _load_torch_image_data(data_source: torchvision.datasets.VisionDataset, subs
         is the test/train parameter called 'train' or 'split' in the data loader. uses_train_param = True corresponds to 'train'
     downloads_path : str
         path to the directory where the data is stored
+    is_color_channel_last : bool
+        if true, the color channels should be in the last dimension, known as HWC representation. Alternatively the color channel can be at the first position, known as CHW representation.
+        Only relevant for color images -> Should be None for grayscale images
 
     Returns
     -------
     data, labels : (np.ndarray, np.ndarray)
         the data numpy array, the labels numpy array
     """
+    subset = subset.lower()
     assert subset in ["all", "train",
-                      "test"], "subset must match 'all', 'train' or 'test' Your input {0}".format(subset)
+                      "test"], "subset must match 'all', 'train' or 'test'. Your input {0}".format(subset)
     # Get data from source
+    default_ssl = ssl._create_default_https_context
     ssl._create_default_https_context = ssl._create_unverified_context
     if subset == "all" or subset == "train":
         # Load training data
@@ -81,33 +87,97 @@ def _load_torch_image_data(data_source: torchvision.datasets.VisionDataset, subs
     # Convert data to float and labels to int
     data = data.float()
     labels = labels.int()
-    ssl._create_default_https_context = ssl._create_default_https_context
+    ssl._create_default_https_context = default_ssl
+    # Check data dimensions
+    if data.dim() < 3 or data.dim() > 5:
+        raise Exception(
+            "Number of dimensions for torchvision data sets should be 3, 4 or 5. Here dim={0}".format(data.dim()))
+    # Channels can be normalized
     if normalize_channels:
-        if data.dim() == 3:
-            # grayscale images
-            data_mean = [data.mean()]
-            data_std = [data.std()]
-        elif data.dim() == 4:
-            # color images
-            data_mean = []
-            data_std = []
-            for i in range(data.dim()):
-                data_mean.append(data[:, i, :, :].mean())
-                data_std.append(data[:, i, :, :].std())
-        else:
-            raise Exception(
-                "Number of dimensions for torchvision data sets should be 3 or 4. Here dim={0}".format(data.dim()))
-        normalize = torchvision.transforms.Normalize(data_mean, data_std)
-        data = normalize(data)
+        data = _torch_normalize_channels(data, is_color_channel_last)
     # Flatten shape
-    if data.dim() == 3:
-        data = data.reshape(-1, data.shape[1] * data.shape[2])
-    elif data.dim() == 4:
-        data = data.reshape(-1, data.shape[1] * data.shape[2] * data.shape[3])
+    data = _torch_flatten_shape(data, is_color_channel_last, normalize_channels)
     # Move data to CPU
     data_cpu = data.detach().cpu().numpy()
     labels_cpu = labels.detach().cpu().numpy()
     return data_cpu, labels_cpu
+
+
+def _torch_normalize_channels(data: torch.Tensor, is_color_channel_last: bool) -> torch.Tensor:
+    """
+    Normalize the color channels of a torch dataset
+
+    Parameters
+    ----------
+    data : torch.Tensor
+        The torch data tensor
+    is_color_channel_last : bool
+        if true, the color channels should be in the last dimension, known as HWC representation. Alternatively the color channel can be at the first position, known as CHW representation.
+        Only relevant for color images -> Should be None for grayscale images
+
+    Returns
+    -------
+    The normalized data tensor
+    """
+    if data.dim() == 3 or (data.dim() == 4 and is_color_channel_last is None):
+        # grayscale images (2d or 3d)
+        data_mean = [data.mean()]
+        data_std = [data.std()]
+    elif data.dim() == 4:  # equals 2d color images
+        if is_color_channel_last:
+            # Change to CHW representation
+            data = data.permute(0, 3, 1, 2)
+        assert data.shape[1] == 3, "Colored image must consist of three channels not " + data.shape[1]
+        # color images
+        data_mean = data.mean([0, 2, 3])
+        data_std = data.std([0, 2, 3])
+    elif data.dim() == 5:  # equals 3d color-images
+        if is_color_channel_last:
+            # Change to CHWD representation
+            data = data.permute(0, 4, 1, 2, 3)
+        assert data.shape[1] == 3, "Colored image must consist of three channels not {0}".format(data.shape[1])
+        # color images
+        data_mean = data.mean([0, 2, 3, 4])
+        data_std = data.std([0, 2, 3, 4])
+    normalize = torchvision.transforms.Normalize(data_mean, data_std)
+    data = normalize(data)
+    return data
+
+
+def _torch_flatten_shape(data: torch.Tensor, is_color_channel_last: bool, normalize_channels: bool):
+    """
+    Convert torch data tensor from image to numerical vector.
+
+    Parameters
+    ----------
+    data : torch.Tensor
+    is_color_channel_last : bool
+        if true, the color channels should be in the last dimension, known as HWC representation. Alternatively the color channel can be at the first position, known as CHW representation.
+        Only relevant for color images -> Should be None for grayscale images
+    normalize_channels : bool
+        normalize each color-channel of the images
+
+    Returns
+    -------
+    The flatten data vector
+    """
+    # Flatten shape
+    if data.dim() == 3:
+        data = data.reshape(-1, data.shape[1] * data.shape[2])
+    elif data.dim() == 4:
+        # In case of 3d grayscale image is_color_channel_last is None
+        if is_color_channel_last is not None and (not is_color_channel_last or normalize_channels):
+            # Change representation to HWC
+            data = data.permute(0, 2, 3, 1)
+        assert is_color_channel_last is None or data.shape[3] == 3, "Colored image must consist of three channels not {0}".format(data.shape[3])
+        data = data.reshape(-1, data.shape[1] * data.shape[2] * data.shape[3])
+    elif data.dim() == 5:
+        if not is_color_channel_last or normalize_channels:
+            # Change representation to HWDC
+            data = data.permute(0, 2, 3, 4, 1)
+        assert data.shape[4] == 3, "Colored image must consist of three channels not {0}".format(data.shape[4])
+        data = data.reshape(-1, data.shape[1] * data.shape[2] * data.shape[3] * data.shape[4])
+    return data
 
 
 def load_mnist(subset: str = "all", normalize_channels: bool = False, downloads_path: str = None) -> (
@@ -136,7 +206,7 @@ def load_mnist(subset: str = "all", normalize_channels: bool = False, downloads_
     https://pytorch.org/vision/stable/generated/torchvision.datasets.MNIST.html#torchvision.datasets.MNIST
     """
     data, labels = _load_torch_image_data(torchvision.datasets.MNIST, subset, normalize_channels, True,
-                                          downloads_path)
+                                          downloads_path, None)
     return data, labels
 
 
@@ -167,7 +237,7 @@ def load_kmnist(subset: str = "all", normalize_channels: bool = False, downloads
     https://pytorch.org/vision/stable/generated/torchvision.datasets.KMNIST.html#torchvision.datasets.KMNIST
     """
     data, labels = _load_torch_image_data(torchvision.datasets.KMNIST, subset, normalize_channels, True,
-                                          downloads_path)
+                                          downloads_path, None)
     return data, labels
 
 
@@ -198,7 +268,7 @@ def load_fmnist(subset: str = "all", normalize_channels: bool = False, downloads
     https://pytorch.org/vision/stable/generated/torchvision.datasets.FashionMNIST.html#torchvision.datasets.FashionMNIST
     """
     data, labels = _load_torch_image_data(torchvision.datasets.FashionMNIST, subset, normalize_channels, True,
-                                          downloads_path)
+                                          downloads_path, None)
     return data, labels
 
 
@@ -228,7 +298,7 @@ def load_usps(subset: str = "all", normalize_channels: bool = False, downloads_p
     https://pytorch.org/vision/stable/generated/torchvision.datasets.USPS.html#torchvision.datasets.USPS
     """
     data, labels = _load_torch_image_data(torchvision.datasets.USPS, subset, normalize_channels, True,
-                                          downloads_path)
+                                          downloads_path, None)
     return data, labels
 
 
@@ -259,7 +329,7 @@ def load_cifar10(subset: str = "all", normalize_channels: bool = False, download
     https://pytorch.org/vision/stable/generated/torchvision.datasets.CIFAR10.html#torchvision.datasets.CIFAR10
     """
     data, labels = _load_torch_image_data(torchvision.datasets.CIFAR10, subset, normalize_channels, True,
-                                          downloads_path)
+                                          downloads_path, True)
     return data, labels
 
 
@@ -289,7 +359,7 @@ def load_svhn(subset: str = "all", normalize_channels: bool = False, downloads_p
     https://pytorch.org/vision/stable/generated/torchvision.datasets.SVHN.html#torchvision.datasets.SVHN
     """
     data, labels = _load_torch_image_data(torchvision.datasets.SVHN, subset, normalize_channels, False,
-                                          downloads_path)
+                                          downloads_path, False)
     return data, labels
 
 
@@ -320,5 +390,5 @@ def load_stl10(subset: str = "all", normalize_channels: bool = False, downloads_
     https://pytorch.org/vision/stable/generated/torchvision.datasets.STL10.html#torchvision.datasets.STL10
     """
     data, labels = _load_torch_image_data(torchvision.datasets.STL10, subset, normalize_channels, False,
-                                          downloads_path)
+                                          downloads_path, False)
     return data, labels

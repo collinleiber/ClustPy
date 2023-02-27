@@ -17,17 +17,19 @@ def create_subspace_data(n_samples: int = 1000, n_clusters: int = 3, subspace_fe
     Parameters
     ----------
     n_samples : int
-        Number of samples (default: 1000)
+        Number of samples in the clusters. If n_samples is int, the samples will be equally divided across all clusters.
+        Otherwise, a tuple (e.g. (100, 200, 700)) can specify the size of each cluster individually (default: 1000)
     n_clusters : int
         Specifies the number of clusters in the clustered space (default: 3)
     subspace_features : tuple
-        Number of features in the two subspaces (default: (2, 2))
+        Number of features in each of the two subspaces (default: (2, 2))
     n_outliers : tuple
-        Number of outliers for each subspace. Number of samples within the clusters will be lowered by this value (default: (0, 0))
+        Number of outliers for each subspace. Overall number of samples will be n_samples + n_outliers.
+        Beware that n_samples + n_outliers must be equal for both subspaces (default: (0, 0))
     std : float
-        Standard deviation of the Gaussian clusters (default: 1.)
+        Standard deviation of the Gaussian clusters. Can be a list specifying an individual value for each subspace (default: 1.)
     box : tuple
-        The bounding box of the cluster centers (default: (-10, 10))
+        The bounding box of the cluster centers. Can be a list specifying an individual value for each subspace (default: (-10, 10))
     rotate_space : bool
         Specifies whether the feature space should be rotated by an orthonormal matrix (default: True)
     random_state: int / np.random.RandomState
@@ -63,17 +65,20 @@ def create_nr_data(n_samples: int = 1000, n_clusters: tuple = (3, 3, 1), subspac
     Parameters
     ----------
     n_samples : int
-        Number of samples (default: 1000)
+        Number of samples in the clusters. If n_samples is int, the samples will be equally divided across all clusters in each subspace.
+        Otherwise, a tuple of tuples (e.g. ((100, 200, 700), (300,300,400), (300,300,400))) can specify the size of each cluster in each subspace individually.
+        Beware that the overall number of samples (including outliers) must be equal for each subspace (default: 1000)
     n_clusters : tuple
         Specifies the number of clusters for each subspace (default: (3, 3, 1))
     subspace_features : tuple
         Number of features in each subspace (default: (2, 2, 2))
     n_outliers : tuple
-        Number of outliers for each subspace. Number of samples within the clusters will be lowered by this value (default: (0, 0, 0))
+        Number of outliers for each subspace. Overall number of samples will be n_samples + n_outliers.
+        Beware that n_samples + n_outliers must be equal for each subspace (default: (0, 0, 0))
     std : float
-        Standard deviation of the Gaussian clusters (default: 1.)
+        Standard deviation of the Gaussian clusters. Can be a list specifying an individual value for each subspace (default: 1.)
     box : tuple
-        The bounding box of the cluster centers (default: (-10, 10))
+        The bounding box of the cluster centers. Can be a list specifying an individual value for each subspace (default: (-10, 10))
     rotate_space : bool
         Specifies whether the feature space should be rotated by an orthonormal matrix (default: True)
     random_state: int / np.random.RandomState
@@ -88,15 +93,29 @@ def create_nr_data(n_samples: int = 1000, n_clusters: tuple = (3, 3, 1), subspac
     # Transform n_clusters to list
     if type(n_clusters) is not list and type(n_clusters) is not tuple:
         n_clusters = [n_clusters]
+    # Transform n_outliers to list
+    if type(n_outliers) is not list and type(n_outliers) is not tuple:
+        n_outliers = [n_outliers] * len(n_clusters)
+    assert len(n_clusters) == len(n_outliers), "inconsistent number of subspaces between n_clusters and n_outliers"
+    # Transform n_samples to list
+    if type(n_samples) is not list and type(n_samples) is not tuple:
+        # Beware the outliers per subspace
+        n_samples = [n_samples + n_outliers[0] - n_outliers[i] for i in range(len(n_clusters))]
+    elif type(n_samples[0]) is not list and type(n_samples[0]) is not tuple:
+        # In this case we only have a list for the number of points for each cluster in the first subspace
+        n_samples = [n_samples] + [np.sum(n_samples) + n_outliers[0] - n_outliers[i] for i in range(1, len(n_clusters))]
+    assert len(n_clusters) == len(
+        n_samples), "inconsistent number of subspaces between n_clusters and n_samples"
+    overall_samples = np.sum(n_samples[0]) + n_outliers[0]
+    assert all([np.sum(n_samples[i]) + n_outliers[i] == overall_samples for i in
+                range(len(n_clusters))]), "samples in each subspace must be equal (sum of cluster objects and outliers)"
+    assert all([type(n_samples[i]) is int or type(n_samples[i]) is np.int32 or n_clusters[i] == len(
+        n_samples[i]) for i in range(len(n_clusters))]), "number of clusters in n_samples does not match n_clusters"
     # Transform cluster_features to list
     if type(subspace_features) is not list and type(subspace_features) is not tuple:
         subspace_features = [subspace_features] * len(n_clusters)
     assert len(n_clusters) == len(
         subspace_features), "inconsistent number of subspaces between n_clusters and subspace_features"
-    # Transform n_outliers to list
-    if type(n_outliers) is not list and type(n_outliers) is not tuple:
-        n_outliers = [n_outliers] * len(n_clusters)
-    assert len(n_clusters) == len(n_outliers), "inconsistent number of subspaces between n_clusters and n_outliers"
     # Transform std to list
     if type(std) is not list and type(std) is not tuple:
         std = [std] * len(n_clusters)
@@ -108,10 +127,12 @@ def create_nr_data(n_samples: int = 1000, n_clusters: tuple = (3, 3, 1), subspac
         box = [box] * len(n_clusters)
     assert len(n_clusters) == len(box), "inconsistent number of subspaces between n_clusters and box"
     # Create empty dataset
-    X, L = np.empty((n_samples, 0)), np.empty((n_samples, 0), dtype=np.int32)
+    X, L = np.empty((overall_samples, 0)), np.empty((overall_samples, 0), dtype=np.int32)
     for i in range(len(n_clusters)):
         # Create Clusters
-        X_tmp, L_tmp = make_blobs(n_samples - n_outliers[i], subspace_features[i], centers=n_clusters[i],
+        n_samples_sub = list(n_samples[i]) if type(n_samples[i]) is tuple else n_samples[i]
+        centers_sub = None if type(n_samples_sub) is list else n_clusters[i]
+        X_tmp, L_tmp = make_blobs(n_samples_sub, subspace_features[i], centers=centers_sub,
                                   cluster_std=std[i], center_box=box[i], random_state=random_state)
         # Create outliers
         if n_outliers[i] != 0:

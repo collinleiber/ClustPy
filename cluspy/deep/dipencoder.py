@@ -14,6 +14,7 @@ from cluspy.deep._data_utils import get_dataloader
 from cluspy.deep._train_utils import get_trained_autoencoder
 import matplotlib.pyplot as plt
 from cluspy.utils import plot_scatter_matrix
+from sklearn.utils import check_random_state
 
 """
 Dip module - holds backward functions
@@ -95,8 +96,6 @@ class _Dip_Gradient(torch.autograd.Function):
         # Calculate dip
         sorted_data = X_proj[sorted_indices].detach().cpu().numpy()
         dip_value, _, modal_triangle = dip_test(sorted_data, is_data_sorted=True, just_dip=False)
-        if modal_triangle is None:
-            modal_triangle = (-1, -1, -1)
         torch_dip = torch.tensor(dip_value)
         # Save parameters for backward
         ctx.save_for_backward(X, X_proj, sorted_indices, projection_vector,
@@ -285,7 +284,7 @@ def plot_dipencoder_embedding(X_embed: np.ndarray, n_clusters: int, labels: np.n
 
 def _get_dip_error(dip_module: _Dip_Module, X_embed: torch.Tensor, projection_axis_index: int,
                    points_in_m: torch.Tensor, points_in_n: torch.Tensor, n_points_in_m: int, n_points_in_n: int,
-                   device: torch.device) -> torch.Tensor:
+                   max_cluster_size_diff_factor: float, device: torch.device) -> torch.Tensor:
     """
     Calculate the dip error for the projection axis between cluster m and cluster n.
     In details it returns:
@@ -308,6 +307,9 @@ def _get_dip_error(dip_module: _Dip_Module, X_embed: torch.Tensor, projection_ax
         Size of cluster m
     n_points_in_n : int
         Size of cluster n
+    max_cluster_size_diff_factor : float
+        The maximum different in size when comparing two clusters regarding the number of samples.
+        If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) closest samples will be used
     device : torch.device
         device to be trained on
 
@@ -323,15 +325,14 @@ def _get_dip_error(dip_module: _Dip_Module, X_embed: torch.Tensor, projection_ax
     dip_value_n = dip_module(X_embed[points_in_n], projection_axis_index)
 
     # Calculate dip combined clusters m and n
-    diff_size_factor = 3
-    if n_points_in_m > diff_size_factor * n_points_in_n:
+    if n_points_in_m > max_cluster_size_diff_factor * n_points_in_n:
         perm = torch.randperm(n_points_in_m).to(device)
-        sampled_m = points_in_m[perm[:n_points_in_n * diff_size_factor]]
+        sampled_m = points_in_m[perm[:n_points_in_n * max_cluster_size_diff_factor]]
         dip_value_mn = dip_module(torch.cat([X_embed[sampled_m], X_embed[points_in_n]]),
                                   projection_axis_index)
-    elif n_points_in_n > diff_size_factor * n_points_in_m:
+    elif n_points_in_n > max_cluster_size_diff_factor * n_points_in_m:
         perm = torch.randperm(n_points_in_n).to(device)
-        sampled_n = points_in_n[perm[:n_points_in_m * diff_size_factor]]
+        sampled_n = points_in_n[perm[:n_points_in_m * max_cluster_size_diff_factor]]
         dip_value_mn = dip_module(torch.cat([X_embed[points_in_m], X_embed[sampled_n]]),
                                   projection_axis_index)
     else:
@@ -460,14 +461,12 @@ def _get_rec_loss_of_first_batch(trainloader: torch.utils.data.DataLoader, autoe
 def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size: int,
                 optimizer_class: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss, clustering_epochs: int,
                 clustering_learning_rate: float, pretrain_batch_size: int, pretrain_epochs: int,
-                pretrain_learning_rate: float, autoencoder: torch.nn.Module, labels_gt: np.ndarray, debug: bool) -> (
+                pretrain_learning_rate: float, autoencoder: torch.nn.Module, max_cluster_size_diff_factor: float,
+                labels_gt: np.ndarray, random_state: np.random.RandomState, debug: bool) -> (
         np.ndarray, np.ndarray, dict, torch.nn.Module):
     """
     Start the actual DipEncoder procedure on the input data set.
     If labels_gt is None this method will act as a clustering algorithm else it will only be used to learn an embedding.
-    First an autoencoder (AE) will be trained (will be skipped if input autoencoder is given).
-    Afterwards, KMeans identifies the initial clusters.
-    Last, the AE will be optimized using the DipEncoder loss function.
 
     Parameters
     ----------
@@ -495,8 +494,13 @@ def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size:
         learning rate for the pretraining of the autoencoder
     autoencoder : torch.nn.Module
         the input autoencoder. If None a new FlexibleAutoencoder will be created
+    max_cluster_size_diff_factor : float
+        The maximum different in size when comparing two clusters regarding the number of samples.
+        If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) closest samples will be used
     labels_gt : no.ndarray
         Ground truth labels. If None, the DipEncoder will be used for clustering
+    random_state : np.random.RandomState
+        use a fixed random state to get a repeatable solution
     debug : bool
         If true, additional information will be printed to the console
 
@@ -533,7 +537,7 @@ def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size:
     X_embed = encode_batchwise(testloader, autoencoder, device)
     if labels_gt is None:
         # Execute kmeans to get initial clusters
-        km = KMeans(n_clusters)
+        km = KMeans(n_clusters, random_state=random_state)
         km.fit(X_embed)
         labels = km.labels_
         centers = km.cluster_centers_
@@ -592,7 +596,7 @@ def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size:
                         continue
                     dip_loss_new = _get_dip_error(
                         dip_module, embedded, index_dict[(m, n)], points_in_all_clusters[m], points_in_all_clusters[n],
-                        n_points_in_all_clusters[m], n_points_in_all_clusters[n], device)
+                        n_points_in_all_clusters[m], n_points_in_all_clusters[n], max_cluster_size_diff_factor, device)
                     dip_loss = dip_loss + dip_loss_new
             final_dip_loss = torch.true_divide(dip_loss, n_cluster_combinations)
             total_loss = final_dip_loss + ae_loss
@@ -621,6 +625,9 @@ class DipEncoder(BaseEstimator, ClusterMixin):
     """
     The DipEncoder.
     Can be used either as a clustering procedure if no ground truth labels are given or as a supervised dimensionality reduction technique.
+    First, an autoencoder (AE) will be trained (will be skipped if input autoencoder is given).
+    Afterwards, KMeans identifies the initial clusters.
+    Last, the AE will be optimized using the DipEncoder loss function.
 
     Parameters
     ----------
@@ -647,6 +654,11 @@ class DipEncoder(BaseEstimator, ClusterMixin):
         the input autoencoder. If None a new FlexibleAutoencoder will be created (default: None)
     embedding_size : int
         size of the embedding within the autoencoder (default: 10)
+    max_cluster_size_diff_factor : float
+        The maximum different in size when comparing two clusters regarding the number of samples.
+        If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) closest samples will be used (default: 3)
+    random_state : np.random.RandomState
+        use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
     debug : bool
         If true, additional information will be printed to the console (default: False)
 
@@ -681,7 +693,8 @@ class DipEncoder(BaseEstimator, ClusterMixin):
                  pretrain_epochs: int = 100, clustering_epochs: int = 100,
                  optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), autoencoder: torch.nn.Module = None,
-                 embedding_size: int = 10, debug: bool = False):
+                 embedding_size: int = 10, max_cluster_size_diff_factor: float = 3,
+                 random_state: np.random.RandomState = None, debug: bool = False):
         self.n_clusters = n_clusters
         self.pretrain_batch_size = pretrain_batch_size
         if batch_size is None:
@@ -695,6 +708,9 @@ class DipEncoder(BaseEstimator, ClusterMixin):
         self.loss_fn = loss_fn
         self.autoencoder = autoencoder
         self.embedding_size = embedding_size
+        self.max_cluster_size_diff_factor = max_cluster_size_diff_factor
+        self.random_state = check_random_state(random_state)
+        torch.manual_seed(self.random_state.get_state()[1][0])
         self.debug = debug
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DipEncoder':
@@ -723,7 +739,8 @@ class DipEncoder(BaseEstimator, ClusterMixin):
                                                                        self.pretrain_batch_size,
                                                                        self.pretrain_epochs,
                                                                        self.pretrain_learning_rate, self.autoencoder,
-                                                                       y, self.debug)
+                                                                       self.max_cluster_size_diff_factor,
+                                                                       y, self.random_state, self.debug)
         self.labels_ = labels
         self.projection_axes_ = projection_axes
         self.index_dict_ = index_dict

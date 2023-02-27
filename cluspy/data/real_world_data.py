@@ -1,7 +1,5 @@
-import urllib.request
+from cluspy.data._utils import _download_file, _get_download_dir, _decompress_z_file, _load_data_file
 import os
-from pathlib import Path
-import ssl
 import numpy as np
 import zipfile
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -10,162 +8,7 @@ from sklearn.datasets import fetch_20newsgroups, fetch_rcv1, load_iris as sk_loa
     load_breast_cancer as sk_load_breast_cancer
 import pandas as pd
 
-DEFAULT_DOWNLOAD_PATH = str(Path.home() / "Downloads/cluspy_datafiles")
-
-
 # More datasets https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/multiclass.html#usps
-
-def _get_download_dir(downloads_path: str) -> str:
-    """
-    Helper function to define the path where the data files should be stored. If downloads_path is None then default path
-    '[USER]/Downloads/cluspy_datafiles' will be used. If the directory does not exists it will be created.
-
-    Parameters
-    ----------
-    downloads_path : str
-        path to the directory where the data will be stored. Can be None
-
-    Returns
-    -------
-    downloads_path : str
-        path to the directory where the data will be stored. If input was None this will be equal to
-        '[USER]/Downloads/cluspy_datafiles'
-    """
-    if downloads_path is None:
-        downloads_path = DEFAULT_DOWNLOAD_PATH
-    if not os.path.isdir(downloads_path):
-        os.makedirs(downloads_path)
-    return downloads_path
-
-
-def _download_file(file_url: str, filename_local: str) -> None:
-    """
-    Helper function to download a file into a specified location.
-
-    Parameters
-    ----------
-    file_url : str
-        URL of the file
-    filename_local : str
-        local name of the file after it has been downloaded
-    """
-    print("Downloading data set from {0} to {1}".format(file_url, filename_local))
-    ssl._create_default_https_context = ssl._create_unverified_context
-    urllib.request.urlretrieve(file_url, filename_local)
-    ssl._create_default_https_context = ssl._create_default_https_context
-
-
-def _load_data_file(filename_local: str, file_url: str, delimiter: str = ",", last_column_are_labels: bool = True) -> (
-        np.ndarray, np.ndarray):
-    """
-    Helper function to load a data file. Either the first or last column, depending on last_column_are_labels, of the
-    data file is used as the label column.
-    If file does not exist on the local machine it will be downloaded.
-
-    Parameters
-    ----------
-    filename_local : str
-        local name of the file after it has been downloaded
-    file_url : str
-        URL of the file
-    delimiter : str
-        delimiter in the data file (default: ";")
-    last_column_are_labels : bool
-        specifies if the last column contains the labels. If false labels should be contained in the first column (default: True)
-
-    Returns
-    -------
-    data, labels : (np.ndarray, np.ndarray)
-        the data numpy array, the labels numpy array
-    """
-    if not os.path.isfile(filename_local):
-        _download_file(file_url, filename_local)
-    datafile = np.genfromtxt(filename_local, delimiter=delimiter)
-    if last_column_are_labels:
-        data = datafile[:, :-1]
-        labels = datafile[:, -1]
-    else:
-        data = datafile[:, 1:]
-        labels = datafile[:, 0]
-    return data, labels
-
-
-def _load_timeseries_classification_data(dataset_name: str, subset: str, labels_minus_one: bool,
-                                         downloads_path: str) -> (np.ndarray, np.ndarray):
-    """
-    Helper function to load timeseries data from www.timeseriesclassification.com.
-
-    Parameters
-    ----------
-    dataset_name : str
-        name of the data set
-    subset : str
-        can be 'all', 'test' or 'train'. 'all' combines test and train data
-    labels_minus_one : bool
-        Convert labels from 1,... to 0,...
-    downloads_path : str
-        path to the directory where the data is stored
-
-    Returns
-    -------
-    data, labels : (np.ndarray, np.ndarray)
-        the data numpy array, the labels numpy array
-    """
-    assert subset in ["all", "train",
-                      "test"], "subset must match 'all', 'train' or 'test' Your input {0}".format(subset)
-    directory = _get_download_dir(downloads_path) + "/" + dataset_name + "/"
-    filename = directory + dataset_name + ".zip"
-    if not os.path.isfile(filename):
-        if not os.path.isdir(directory):
-            os.mkdir(directory)
-        _download_file("http://www.timeseriesclassification.com/Downloads/" + dataset_name + ".zip",
-                       filename)
-        # Unpack zipfile
-        with zipfile.ZipFile(filename, 'r') as zipf:
-            zipf.extractall(directory)
-    # Load data and labels
-    if subset == "all" or subset == "train":
-        dataset = np.genfromtxt(directory + dataset_name + "_TRAIN.txt")
-        data = dataset[:, 1:]
-        labels = dataset[:, 0]
-    if subset == "all" or subset == "test":
-        test_dataset = np.genfromtxt(directory + dataset_name + "_TEST.txt")
-        if subset == "all":
-            data = np.r_[data, test_dataset[:, 1:]]
-            labels = np.r_[labels, test_dataset[:, 0]]
-        else:
-            data = test_dataset[:, 1:]
-            labels = test_dataset[:, 0]
-    if labels_minus_one:
-        # Convert labels from 1,... to 0,...
-        labels -= 1
-    return data, labels
-
-
-def _decompress_z_file(filename: str, directory: str) -> bool:
-    """
-    Helper function to decompress a 7z file. The function uses an installed version of 7zip to decompress the file.
-    If 7zip is not installed on this machine, the function will return False and a warning is printed.
-
-    Parameters
-    ----------
-    filename : str
-        name of the file that should be decompressed
-    directory : str
-        directory of the file that should be decompressed
-
-    Returns
-    -------
-    successful : bool
-        True if decompression was successful, else False
-    """
-    os.system("7z x {0} -o{1}".format(filename.replace("\\", "/"), directory.replace("\\", "/")))
-    successful = True
-    if not os.path.isfile(filename[:-2]):
-        # If no file without .z exists, decompression was not successful
-        successful = False
-        print("[WARNING] 7Zip is needed to uncompress *.Z files!")
-    return successful
 
 
 """
@@ -488,8 +331,9 @@ def load_soybean_large(subset: str = "all", downloads_path: str = None) -> (np.n
     -------
     https://archive.ics.uci.edu/ml/datasets/soybean+(Large)
     """
+    subset = subset.lower()
     assert subset in ["all", "train",
-                      "test"], "subset must match 'all', 'train' or 'test' Your input {0}".format(subset)
+                      "test"], "subset must match 'all', 'train' or 'test'. Your input {0}".format(subset)
     if subset == "all" or subset == "train":
         filename = _get_download_dir(downloads_path) + "/soybean-large.data"
         if not os.path.isfile(filename):
@@ -517,7 +361,7 @@ def load_soybean_large(subset: str = "all", downloads_path: str = None) -> (np.n
             data = df_test.values
             labels_raw = labels_test
     # Transform data to numerical array
-    data = np.array(data, dtype=np.int)
+    data = np.array(data, dtype=int)
     LE = LabelEncoder()
     labels = LE.fit_transform(labels_raw)
     return data, labels
@@ -546,8 +390,9 @@ def load_optdigits(subset: str = "all", downloads_path: str = None) -> (np.ndarr
     -------
     http://archive.ics.uci.edu/ml/datasets/optical+recognition+of+handwritten+digits
     """
+    subset = subset.lower()
     assert subset in ["all", "train",
-                      "test"], "subset must match 'all', 'train' or 'test' Your input {0}".format(subset)
+                      "test"], "subset must match 'all', 'train' or 'test'. Your input {0}".format(subset)
     if subset == "all" or subset == "train":
         filename = _get_download_dir(downloads_path) + "/optdigits.tra"
         data, labels = _load_data_file(filename,
@@ -588,8 +433,9 @@ def load_pendigits(subset: str = "all", downloads_path: str = None) -> (np.ndarr
     -------
     http://archive.ics.uci.edu/ml/datasets/pen-based+recognition+of+handwritten+digits
     """
+    subset = subset.lower()
     assert subset in ["all", "train",
-                      "test"], "subset must match 'all', 'train' or 'test' Your input {0}".format(subset)
+                      "test"], "subset must match 'all', 'train' or 'test'. Your input {0}".format(subset)
     if subset == "all" or subset == "train":
         filename = _get_download_dir(downloads_path) + "/pendigits.tra"
         data, labels = _load_data_file(filename,
@@ -647,6 +493,8 @@ def load_ecoli(ignore_small_clusters: bool = False, downloads_path: str = None) 
         labels_raw = [l for i, l in enumerate(labels_raw) if keep_labels[i]]
     LE = LabelEncoder()
     labels = LE.fit_transform(labels_raw)
+    # Convert labels to int32 format
+    labels = labels.astype(np.int32)
     return data, labels
 
 
@@ -685,6 +533,8 @@ def load_htru2(downloads_path: str = None) -> (np.ndarray, np.ndarray):
     dataset = np.genfromtxt(directory + "HTRU_2.csv", delimiter=",")
     data = dataset[:, :-1]
     labels = dataset[:, -1]
+    # Convert labels to int32 format
+    labels = labels.astype(np.int32)
     return data, labels
 
 
@@ -727,6 +577,8 @@ def load_letterrecognition(downloads_path: str = None) -> (np.ndarray, np.ndarra
     datafile = np.fromstring(file_text, sep=",").reshape(-1, 17)
     data = datafile[:, 1:]
     labels = datafile[:, 0]
+    # Convert labels to int32 format
+    labels = labels.astype(np.int32)
     return data, labels
 
 
@@ -754,8 +606,9 @@ def load_har(subset: str = "all", downloads_path: str = None) -> (np.ndarray, np
     -------
     https://archive.ics.uci.edu/ml/datasets/human+activity+recognition+using+smartphones
     """
+    subset = subset.lower()
     assert subset in ["all", "train",
-                      "test"], "subset must match 'all', 'train' or 'test' Your input {0}".format(subset)
+                      "test"], "subset must match 'all', 'train' or 'test'. Your input {0}".format(subset)
     directory = _get_download_dir(downloads_path) + "/har/"
     filename = directory + "UCI HAR Dataset.zip"
     if not os.path.isfile(filename):
@@ -779,6 +632,8 @@ def load_har(subset: str = "all", downloads_path: str = None) -> (np.ndarray, np
         else:
             data = test_data
             labels = test_labels
+    # Convert labels to int32 format
+    labels = labels.astype(np.int32)
     # Convert labels from 1,... to 0,...
     labels = labels - 1
     return data, labels
@@ -807,8 +662,9 @@ def load_statlog_shuttle(subset: str = "all", downloads_path: str = None) -> (np
     -------
     https://archive.ics.uci.edu/ml/datasets/Statlog+(Shuttle)
     """
+    subset = subset.lower()
     assert subset in ["all", "train",
-                      "test"], "subset must match 'all', 'train' or 'test' Your input {0}".format(subset)
+                      "test"], "subset must match 'all', 'train' or 'test'. Your input {0}".format(subset)
     directory = _get_download_dir(downloads_path) + "/shuttle/"
     if subset == "all" or subset == "train":
         filename = directory + "shuttle.trn.Z"
@@ -820,7 +676,7 @@ def load_statlog_shuttle(subset: str = "all", downloads_path: str = None) -> (np
             # Unpack z-file
             success = _decompress_z_file(filename, directory)
             if not success:
-                # os.remove(filename)
+                os.remove(filename)
                 return None, None
         # Load data and labels
         dataset = np.genfromtxt(directory + "shuttle.trn")
@@ -841,6 +697,8 @@ def load_statlog_shuttle(subset: str = "all", downloads_path: str = None) -> (np
         else:
             data = test_data
             labels = test_labels
+    # Convert labels to int32 format
+    labels = labels.astype(np.int32)
     # Convert labels from 1,... to 0,...
     labels -= 1
     return data, labels
@@ -906,6 +764,8 @@ def load_mice_protein(return_additional_labels: bool = False, downloads_path: st
         LE = LabelEncoder()
         genotype_labels = LE.fit_transform(genotypes_raw)
         labels = np.c_[labels, id_labels, bahaviors_labels, treatment_labels, genotype_labels]
+    # Convert labels to int32 format
+    labels = labels.astype(np.int32)
     # Remove rows also from labels (3 cases)
     labels = labels[n_of_nans_per_row < 43]
     return data, labels
@@ -934,8 +794,9 @@ def load_user_knowledge(subset: str = "all", downloads_path: str = None) -> (np.
     -------
     https://archive.ics.uci.edu/ml/datasets/User+Knowledge+Modeling
     """
+    subset = subset.lower()
     assert subset in ["all", "train",
-                      "test"], "subset must match 'all', 'train' or 'test' Your input {0}".format(subset)
+                      "test"], "subset must match 'all', 'train' or 'test'. Your input {0}".format(subset)
     filename = _get_download_dir(downloads_path) + "/Data_User_Modeling_Dataset_Hamdi Tolga KAHRAMAN.xls"
     if not os.path.isfile(filename):
         _download_file(
@@ -965,6 +826,8 @@ def load_user_knowledge(subset: str = "all", downloads_path: str = None) -> (np.
     # Transform labels
     LE = LabelEncoder()
     labels = LE.fit_transform(labels_raw)
+    # Convert labels to int32 format
+    labels = labels.astype(np.int32)
     data = np.array(data, dtype=np.float64)
     return data, labels
 
@@ -1026,8 +889,9 @@ def load_forest_types(subset: str = "all", downloads_path: str = None) -> (np.nd
     -------
     https://archive.ics.uci.edu/ml/datasets/Forest+type+mapping
     """
+    subset = subset.lower()
     assert subset in ["all", "train",
-                      "test"], "subset must match 'all', 'train' or 'test' Your input {0}".format(subset)
+                      "test"], "subset must match 'all', 'train' or 'test'. Your input {0}".format(subset)
     directory = _get_download_dir(downloads_path) + "/ForestTypes/"
     filename = directory + "ForestTypes.zip"
     if not os.path.isfile(filename):
@@ -1058,162 +922,168 @@ def load_forest_types(subset: str = "all", downloads_path: str = None) -> (np.nd
     return data, labels
 
 
-"""
-Load timeseries classification data
-"""
-
-
-def load_motestrain(subset: str = "all", downloads_path: str = None) -> (np.ndarray, np.ndarray):
+def load_dermatology(downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
-    Load the motestrain data set. It consists of 1272 samples belonging to one of 2 classes.
-    The data set is composed of 20 training and 1252 test samples.
-    N=1272, d=84, k=2.
+    Load the dermatology data set. It consists of 366 samples belonging to one of 6 classes.
+    8 samples contain '?' values and are therefore removed.
+    N=358, d=34, k=6.
 
     Parameters
     ----------
-    subset : str
-        can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     downloads_path : str
         path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
 
     Returns
     -------
     data, labels : (np.ndarray, np.ndarray)
-        the data numpy array (1272 x 84), the labels numpy array (1272)
+        the data numpy array (358 x 34), the labels numpy array (358)
 
     References
     -------
-    http://www.timeseriesclassification.com/description.php?Dataset=MoteStrain
+    https://archive.ics.uci.edu/ml/datasets/dermatology
     """
-    data, labels = _load_timeseries_classification_data("MoteStrain", subset, True, downloads_path)
+    filename = _get_download_dir(downloads_path) + "/dermatology.data"
+    data, labels = _load_data_file(filename,
+                                   "https://archive.ics.uci.edu/ml/machine-learning-databases/dermatology/dermatology.data",
+                                   delimiter=",")
+    # Remove rows with nan
+    rows_with_nan = ~np.isnan(data).any(axis=1)
+    data = data[rows_with_nan]
+    labels = labels[rows_with_nan]
+    # Convert labels from 1,... to 0,...
+    labels -= 1
     return data, labels
 
 
-def load_proximal_phalanx_outline(subset: str = "all", downloads_path: str = None) -> (np.ndarray, np.ndarray):
+def load_multiple_features(downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
-    Load the proximal phalanx outline data set. It consists of 876 samples belonging to one of 2 classes.
-    The data set is composed of 600 training and 276 test samples.
-    N=876, d=80, k=2.
+    Load the multiple features data set. It consists of 2000 samples belonging to one of 10 classes.
+    Each class corresponds to handwritten numerals (0-9) extracted from a collection of Dutch utility maps.
+    N=2000, d=649, k=10.
 
     Parameters
     ----------
-    subset : str
-        can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     downloads_path : str
         path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
 
     Returns
     -------
     data, labels : (np.ndarray, np.ndarray)
-        the data numpy array (876 x 80), the labels numpy array (876)
+        the data numpy array (2000 x 649), the labels numpy array (2000)
 
     References
     -------
-    http://www.timeseriesclassification.com/description.php?Dataset=ProximalPhalanxOutlineCorrect
+    https://archive.ics.uci.edu/ml/datasets/Multiple+Features
     """
-    data, labels = _load_timeseries_classification_data("DistalPhalanxOutlineCorrect", subset, False, downloads_path)
+    directory = _get_download_dir(downloads_path) + "/MultipleFeatures/"
+    if not os.path.isdir(directory):
+        os.mkdir(directory)
+    data = np.zeros((2000, 0))
+    # Dataset consists of multiple .xls files
+    for file in ["mfeat-fac", "mfeat-fou", "mfeat-kar", "mfeat-mor", "mfeat-pix", "mfeat-zer"]:
+        filename = directory + file + ".xls"
+        if not os.path.isfile(filename):
+            _download_file("https://archive.ics.uci.edu/ml/machine-learning-databases/mfeat/" + file,
+                           filename)
+        data_tmp = np.genfromtxt(filename, delimiter=None)
+        data = np.c_[data, data_tmp]
+    # First 200 entries correspond to '0', next 200 to '1' and so on
+    labels = np.repeat(range(10), 200)
     return data, labels
 
 
-def load_diatom_size_reduction(subset: str = "all", downloads_path: str = None) -> (np.ndarray, np.ndarray):
+def load_statlog_australian_credit_approval(downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
-    Load the diatom size reduction data set. It consists of 322 samples belonging to one of 4 classes.
-    The data set is composed of 16 training and 306 test samples.
-    N=322, d=345, k=4.
+    Load the statlog Australian Credit Approval data set. It consists of 690 samples belonging to one of 2 classes.
+    N=690, d=14, k=2.
 
     Parameters
     ----------
-    subset : str
-        can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     downloads_path : str
         path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
 
     Returns
     -------
     data, labels : (np.ndarray, np.ndarray)
-        the data numpy array (322 x 345), the labels numpy array (322)
+        the data numpy array (690 x 14), the labels numpy array (690)
 
     References
     -------
-    http://www.timeseriesclassification.com/description.php?Dataset=DiatomSizeReduction
+    https://archive.ics.uci.edu/ml/datasets/statlog+(australian+credit+approval)
     """
-    data, labels = _load_timeseries_classification_data("DiatomSizeReduction", subset, True, downloads_path)
+    filename = _get_download_dir(downloads_path) + "/australian.dat"
+    data, labels = _load_data_file(filename,
+                                   "https://archive.ics.uci.edu/ml/machine-learning-databases/statlog/australian/australian.dat",
+                                   delimiter=None)
     return data, labels
 
 
-def load_symbols(subset: str = "all", downloads_path: str = None) -> (np.ndarray, np.ndarray):
+def load_breast_cancer_wisconsin_original(downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
-    Load the symbols data set. It consists of 1020 samples belonging to one of 6 classes.
-    The data set is composed of 25 training and 995 test samples.
-    N=1020, d=398, k=6.
+    Load the original breast cancer Wisconsin data set. It consists of 699 samples belonging to one of 2 classes.
+    16 samples contain '?' values and will be removed.
+    N=683, d=9, k=2.
 
     Parameters
     ----------
-    subset : str
-        can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     downloads_path : str
         path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
 
     Returns
     -------
     data, labels : (np.ndarray, np.ndarray)
-        the data numpy array (1020 x 398), the labels numpy array (1020)
+        the data numpy array (683 x 9), the labels numpy array (683)
 
     References
     -------
-    http://www.timeseriesclassification.com/description.php?Dataset=Symbols
+    https://archive.ics.uci.edu/ml/datasets/breast+cancer+wisconsin+%28original%29
     """
-    data, labels = _load_timeseries_classification_data("Symbols", subset, True, downloads_path)
+    filename = _get_download_dir(downloads_path) + "/breast-cancer-wisconsin.data"
+    data, labels = _load_data_file(filename,
+                                   "https://archive.ics.uci.edu/ml/machine-learning-databases/breast-cancer-wisconsin/breast-cancer-wisconsin.data",
+                                   delimiter=",")
+    # First column contains unique ids
+    data = data[:, 1:]
+    # Remove rows with nan
+    rows_with_nan = ~np.isnan(data).any(axis=1)
+    data = data[rows_with_nan]
+    labels = labels[rows_with_nan]
+    # labels are 2 or 4. Convert to 0 or 1
+    labels = labels / 2 - 1
+    # Convert labels to int32 format
+    labels = labels.astype(np.int32)
     return data, labels
 
 
-def load_olive_oil(subset: str = "all", downloads_path: str = None) -> (np.ndarray, np.ndarray):
+def load_semeion(downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
-    Load the OliveOil data set. It consists of 60 samples belonging to one of 4 classes.
-    The data set is composed of 30 training and 30 test samples.
-    N=60, d=570, k=4.
+    Load the semeion data set. It consists of 1593 samples belonging to one of 10 classes.
+    Each sample corresponds to a grayscale 16x16 scan of handwritten digits originating from about 80 different persons.
+    Further, each pixel was converted to a boolean value using a fixed threshold.
+    N=1593, d=256, k=10.
 
     Parameters
     ----------
-    subset : str
-        can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     downloads_path : str
         path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
 
     Returns
     -------
     data, labels : (np.ndarray, np.ndarray)
-        the data numpy array (60 x 570), the labels numpy array (60)
+        the data numpy array (1593 x 256), the labels numpy array (1593)
 
     References
     -------
-    http://www.timeseriesclassification.com/description.php?Dataset=OliveOil
+    https://archive.ics.uci.edu/ml/datasets/semeion+handwritten+digit
     """
-    data, labels = _load_timeseries_classification_data("OliveOil", subset, True, downloads_path)
-    return data, labels
-
-
-def load_plane(subset: str = "all", downloads_path: str = None) -> (np.ndarray, np.ndarray):
-    """
-    Load the plane data set. It consists of 210 samples belonging to one of 7 classes.
-    The data set is composed of 105 training and 105 test samples.
-    N=210, d=144, k=7.
-
-    Parameters
-    ----------
-    subset : str
-        can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
-    downloads_path : str
-        path to the directory where the data is stored (default: None -> [USER]/Downloads/cluspy_datafiles)
-
-    Returns
-    -------
-    data, labels : (np.ndarray, np.ndarray)
-        the data numpy array (210 x 144), the labels numpy array (210)
-
-    References
-    -------
-    http://www.timeseriesclassification.com/description.php?Dataset=Plane
-    """
-    data, labels = _load_timeseries_classification_data("Plane", subset, True, downloads_path)
+    filename = _get_download_dir(downloads_path) + "/semeion.data"
+    if not os.path.isfile(filename):
+        _download_file("https://archive.ics.uci.edu/ml/machine-learning-databases/semeion/semeion.data",
+                       filename)
+    datafile = np.genfromtxt(filename)
+    # Last columns each correspond to one label (one-hot encoding)
+    data = datafile[:, :-10]
+    labels = np.zeros(data.shape[0], dtype=np.int32)
+    for i in range(1, 10):
+        labels[datafile[:, -10 + i] == 1] = i
     return data, labels

@@ -9,6 +9,7 @@ def test_simple_dipdeck_with_optdigits():
     dipdeck = DipDECK(pretrain_epochs=10, clustering_epochs=10)
     assert not hasattr(dipdeck, "labels_")
     dipdeck.fit(X)
+    assert dipdeck.labels_.dtype == np.int32
     assert dipdeck.labels_.shape == labels.shape
 
 
@@ -56,9 +57,10 @@ def test_get_dip_matrix():
     cluster_labels = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2])
     dip_matrix = _get_dip_matrix(embedded_data=embedded_data, embedded_centers_cpu=embedded_centers,
                                  cluster_labels_cpu=cluster_labels,
-                                 n_clusters=3, max_cluster_size_diff_factor=2)
-    assert dip_matrix.shape == (3,3)
-    assert np.array_equal(dip_matrix.diagonal(), np.array([0,0,0]))
+                                 n_clusters=3, max_cluster_size_diff_factor=2, pval_strategy="table", n_boots=1000,
+                                 random_state=1)
+    assert dip_matrix.shape == (3, 3)
+    assert np.array_equal(dip_matrix.diagonal(), np.array([0, 0, 0]))
     dip_matrix_tmp = dip_matrix + np.identity(3) * 0.1
     assert np.max(dip_matrix_tmp) <= 1
     assert np.min(dip_matrix_tmp) >= 0
