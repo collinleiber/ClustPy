@@ -3,6 +3,7 @@
 ---
 [![PyPI version](https://badge.fury.io/py/clustpy.svg)](https://pypi.org/project/clustpy/)
 [![TestMain](https://github.com/collinleiber/clustpy/actions/workflows/test-main.yml/badge.svg)](https://github.com/collinleiber/ClustPy/actions/workflows/test-main.yml)
+[![CircleCI](https://dl.circleci.com/status-badge/img/gh/collinleiber/ClustPy/tree/main.svg?style=svg)](https://dl.circleci.com/status-badge/redirect/gh/collinleiber/ClustPy/tree/main)
 [![codecov](https://codecov.io/gh/collinleiber/ClustPy/branch/main/graph/badge.svg?token=5AJYQFIYFR)](https://codecov.io/gh/collinleiber/ClustPy)
 
 The package provides a simple way to cluster data in Python.
