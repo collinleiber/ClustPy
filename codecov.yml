@@ -1,2 +1,3 @@
 ignore:
   - ".*/tests"  # ignore folders and all its contents
+  - ".*/data" # ignore data directory

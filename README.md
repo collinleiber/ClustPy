@@ -1,6 +1,9 @@
-# ClustPy
+![Logo](logo.PNG)
 
-[![codecov](https://codecov.io/github/collinleiber/ClustPy/branch/master/graphs/badge.svg)](https://codecov.io/github/collinleiber/ClustPy) 
+---
+![PyPI Latest Release](https://img.shields.io/pypi/collinleiber/clustpy)
+[![TestMain](https://github.com/collinleiber/clustpy/actions/workflows/test-main.yml/badge.svg)](https://github.com/collinleiber/ClustPy/actions/workflows/test-main.yml)
+[![codecov](https://codecov.io/gh/collinleiber/ClustPy/branch/main/graph/badge.svg?token=5AJYQFIYFR)](https://codecov.io/gh/collinleiber/ClustPy)
 
 The package provides a simple way to cluster data in Python.
 For this purpose it provides a variety of algorithms from different domains. 
