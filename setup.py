@@ -22,7 +22,7 @@ setup(
     name='clustpy',
     version=clustpy.__version__,
     packages=find_packages(),
-    package_data={'clustpy': ['data/datasets/*.data']},
+    package_data={'clustpy': ['data/datasets/*.data', 'requirements.txt']},
     url='https://github.com/collinleiber/ClustPy',
     license='BSD-3-Clause License',
     author='Collin Leiber',
