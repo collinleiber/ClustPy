@@ -3,16 +3,11 @@ import clustpy
 import numpy as np
 
 
-def _load_requirements():
-    with open("requirements.txt", "r") as file:
-        requirements = [line.rstrip() for line in file]
-    return requirements
-
-
 def _load_readme():
     with open("README.md", "r") as file:
         readme = file.read()
     return readme
+
 
 dip_extension = Extension('clustpy.utils.dipModule',
                           include_dirs=[np.get_include()],
@@ -31,6 +26,15 @@ setup(
     long_description=_load_readme(),
     long_description_content_type="text/markdown",
     python_requires='>=3.7',
-    install_requires=_load_requirements(),
+    install_requires=['numpy',
+                      'scipy',
+                      'scikit-learn',
+                      'pandas',
+                      'matplotlib',
+                      'torch',
+                      'torchvision',
+                      'xlrd',
+                      'Pillow',
+                      'nltk'],
     ext_modules=[dip_extension]
 )
