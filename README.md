@@ -1,7 +1,7 @@
 ![Logo](logo.PNG)
 
 ---
-[![PyPI version](https://badge.fury.io/py/clustpy.svg)](https://github.com/collinleiber/ClustPy)
+[![PyPI version](https://badge.fury.io/py/clustpy.svg)](https://pypi.org/project/clustpy/)
 [![TestMain](https://github.com/collinleiber/clustpy/actions/workflows/test-main.yml/badge.svg)](https://github.com/collinleiber/ClustPy/actions/workflows/test-main.yml)
 [![codecov](https://codecov.io/gh/collinleiber/ClustPy/branch/main/graph/badge.svg?token=5AJYQFIYFR)](https://codecov.io/gh/collinleiber/ClustPy)
 
@@ -22,6 +22,8 @@ it can be combined with many other packages (see below).
 ### For Users
 
 #### Stable Version
+
+The current stable version can be installed by the following command:
 
 `pip3 install clustpy`
 
