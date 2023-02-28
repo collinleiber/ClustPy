@@ -14,15 +14,17 @@ def test_execute_kmeans():
     n_clusters = 1
     labels, dispersion = _execute_kmeans(X, n_clusters, use_log=False, random_state=random_state)
     assert np.array_equal(labels, np.array([0] * 11))
-    assert dispersion == np.sum([np.sum((X - x) ** 2) for x in X]) / (11 * 2)
+    assert abs(dispersion - np.sum([np.sum((X - x) ** 2) for x in X]) / (11 * 2)) < 1e-9
     # With number of clusters > 1
     n_clusters = 2
     labels, dispersion = _execute_kmeans(X, n_clusters, use_log=True, random_state=random_state)
     assert np.array_equal(labels, np.array([0] * 5 + [1] * 6)) or np.array_equal(labels, np.array([1] * 5 + [0] * 6))
-    assert dispersion == np.log(np.sum([np.sum((X[labels == 0] - x) ** 2) for x in X[labels == 0]]) / (5 * 2) + np.sum(
-        [np.sum((X[labels == 1] - x) ** 2) for x in X[labels == 1]]) / (6 * 2)) or dispersion == np.log(np.sum(
-        [np.sum((X[labels == 1] - x) ** 2) for x in X[labels == 1]]) / (5 * 2) + np.sum(
-        [np.sum((X[labels == 0] - x) ** 2) for x in X[labels == 0]]) / (6 * 2))
+    assert abs(dispersion -
+               (np.log(np.sum([np.sum((X[labels == 0] - x) ** 2) for x in X[labels == 0]]) / (5 * 2) +
+                       np.sum([np.sum((X[labels == 1] - x) ** 2) for x in X[labels == 1]]) / (6 * 2)))) < 1e-9 or \
+           abs(dispersion -
+               (np.log(np.sum([np.sum((X[labels == 1] - x) ** 2) for x in X[labels == 1]]) / (5 * 2) +
+                       np.sum([np.sum((X[labels == 0] - x) ** 2) for x in X[labels == 0]]) / (6 * 2)))) < 1e-9
 
 
 def test_generate_random_data():
