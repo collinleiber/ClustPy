@@ -134,6 +134,7 @@ def create_nr_data(n_samples: int = 1000, n_clusters: tuple = (3, 3, 1), subspac
         centers_sub = None if type(n_samples_sub) is list else n_clusters[i]
         X_tmp, L_tmp = make_blobs(n_samples_sub, subspace_features[i], centers=centers_sub,
                                   cluster_std=std[i], center_box=box[i], random_state=random_state)
+        L_tmp = L_tmp.astype(np.int32)
         # Create outliers
         if n_outliers[i] != 0:
             X_out = random_state.random((n_outliers[i], subspace_features[i]))
@@ -147,7 +148,6 @@ def create_nr_data(n_samples: int = 1000, n_clusters: tuple = (3, 3, 1), subspac
         # Add subspace to dataset
         X = np.c_[X, X_tmp]
         L = np.c_[L, L_tmp]
-    L = L.astype(np.int32)
     # Rotate space
     if rotate_space:
         V = special_ortho_group.rvs(dim=sum(subspace_features), random_state=random_state)
