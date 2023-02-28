@@ -12,7 +12,7 @@ import pytest
 TEST_DOWNLOAD_PATH = str(Path.home() / "Downloads/clustpy_testfiles_medical_mnist")
 
 
-@pytest.fixture(autouse=True, scope='session')
+@pytest.fixture(autouse=True, scope='function')
 def run_around_tests():
     # Code that will run before the tests
     if not os.path.isdir(TEST_DOWNLOAD_PATH):

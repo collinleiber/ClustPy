@@ -161,20 +161,20 @@ print("Clustering accuracy:", acc_res)
 ### 2)
 
 The second example covers the topic of non-redundant/alternative clustering.
-Here, the NrKmeans algorithm is run on the CMUfaces dataset.
+Here, the NrKmeans algorithm is run on the Fruit dataset.
 Beware that NrKmeans as a non-redundant clustering algorithm returns multiple labelings.
 Therefore, we calculate the confusion matrix by comparing each combination of labels using the normalized mutual information (nmi).
 The confusion matrix will be printed and finally the best matching nmi will be stated for each set of labels.
 
 ```python
 from clustpy.alternative import NrKmeans
-from clustpy.data import load_cmu_faces
+from clustpy.data import load_fruit
 from clustpy.metrics import MultipleLabelingsConfusionMatrix
 from sklearn.metrics import normalized_mutual_info_score as nmi
 import numpy as np
 
-data, labels = load_cmu_faces()
-nk = NrKmeans([20, 4, 4, 2])
+data, labels = load_fruit()
+nk = NrKmeans([3, 3])
 nk.fit(data)
 mlcm = MultipleLabelingsConfusionMatrix(labels, nk.labels_, nmi)
 mlcm.rearrange()
@@ -185,16 +185,16 @@ print(np.max(mlcm.confusion_matrix, axis=1))
 ### 3)
 
 One mentionable feature of the ClustPy package is the ability to run various modern deep clustering algorithms out of the box. 
-For example, the following code runs the DEC algorithm on the Optdigits dataset. 
+For example, the following code runs the DEC algorithm on the Newsgroups dataset. 
 To evaluate the result, we compute the adjusted RAND index (ari).
 
 ```python
 from clustpy.deep import DEC
-from clustpy.data import load_optdigits
+from clustpy.data import load_newsgroups
 from sklearn.metrics import adjusted_rand_score as ari
 
-data, labels = load_optdigits()
-dec = DEC(10)
+data, labels = load_newsgroups()
+dec = DEC(20)
 dec.fit(data)
 my_ari = ari(labels, dec.labels_)
 print(my_ari)
