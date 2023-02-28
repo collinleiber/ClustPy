@@ -44,7 +44,7 @@ def create_subspace_data(n_samples: int = 1000, n_clusters: int = 3, subspace_fe
     X, L = create_nr_data(n_samples=n_samples, n_clusters=(n_clusters, 1), subspace_features=subspace_features,
                           n_outliers=n_outliers, std=std, box=box, rotate_space=rotate_space,
                           random_state=random_state)
-    return X, L[:, 0]
+    return X, L[:, 0].astype(np.int32)
 
 
 def create_nr_data(n_samples: int = 1000, n_clusters: tuple = (3, 3, 1), subspace_features: tuple = (2, 2, 2),
@@ -109,7 +109,7 @@ def create_nr_data(n_samples: int = 1000, n_clusters: tuple = (3, 3, 1), subspac
     overall_samples = np.sum(n_samples[0]) + n_outliers[0]
     assert all([np.sum(n_samples[i]) + n_outliers[i] == overall_samples for i in
                 range(len(n_clusters))]), "samples in each subspace must be equal (sum of cluster objects and outliers)"
-    assert all([type(n_samples[i]) is int or type(n_samples[i]) is np.int32 or n_clusters[i] == len(
+    assert all([isinstance(n_samples[i], (int, np.integer)) or n_clusters[i] == len(
         n_samples[i]) for i in range(len(n_clusters))]), "number of clusters in n_samples does not match n_clusters"
     # Transform cluster_features to list
     if type(subspace_features) is not list and type(subspace_features) is not tuple:
@@ -134,7 +134,6 @@ def create_nr_data(n_samples: int = 1000, n_clusters: tuple = (3, 3, 1), subspac
         centers_sub = None if type(n_samples_sub) is list else n_clusters[i]
         X_tmp, L_tmp = make_blobs(n_samples_sub, subspace_features[i], centers=centers_sub,
                                   cluster_std=std[i], center_box=box[i], random_state=random_state)
-        L_tmp = L_tmp.astype(np.int32)
         # Create outliers
         if n_outliers[i] != 0:
             X_out = random_state.random((n_outliers[i], subspace_features[i]))
@@ -148,6 +147,7 @@ def create_nr_data(n_samples: int = 1000, n_clusters: tuple = (3, 3, 1), subspac
         # Add subspace to dataset
         X = np.c_[X, X_tmp]
         L = np.c_[L, L_tmp]
+    L = L.astype(np.int32)
     # Rotate space
     if rotate_space:
         V = special_ortho_group.rvs(dim=sum(subspace_features), random_state=random_state)

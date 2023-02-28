@@ -43,7 +43,7 @@ def _helper_test_data_loader(data, labels, N, d, k, outliers=False):
         Defines if outliers are contained in the dataset. Should be a list for datasets with multiple labelings (default: False)
     """
     assert data.shape == (N, d)
-    assert labels.dtype == np.int32
+    assert labels.dtype == np.integer
     if type(k) is int:
         assert labels.shape == (N,)
         assert np.array_equal(np.unique(labels), range(k) if not outliers else range(-1, k))
