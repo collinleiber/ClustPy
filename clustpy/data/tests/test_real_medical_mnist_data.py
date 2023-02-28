@@ -15,13 +15,15 @@ TEST_DOWNLOAD_PATH = str(Path.home() / "Downloads/clustpy_testfiles_medical_mnis
 @pytest.fixture(autouse=True, scope='session')
 def run_around_tests():
     # Code that will run before the tests
-    os.makedirs(TEST_DOWNLOAD_PATH)
+    if not os.path.isdir(TEST_DOWNLOAD_PATH):
+        os.makedirs(TEST_DOWNLOAD_PATH)
     # Test functions will be run at this point
     yield
     # Code that will run after the tests
     shutil.rmtree(TEST_DOWNLOAD_PATH)
 
 
+@pytest.mark.data
 def test_load_path_mnist():
     # Full data set
     data, labels = load_path_mnist("all", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)
@@ -41,6 +43,7 @@ def test_load_path_mnist():
     _check_normalized_channels(data, 1, False)
 
 
+@pytest.mark.data
 def test_load_chest_mnist():
     # Full data set
     data, labels = load_chest_mnist("all", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)
@@ -60,6 +63,7 @@ def test_load_chest_mnist():
     _check_normalized_channels(data, 1, False)
 
 
+@pytest.mark.data
 def test_load_derma_mnist():
     # Full data set
     data, labels = load_derma_mnist("all", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)
@@ -79,6 +83,7 @@ def test_load_derma_mnist():
     _check_normalized_channels(data, 1, False)
 
 
+@pytest.mark.data
 def test_load_oct_mnist():
     # Full data set
     data, labels = load_oct_mnist("all", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)
@@ -98,6 +103,7 @@ def test_load_oct_mnist():
     _check_normalized_channels(data, 1, False)
 
 
+@pytest.mark.data
 def test_load_pneumonia_mnist():
     # Full data set
     data, labels = load_pneumonia_mnist("all", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)
@@ -117,6 +123,7 @@ def test_load_pneumonia_mnist():
     _check_normalized_channels(data, 1, False)
 
 
+@pytest.mark.data
 def test_load_retina_mnist():
     # Full data set
     data, labels = load_retina_mnist("all", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)
@@ -136,6 +143,7 @@ def test_load_retina_mnist():
     _check_normalized_channels(data, 1, False)
 
 
+@pytest.mark.data
 def test_load_breast_mnist():
     # Full data set
     data, labels = load_breast_mnist("all", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)
@@ -155,6 +163,7 @@ def test_load_breast_mnist():
     _check_normalized_channels(data, 1, False)
 
 
+@pytest.mark.data
 def test_load_blood_mnist():
     # Full data set
     data, labels = load_blood_mnist("all", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)
@@ -174,6 +183,7 @@ def test_load_blood_mnist():
     _check_normalized_channels(data, 1, False)
 
 
+@pytest.mark.data
 def test_load_tissue_mnist():
     # Full data set
     data, labels = load_tissue_mnist("all", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)
@@ -193,6 +203,7 @@ def test_load_tissue_mnist():
     _check_normalized_channels(data, 1, False)
 
 
+@pytest.mark.data
 def test_load_organ_a_mnist():
     # Full data set
     data, labels = load_organ_a_mnist("all", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)
@@ -212,6 +223,7 @@ def test_load_organ_a_mnist():
     _check_normalized_channels(data, 1, False)
 
 
+@pytest.mark.data
 def test_load_organ_c_mnist():
     # Full data set
     data, labels = load_organ_c_mnist("all", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)
@@ -231,6 +243,7 @@ def test_load_organ_c_mnist():
     _check_normalized_channels(data, 1, False)
 
 
+@pytest.mark.data
 def test_load_organ_s_mnist():
     # Full data set
     data, labels = load_organ_s_mnist("all", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)
@@ -250,6 +263,7 @@ def test_load_organ_s_mnist():
     _check_normalized_channels(data, 1, False)
 
 
+@pytest.mark.data
 def test_load_organ_mnist_3d():
     # Full data set
     data, labels = load_organ_mnist_3d("all", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)
@@ -269,6 +283,7 @@ def test_load_organ_mnist_3d():
     _check_normalized_channels(data, 1, False)
 
 
+@pytest.mark.data
 def test_load_nodule_mnist_3d():
     # Full data set
     data, labels = load_nodule_mnist_3d("all", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)
@@ -288,6 +303,7 @@ def test_load_nodule_mnist_3d():
     _check_normalized_channels(data, 1, False)
 
 
+@pytest.mark.data
 def test_load_adrenal_mnist_3d():
     # Full data set
     data, labels = load_adrenal_mnist_3d("all", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)
@@ -307,6 +323,7 @@ def test_load_adrenal_mnist_3d():
     _check_normalized_channels(data, 1, False)
 
 
+@pytest.mark.data
 def test_load_fracture_mnist_3d():
     # Full data set
     data, labels = load_fracture_mnist_3d("all", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)
@@ -326,6 +343,7 @@ def test_load_fracture_mnist_3d():
     _check_normalized_channels(data, 1, False)
 
 
+@pytest.mark.data
 def test_load_vessel_mnist_3d():
     # Full data set
     data, labels = load_vessel_mnist_3d("all", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)
@@ -345,6 +363,7 @@ def test_load_vessel_mnist_3d():
     _check_normalized_channels(data, 1, False)
 
 
+@pytest.mark.data
 def test_load_synapse_mnist_3d():
     # Full data set
     data, labels = load_synapse_mnist_3d("all", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)

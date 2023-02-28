@@ -203,7 +203,8 @@ def _xmeans(X: np.ndarray, n_clusters_init: int, max_n_clusters: int, check_glob
             ids_in_each_cluster = [np.where(labels == c)[0] for c in range(n_clusters)]
             cluster_sizes = np.array([ids_in_cluster.shape[0] for ids_in_cluster in ids_in_each_cluster])
             cluster_variances = [np.sum((X[ids_in_each_cluster[c]] - centers[c]) ** 2) / (
-                    cluster_sizes[c] - 1) for c in range(n_clusters)]  # Only used if allow_merging is True
+                    cluster_sizes[c] - 1) if cluster_sizes[c] > 1 else 0 for c in
+                                 range(n_clusters)]  # Only used if allow_merging is True
             if check_global_score:
                 # Get new global variance
                 global_variance = kmeans.inertia_ / (X.shape[0] - n_clusters)

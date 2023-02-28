@@ -15,7 +15,8 @@ TEST_DOWNLOAD_PATH = str(Path.home() / "Downloads/clustpy_testfiles_realworld")
 @pytest.fixture(autouse=True, scope='session')
 def run_around_tests():
     # Code that will run before the tests
-    os.makedirs(TEST_DOWNLOAD_PATH)
+    if not os.path.isdir(TEST_DOWNLOAD_PATH):
+        os.makedirs(TEST_DOWNLOAD_PATH)
     # Test functions will be run at this point
     yield
     # Code that will run after the tests
@@ -55,24 +56,29 @@ def _helper_test_data_loader(data, labels, N, d, k, outliers=False):
         assert [len(l) for l in unique_labels] == [k[i] if not outliers[i] else k[i] + 1 for i in
                                                    range(labels.shape[1])]  # Checks that number of labels is correct
         for i, ul in enumerate(unique_labels):
-            assert np.array_equal(ul, range(k[i]) if not outliers[i] else range(-1, k[i]))  # Checks that labels go from 0 to k
+            assert np.array_equal(ul, range(k[i]) if not outliers[i] else range(-1, k[
+                i]))  # Checks that labels go from 0 to k
 
 
+@pytest.mark.data
 def test_load_iris():
     data, labels = load_iris()
     _helper_test_data_loader(data, labels, 150, 4, 3)
 
 
+@pytest.mark.data
 def test_load_wine():
     data, labels = load_wine()
     _helper_test_data_loader(data, labels, 178, 13, 3)
 
 
+@pytest.mark.data
 def test_load_breast_cancer():
     data, labels = load_breast_cancer()
     _helper_test_data_loader(data, labels, 569, 30, 2)
 
 
+@pytest.mark.data
 def test_load_newsgroups():
     # Full data set
     data, labels = load_newsgroups("all")
@@ -85,6 +91,7 @@ def test_load_newsgroups():
     _helper_test_data_loader(data, labels, 7532, 500, 20)
 
 
+@pytest.mark.data
 def test_load_reuters():
     # Full data set
     data, labels = load_reuters("all")
@@ -97,31 +104,37 @@ def test_load_reuters():
     _helper_test_data_loader(data, labels, 665265, 500, 4)
 
 
+@pytest.mark.data
 def test_load_banknotes():
     data, labels = load_banknotes(downloads_path=TEST_DOWNLOAD_PATH)
     _helper_test_data_loader(data, labels, 1372, 4, 2)
 
 
+@pytest.mark.data
 def test_load_spambase():
     data, labels = load_spambase(downloads_path=TEST_DOWNLOAD_PATH)
     _helper_test_data_loader(data, labels, 4601, 57, 2)
 
 
+@pytest.mark.data
 def test_load_seeds():
     data, labels = load_seeds(downloads_path=TEST_DOWNLOAD_PATH)
     _helper_test_data_loader(data, labels, 210, 7, 3)
 
 
+@pytest.mark.data
 def test_load_skin():
     data, labels = load_skin(downloads_path=TEST_DOWNLOAD_PATH)
     _helper_test_data_loader(data, labels, 245057, 3, 2)
 
 
+@pytest.mark.data
 def test_load_soybean_small():
     data, labels = load_soybean_small(downloads_path=TEST_DOWNLOAD_PATH)
     _helper_test_data_loader(data, labels, 47, 35, 4)
 
 
+@pytest.mark.data
 def test_load_soybean_large():
     # Full data set
     data, labels = load_soybean_large("all", downloads_path=TEST_DOWNLOAD_PATH)
@@ -134,6 +147,7 @@ def test_load_soybean_large():
     _helper_test_data_loader(data, labels, 296, 35, 15)
 
 
+@pytest.mark.data
 def test_load_optdigits():
     # Full data set
     data, labels = load_optdigits("all", downloads_path=TEST_DOWNLOAD_PATH)
@@ -146,6 +160,7 @@ def test_load_optdigits():
     _helper_test_data_loader(data, labels, 1797, 64, 10)
 
 
+@pytest.mark.data
 def test_load_pendigits():
     # Full data set
     data, labels = load_pendigits("all", downloads_path=TEST_DOWNLOAD_PATH)
@@ -158,6 +173,7 @@ def test_load_pendigits():
     _helper_test_data_loader(data, labels, 3498, 16, 10)
 
 
+@pytest.mark.data
 def test_load_ecoli():
     data, labels = load_ecoli(downloads_path=TEST_DOWNLOAD_PATH)
     _helper_test_data_loader(data, labels, 336, 7, 8)
@@ -166,16 +182,19 @@ def test_load_ecoli():
     _helper_test_data_loader(data, labels, 327, 7, 5)
 
 
+@pytest.mark.data
 def test_load_hrtu2():
     data, labels = load_htru2(downloads_path=TEST_DOWNLOAD_PATH)
     _helper_test_data_loader(data, labels, 17898, 8, 2)
 
 
+@pytest.mark.data
 def test_load_letterrecognition():
     data, labels = load_letterrecognition(downloads_path=TEST_DOWNLOAD_PATH)
     _helper_test_data_loader(data, labels, 20000, 16, 26)
 
 
+@pytest.mark.data
 def test_load_har():
     # Full data set
     data, labels = load_har("all", downloads_path=TEST_DOWNLOAD_PATH)
@@ -188,6 +207,7 @@ def test_load_har():
     _helper_test_data_loader(data, labels, 2947, 561, 6)
 
 
+@pytest.mark.data
 def test_load_statlog_shuttle():
     # 7z probably not installed! -> data and labels can be None
     # Full data set
@@ -210,6 +230,7 @@ def test_load_statlog_shuttle():
         _helper_test_data_loader(data, labels, 14500, 9, 7)
 
 
+@pytest.mark.data
 def test_load_mice_protein():
     data, labels = load_mice_protein(downloads_path=TEST_DOWNLOAD_PATH)
     _helper_test_data_loader(data, labels, 1077, 68, 8)
@@ -218,6 +239,7 @@ def test_load_mice_protein():
     _helper_test_data_loader(data, labels, 1077, 68, [8, 72, 2, 2, 2])
 
 
+@pytest.mark.data
 def test_load_user_knowledge():
     # Full data set
     data, labels = load_user_knowledge("all", downloads_path=TEST_DOWNLOAD_PATH)
@@ -230,11 +252,13 @@ def test_load_user_knowledge():
     _helper_test_data_loader(data, labels, 145, 5, 4)
 
 
+@pytest.mark.data
 def test_load_breast_tissue():
     data, labels = load_breast_tissue(downloads_path=TEST_DOWNLOAD_PATH)
     _helper_test_data_loader(data, labels, 106, 9, 6)
 
 
+@pytest.mark.data
 def test_load_forest_types():
     # Full data set
     data, labels = load_forest_types("all", downloads_path=TEST_DOWNLOAD_PATH)
@@ -247,26 +271,31 @@ def test_load_forest_types():
     _helper_test_data_loader(data, labels, 325, 27, 4)
 
 
+@pytest.mark.data
 def test_load_dermatology():
     data, labels = load_dermatology(downloads_path=TEST_DOWNLOAD_PATH)
     _helper_test_data_loader(data, labels, 358, 34, 6)
 
 
+@pytest.mark.data
 def test_load_multiple_features():
     data, labels = load_multiple_features(downloads_path=TEST_DOWNLOAD_PATH)
     _helper_test_data_loader(data, labels, 2000, 649, 10)
 
 
+@pytest.mark.data
 def test_load_statlog_australian_credit_approval():
     data, labels = load_statlog_australian_credit_approval(downloads_path=TEST_DOWNLOAD_PATH)
     _helper_test_data_loader(data, labels, 690, 14, 2)
 
 
+@pytest.mark.data
 def test_load_breast_cancer_wisconsin_original():
     data, labels = load_breast_cancer_wisconsin_original(downloads_path=TEST_DOWNLOAD_PATH)
     _helper_test_data_loader(data, labels, 683, 9, 2)
 
 
+@pytest.mark.data
 def test_load_semeion():
     data, labels = load_semeion(downloads_path=TEST_DOWNLOAD_PATH)
     _helper_test_data_loader(data, labels, 1593, 256, 10)

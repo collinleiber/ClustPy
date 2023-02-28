@@ -13,7 +13,8 @@ TEST_DOWNLOAD_PATH = str(Path.home() / "Downloads/clustpy_testfiles_torchvision"
 @pytest.fixture(autouse=True, scope='session')
 def run_around_tests():
     # Code that will run before the tests
-    os.makedirs(TEST_DOWNLOAD_PATH)
+    if not os.path.isdir(TEST_DOWNLOAD_PATH):
+        os.makedirs(TEST_DOWNLOAD_PATH)
     # Test functions will be run at this point
     yield
     # Code that will run after the tests
@@ -42,6 +43,7 @@ def _check_normalized_channels(data, channels, should_be_normalized=True):
 
 
 # Check if loading methods still exist (could be renamed/moved)
+@pytest.mark.data
 def test_torchvision_data_methods():
     assert "USPS" in dir(torchvision.datasets)
     assert "MNIST" in dir(torchvision.datasets)
@@ -53,6 +55,7 @@ def test_torchvision_data_methods():
 
 
 # Do not skip USPS as it is the smallest dataset and can check the torchvision data loading mechanism
+@pytest.mark.data
 def test_load_usps():
     # Full data set
     data, labels = load_usps("all", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)
@@ -69,6 +72,7 @@ def test_load_usps():
 
 
 @pytest.mark.skip(reason="torchvision should already test this (keep only USPS and cifar10 test)")
+@pytest.mark.data
 def test_load_mnist():
     # Full data set
     data, labels = load_mnist("all", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)
@@ -85,6 +89,7 @@ def test_load_mnist():
 
 
 @pytest.mark.skip(reason="torchvision should already test this (keep only USPS and cifar10 test)")
+@pytest.mark.data
 def test_load_kmnist():
     # Full data set
     data, labels = load_kmnist("all", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)
@@ -101,6 +106,7 @@ def test_load_kmnist():
 
 
 @pytest.mark.skip(reason="torchvision should already test this (keep only USPS and cifar10 test)")
+@pytest.mark.data
 def test_load_fmnist():
     # Full data set
     data, labels = load_fmnist("all", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)
@@ -117,6 +123,7 @@ def test_load_fmnist():
 
 
 # Do not skip cifar10 as it is the smallest 3-channel dataset and can check channel normalization
+@pytest.mark.data
 def test_load_cifar10():
     # Full data set
     data, labels = load_cifar10("all", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)
@@ -133,6 +140,7 @@ def test_load_cifar10():
 
 
 @pytest.mark.skip(reason="torchvision should already test this (keep only USPS and cifar10 test)")
+@pytest.mark.data
 def test_load_svhn():
     # Full data set
     data, labels = load_svhn("all", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)
@@ -149,6 +157,7 @@ def test_load_svhn():
 
 
 @pytest.mark.skip(reason="torchvision should already test this (keep only USPS and cifar10 test)")
+@pytest.mark.data
 def test_load_stl10():
     # Full data set
     data, labels = load_stl10("all", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)

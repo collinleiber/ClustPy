@@ -15,7 +15,7 @@ def test_create_nr_data():
     data, labels = create_nr_data(1000, [3, 3, 5], [4, 3, 2], [100, 0, 0], rotate_space=False, random_state=0)
     _helper_test_data_loader(data, labels, 1100, 9, [3, 3, 5], outliers=[True, False, False])
     _, cluster_sizes = np.unique(labels[:, 0], return_counts=True)
-    assert cluster_sizes[0] == 100 # Checks number of outliers
+    assert cluster_sizes[0] == 100  # Checks number of outliers
     # Check if random state is working
     data2, labels2 = create_nr_data(1000, [3, 3, 5], [4, 3, 2], [100, 0, 0], rotate_space=False, random_state=0)
     assert np.array_equal(data, data2)  # Should be the same

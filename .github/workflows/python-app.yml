@@ -48,7 +48,7 @@ jobs:
 
     - name: Test with pytest
       run: |
-        pytest --ignore=cluspy/data
+        pytest -m "not data" --cov
 
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v3

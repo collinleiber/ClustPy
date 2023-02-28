@@ -12,13 +12,15 @@ TEST_DOWNLOAD_PATH = str(Path.home() / "Downloads/clustpy_testfiles_timeseries")
 @pytest.fixture(autouse=True, scope='session')
 def run_around_tests():
     # Code that will run before the tests
-    os.makedirs(TEST_DOWNLOAD_PATH)
+    if not os.path.isdir(TEST_DOWNLOAD_PATH):
+        os.makedirs(TEST_DOWNLOAD_PATH)
     # Test functions will be run at this point
     yield
     # Code that will run after the tests
     shutil.rmtree(TEST_DOWNLOAD_PATH)
 
 
+@pytest.mark.data
 def test_load_motestrain():
     # Full data set
     data, labels = load_motestrain("all", downloads_path=TEST_DOWNLOAD_PATH)
@@ -31,6 +33,7 @@ def test_load_motestrain():
     _helper_test_data_loader(data, labels, 1252, 84, 2)
 
 
+@pytest.mark.data
 def test_load_proximal_phalanx_outline():
     # Full data set
     data, labels = load_proximal_phalanx_outline("all", downloads_path=TEST_DOWNLOAD_PATH)
@@ -43,6 +46,7 @@ def test_load_proximal_phalanx_outline():
     _helper_test_data_loader(data, labels, 276, 80, 2)
 
 
+@pytest.mark.data
 def test_load_diatom_size_reduction():
     # Full data set
     data, labels = load_diatom_size_reduction("all", downloads_path=TEST_DOWNLOAD_PATH)
@@ -55,6 +59,7 @@ def test_load_diatom_size_reduction():
     _helper_test_data_loader(data, labels, 306, 345, 4)
 
 
+@pytest.mark.data
 def test_load_symbols():
     # Full data set
     data, labels = load_symbols("all", downloads_path=TEST_DOWNLOAD_PATH)
@@ -67,6 +72,7 @@ def test_load_symbols():
     _helper_test_data_loader(data, labels, 995, 398, 6)
 
 
+@pytest.mark.data
 def test_load_olive_oil():
     # Full data set
     data, labels = load_olive_oil("all", downloads_path=TEST_DOWNLOAD_PATH)
@@ -79,6 +85,7 @@ def test_load_olive_oil():
     _helper_test_data_loader(data, labels, 30, 570, 4)
 
 
+@pytest.mark.data
 def test_load_plane():
     # Full data set
     data, labels = load_plane("all", downloads_path=TEST_DOWNLOAD_PATH)
@@ -91,6 +98,7 @@ def test_load_plane():
     _helper_test_data_loader(data, labels, 105, 144, 7)
 
 
+@pytest.mark.data
 def test_load_sony_aibo_robot_surface():
     # Full data set
     data, labels = load_sony_aibo_robot_surface("all", downloads_path=TEST_DOWNLOAD_PATH)
@@ -103,6 +111,7 @@ def test_load_sony_aibo_robot_surface():
     _helper_test_data_loader(data, labels, 601, 70, 2)
 
 
+@pytest.mark.data
 def test_load_two_patterns():
     # Full data set
     data, labels = load_two_patterns("all", downloads_path=TEST_DOWNLOAD_PATH)
@@ -115,6 +124,7 @@ def test_load_two_patterns():
     _helper_test_data_loader(data, labels, 4000, 128, 4)
 
 
+@pytest.mark.data
 def test_load_lsst():
     # Full data set
     data, labels = load_lsst("all", downloads_path=TEST_DOWNLOAD_PATH)
