@@ -71,7 +71,7 @@ def test_load_usps():
     _check_normalized_channels(data, 1, False)
 
 
-@pytest.mark.skip(reason="torchvision should already test this (keep only USPS and cifar10 test)")
+@pytest.mark.largedata
 @pytest.mark.data
 def test_load_mnist():
     # Full data set
@@ -88,7 +88,7 @@ def test_load_mnist():
     _check_normalized_channels(data, 1, False)
 
 
-@pytest.mark.skip(reason="torchvision should already test this (keep only USPS and cifar10 test)")
+@pytest.mark.largedata
 @pytest.mark.data
 def test_load_kmnist():
     # Full data set
@@ -105,7 +105,7 @@ def test_load_kmnist():
     _check_normalized_channels(data, 1, False)
 
 
-@pytest.mark.skip(reason="torchvision should already test this (keep only USPS and cifar10 test)")
+@pytest.mark.largedata
 @pytest.mark.data
 def test_load_fmnist():
     # Full data set
@@ -139,7 +139,7 @@ def test_load_cifar10():
     _check_normalized_channels(data, 3, False)
 
 
-@pytest.mark.skip(reason="torchvision should already test this (keep only USPS and cifar10 test)")
+@pytest.mark.largedata
 @pytest.mark.data
 def test_load_svhn():
     # Full data set
@@ -156,7 +156,7 @@ def test_load_svhn():
     _check_normalized_channels(data, 3, False)
 
 
-@pytest.mark.skip(reason="torchvision should already test this (keep only USPS and cifar10 test)")
+@pytest.mark.largedata
 @pytest.mark.data
 def test_load_stl10():
     # Full data set

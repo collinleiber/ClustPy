@@ -92,6 +92,7 @@ def test_load_newsgroups():
 
 
 @pytest.mark.data
+@pytest.mark.largedata
 def test_load_reuters():
     # Full data set
     data, labels = load_reuters("all")
