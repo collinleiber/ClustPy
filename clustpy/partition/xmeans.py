@@ -331,7 +331,7 @@ def _bic_score(n_points: int, cluster_sizes: np.ndarray, n_dims: int, variance: 
     bic_total : float
         The BIC score of the cluster
     """
-    n_clusters = 1 if type(cluster_sizes) is int or type(cluster_sizes) is np.int32 else cluster_sizes.shape[0]
+    n_clusters = cluster_sizes.shape[0] if type(cluster_sizes) is np.ndarray else 1
     # BIC of the free parameters
     n_free_params = n_clusters * (n_dims + 1)  # Equal to: (n_clusters - 1) + n_clusters * n_dims + 1
     bic_free_params = n_free_params * bic_costs(n_points, False)

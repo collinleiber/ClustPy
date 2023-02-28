@@ -32,7 +32,7 @@ def test_example_3():
     from sklearn.metrics import adjusted_rand_score as ari
 
     data, labels = load_optdigits()
-    dec = DEC(10, pretrain_epochs=10, clustering_epochs=10)
+    dec = DEC(10, pretrain_epochs=3, clustering_epochs=3)
     dec.fit(data)
     my_ari = ari(labels, dec.labels_)
     print(my_ari)

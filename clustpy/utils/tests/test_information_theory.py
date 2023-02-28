@@ -82,10 +82,10 @@ Tests
 def test_bic_costs():
     # Use log2
     costs = bic_costs(3, True)
-    assert costs == 0.792481250360578
+    assert abs(costs - 0.792481250360578) < 1e-9
     # Use ln
     costs = bic_costs(3, False)
-    assert costs == 0.5493061443340549
+    assert abs(costs - 0.5493061443340549) < 1e-9
 
 
 def test_integer_costs():

@@ -190,7 +190,7 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
                 np.random.seed(seeds[rep])
                 # Execute algorithm
                 start_time = time.time()
-                algo_obj = eval_algo.obj(**eval_algo.params)
+                algo_obj = eval_algo.algorithm(**eval_algo.params)
                 try:
                     algo_obj.fit(X_processed)
                 except Exception as e:
@@ -567,8 +567,7 @@ class EvaluationAlgorithm():
                  preprocess_methods: list = None, preprocess_params: list = {}):
         assert type(name) is str, "name must be a string"
         self.name = name
-        assert type(algorithm) is type, "name must be Algorithm class"
-        self.obj = algorithm
+        self.algorithm = algorithm
         assert type(params) is dict, "params must be a dict"
         self.params = params
         assert type(deterministic) is bool, "deterministic must be bool"

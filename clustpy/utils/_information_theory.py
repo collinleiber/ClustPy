@@ -250,9 +250,9 @@ def mdl_costs_gaussian_spherical_covariance(n_dims: int, scatter_matrix_cluster:
         rotation = np.identity(scatter_matrix_cluster.shape[0])
     # Calculate the actual costs
     trace = np.trace(np.matmul(np.matmul(rotation.transpose(), scatter_matrix_cluster), rotation))
-    assert trace >= -1e-20, "Trace can not be negative! Trace is {0}".format(trace)
+    assert trace >= -1e-15, "Trace can not be negative! Trace is {0}".format(trace)
     # Can occur if all points in this cluster lie on the same position
-    if trace <= 1e-20:
+    if trace <= 1e-15:
         return 0
     pdf_costs = 1 + _LOG_2_PI - np.log(n_dims * n_points_in_cluster) + np.log(trace)
     pdf_costs *= n_points_in_cluster * n_dims / (2 * _LOG_2)

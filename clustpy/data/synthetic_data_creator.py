@@ -147,6 +147,7 @@ def create_nr_data(n_samples: int = 1000, n_clusters: tuple = (3, 3, 1), subspac
         # Add subspace to dataset
         X = np.c_[X, X_tmp]
         L = np.c_[L, L_tmp]
+    L = L.astype(np.int32)
     # Rotate space
     if rotate_space:
         V = special_ortho_group.rvs(dim=sum(subspace_features), random_state=random_state)
