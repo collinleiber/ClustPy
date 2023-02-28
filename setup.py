@@ -14,7 +14,6 @@ def _load_readme():
         readme = file.read()
     return readme
 
-
 dip_extension = Extension('clustpy.utils.dipModule',
                           include_dirs=[np.get_include()],
                           sources=['clustpy/utils/dip.c'])
@@ -32,6 +31,6 @@ setup(
     long_description=_load_readme(),
     long_description_content_type="text/markdown",
     python_requires='>=3.7',
-    install_requires=[_load_requirements()],
+    install_requires=_load_requirements(),
     ext_modules=[dip_extension]
 )
