@@ -18,7 +18,7 @@ setup(
     version=clustpy.__version__,
     packages=find_packages(),
     package_data={'clustpy': ['data/datasets/*.data', 'requirements.txt']},
-    url='https://github.com/collinleiber/ClustPy',
+    url='https://clustpy.readthedocs.io/en/latest/',
     license='BSD-3-Clause License',
     author='Collin Leiber',
     author_email='leiber@dbs.ifi.lmu.de',
