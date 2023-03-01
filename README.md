@@ -1,4 +1,4 @@
-![Logo](logo.PNG)
+![Logo](https://github.com/collinleiber/clustpy/docs/logo.PNG)
 
 ---
 [![PyPI version](https://badge.fury.io/py/clustpy.svg)](https://pypi.org/project/clustpy/)
