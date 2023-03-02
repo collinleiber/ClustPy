@@ -227,7 +227,7 @@ def _get_max_dip_using_gradient(X: np.ndarray, projection_vector: np.ndarray, co
     # Calculate dip, capturing the output which we need for touching-triangle calculations
     dip_value, _, modal_triangle = dip_test(sorted_projected_data, just_dip=False, is_data_sorted=True)
     if modal_triangle[0] == -1:
-        return [np.zeros(X.shape[1])], dip_value, projected_data
+        return np.zeros(X.shape[1]), dip_value, projected_data
     if consider_duplicates:
         # If duplicate values should be considered, get random modal triangle
         modal_triangle = _get_random_modal_triangle(sorted_projected_data, modal_triangle, random_state)
