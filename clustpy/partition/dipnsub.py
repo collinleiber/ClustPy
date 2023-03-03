@@ -38,7 +38,7 @@ def _dip_n_sub(X: np.ndarray, significance: float, threshold: float, step_size: 
     consider_duplicates : bool
         If multiple instances on the projection axis share a value, the gradient is not unambigous. If those duplicate values should be considered a random instances will be choses for furhter calculations. Beware: The calculation will not be deterministic anymore
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int
+        use a fixed random state to get a repeatable solution
     debug : bool
         If true, additional information will be printed to the console
 
@@ -140,7 +140,7 @@ def _find_min_dippvalue_by_grouped_sgd(X: np.ndarray, labels: np.ndarray, n_clus
     consider_duplicates : bool
         If multiple instances on the projection axis share a value, the gradient is not unambigous. If those duplicate values should be considered a random instances will be choses for furhter calculations. Beware: The calculation will not be deterministic anymore
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int
+        use a fixed random state to get a repeatable solution
     debug : bool
         If true, additional information will be printed to the console
 
@@ -246,7 +246,7 @@ def _find_min_dippvalue_by_grouped_sgd_with_start(X: np.ndarray, labels: np.ndar
     consider_duplicates : bool
         If multiple instances on the projection axis share a value, the gradient is not unambigous. If those duplicate values should be considered a random instances will be choses for furhter calculations. Beware: The calculation will not be deterministic anymore
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int
+        use a fixed random state to get a repeatable solution
     debug : bool
         If true, additional information will be printed to the console
 
@@ -336,7 +336,7 @@ def _get_min_dippvalue_using_grouped_gradient(X: np.ndarray, labels: np.ndarray,
     consider_duplicates : bool
         If multiple instances on the projection axis share a value, the gradient is not unambigous. If those duplicate values should be considered a random instances will be choses for furhter calculations. Beware: The calculation will not be deterministic anymore
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int
+        use a fixed random state to get a repeatable solution
 
     Returns
     -------

@@ -29,7 +29,7 @@ def _gmeans(X: np.ndarray, significance: float, n_clusters_init: int, max_n_clus
     n_split_trials : int
         Number tries to split a cluster. For each try 2-KMeans is executed with different cluster centers
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int
+        use a fixed random state to get a repeatable solution
 
     Returns
     -------

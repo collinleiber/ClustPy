@@ -1643,6 +1643,15 @@ class ENRC(BaseEstimator, ClusterMixin):
     verbose: bool
         if True additional information during the training will be printed (default: False)
 
+    Attributes
+    ----------
+    labels_ : np.ndarray
+        The final labels
+    cluster_centers_ : np.ndarray
+        The final cluster centers
+    autoencoder : torch.nn.Module
+        The final autoencoder
+
     Raises
     ----------
     ValueError : if init is not one of 'nrkmeans', 'random', 'auto' or 'sgd'.

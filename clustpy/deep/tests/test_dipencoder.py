@@ -6,11 +6,17 @@ import numpy as np
 
 def test_simple_dipencoder_with_nrletters():
     X, labels = _load_single_label_nrletters()
-    dipencoder = DipEncoder(6, pretrain_epochs=3, clustering_epochs=3)
+    dipencoder = DipEncoder(6, pretrain_epochs=3, clustering_epochs=3, random_state=1)
     assert not hasattr(dipencoder, "labels_")
     dipencoder.fit(X)
     assert dipencoder.labels_.dtype == np.int32
     assert dipencoder.labels_.shape == labels.shape
+    # Test if random state is working
+    dipencoder2 = DipEncoder(6, pretrain_epochs=3, clustering_epochs=3, random_state=1)
+    dipencoder2.fit(X)
+    assert np.array_equal(dipencoder.labels_, dipencoder2.labels_)
+    assert np.array_equal(dipencoder.projection_axes_, dipencoder2.projection_axes_)
+    assert dipencoder.index_dict_ == dipencoder2.index_dict_
 
 
 def test_plot_dipencoder_embedding():

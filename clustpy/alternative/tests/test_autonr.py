@@ -76,7 +76,7 @@ def test_simple_autonr_with_fruit():
 @patch("matplotlib.pyplot.show")  # Used to test plots (show will not be called)
 def test_plot_autonr_mdl_costs_progress_with_fruit(mock_fig):
     X, labels = load_fruit()
-    autonr = AutoNR(max_subspaces=2, max_n_clusters=2)
+    autonr = AutoNR(max_subspaces=2, max_n_clusters=2, random_state=1)
     autonr.fit(X)
     assert None == autonr.plot_mdl_progress()
 

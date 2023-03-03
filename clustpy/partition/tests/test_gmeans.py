@@ -24,7 +24,7 @@ Tests regarding the GMeans object
 
 def test_simple_GMeans_with_wine():
     X, labels = load_wine()
-    gmeans = GMeans()
+    gmeans = GMeans(random_state=1)
     assert not hasattr(gmeans, "labels_")
     gmeans.fit(X)
     assert gmeans.labels_.dtype == np.int32
@@ -32,6 +32,11 @@ def test_simple_GMeans_with_wine():
     assert gmeans.cluster_centers_.shape == (gmeans.n_clusters_, X.shape[1])
     assert len(np.unique(gmeans.labels_)) == gmeans.n_clusters_
     assert np.array_equal(np.unique(gmeans.labels_), np.arange(gmeans.n_clusters_))
+    # Test if random state is working
+    gmeans2 = GMeans(random_state=1)
+    gmeans2.fit(X)
+    assert np.array_equal(gmeans.labels_, gmeans2.labels_)
+    assert np.array_equal(gmeans.cluster_centers_, gmeans2.cluster_centers_)
     # Test with parameters
     gmeans = GMeans(significance=0.1, n_clusters_init=3, max_n_clusters=5, n_split_trials=5, random_state=1)
     gmeans.fit(X)

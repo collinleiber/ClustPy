@@ -45,7 +45,7 @@ Tests regarding the Gap Statistic object
 
 def test_simple_GapStatistic_with_wine():
     X, labels = load_wine()
-    gapstat = GapStatistic()
+    gapstat = GapStatistic(random_state=1)
     assert not hasattr(gapstat, "labels_")
     gapstat.fit(X)
     assert gapstat.labels_.dtype == np.int32
@@ -53,6 +53,11 @@ def test_simple_GapStatistic_with_wine():
     assert gapstat.cluster_centers_.shape == (gapstat.n_clusters_, X.shape[1])
     assert len(np.unique(gapstat.labels_)) == gapstat.n_clusters_
     assert np.array_equal(np.unique(gapstat.labels_), np.arange(gapstat.n_clusters_))
+    # Test if random state is working
+    gapstat2 = GapStatistic(random_state=1)
+    gapstat2.fit(X)
+    assert np.array_equal(gapstat.labels_, gapstat2.labels_)
+    assert np.array_equal(gapstat.cluster_centers_, gapstat2.cluster_centers_)
     # Test with parameters
     gapstat = GapStatistic(min_n_clusters=2, max_n_clusters=10, n_boots=3, use_principal_components=False,
                            use_log=False, random_state=1)
@@ -67,6 +72,6 @@ def test_simple_GapStatistic_with_wine():
 @patch("matplotlib.pyplot.show")  # Used to test plots (show will not be called)
 def test_plot_subkmeans_result_with_wine(mock_fig):
     X, labels = load_wine()
-    gapstat = GapStatistic(min_n_clusters=1, max_n_clusters=2)
+    gapstat = GapStatistic(min_n_clusters=1, max_n_clusters=2, random_state=1)
     gapstat.fit(X)
     assert None == gapstat.plot()

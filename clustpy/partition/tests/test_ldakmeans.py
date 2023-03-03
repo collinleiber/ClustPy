@@ -9,12 +9,18 @@ Tests regarding the LDAKmeans object
 
 def test_simple_LDAKmeans_with_wine():
     X, labels = load_wine()
-    ldakm = LDAKmeans(3)
+    ldakm = LDAKmeans(3, random_state=1)
     assert not hasattr(ldakm, "labels_")
     ldakm.fit(X)
     assert ldakm.labels_.dtype == np.int32
     assert ldakm.labels_.shape == labels.shape
     assert ldakm.cluster_centers_.shape == (ldakm.n_clusters, 2)
+    # Test if random state is working
+    ldakm2 = LDAKmeans(3, random_state=1)
+    ldakm2.fit(X)
+    assert np.array_equal(ldakm.labels_, ldakm2.labels_)
+    assert np.array_equal(ldakm.cluster_centers_, ldakm2.cluster_centers_)
+    assert np.array_equal(ldakm.rotation_, ldakm2.rotation_)
     # Test with parameters
     ldakm = LDAKmeans(3, n_dims=5, max_iter=10, kmeans_repetitions=5, random_state=1)
     ldakm.fit(X)

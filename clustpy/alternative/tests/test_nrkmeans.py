@@ -227,20 +227,20 @@ def test_simple_nrkmeans_with_fruit():
     assert np.array_equal(nrk.labels_, nrk.predict(X))
     assert np.array_equal(nrk_2.labels_[:-1], nrk_2.predict(X[:-1]))
     assert X.shape[0] - np.sum(nrk_3.labels_[:-2] == nrk_3.predict(X[:-2])) < X.shape[
-        0] * 0.01  # Some points can change labels when running with outliers=True
+                                                                                  0] * 0.01  # Some points can change labels when running with outliers=True
     assert np.array_equal(nrk_4.labels_[:-3], nrk_4.predict(X[:-3]))
 
 
 @patch("matplotlib.pyplot.show")  # Used to test plots (show will not be called)
 def test_plot_nrkmeans_result_with_fruit(mock_fig):
     X, labels = load_fruit()
-    nrk = NrKmeans([3, 1], max_iter=1)
+    nrk = NrKmeans([3, 1], max_iter=1, random_state=1)
     nrk.fit(X)
     assert None == nrk.plot_subspace(X, 0, None, True, labels[:, 0], True)
 
 
 def test_have_clusters_been_lost():
-    nrk = NrKmeans([3, 3, 1], max_iter=1)
+    nrk = NrKmeans([3, 3, 1], max_iter=1, random_state=1)
     assert not nrk.have_clusters_been_lost()
     # Overwrite n_clusters
     nrk.n_clusters = [3, 1]
@@ -251,7 +251,7 @@ def test_have_clusters_been_lost():
 
 
 def test_have_subspaces_been_lost():
-    nrk = NrKmeans([3, 3, 1], max_iter=1)
+    nrk = NrKmeans([3, 3, 1], max_iter=1, random_state=1)
     assert not nrk.have_subspaces_been_lost()
     # Overwrite n_clusters
     nrk.n_clusters = [3, 1]
@@ -263,7 +263,7 @@ def test_have_subspaces_been_lost():
 
 def test_transform_full_space():
     X = np.c_[np.zeros(25), np.zeros(25) + 1, np.zeros(25) + 2, np.zeros(25) + 3]
-    nrk = NrKmeans([3, 1], max_iter=1)
+    nrk = NrKmeans([3, 1], max_iter=1, random_state=1)
     nrk.fit(X)
     # Overwrite V
     nrk.V = np.array([[0, 1, 0, 0], [1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
@@ -273,7 +273,7 @@ def test_transform_full_space():
 
 def test_transform_subspace():
     X = np.c_[np.zeros(25), np.zeros(25) + 1, np.zeros(25) + 2, np.zeros(25) + 3]
-    nrk = NrKmeans([3, 1], max_iter=1)
+    nrk = NrKmeans([3, 1], max_iter=1, random_state=1)
     nrk.fit(X)
     # Overwrite V and P
     nrk.V = np.array([[0, 1, 0, 0], [1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
@@ -286,7 +286,7 @@ def test_transform_subspace():
 
 def test_calculate_mdl_costs():
     X = np.c_[np.zeros(30), np.r_[np.zeros(10), np.zeros(10) + 1, np.zeros(10) + 2], np.zeros(30) + 3]
-    nrk = NrKmeans([4, 1], max_iter=1)
+    nrk = NrKmeans([4, 1], max_iter=1, random_state=1)
     nrk.fit(X)
     nrk.V = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
     nrk.P = [np.array([2, 0]), np.array([1])]

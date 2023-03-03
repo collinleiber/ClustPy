@@ -339,7 +339,7 @@ def dip_pval(dip_value: float, n_points: int, pval_strategy: str = "table", n_bo
     n_boots : int
         Number of random data sets that should be created to calculate Dip-values. Only relevant if pval_strategy is 'bootstrap' (default: 1000)
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int. Only relevant if pval_strategy is 'bootstrap'
+        use a fixed random state to get a repeatable solution. Can also be of type int. Only relevant if pval_strategy is 'bootstrap' (default: None)
 
     Returns
     -------

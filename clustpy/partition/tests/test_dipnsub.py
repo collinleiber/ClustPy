@@ -9,7 +9,7 @@ Tests regarding the DipNSub object
 
 def test_simple_DipNSub_with_wine():
     X, labels = load_wine()
-    dipnsub = DipNSub()
+    dipnsub = DipNSub(random_state=1)
     assert not hasattr(dipnsub, "labels_")
     dipnsub.fit(X)
     assert dipnsub.labels_.dtype == np.int32

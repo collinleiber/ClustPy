@@ -40,7 +40,7 @@ def _pgmeans(X, significance, n_projections, n_samples, n_new_centers, amount_ra
     max_n_clusters : int
         Maximum number of clusters. Must be larger than n_clusters_init
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int
+        use a fixed random state to get a repeatable solution
 
     Returns
     -------
@@ -100,7 +100,7 @@ def _project_model(gmm: GMM, projection_vector: np.ndarray, n_clusters: int,
     n_clusters : int
         The current number of clusters
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int
+        use a fixed random state to get a repeatable solution
 
     Returns
     -------
@@ -140,7 +140,7 @@ def _update_gmm_with_new_center(X: np.ndarray, n_clusters: int, current_gmm: GMM
     n_new_random_centers : int
         Number of random centers that should be tested
     random_state : np.ndarray
-        use a fixed random state to get a repeatable solution. Can also be of type int
+        use a fixed random state to get a repeatable solution
 
     Returns
     -------
@@ -151,7 +151,7 @@ def _update_gmm_with_new_center(X: np.ndarray, n_clusters: int, current_gmm: GMM
     best_log_likelihood = -np.inf
     if n_new_non_random_centers > 0:
         # Non-random centers are chosen through lowest probability regarding current GMM
-        min_probability_densities = np.min(current_gmm.predict_proba(X), axis=1)
+        min_probability_densities = np.max(current_gmm.predict_proba(X), axis=1)
         min_probability_densities[min_probability_densities == 0] = np.inf
         possible_non_random_samples = np.argsort(min_probability_densities)
     for c in range(n_new_non_random_centers + n_new_random_centers):
@@ -186,7 +186,7 @@ def _initial_gmm_clusters(X: np.ndarray, n_clusters_init: int, gmm_repetitions: 
     gmm_repetitions : int
         Number of repetitions for the initial GMM
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int
+        use a fixed random state to get a repeatable solution
 
     Returns
     -------

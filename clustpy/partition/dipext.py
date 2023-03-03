@@ -36,7 +36,7 @@ def _dip_ext(X: np.ndarray, n_components: int, do_dip_scaling: bool, step_size: 
     consider_duplicates : bool
         If multiple instances on the projection axis share a value, the gradient is not unambigous. If those duplicate values should be considered a random instances will be choses for furhter calculations. Beware: The calculation will not be deterministic anymore
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int. Only used if consider_duplicates is True
+        use a fixed random state to get a repeatable solution. Only used if consider_duplicates is True
 
     Returns
     -------
@@ -101,7 +101,7 @@ def _find_max_dip_by_sgd(X: np.ndarray, step_size: float, momentum: float, n_sta
     consider_duplicates : bool
         If multiple instances on the projection axis share a value, the gradient is not unambigous. If those duplicate values should be considered a random instances will be choses for furhter calculations. Beware: The calculation will not be deterministic anymore
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int. Only used if consider_duplicates is True
+        use a fixed random state to get a repeatable solution. Only used if consider_duplicates is True
 
     Returns
     -------
@@ -155,7 +155,7 @@ def _find_max_dip_by_sgd_with_start(X: np.ndarray, projection: np.ndarray, step_
     consider_duplicates : bool
         If multiple instances on the projection axis share a value, the gradient is not unambigous. If those duplicate values should be considered a random instances will be choses for furhter calculations. Beware: The calculation will not be deterministic anymore
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int. Only used if consider_duplicates is True
+        use a fixed random state to get a repeatable solution. Only used if consider_duplicates is True
 
     Returns
     -------
@@ -210,7 +210,7 @@ def _get_max_dip_using_gradient(X: np.ndarray, projection_vector: np.ndarray, co
     consider_duplicates : bool
         If multiple instances on the projection axis share a value, the gradient is not unambigous. If those duplicate values should be considered a random instances will be choses for furhter calculations. Beware: The calculation will not be deterministic anymore
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int
+        use a fixed random state to get a repeatable solution. Only used if consider_duplicates is True
 
     Returns
     -------
@@ -227,7 +227,7 @@ def _get_max_dip_using_gradient(X: np.ndarray, projection_vector: np.ndarray, co
     # Calculate dip, capturing the output which we need for touching-triangle calculations
     dip_value, _, modal_triangle = dip_test(sorted_projected_data, just_dip=False, is_data_sorted=True)
     if modal_triangle[0] == -1:
-        return [np.zeros(X.shape[1])], dip_value, projected_data
+        return np.zeros(X.shape[1]), dip_value, projected_data
     if consider_duplicates:
         # If duplicate values should be considered, get random modal triangle
         modal_triangle = _get_random_modal_triangle(sorted_projected_data, modal_triangle, random_state)
@@ -249,7 +249,7 @@ def _get_random_modal_triangle(sorted_projected_data: np.ndarray, modal_triangle
     modal_triangle : tuple
         Theoriginal modal triangle as returned by the dip-test
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int
+        use a fixed random state to get a repeatable solution
 
     Returns
     -------

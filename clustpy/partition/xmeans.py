@@ -28,7 +28,7 @@ def _initial_kmeans_clusters(X: np.ndarray, n_clusters_init: int, random_state: 
     n_clusters_init : int
         The initial number of clusters. Can also by of type np.ndarray if initial cluster centers are specified
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int
+        use a fixed random state to get a repeatable solution
 
     Returns
     -------
@@ -78,9 +78,9 @@ def _execute_two_means(X: np.ndarray, ids_in_each_cluster: list, cluster_id_to_s
     centers : np.ndarray
         The original cluster centers
     n_split_trials : int
-        Number tries to split a cluster. For each try 2-KMeans is executed with different cluster centers (default: 10)
+        Number tries to split a cluster. For each try 2-KMeans is executed with different cluster centers
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
+        use a fixed random state to get a repeatable solution
 
     Returns
     -------
@@ -137,7 +137,7 @@ def _xmeans(X: np.ndarray, n_clusters_init: int, max_n_clusters: int, check_glob
     n_split_trials : int
         Number tries to split a cluster. For each try 2-KMeans is executed with different cluster centers
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int
+        use a fixed random state to get a repeatable solution
 
     Returns
     -------

@@ -50,11 +50,17 @@ Tests regarding the SubKmeans object
 
 def test_simple_subkmeans_with_wine():
     X, labels = load_wine()
-    subkm = SubKmeans(3)
+    subkm = SubKmeans(3, random_state=1)
     assert not hasattr(subkm, "labels_")
     subkm.fit(X)
     assert subkm.labels_.dtype == np.int32
     assert subkm.labels_.shape == labels.shape
+    # Test if random state is working
+    subkm2 = SubKmeans(3, random_state=1)
+    subkm2.fit(X)
+    assert np.array_equal(subkm.labels_, subkm2.labels_)
+    assert np.array_equal(subkm.cluster_centers_, subkm2.cluster_centers_)
+    assert np.array_equal(subkm.V, subkm2.V)
     # Check if input parameters are working
     subkm_2 = SubKmeans(3, random_state=1, m=4, cluster_centers=np.ones((3, X.shape[1])))
     assert not hasattr(subkm_2, "labels_")

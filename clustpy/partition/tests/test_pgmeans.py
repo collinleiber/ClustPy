@@ -1,10 +1,67 @@
 import numpy as np
 from clustpy.partition import PGMeans
-from clustpy.partition.pgmeans import _initial_gmm_clusters
+from clustpy.partition.pgmeans import _initial_gmm_clusters, _update_gmm_with_new_center, _project_model
 from clustpy.data import load_wine
+from sklearn.mixture import GaussianMixture as GMM
 
 
-def test_initial_centers():
+def test_project_model():
+    random_state = np.random.RandomState(1)
+    X = np.array([[1, 2, 3],
+                  [3, 1, 2],
+                  [2, 3, 1],
+                  [1, 1, 1],
+                  [3, 3, 3],
+                  [11, 12, 13],
+                  [13, 11, 12],
+                  [12, 13, 11],
+                  [11, 11, 11],
+                  [13, 13, 13],
+                  [12, 12, 12]
+                  ])
+    gmm = GMM(n_components=2, n_init=1, random_state=random_state)
+    gmm.fit(X)
+    proj_gmm = _project_model(gmm, np.array([0, 1, 0]), 2, random_state)
+    assert np.array_equal(proj_gmm.means_, np.array([[2], [12]]))
+
+
+def test_update_gmm_with_new_center():
+    random_state = np.random.RandomState(1)
+    X = np.array([[1, 2, 3],
+                  [3, 1, 2],
+                  [2, 3, 1],
+                  [1, 1, 1],
+                  [3, 3, 3],
+                  [11, 12, 13],
+                  [13, 11, 12],
+                  [12, 13, 11],
+                  [11, 11, 11],
+                  [13, 13, 13],
+                  [12, 12, 12],
+                  [41, 42, 43],
+                  [43, 41, 42],
+                  [42, 43, 41],
+                  [41, 41, 41],
+                  [43, 43, 43],
+                  [43, 42, 43],
+                  [41, 42, 41]])
+    gmm = GMM(n_components=2, n_init=1, random_state=random_state)
+    gmm.fit(X)
+    assert gmm.means_.shape == (2, 5)
+    updated_gmm = _update_gmm_with_new_center(X, 2, gmm, 2, 2, random_state)
+    assert updated_gmm.means_.shape == (3, 5)
+    assert np.array_equal(updated_gmm.means_[0], [2, 2, 2]) or np.array_equal(updated_gmm.means_[1],
+                                                                              [2, 2, 2]) or np.array_equal(
+        updated_gmm.means_[2], [2, 2, 2])
+    assert np.array_equal(updated_gmm.means_[0], [12, 12, 12]) or np.array_equal(updated_gmm.means_[1],
+                                                                                 [12, 12, 12]) or np.array_equal(
+        updated_gmm.means_[2], [12, 12, 12])
+    assert np.array_equal(updated_gmm.means_[0], [42, 42, 42]) or np.array_equal(updated_gmm.means_[1],
+                                                                                 [42, 42, 42]) or np.array_equal(
+        updated_gmm.means_[2], [42, 42, 42])
+
+
+def test_initial_gmm_clusters():
     X = np.array([[1, 1, 1],
                   [2, 2, 2],
                   [3, 3, 3],
@@ -31,7 +88,7 @@ Tests regarding the PGMeans object
 
 def test_simple_PGMeans_with_wine():
     X, labels = load_wine()
-    pgmeans = PGMeans()
+    pgmeans = PGMeans(random_state=1)
     assert not hasattr(pgmeans, "labels_")
     pgmeans.fit(X)
     assert pgmeans.labels_.dtype == np.int32
@@ -39,6 +96,11 @@ def test_simple_PGMeans_with_wine():
     assert pgmeans.cluster_centers_.shape == (pgmeans.n_clusters_, X.shape[1])
     assert len(np.unique(pgmeans.labels_)) == pgmeans.n_clusters_
     assert np.array_equal(np.unique(pgmeans.labels_), np.arange(pgmeans.n_clusters_))
+    # Test if random state is working
+    pgmeans2 = PGMeans(random_state=1)
+    pgmeans2.fit(X)
+    assert np.array_equal(pgmeans.labels_, pgmeans2.labels_)
+    assert np.array_equal(pgmeans.cluster_centers_, pgmeans2.cluster_centers_)
     # Test with parameters
     pgmeans = PGMeans(significance=0.05, n_projections=5, n_samples=50, n_new_centers=6, amount_random_centers=0.2,
                       n_clusters_init=3, max_n_clusters=5, random_state=1)

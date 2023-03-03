@@ -9,7 +9,7 @@ Tests regarding the SkinnyDip object
 
 def test_simple_SkinnyDip_with_wine():
     X, labels = load_wine()
-    skinny = SkinnyDip()
+    skinny = SkinnyDip(random_state=1)
     assert not hasattr(skinny, "labels_")
     skinny.fit(X)
     assert skinny.labels_.dtype == np.int32
@@ -18,7 +18,7 @@ def test_simple_SkinnyDip_with_wine():
     assert np.array_equal(np.unique(skinny.labels_), np.append([-1], np.arange(skinny.n_clusters_)))
     # Test with parameters
     skinny = SkinnyDip(significance=0.01, pval_strategy="bootstrap", n_boots=10, add_tails=True, outliers=False,
-                       max_cluster_size_diff_factor=3, random_state=1)
+                       max_cluster_size_diff_factor=3, debug=True, random_state=1)
     assert not hasattr(skinny, "labels_")
     skinny.fit(X)
     assert skinny.labels_.dtype == np.int32

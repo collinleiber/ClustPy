@@ -35,7 +35,7 @@ def _gap_statistic(X: np.ndarray, min_n_clusters: int, max_n_clusters: int, n_bo
         True, if the logarithm of the within cluster dispersion should be used
         For more information see Mohajer et al.
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int
+        use a fixed random state to get a repeatable solution
 
     Returns
     -------
@@ -110,7 +110,7 @@ def _generate_random_data(data_shape: tuple, mins: np.ndarray, maxs: np.ndarray,
     pca : PCA
         The PCA object used to calculate mins and maxs. Can be None, if principle components are not used
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int
+        use a fixed random state to get a repeatable solution
 
     Returns
     -------
@@ -138,7 +138,7 @@ def _execute_kmeans(X: np.ndarray, n_clusters: int, use_log: bool, random_state:
         True, if the logarithm of the within cluster dispersion should be used
         For more information see Mohajer et al.
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int
+        use a fixed random state to get a repeatable solution
 
     Returns
     -------
@@ -183,7 +183,7 @@ class GapStatistic(BaseEstimator, ClusterMixin):
         True, if the logarithm of the within cluster dispersion should be used.
         For more information see Mohajer et al. (default: True)
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int
+        use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Attributes
     ----------

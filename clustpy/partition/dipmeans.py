@@ -36,7 +36,7 @@ def _dipmeans(X: np.ndarray, significance: float, split_viewers_threshold: float
     max_n_clusters : int
         Maximum number of clusters. Must be larger than n_clusters_init
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int
+        use a fixed random state to get a repeatable solution
 
     Returns
     -------

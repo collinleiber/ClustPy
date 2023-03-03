@@ -7,11 +7,18 @@ import numpy as np
 
 def test_simple_dcn_with_load_nrletters():
     X, labels = _load_single_label_nrletters()
-    dcn = DCN(6, pretrain_epochs=3, clustering_epochs=3)
+    dcn = DCN(6, pretrain_epochs=3, clustering_epochs=3, random_state=1)
     assert not hasattr(dcn, "labels_")
     dcn.fit(X)
     assert dcn.labels_.dtype == np.int32
     assert dcn.labels_.shape == labels.shape
+    # Test if random state is working
+    dcn2 = DCN(6, pretrain_epochs=3, clustering_epochs=3, random_state=1)
+    dcn2.fit(X)
+    assert np.array_equal(dcn.labels_, dcn2.labels_)
+    assert np.array_equal(dcn.cluster_centers_, dcn2.cluster_centers_)
+    assert np.array_equal(dcn.dcn_labels_, dcn2.dcn_labels_)
+    assert np.array_equal(dcn.dcn_cluster_centers_, dcn2.dcn_cluster_centers_)
 
 
 def test_compute_centroids():

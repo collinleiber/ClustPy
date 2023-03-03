@@ -33,7 +33,7 @@ def _skinnydip(X: np.ndarray, significance: float, pval_strategy: str, n_boots: 
         The maximum different in size when comparing two clusters regarding the number of samples.
         If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) closest samples will be used for merging and assigning tails of distributions if 'add_tails' is True
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int. Only relevant if pval_strategy is 'bootstrap'
+        use a fixed random state to get a repeatable solution. Only relevant if pval_strategy is 'bootstrap'
     debug : bool
         If true, additional information will be printed to the console
 
@@ -100,7 +100,7 @@ def _unidip_original(X_1d: np.ndarray, significance: float, already_sorted: bool
         The maximum different in size when comparing two clusters regarding the number of samples.
         If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) closest samples will be used for merging
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int. Only relevant if pval_strategy is 'bootstrap'
+        use a fixed random state to get a repeatable solution. Only relevant if pval_strategy is 'bootstrap'
     debug : bool
         If true, additional information will be printed to the console
 
@@ -320,7 +320,7 @@ def _merge_clusters(X_1d_sorted: np.ndarray, argsorted: np.ndarray, labels: np.n
         The maximum different in size when comparing two clusters regarding the number of samples.
         If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) closest samples will be used
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int. Only relevant if pval_strategy is 'bootstrap'
+        use a fixed random state to get a repeatable solution. Only relevant if pval_strategy is 'bootstrap'
 
     Returns
     -------
@@ -404,7 +404,7 @@ def _tailoreddip(X_1d: np.ndarray, significance: float, pval_strategy: str, n_bo
         The maximum different in size when comparing two clusters regarding the number of samples.
         If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) closest samples will be used for merging and assigning tails of distributions if 'add_tails' is True
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int. Only relevant if pval_strategy is 'bootstrap'
+        use a fixed random state to get a repeatable solution. Only relevant if pval_strategy is 'bootstrap'
     debug : bool
         If true, additional information will be printed to the console
 
@@ -466,7 +466,7 @@ def _add_tails(X_1d: np.ndarray, labels: np.ndarray, sorted_X_1d: np.ndarray, ar
         The maximum different in size when comparing two clusters regarding the number of samples.
         If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) closest samples will be used for merging and assigning tails of distributions if 'add_tails' is True
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int. Only relevant if pval_strategy is 'bootstrap'
+        use a fixed random state to get a repeatable solution. Only relevant if pval_strategy is 'bootstrap'
     debug : bool
         If true, additional information will be printed to the console
 

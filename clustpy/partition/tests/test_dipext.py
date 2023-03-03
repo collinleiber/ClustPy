@@ -29,7 +29,7 @@ def test_dip_scaling():
                          [0.5 * 0.5, 0.5 * 0.1, 0.5 * 0.2],
                          [0.75 * 0.5, 0.1, 0.75 * 0.2],
                          [0.5, 0.1, 0.2]])
-    np.array_equal(subspace, X_result)
+    assert np.array_equal(subspace, X_result)
 
 
 def test_get_random_modal_triangle():
@@ -52,11 +52,11 @@ Tests regarding the DipExt object
 
 def test_simple_DipExt_with_wine():
     X, labels = load_wine()
-    dipext = DipExt()
+    dipext = DipExt(random_state=1)
     subspace = dipext.fit_transform(X)
     assert subspace.shape[0] == X.shape[0]
     # Check if fit + transform equals fit_transform
-    dipext2 = DipExt()
+    dipext2 = DipExt(random_state=1)
     dipext2.fit(X)
     subspace2 = dipext2.transform(X)
     assert subspace.shape == subspace2.shape
@@ -73,7 +73,7 @@ def test_DipExt_with_parameters_with_wine():
     X, labels = load_wine()
     # Check if input parameters are working
     dipext = DipExt(n_components=5, do_dip_scaling=False, consider_duplicates=True,
-                    n_starting_vectors=5)
+                    n_starting_vectors=5, random_state=2)
     subspace = dipext.fit_transform(X)
     assert subspace.shape == (X.shape[0], 5)
     # Check if random_state is working
@@ -91,7 +91,7 @@ Tests regarding the DipInit object
 
 def test_simple_DipInit_with_wine():
     X, labels = load_wine()
-    dipinit = DipInit(3)
+    dipinit = DipInit(3, random_state=1)
     assert not hasattr(dipinit, "labels_")
     dipinit.fit(X)
     assert dipinit.labels_.dtype == np.int32
