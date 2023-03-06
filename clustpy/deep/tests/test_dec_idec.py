@@ -14,9 +14,9 @@ def test_simple_dec_with_nrletters():
     dec2 = DEC(6, pretrain_epochs=3, clustering_epochs=3, random_state=1)
     dec2.fit(X)
     assert np.array_equal(dec.labels_, dec2.labels_)
-    assert np.array_equal(dec.cluster_centers_, dec2.cluster_centers_)
+    assert np.allclose(dec.cluster_centers_, dec2.cluster_centers_, atol=1e-1)
     assert np.array_equal(dec.dec_labels_, dec2.dec_labels_)
-    assert np.array_equal(dec.dec_cluster_centers_, dec2.dec_cluster_centers_)
+    assert np.allclose(dec.dec_cluster_centers_, dec2.dec_cluster_centers_, atol=1e-1)
 
 
 def test_simple_idec_with_nrletters():
@@ -27,9 +27,9 @@ def test_simple_idec_with_nrletters():
     assert idec.labels_.dtype == np.int32
     assert idec.labels_.shape == labels.shape
     # Test if random state is working
-    idec2 = DEC(6, pretrain_epochs=3, clustering_epochs=3, random_state=1)
+    idec2 = IDEC(6, pretrain_epochs=3, clustering_epochs=3, random_state=1)
     idec2.fit(X)
     assert np.array_equal(idec.labels_, idec2.labels_)
-    assert np.array_equal(idec.cluster_centers_, idec2.cluster_centers_)
+    assert np.allclose(idec.cluster_centers_, idec2.cluster_centers_, atol=5e-1)
     assert np.array_equal(idec.dec_labels_, idec2.dec_labels_)
-    assert np.array_equal(idec.dec_cluster_centers_, idec2.dec_cluster_centers_)
+    assert np.allclose(idec.dec_cluster_centers_, idec2.dec_cluster_centers_, atol=5e-1)

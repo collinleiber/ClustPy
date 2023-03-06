@@ -22,7 +22,9 @@ def test_project_model():
     gmm = GMM(n_components=2, n_init=1, random_state=random_state)
     gmm.fit(X)
     proj_gmm = _project_model(gmm, np.array([0, 1, 0]), 2, random_state)
-    assert np.array_equal(proj_gmm.means_, np.array([[2], [12]]))
+    assert proj_gmm.means_.shape == (2, 1)
+    assert proj_gmm.covariances_.shape == (2, 1, 1)
+    assert np.allclose(proj_gmm.means_, np.array([[2], [12]])) or np.allclose(proj_gmm.means_, np.array([[12], [2]]))
 
 
 def test_update_gmm_with_new_center():
@@ -47,17 +49,17 @@ def test_update_gmm_with_new_center():
                   [41, 42, 41]])
     gmm = GMM(n_components=2, n_init=1, random_state=random_state)
     gmm.fit(X)
-    assert gmm.means_.shape == (2, 5)
-    updated_gmm = _update_gmm_with_new_center(X, 2, gmm, 2, 2, random_state)
-    assert updated_gmm.means_.shape == (3, 5)
-    assert np.array_equal(updated_gmm.means_[0], [2, 2, 2]) or np.array_equal(updated_gmm.means_[1],
-                                                                              [2, 2, 2]) or np.array_equal(
+    assert gmm.means_.shape == (2, 3)
+    updated_gmm = _update_gmm_with_new_center(X, 2, gmm, 3, 3, random_state)
+    assert updated_gmm.means_.shape == (3, 3)
+    assert np.allclose(updated_gmm.means_[0], [2, 2, 2]) or np.allclose(updated_gmm.means_[1],
+                                                                              [2, 2, 2]) or np.allclose(
         updated_gmm.means_[2], [2, 2, 2])
-    assert np.array_equal(updated_gmm.means_[0], [12, 12, 12]) or np.array_equal(updated_gmm.means_[1],
-                                                                                 [12, 12, 12]) or np.array_equal(
+    assert np.allclose(updated_gmm.means_[0], [12, 12, 12]) or np.allclose(updated_gmm.means_[1],
+                                                                                 [12, 12, 12]) or np.allclose(
         updated_gmm.means_[2], [12, 12, 12])
-    assert np.array_equal(updated_gmm.means_[0], [42, 42, 42]) or np.array_equal(updated_gmm.means_[1],
-                                                                                 [42, 42, 42]) or np.array_equal(
+    assert np.allclose(updated_gmm.means_[0], [42, 42, 42]) or np.allclose(updated_gmm.means_[1],
+                                                                                 [42, 42, 42]) or np.allclose(
         updated_gmm.means_[2], [42, 42, 42])
 
 

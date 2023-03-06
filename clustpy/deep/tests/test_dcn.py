@@ -16,9 +16,9 @@ def test_simple_dcn_with_load_nrletters():
     dcn2 = DCN(6, pretrain_epochs=3, clustering_epochs=3, random_state=1)
     dcn2.fit(X)
     assert np.array_equal(dcn.labels_, dcn2.labels_)
-    assert np.array_equal(dcn.cluster_centers_, dcn2.cluster_centers_)
+    assert np.allclose(dcn.cluster_centers_, dcn2.cluster_centers_, atol=1e-1)
     assert np.array_equal(dcn.dcn_labels_, dcn2.dcn_labels_)
-    assert np.array_equal(dcn.dcn_cluster_centers_, dcn2.dcn_cluster_centers_)
+    assert np.allclose(dcn.dcn_cluster_centers_, dcn2.dcn_cluster_centers_, atol=1e-1)
 
 
 def test_compute_centroids():

@@ -37,8 +37,11 @@ jobs:
             pip install -e .
       - run:
           name: Run tests
+          no_output_timeout: 30m
           # This assumes pytest is installed via the install-package step above
-          command: pytest -m "not data"
+          command: |
+            export PYTHONUNBUFFERED=1
+            pytest -m "not data"
 
 # Invoke jobs via workflows
 # See: https://circleci.com/docs/2.0/configuration-reference/#workflows

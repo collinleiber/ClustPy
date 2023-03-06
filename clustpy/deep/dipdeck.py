@@ -7,8 +7,8 @@ from scipy.spatial.distance import cdist
 import numpy as np
 from clustpy.utils import dip_test, dip_pval
 import torch
-from clustpy.deep._utils import detect_device, encode_batchwise, \
-    squared_euclidean_distance, int_to_one_hot
+from clustpy.deep._utils import detect_device, encode_batchwise, squared_euclidean_distance, int_to_one_hot, \
+    set_torch_seed
 from clustpy.deep._data_utils import get_dataloader
 from clustpy.deep._train_utils import get_trained_autoencoder
 from sklearn.cluster import KMeans
@@ -624,7 +624,7 @@ class DipDECK(BaseEstimator, ClusterMixin):
         self.pval_strategy = pval_strategy
         self.n_boots = n_boots
         self.random_state = check_random_state(random_state)
-        torch.manual_seed(self.random_state.get_state()[1][0])
+        set_torch_seed(self.random_state)
         self.debug = debug
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DipDECK':

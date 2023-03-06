@@ -6,9 +6,10 @@ Lukas Miklautz
 import torch
 from sklearn.base import BaseEstimator, ClusterMixin
 import numpy as np
-from ._utils import int_to_one_hot, squared_euclidean_distance, encode_batchwise, detect_device
-from ._data_utils import get_dataloader
-from ._train_utils import get_trained_autoencoder
+from clustpy.deep._utils import int_to_one_hot, squared_euclidean_distance, encode_batchwise, detect_device, \
+    set_torch_seed
+from clustpy.deep._data_utils import get_dataloader
+from clustpy.deep._train_utils import get_trained_autoencoder
 from clustpy.alternative import NrKmeans
 from sklearn.utils import check_random_state
 from sklearn.metrics import normalized_mutual_info_score
@@ -1691,7 +1692,7 @@ class ENRC(BaseEstimator, ClusterMixin):
         self.init_kwargs = init_kwargs
         self.init_subsample_size = init_subsample_size
         self.random_state = check_random_state(random_state)
-        torch.manual_seed(self.random_state.get_state()[1][0])
+        set_torch_seed(self.random_state)
         self.verbose = verbose
 
         if len(self.n_clusters) < 2:

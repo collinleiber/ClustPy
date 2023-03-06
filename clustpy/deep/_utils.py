@@ -1,6 +1,24 @@
 import torch
 from itertools import islice
 import numpy as np
+import random
+
+
+def set_torch_seed(random_state: np.random.RandomState) -> None:
+    """
+    Set the random state for torch applications.
+
+    Parameters
+    ----------
+    random_state : np.random.RandomState
+        use a fixed random state to get a repeatable solution
+    """
+    seed = random_state.get_state()[1][0]
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
 
 
 def squared_euclidean_distance(tensor1: torch.Tensor, tensor2: torch.Tensor,

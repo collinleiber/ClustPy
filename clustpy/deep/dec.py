@@ -5,7 +5,8 @@ Dominik Mautz
 Collin Leiber
 """
 
-from clustpy.deep._utils import detect_device, encode_batchwise, squared_euclidean_distance, predict_batchwise
+from clustpy.deep._utils import detect_device, encode_batchwise, squared_euclidean_distance, predict_batchwise, \
+    set_torch_seed
 from clustpy.deep._data_utils import get_dataloader
 from clustpy.deep._train_utils import get_trained_autoencoder
 import torch
@@ -384,7 +385,7 @@ class DEC(BaseEstimator, ClusterMixin):
         self.use_reconstruction_loss = use_reconstruction_loss
         self.cluster_loss_weight = cluster_loss_weight
         self.random_state = check_random_state(random_state)
-        torch.manual_seed(self.random_state.get_state()[1][0])
+        set_torch_seed(self.random_state)
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DEC':
         """

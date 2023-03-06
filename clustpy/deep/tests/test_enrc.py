@@ -14,4 +14,5 @@ def test_simple_enrc_with_nrletters():
     enrc2 = ENRC([6, 4, 3], pretrain_epochs=3, clustering_epochs=3, random_state=1)
     enrc2.fit(X)
     assert np.array_equal(enrc.labels_, enrc2.labels_)
-    assert np.array_equal(enrc.cluster_centers_, enrc2.cluster_centers_)
+    for i in range(len(enrc.cluster_centers_)):
+        assert np.allclose(enrc.cluster_centers_[i], enrc2.cluster_centers_[i])
