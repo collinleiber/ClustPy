@@ -1,7 +1,7 @@
 """
 @authors:
-Lukas Miklautz
-Dominik Mautz
+Lukas Miklautz,
+Dominik Mautz,
 Collin Leiber
 """
 
