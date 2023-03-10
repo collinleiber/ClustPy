@@ -1,6 +1,6 @@
 """
 @authors:
-Lukas Miklautz
+Lukas Miklautz,
 Dominik Mautz
 """
 

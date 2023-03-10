@@ -1,6 +1,6 @@
 """
 @authors:
-Benjamin Schelling and Sam Maurus (original R implementation)
+Benjamin Schelling and Sam Maurus (original R implementation),
 Collin Leiber
 """
 
