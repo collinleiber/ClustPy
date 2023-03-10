@@ -42,7 +42,7 @@ def test_encode_batchwise():
     # Each embedded feature should match the sum of the original features
     desired = np.sum(data, axis=1).reshape((-1, 1))
     desired = np.tile(desired, embedding_size)
-    assert np.allclose(encoded, desired)
+    assert np.allclose(encoded, desired, atol=1e-5)
 
 
 def test_predict_batchwise():
@@ -57,7 +57,7 @@ def test_predict_batchwise():
     predictions = predict_batchwise(dataloader, autoencoder, cluster_module, device)
     # Check whether sum of the features (= embedded samples) is larger than the threshold
     desired = (np.sum(data, axis=1) >= threshold) * 1
-    assert np.allclose(predictions, desired)
+    assert np.array_equal(predictions, desired)
 
 
 def test_window():

@@ -73,51 +73,51 @@ Remove clustpy via pip to avoid ambiguities during development, e.g., when chang
 ### Algorithms
 
 - Partition-based clustering
-    - [DipExt + DipInit](https://link.springer.com/chapter/10.1007/978-3-030-67658-2_6)
-    - [Dip-Means](https://proceedings.neurips.cc/paper/2012/hash/a8240cb8235e9c493a0c30607586166c-Abstract.html)
+    - DipExt + DipInit [[Source](https://link.springer.com/chapter/10.1007/978-3-030-67658-2_6)]
+    - Dip-Means [[Source](https://proceedings.neurips.cc/paper/2012/hash/a8240cb8235e9c493a0c30607586166c-Abstract.html)]
     - Dip'n'sub
-    - [GapStatistic](https://rss.onlinelibrary.wiley.com/doi/abs/10.1111/1467-9868.00293)
-    - [G-Means](https://proceedings.neurips.cc/paper/2003/hash/234833147b97bb6aed53a8f4f1c7a7d8-Abstract.html)
-    - [LDA-K-Means](https://dl.acm.org/doi/abs/10.1145/1273496.1273562)
-    - [PG-Means](https://proceedings.neurips.cc/paper/2006/hash/a9986cb066812f440bc2bb6e3c13696c-Abstract.html)
-    - [Projected Dip-Means](https://dl.acm.org/doi/abs/10.1145/3200947.3201008)
-    - [SkinnyDip + UniDip](https://dl.acm.org/doi/abs/10.1145/2939672.2939740) & TailoredDip
-    - [SubKmeans](https://dl.acm.org/doi/abs/10.1145/3097983.3097989)
-    - [X-Means](https://web.cs.dal.ca/~shepherd/courses/csci6403/clustering/xmeans.pdf)
+    - GapStatistic [[Source](https://rss.onlinelibrary.wiley.com/doi/abs/10.1111/1467-9868.00293)]
+    - G-Means [[Source](https://proceedings.neurips.cc/paper/2003/hash/234833147b97bb6aed53a8f4f1c7a7d8-Abstract.html)]
+    - LDA-K-Means [[Source](https://dl.acm.org/doi/abs/10.1145/1273496.1273562)]
+    - PG-Means [[Source](https://proceedings.neurips.cc/paper/2006/hash/a9986cb066812f440bc2bb6e3c13696c-Abstract.html)]
+    - Projected Dip-Means [[Source](https://dl.acm.org/doi/abs/10.1145/3200947.3201008)]
+    - SkinnyDip + UniDip [[Source](https://dl.acm.org/doi/abs/10.1145/2939672.2939740)] & TailoredDip
+    - SubKmeans [[Source](https://dl.acm.org/doi/abs/10.1145/3097983.3097989)]
+    - X-Means [[Source](https://web.cs.dal.ca/~shepherd/courses/csci6403/clustering/xmeans.pdf)]
 - Density-based clustering
-    - [Multi Density DBSCAN](https://link.springer.com/chapter/10.1007/978-3-642-23878-9_53)
+    - Multi Density DBSCAN [[Source](https://link.springer.com/chapter/10.1007/978-3-642-23878-9_53)]
 - Hierarchical clustering
-    - [Diana](https://www.jstor.org/stable/2290430?origin=crossref)
+    - Diana [[Source](https://www.jstor.org/stable/2290430?origin=crossref)]
 - Alternative clustering / Non-redundant clustering
-    - [AutoNR](https://epubs.siam.org/doi/abs/10.1137/1.9781611977172.26)
-    - [NR-Kmeans](https://dl.acm.org/doi/abs/10.1145/3219819.3219945)
+    - AutoNR [[Source](https://epubs.siam.org/doi/abs/10.1137/1.9781611977172.26)]
+    - NR-Kmeans [[Source](https://dl.acm.org/doi/abs/10.1145/3219819.3219945)]
 - Deep clustering
     - Autoencoder
-        - [Flexible Autoencoder](https://www.aaai.org/Library/AAAI/1987/aaai87-050.php)
-        - [Neighbor Encoder](https://arxiv.org/abs/1811.01557)
-        - [Stacked Autoencoder](https://www.jmlr.org/papers/volume11/vincent10a/vincent10a.pdf?ref=https://githubhelp.com)
-        - [Variational Autoencoder](https://arxiv.org/abs/1312.6114)
-    - [DCN](https://dl.acm.org/doi/abs/10.5555/3305890.3306080)
-    - [DEC](https://dl.acm.org/doi/abs/10.5555/3045390.3045442)
-    - [DipDECK](https://dl.acm.org/doi/10.1145/3447548.3467316)
-    - [DipEncoder](https://dl.acm.org/doi/10.1145/3534678.3539407)
-    - [ENRC](https://ojs.aaai.org/index.php/AAAI/article/view/5961)
-    - [IDEC](https://dl.acm.org/doi/abs/10.5555/3172077.3172131)
-    - [VaDE](https://dl.acm.org/doi/abs/10.5555/3172077.3172161)
+        - Flexible Autoencoder [[Source](https://www.aaai.org/Library/AAAI/1987/aaai87-050.php)]
+        - Neighbor Encoder [[Source](https://arxiv.org/abs/1811.01557)]
+        - Stacked Autoencoder [[Source](https://www.jmlr.org/papers/volume11/vincent10a/vincent10a.pdf?)]
+        - Variational Autoencoder [[Source](https://arxiv.org/abs/1312.6114)]
+    - DCN [[Source](https://dl.acm.org/doi/abs/10.5555/3305890.3306080)]
+    - DEC [[Source](https://dl.acm.org/doi/abs/10.5555/3045390.3045442)]
+    - DipDECK [[Source](https://dl.acm.org/doi/10.1145/3447548.3467316)]
+    - DipEncoder [[Source](https://dl.acm.org/doi/10.1145/3534678.3539407)]
+    - ENRC [[Source](https://ojs.aaai.org/index.php/AAAI/article/view/5961)]
+    - IDEC [[Source](https://dl.acm.org/doi/abs/10.5555/3172077.3172131)]
+    - VaDE [[Source](https://dl.acm.org/doi/abs/10.5555/3172077.3172161)]
     
 ### Other implementations
 
 - Metrics
     - Confusion Matrix
-    - [Pair Counting Scores (f1, rand, jaccard, recall, precision)](https://link.springer.com/article/10.1007/s10115-008-0150-6)
-    - [Unsupervised Clustering Accuracy](https://ieeexplore.ieee.org/abstract/document/5454426)
-    - [Variation of information](https://link.springer.com/chapter/10.1007/978-3-540-45167-9_14)
+    - Pair Counting Scores (f1, rand, jaccard, recall, precision) [[Source](https://link.springer.com/article/10.1007/s10115-008-0150-6)]
+    - Unsupervised Clustering Accuracy [[Source](https://ieeexplore.ieee.org/abstract/document/5454426)]
+    - Variation of information [[Source](https://link.springer.com/chapter/10.1007/978-3-540-45167-9_14)]
     - Scores for multiple labelings (see alternative clustering algorithms)
         - Multiple Labelings Confusion Matrix
-        - [Multiple Labelings Pair Counting Scores](https://ieeexplore.ieee.org/abstract/document/6228189)
+        - Multiple Labelings Pair Counting Scores [[Source](https://ieeexplore.ieee.org/abstract/document/6228189)]
 - Utils
     - Automatic evaluation methods
-    - [Hartigans Dip-test](https://www.jstor.org/stable/2241144)
+    - Hartigans Dip-test [[Source](https://www.jstor.org/stable/2241144)]
     - Various plots
 - Datasets
     - Synthetic dataset creator for subspace and alternative clustering 
