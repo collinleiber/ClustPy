@@ -1,13 +1,13 @@
-from clustpy.deep.tests._helpers_for_tests import _load_single_label_nrletters
 from clustpy.deep import get_dataloader, NeighborEncoder
 from clustpy.deep.neighbor_encoder import get_neighbors_batchwise
+from clustpy.data import create_subspace_data
 from scipy.spatial.distance import pdist, squareform
 import torch
 import numpy as np
 
 
-def test_simple_neighbor_encoder_with_nrletters():
-    data, _ = _load_single_label_nrletters()
+def test_simple_neighbor_encoder():
+    data, _ = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
     embedding_dim = 10
     n_neighbors = 3
     dist_matrix = squareform(pdist(data))

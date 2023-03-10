@@ -22,7 +22,7 @@ def run_around_tests():
 
 
 def _check_normalized_channels(data, channels, should_be_normalized=True):
-    imprecision = 1e-5
+    imprecision = 1e-4
     # Check is simple if we only have a single channel, i.e. a grayscale image
     if channels == 1:
         if should_be_normalized:

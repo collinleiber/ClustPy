@@ -1,7 +1,7 @@
 import numpy as np
 from clustpy.partition import XMeans
 from clustpy.partition.xmeans import _execute_two_means, _merge_clusters, _initial_kmeans_clusters
-from clustpy.data import load_wine
+from sklearn.datasets import make_blobs
 from sklearn.metrics import normalized_mutual_info_score as nmi
 
 
@@ -76,8 +76,8 @@ Tests regarding the XMeans object
 """
 
 
-def test_simple_XMeans_with_wine():
-    X, labels = load_wine()
+def test_simple_XMeans():
+    X, labels = make_blobs(200, 4, centers=3, random_state=1)
     xmeans = XMeans(random_state=1)
     assert not hasattr(xmeans, "labels_")
     xmeans.fit(X)
@@ -89,6 +89,7 @@ def test_simple_XMeans_with_wine():
     # Test if random state is working
     xmeans2 = XMeans(random_state=1)
     xmeans2.fit(X)
+    assert np.array_equal(xmeans.n_clusters_, xmeans2.n_clusters_)
     assert np.array_equal(xmeans.labels_, xmeans2.labels_)
     assert np.array_equal(xmeans.cluster_centers_, xmeans2.cluster_centers_)
     # Test with parameters

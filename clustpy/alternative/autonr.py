@@ -1147,6 +1147,8 @@ class AutoNR(BaseEstimator, ClusterMixin):
 
     Attributes
     ----------
+    n_clusters_ : list
+        The final number of clusters in each subspace
     labels_ : np.ndarray
         The final labels. Shape equals (n_samples x n_subspaces)
     nrkmeans_ : NrKmeans
@@ -1201,6 +1203,7 @@ class AutoNR(BaseEstimator, ClusterMixin):
                                                      self.max_distance, self.precision, self.similarity_threshold,
                                                      self.random_state, self.debug)
         # Output
+        self.n_clusters_ = nrkmeans.n_clusters
         self.nrkmeans_ = nrkmeans
         self.mdl_costs_ = mdl_costs
         self.all_mdl_costs_ = all_mdl_costs

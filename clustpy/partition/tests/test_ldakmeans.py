@@ -1,14 +1,14 @@
 import numpy as np
 from clustpy.partition import LDAKmeans
-from clustpy.data import load_wine
+from clustpy.data import create_subspace_data
 
 """
 Tests regarding the LDAKmeans object
 """
 
 
-def test_simple_LDAKmeans_with_wine():
-    X, labels = load_wine()
+def test_simple_LDAKmeans():
+    X, labels = create_subspace_data(200, subspace_features=(3, 5), random_state=1)
     ldakm = LDAKmeans(3, random_state=1)
     assert not hasattr(ldakm, "labels_")
     ldakm.fit(X)
@@ -30,8 +30,7 @@ def test_simple_LDAKmeans_with_wine():
 
 
 def test_transform_subspace():
-    X, labels = load_wine()
-    X = X[:, :4]
+    X, labels = create_subspace_data(200, subspace_features=(2, 2), random_state=1)
     ldakm = LDAKmeans(3, n_dims=3, max_iter=10, kmeans_repetitions=1)
     ldakm.fit(X)
     # Overwrite rotation

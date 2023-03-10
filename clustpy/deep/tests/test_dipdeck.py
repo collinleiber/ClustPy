@@ -1,11 +1,13 @@
-from clustpy.deep.tests._helpers_for_tests import _load_single_label_nrletters
 from clustpy.deep import DipDECK
 from clustpy.deep.dipdeck import _get_nearest_points_to_optimal_centers, _get_nearest_points, _get_dip_matrix
+from clustpy.data import create_subspace_data
 import numpy as np
+import torch
 
 
-def test_simple_dipdeck_with_nrletters():
-    X, labels = _load_single_label_nrletters()
+def test_simple_dipdeck():
+    torch.use_deterministic_algorithms(True)
+    X, labels = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
     dipdeck = DipDECK(pretrain_epochs=3, clustering_epochs=3, random_state=1)
     assert not hasattr(dipdeck, "labels_")
     dipdeck.fit(X)

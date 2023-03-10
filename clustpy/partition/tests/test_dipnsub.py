@@ -1,14 +1,14 @@
 import numpy as np
 from clustpy.partition import DipNSub
-from clustpy.data import load_wine
+from clustpy.data import create_subspace_data
 
 """
 Tests regarding the DipNSub object
 """
 
 
-def test_simple_DipNSub_with_wine():
-    X, labels = load_wine()
+def test_simple_DipNSub():
+    X, labels = create_subspace_data(200, subspace_features=(3, 5), random_state=1)
     dipnsub = DipNSub(random_state=1)
     assert not hasattr(dipnsub, "labels_")
     dipnsub.fit(X)

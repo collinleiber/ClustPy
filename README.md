@@ -1,4 +1,4 @@
-![Logo](https://github.com/collinleiber/ClustPy/blob/main/docs/logo.png)
+![Logo](https://raw.githubusercontent.com/collinleiber/ClustPy/main/docs/logo.png)
 
 ---
 [![PyPI version](https://badge.fury.io/py/clustpy.svg)](https://pypi.org/project/clustpy/)
@@ -27,13 +27,22 @@ it can be combined with many other packages (see below).
 
 The current stable version can be installed by the following command:
 
-`pip3 install clustpy`
+`pip install clustpy`
+
+Note that a gcc compiler is required for installation.
+Therefore, in case of an installation error, make sure that:
+- Windows: [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/de/visual-cpp-build-tools/) is installed
+- Linux: Python dev is installed (e.g. by running `apt-get install python-dev` - the exact command may differ depending on the linux distribution)
+
+The error messages may look like this:
+- 'Could not build wheels for clustpy, which is required to install pyproject.toml-based projects'
+- 'Microsoft Visual C++ 14.0 or greater is required. Get it with "Microsoft C++ Build Tools'
 
 #### Development Version
 
 The current development version can be installed directly from git by executing:
 
-`sudo pip3 install git+https://github.com/collinleiber/ClustPy.git`
+`sudo pip install git+https://github.com/collinleiber/ClustPy.git`
 
 Alternatively, clone the repository, go to the directory and execute:
 
@@ -57,7 +66,7 @@ Copy compiled C files to correct file location:
 
 Remove clustpy via pip to avoid ambiguities during development, e.g., when changing files in the code:
 
-`pip3 uninstall clustpy`
+`pip uninstall clustpy`
 
 ## Components
 

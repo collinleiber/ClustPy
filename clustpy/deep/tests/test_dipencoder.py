@@ -1,18 +1,20 @@
-from clustpy.deep.tests._helpers_for_tests import _load_single_label_nrletters
 from clustpy.deep import DipEncoder
 from clustpy.deep.dipencoder import plot_dipencoder_embedding
+from clustpy.data import create_subspace_data
 import numpy as np
+import torch
 
 
-def test_simple_dipencoder_with_nrletters():
-    X, labels = _load_single_label_nrletters()
-    dipencoder = DipEncoder(6, pretrain_epochs=3, clustering_epochs=3, random_state=1)
+def test_simple_dipencoder():
+    torch.use_deterministic_algorithms(True)
+    X, labels = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    dipencoder = DipEncoder(3, pretrain_epochs=3, clustering_epochs=3, random_state=1)
     assert not hasattr(dipencoder, "labels_")
     dipencoder.fit(X)
     assert dipencoder.labels_.dtype == np.int32
     assert dipencoder.labels_.shape == labels.shape
     # Test if random state is working
-    dipencoder2 = DipEncoder(6, pretrain_epochs=3, clustering_epochs=3, random_state=1)
+    dipencoder2 = DipEncoder(3, pretrain_epochs=3, clustering_epochs=3, random_state=1)
     dipencoder2.fit(X)
     assert np.array_equal(dipencoder.labels_, dipencoder2.labels_)
     assert np.allclose(dipencoder.projection_axes_, dipencoder2.projection_axes_, atol=1e-1)

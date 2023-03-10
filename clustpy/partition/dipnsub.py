@@ -7,7 +7,7 @@ import numpy as np
 from clustpy.utils import dip_test, dip_pval, dip_pval_gradient
 from clustpy.partition import UniDip
 from sklearn.decomposition import PCA
-from clustpy.partition.dipext import _angle, _n_starting_vectors_default, _get_random_modal_triangle
+from clustpy.partition.dipext import _angle, _n_starting_vectors_default, _ambiguous_modal_triangle_random
 from sklearn.utils import check_random_state
 
 
@@ -36,7 +36,7 @@ def _dip_n_sub(X: np.ndarray, significance: float, threshold: float, step_size: 
     outliers : bool
         Defines if outliers should be identified as described by UniDip
     consider_duplicates : bool
-        If multiple instances on the projection axis share a value, the gradient is not unambigous. If those duplicate values should be considered a random instances will be choses for furhter calculations. Beware: The calculation will not be deterministic anymore
+        If multiple instances on the projection axis share a value, the gradient is ambiguous. If those duplicate values should be considered a random instances will be choses for furhter calculations. Beware: The calculation will not be deterministic anymore
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution
     debug : bool
@@ -138,7 +138,7 @@ def _find_min_dippvalue_by_grouped_sgd(X: np.ndarray, labels: np.ndarray, n_clus
     cluster_sizes : np.ndarray
         List containing the number of samples in each cluster
     consider_duplicates : bool
-        If multiple instances on the projection axis share a value, the gradient is not unambigous. If those duplicate values should be considered a random instances will be choses for furhter calculations. Beware: The calculation will not be deterministic anymore
+        If multiple instances on the projection axis share a value, the gradient is ambiguous. If those duplicate values should be considered a random instances will be choses for furhter calculations. Beware: The calculation will not be deterministic anymore
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution
     debug : bool
@@ -244,7 +244,7 @@ def _find_min_dippvalue_by_grouped_sgd_with_start(X: np.ndarray, labels: np.ndar
     cluster_sizes : np.ndarray
         List containing the number of samples in each cluster
     consider_duplicates : bool
-        If multiple instances on the projection axis share a value, the gradient is not unambigous. If those duplicate values should be considered a random instances will be choses for furhter calculations. Beware: The calculation will not be deterministic anymore
+        If multiple instances on the projection axis share a value, the gradient is ambiguous. If those duplicate values should be considered a random instances will be choses for furhter calculations. Beware: The calculation will not be deterministic anymore
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution
     debug : bool
@@ -334,7 +334,7 @@ def _get_min_dippvalue_using_grouped_gradient(X: np.ndarray, labels: np.ndarray,
     cluster_sizes : np.ndarray
         List containing the number of samples in each cluster
     consider_duplicates : bool
-        If multiple instances on the projection axis share a value, the gradient is not unambigous. If those duplicate values should be considered a random instances will be choses for furhter calculations. Beware: The calculation will not be deterministic anymore
+        If multiple instances on the projection axis share a value, the gradient is ambiguous. If those duplicate values should be considered a random instances will be choses for furhter calculations. Beware: The calculation will not be deterministic anymore
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution
 
@@ -355,18 +355,19 @@ def _get_min_dippvalue_using_grouped_gradient(X: np.ndarray, labels: np.ndarray,
         if np.sum(points_in_cluster) < 4:
             # Clusters can in theory get very small
             continue
-        sortedIndices = np.argsort(projected_data[points_in_cluster])
-        sorted_projected_data_in_cluster = projected_data[points_in_cluster][sortedIndices]
+        sorted_indices = np.argsort(projected_data[points_in_cluster])
+        sorted_projected_data_in_cluster = projected_data[points_in_cluster][sorted_indices]
         dip_value, _, modal_triangle = dip_test(sorted_projected_data_in_cluster, just_dip=False,
                                                 is_data_sorted=True)
         if modal_triangle[0] == -1:
             continue
         if consider_duplicates:
-            # If duplicate values should be considered, get random modal triangle
-            modal_triangle = _get_random_modal_triangle(sorted_projected_data_in_cluster, modal_triangle, random_state)
+            # If duplicate values should be considered, get random ordering of the objects
+            sorted_indices = _ambiguous_modal_triangle_random(sorted_projected_data_in_cluster, sorted_indices,
+                                                              modal_triangle, random_state)
         # Calculate the partial derivative for all dimensions regarding this cluster
         gradient_tmp = -dip_pval_gradient(X[points_in_cluster], projected_data[points_in_cluster],
-                                          sortedIndices, modal_triangle, dip_value)
+                                          sorted_indices, modal_triangle, dip_value)
         dip_values[i] = dip_value
         # Weight gradient by cluster size
         gradient = gradient + cluster_sizes[i] * gradient_tmp
@@ -399,7 +400,7 @@ class DipNSub():
     outliers : bool
         Defines if outliers should be identified as described by UniDip (default: False)
     consider_duplicates : bool
-        If multiple instances on the projection axis share a value, the gradient is not unambigous. If those duplicate values should be considered a random instances will be choses for furhter calculations. Beware: The calculation will not be deterministic anymore (default: False)
+        If multiple instances on the projection axis share a value, the gradient is ambiguous. If those duplicate values should be considered a random instances will be choses for furhter calculations. Beware: The calculation will not be deterministic anymore (default: False)
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
     debug : bool

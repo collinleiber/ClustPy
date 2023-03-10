@@ -1,14 +1,14 @@
 import numpy as np
 from clustpy.partition import DipMeans
-from clustpy.data import load_wine
+from sklearn.datasets import make_blobs
 
 """
 Tests regarding the DipMeans object
 """
 
 
-def test_simple_DipMeans_with_wine():
-    X, labels = load_wine()
+def test_simple_DipMeans():
+    X, labels = make_blobs(200, 4, centers=3, random_state=1)
     dipmeans = DipMeans(random_state=1)
     assert not hasattr(dipmeans, "labels_")
     dipmeans.fit(X)
@@ -20,6 +20,7 @@ def test_simple_DipMeans_with_wine():
     # Test if random state is working
     dipmeans2 = DipMeans(random_state=1)
     dipmeans2.fit(X)
+    assert np.array_equal(dipmeans.n_clusters_, dipmeans2.n_clusters_)
     assert np.array_equal(dipmeans.labels_, dipmeans2.labels_)
     assert np.array_equal(dipmeans.cluster_centers_, dipmeans2.cluster_centers_)
     # Test with parameters

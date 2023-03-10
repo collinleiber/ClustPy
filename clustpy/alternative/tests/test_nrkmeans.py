@@ -3,7 +3,7 @@ from clustpy.alternative import NrKmeans
 from clustpy.alternative.nrkmeans import _assign_labels, _are_labels_equal, _is_matrix_orthogonal, _is_matrix_symmetric, \
     _create_full_rotation_matrix, _update_projections, _update_centers_and_scatter_matrix, _remove_empty_cluster, \
     _get_cost_function_of_subspace, _get_total_cost_function, _remove_empty_subspace, _get_precision
-from clustpy.data import load_fruit
+from clustpy.data import create_nr_data
 from unittest.mock import patch
 
 
@@ -198,15 +198,15 @@ Tests regarding the NrKmeans object
 """
 
 
-def test_simple_nrkmeans_with_fruit():
-    X, labels = load_fruit()
-    nrk = NrKmeans([3, 1], random_state=1, mdl_for_noisespace=False)
+def test_simple_nrkmeans():
+    X, labels = create_nr_data(200, random_state=1)
+    nrk = NrKmeans([3, 3, 1], random_state=1)
     assert not hasattr(nrk, "labels_")
     nrk.fit(X)
     assert nrk.labels_.dtype == np.int32
     assert nrk.labels_.shape == labels.shape
     # Check if random state is working
-    nrk_2 = NrKmeans([3, 1], random_state=1, mdl_for_noisespace=False)
+    nrk_2 = NrKmeans([3, 3, 1], random_state=1)
     assert not hasattr(nrk_2, "labels_")
     nrk_2.fit(X)
     assert np.array_equal(nrk_2.labels_, nrk.labels_)
@@ -214,12 +214,12 @@ def test_simple_nrkmeans_with_fruit():
     assert all([np.array_equal(nrk_2.cluster_centers[i], nrk.cluster_centers[i]) for i in range(2)])
     assert all([np.array_equal(nrk_2.scatter_matrices_[i], nrk.scatter_matrices_[i]) for i in range(2)])
     # Check result with mdl_for_noisespace and n_init=3 and outliers
-    nrk_3 = NrKmeans([3, 1], random_state=2, mdl_for_noisespace=True, n_init=3, outliers=True)
+    nrk_3 = NrKmeans([3, 3, 1], mdl_for_noisespace=True, n_init=3, outliers=True, random_state=1)
     assert not hasattr(nrk_3, "labels_")
     nrk_3.fit(X)
     assert nrk_3.labels_.shape == labels.shape
     # Check result with mdl_for_noisespace and n_init=3 and cost_type = mdl
-    nrk_4 = NrKmeans([3, 1], random_state=3, mdl_for_noisespace=True, n_init=3, cost_type="mdl")
+    nrk_4 = NrKmeans([3, 3, 1], mdl_for_noisespace=True, n_init=3, cost_type="mdl", random_state=1)
     assert not hasattr(nrk_4, "labels_")
     nrk_4.fit(X)
     assert nrk_4.labels_.shape == labels.shape
@@ -227,14 +227,14 @@ def test_simple_nrkmeans_with_fruit():
     assert np.array_equal(nrk.labels_, nrk.predict(X))
     assert np.array_equal(nrk_2.labels_[:-1], nrk_2.predict(X[:-1]))
     assert X.shape[0] - np.sum(nrk_3.labels_[:-2] == nrk_3.predict(X[:-2])) < X.shape[
-                                                                                  0] * 0.01  # Some points can change labels when running with outliers=True
+        0] * 0.01  # Some points can change labels when running with outliers=True
     assert np.array_equal(nrk_4.labels_[:-3], nrk_4.predict(X[:-3]))
 
 
 @patch("matplotlib.pyplot.show")  # Used to test plots (show will not be called)
-def test_plot_nrkmeans_result_with_fruit(mock_fig):
-    X, labels = load_fruit()
-    nrk = NrKmeans([3, 1], max_iter=1, random_state=1)
+def test_plot_nrkmeans_result(mock_fig):
+    X, labels = create_nr_data(200, random_state=1)
+    nrk = NrKmeans([3, 3, 1], max_iter=1, random_state=1)
     nrk.fit(X)
     assert None == nrk.plot_subspace(X, 0, None, True, labels[:, 0], True)
 
@@ -263,7 +263,7 @@ def test_have_subspaces_been_lost():
 
 def test_transform_full_space():
     X = np.c_[np.zeros(25), np.zeros(25) + 1, np.zeros(25) + 2, np.zeros(25) + 3]
-    nrk = NrKmeans([3, 1], max_iter=1, random_state=1)
+    nrk = NrKmeans([3, 3, 1], max_iter=1, random_state=1)
     nrk.fit(X)
     # Overwrite V
     nrk.V = np.array([[0, 1, 0, 0], [1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])

@@ -132,7 +132,7 @@ def _update_gmm_with_new_center(X: np.ndarray, n_clusters: int, current_gmm: GMM
     X : np.ndarray
         the given data set
     n_clusters : int
-        The current number of clusters
+        The updated number of clusters (number of clusters in current_gmm + 1)
     current_gmm : GMM
         The current GMM
     n_new_non_random_centers : int
@@ -161,7 +161,7 @@ def _update_gmm_with_new_center(X: np.ndarray, n_clusters: int, current_gmm: GMM
         else:
             # Add random centers
             new_center = X[random_state.choice(np.arange(X.shape[0]))]
-        new_gmm = GMM(n_components=n_clusters + 1, n_init=1, means_init=np.r_[current_gmm.means_, [new_center]],
+        new_gmm = GMM(n_components=n_clusters, n_init=1, means_init=np.r_[current_gmm.means_, [new_center]],
                       random_state=random_state)
         new_gmm.fit(X)
         # Check error of new GMM

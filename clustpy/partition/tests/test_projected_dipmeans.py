@@ -1,7 +1,7 @@
 import numpy as np
 from clustpy.partition import ProjectedDipMeans
 from clustpy.partition.projected_dipmeans import _get_projected_data
-from clustpy.data import load_wine
+from sklearn.datasets import make_blobs
 
 
 def test_get_projected_data():
@@ -22,8 +22,8 @@ Tests regarding the ProjectedDipMeans object
 """
 
 
-def test_simple_ProjectedDipMeans_with_wine():
-    X, labels = load_wine()
+def test_simple_ProjectedDipMeans():
+    X, labels = make_blobs(200, 4, centers=3, random_state=1)
     pdipmeans = ProjectedDipMeans(random_state=1)
     assert not hasattr(pdipmeans, "labels_")
     pdipmeans.fit(X)
@@ -35,6 +35,7 @@ def test_simple_ProjectedDipMeans_with_wine():
     # Test if random state is working
     pdipmeans2 = ProjectedDipMeans(random_state=1)
     pdipmeans2.fit(X)
+    assert np.array_equal(pdipmeans.n_clusters_, pdipmeans2.n_clusters_)
     assert np.array_equal(pdipmeans.labels_, pdipmeans2.labels_)
     assert np.array_equal(pdipmeans.cluster_centers_, pdipmeans2.cluster_centers_)
     # Test with parameters

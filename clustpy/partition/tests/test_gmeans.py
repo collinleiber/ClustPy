@@ -1,7 +1,7 @@
 import numpy as np
 from clustpy.partition import GMeans
 from clustpy.partition.gmeans import _anderson_darling_statistic_to_prob
-from clustpy.data import load_wine
+from sklearn.datasets import make_blobs
 from scipy.stats import anderson
 
 
@@ -22,8 +22,8 @@ Tests regarding the GMeans object
 """
 
 
-def test_simple_GMeans_with_wine():
-    X, labels = load_wine()
+def test_simple_GMeans():
+    X, labels = make_blobs(200, 4, centers=3, random_state=1)
     gmeans = GMeans(random_state=1)
     assert not hasattr(gmeans, "labels_")
     gmeans.fit(X)
@@ -35,6 +35,7 @@ def test_simple_GMeans_with_wine():
     # Test if random state is working
     gmeans2 = GMeans(random_state=1)
     gmeans2.fit(X)
+    assert np.array_equal(gmeans.n_clusters_, gmeans2.n_clusters_)
     assert np.array_equal(gmeans.labels_, gmeans2.labels_)
     assert np.array_equal(gmeans.cluster_centers_, gmeans2.cluster_centers_)
     # Test with parameters

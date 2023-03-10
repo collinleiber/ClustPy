@@ -1,11 +1,4 @@
 import torch
-from clustpy.data import load_nrletters
-
-
-def _load_single_label_nrletters():
-    X, L = load_nrletters()
-    L = L[:, 0]
-    return X, L
 
 
 def _get_test_dataloader(data, batch_size, shuffle, drop_last):

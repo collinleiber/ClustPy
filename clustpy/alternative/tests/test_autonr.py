@@ -1,7 +1,7 @@
 import numpy as np
 from clustpy.alternative import AutoNR
 from clustpy.alternative.autonr import _find_two_closest_centers, _merge_nearest_centers, _split_largest_cluster
-from clustpy.data import load_fruit
+from clustpy.data import create_nr_data
 from unittest.mock import patch
 
 
@@ -54,35 +54,41 @@ Tests regarding the AutoNR object
 """
 
 
-def test_simple_autonr_with_fruit():
-    X, labels = load_fruit()
-    autonr = AutoNR(random_state=1, mdl_for_noisespace=False)
+def test_simple_autonr():
+    X, labels = create_nr_data(200, random_state=1)
+    autonr = AutoNR(random_state=1)
     assert not hasattr(autonr, "labels_")
     autonr.fit(X)
     assert autonr.labels_.dtype == np.int32
     assert autonr.labels_.shape[0] == labels.shape[0]
     # Check if random state is working
-    autonr_2 = AutoNR(random_state=1, mdl_for_noisespace=False)
-    assert not hasattr(autonr_2, "labels_")
+    autonr_2 = AutoNR(random_state=1)
     autonr_2.fit(X)
+    assert np.array_equal(autonr_2.n_clusters_, autonr.n_clusters_)
     assert np.array_equal(autonr_2.labels_, autonr.labels_)
     assert np.array_equal(autonr_2.nrkmeans_.V, autonr.nrkmeans_.V)
     assert all(
         [np.array_equal(autonr_2.nrkmeans_.cluster_centers[i], autonr.nrkmeans_.cluster_centers[i]) for i in range(2)])
     assert all([np.array_equal(autonr_2.nrkmeans_.scatter_matrices_[i], autonr.nrkmeans_.scatter_matrices_[i]) for i in
                 range(2)])
+    # Test parameters
+    autonr = AutoNR(nrkmeans_repetitions=3, max_subspaces=2, max_n_clusters=2, mdl_for_noisespace=False, random_state=1)
+    assert not hasattr(autonr, "labels_")
+    autonr.fit(X)
+    assert autonr.labels_.dtype == np.int32
+    assert autonr.labels_.shape[0] == labels.shape[0]
 
 
 @patch("matplotlib.pyplot.show")  # Used to test plots (show will not be called)
-def test_plot_autonr_mdl_costs_progress_with_fruit(mock_fig):
-    X, labels = load_fruit()
+def test_plot_autonr_mdl_costs_progress(mock_fig):
+    X, labels = create_nr_data(200, random_state=1)
     autonr = AutoNR(max_subspaces=2, max_n_clusters=2, random_state=1)
     autonr.fit(X)
     assert None == autonr.plot_mdl_progress()
 
 
-def test_dissolve_noise_space_with_fruit():
-    X, _ = load_fruit()
+def test_dissolve_noise_space():
+    X, _ = create_nr_data(200, random_state=1)
     autonr = AutoNR(random_state=4, max_subspaces=4, max_n_clusters=4)
     autonr.fit(X)
     # Save original parameters

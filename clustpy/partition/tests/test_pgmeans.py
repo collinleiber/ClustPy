@@ -1,7 +1,7 @@
 import numpy as np
 from clustpy.partition import PGMeans
 from clustpy.partition.pgmeans import _initial_gmm_clusters, _update_gmm_with_new_center, _project_model
-from clustpy.data import load_wine
+from sklearn.datasets import make_blobs
 from sklearn.mixture import GaussianMixture as GMM
 
 
@@ -50,7 +50,7 @@ def test_update_gmm_with_new_center():
     gmm = GMM(n_components=2, n_init=1, random_state=random_state)
     gmm.fit(X)
     assert gmm.means_.shape == (2, 3)
-    updated_gmm = _update_gmm_with_new_center(X, 2, gmm, 3, 3, random_state)
+    updated_gmm = _update_gmm_with_new_center(X, 3, gmm, 3, 3, random_state)
     assert updated_gmm.means_.shape == (3, 3)
     assert np.allclose(updated_gmm.means_[0], [2, 2, 2]) or np.allclose(updated_gmm.means_[1],
                                                                               [2, 2, 2]) or np.allclose(
@@ -88,8 +88,8 @@ Tests regarding the PGMeans object
 """
 
 
-def test_simple_PGMeans_with_wine():
-    X, labels = load_wine()
+def test_simple_PGMeans():
+    X, labels = make_blobs(200, 4, centers=3, random_state=1)
     pgmeans = PGMeans(random_state=1)
     assert not hasattr(pgmeans, "labels_")
     pgmeans.fit(X)
@@ -101,6 +101,7 @@ def test_simple_PGMeans_with_wine():
     # Test if random state is working
     pgmeans2 = PGMeans(random_state=1)
     pgmeans2.fit(X)
+    assert np.array_equal(pgmeans.n_clusters_, pgmeans2.n_clusters_)
     assert np.array_equal(pgmeans.labels_, pgmeans2.labels_)
     assert np.array_equal(pgmeans.cluster_centers_, pgmeans2.cluster_centers_)
     # Test with parameters

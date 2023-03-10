@@ -1,14 +1,14 @@
 import numpy as np
 from clustpy.partition import SkinnyDip, UniDip
-from clustpy.data import load_wine
+from sklearn.datasets import make_blobs
 
 """
 Tests regarding the SkinnyDip object
 """
 
 
-def test_simple_SkinnyDip_with_wine():
-    X, labels = load_wine()
+def test_simple_SkinnyDip():
+    X, labels = make_blobs(200, 4, centers=3, random_state=1)
     skinny = SkinnyDip(random_state=1)
     assert not hasattr(skinny, "labels_")
     skinny.fit(X)
@@ -32,9 +32,9 @@ Tests regarding the UniDip object
 """
 
 
-def test_simple_UniDip_with_1d_of_wine():
-    X, labels = load_wine()
-    X = X[:, -1]
+def test_simple_UniDip():
+    X, labels = make_blobs(200, 1, centers=3, random_state=1)
+    X = X.reshape(-1,)
     unidip = UniDip()
     assert not hasattr(unidip, "labels_")
     unidip.fit(X)

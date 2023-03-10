@@ -1,11 +1,11 @@
-from clustpy.deep.tests._helpers_for_tests import _load_single_label_nrletters
 from clustpy.deep import VariationalAutoencoder
 from clustpy.deep.variational_autoencoder import _vae_sampling
+from clustpy.data import create_subspace_data
 import torch
 
 
-def test_simple_variational_autoencoder_with_nrletters():
-    data, _ = _load_single_label_nrletters()
+def test_simple_variational_autoencoder():
+    data, _ = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
     embedding_dim = 10
     # Test fitting
     autoencoder = VariationalAutoencoder(layers=[data.shape[1], 128, 64, embedding_dim])

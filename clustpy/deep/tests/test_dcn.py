@@ -1,19 +1,20 @@
-from clustpy.deep.tests._helpers_for_tests import _load_single_label_nrletters
 from clustpy.deep import DCN
 from clustpy.deep.dcn import _compute_centroids
+from clustpy.data import create_subspace_data
 import torch
 import numpy as np
 
 
-def test_simple_dcn_with_load_nrletters():
-    X, labels = _load_single_label_nrletters()
-    dcn = DCN(6, pretrain_epochs=3, clustering_epochs=3, random_state=1)
+def test_simple_dcn():
+    torch.use_deterministic_algorithms(True)
+    X, labels = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    dcn = DCN(3, pretrain_epochs=3, clustering_epochs=3, random_state=1)
     assert not hasattr(dcn, "labels_")
     dcn.fit(X)
     assert dcn.labels_.dtype == np.int32
     assert dcn.labels_.shape == labels.shape
     # Test if random state is working
-    dcn2 = DCN(6, pretrain_epochs=3, clustering_epochs=3, random_state=1)
+    dcn2 = DCN(3, pretrain_epochs=3, clustering_epochs=3, random_state=1)
     dcn2.fit(X)
     assert np.array_equal(dcn.labels_, dcn2.labels_)
     assert np.allclose(dcn.cluster_centers_, dcn2.cluster_centers_, atol=1e-1)
