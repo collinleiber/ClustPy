@@ -14,7 +14,7 @@ def test_simple_dipdeck():
     assert dipdeck.labels_.dtype == np.int32
     assert dipdeck.labels_.shape == labels.shape
     # Test if random state is working
-    dipdeck2 = DipDECK(pretrain_epochs=3, clustering_epochs=3, random_state=1)
+    dipdeck2 = DipDECK(pretrain_epochs=3, clustering_epochs=3, random_state=1, debug=True)
     dipdeck2.fit(X)
     assert np.array_equal(dipdeck.labels_, dipdeck2.labels_)
     assert np.array_equal(dipdeck.cluster_centers_, dipdeck2.cluster_centers_)

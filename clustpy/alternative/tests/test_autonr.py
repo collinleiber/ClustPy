@@ -72,7 +72,8 @@ def test_simple_autonr():
     assert all([np.array_equal(autonr_2.nrkmeans_.scatter_matrices_[i], autonr.nrkmeans_.scatter_matrices_[i]) for i in
                 range(2)])
     # Test parameters
-    autonr = AutoNR(nrkmeans_repetitions=3, max_subspaces=2, max_n_clusters=2, mdl_for_noisespace=False, random_state=1)
+    autonr = AutoNR(nrkmeans_repetitions=3, max_subspaces=2, max_n_clusters=2, mdl_for_noisespace=False, debug=True,
+                    random_state=1)
     assert not hasattr(autonr, "labels_")
     autonr.fit(X)
     assert autonr.labels_.dtype == np.int32

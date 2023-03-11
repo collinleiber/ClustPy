@@ -218,8 +218,8 @@ def test_simple_nrkmeans():
     assert not hasattr(nrk_3, "labels_")
     nrk_3.fit(X)
     assert nrk_3.labels_.shape == labels.shape
-    # Check result with mdl_for_noisespace and n_init=3 and cost_type = mdl
-    nrk_4 = NrKmeans([3, 3, 1], mdl_for_noisespace=True, n_init=3, cost_type="mdl", random_state=1)
+    # Check result with mdl_for_noisespace and n_init=3 and cost_type = mdl and debug = True
+    nrk_4 = NrKmeans([3, 3, 1], mdl_for_noisespace=True, n_init=3, cost_type="mdl", debug=True, random_state=1)
     assert not hasattr(nrk_4, "labels_")
     nrk_4.fit(X)
     assert nrk_4.labels_.shape == labels.shape

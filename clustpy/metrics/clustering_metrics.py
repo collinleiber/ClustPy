@@ -1,5 +1,7 @@
 import numpy as np
 from scipy.optimize import linear_sum_assignment
+from clustpy.metrics.confusion_matrix import ConfusionMatrix
+from scipy.special import comb
 
 
 def _check_number_of_points(labels_true: np.ndarray, labels_pred: np.ndarray) -> bool:
@@ -29,6 +31,7 @@ def _check_number_of_points(labels_true: np.ndarray, labels_pred: np.ndarray) ->
 def variation_of_information(labels_true: np.ndarray, labels_pred: np.ndarray) -> float:
     """
     Calculate the variation of information between the ground truth labels and the predicted labels.
+    Returns a minimum value of 0.0 which corresponds to a perfect match.
     Implemented as defined in https://en.wikipedia.org/wiki/Variation_of_information
 
     Parameters
@@ -99,3 +102,57 @@ def unsupervised_clustering_accuracy(labels_true: np.ndarray, labels_pred: np.nd
     indices = linear_sum_assignment(match_matrix)
     acc = -np.sum(match_matrix[indices]) / labels_pred.size
     return acc
+
+
+def information_theoretic_external_cluster_validity_measure(labels_true: np.ndarray, labels_pred: np.ndarray,
+                                                            scale: bool = True) -> float:
+    """
+    Evaluate the quality of predicted labels by comparing it to the ground truth labels using the
+    Information-Theoretic External Cluster-Validity Measure. Often simply called DOM.
+    A lower value indicates a better clustering result.
+    If the result is scaled, this method will return a value between 1.0 (perfect match) and 0.0 (arbitrary result).
+    An advantage of this metric is that it also works with a differing number of clusters.
+
+    Parameters
+    ----------
+    labels_true : np.ndarray
+        The ground truth labels of the data set
+    labels_pred : np.ndarray
+        The labels as predicted by a clustering algorithm
+    scale : bool
+        Scale the result to (0, 1], where 1 indicates a perfect match and 0 indicates an arbitrary result (default: True)
+
+    Returns
+    -------
+    dom : float
+        The validity between the two input label sets.
+
+    References
+    -------
+    Byron E. Dom. 2002. "An information-theoretic external cluster-validity measure."
+    In Proceedings of the Eighteenth conference on Uncertainty in artificial intelligence (UAI'02).
+    """
+    _check_number_of_points(labels_true, labels_pred)
+    # Build confusion matrix
+    cm = ConfusionMatrix(labels_true, labels_pred)
+    n_points = labels_true.shape[0]
+    n_classes = cm.confusion_matrix.shape[0]
+    # Get number of objects per predicted label
+    hks = np.sum(cm.confusion_matrix, axis=0)
+    # Calculate Q_0
+    empirical_conditional_entropy = cm.confusion_matrix / n_points * np.log(cm.confusion_matrix / hks)
+    empirical_conditional_entropy = - np.sum(empirical_conditional_entropy[~np.isnan(empirical_conditional_entropy)])
+    sum_binom_coefficient = np.sum([np.log(comb(hk + n_classes - 1, n_classes - 1)) for hk in hks])
+    Q_0 = empirical_conditional_entropy + sum_binom_coefficient / n_points
+    if scale:
+        # --- Scale Q_0 to (0, 1] ---
+        # Get number of objects per ground truth label
+        hcs = np.sum(cm.confusion_matrix, axis=1)
+        # Calculate Q_2
+        min_Q_0 = np.sum([np.log(comb(hc + n_classes - 1, n_classes - 1)) for hc in hcs]) / n_points
+        entropy_H_C = -np.sum([hc / n_points * np.log(hc / n_points) for hc in hcs])
+        max_Q_0 = entropy_H_C + np.log(n_classes)
+        assert Q_0 >= min_Q_0 and Q_0 <= max_Q_0, "Q_0 must be between min_Q_0 and max_Q_0"
+        # Scale Q_0 to receive final value
+        Q_0 = (max_Q_0 - Q_0) / (max_Q_0 - min_Q_0)
+    return Q_0

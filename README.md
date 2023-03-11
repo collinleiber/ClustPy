@@ -109,6 +109,7 @@ Remove clustpy via pip to avoid ambiguities during development, e.g., when chang
 
 - Metrics
     - Confusion Matrix
+    - Information-Theoretic External Cluster-Validity Measure (DOM) [[Source](https://dl.acm.org/doi/10.5555/2073876.2073893)]
     - Pair Counting Scores (f1, rand, jaccard, recall, precision) [[Source](https://link.springer.com/article/10.1007/s10115-008-0150-6)]
     - Unsupervised Clustering Accuracy [[Source](https://ieeexplore.ieee.org/abstract/document/5454426)]
     - Variation of information [[Source](https://link.springer.com/chapter/10.1007/978-3-540-45167-9_14)]

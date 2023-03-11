@@ -14,7 +14,7 @@ def test_simple_enrc():
     assert enrc.labels_.dtype == np.int32
     assert enrc.labels_.shape == labels.shape
     # Test if random state is working
-    enrc2 = ENRC([3, 3], pretrain_epochs=3, clustering_epochs=3, random_state=1)
+    enrc2 = ENRC([3, 3], pretrain_epochs=3, clustering_epochs=3, random_state=1, debug=True)
     enrc2.fit(X)
     assert np.array_equal(enrc.labels_, enrc2.labels_)
     for i in range(len(enrc.cluster_centers_)):

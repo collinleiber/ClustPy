@@ -14,7 +14,7 @@ def test_simple_dipencoder():
     assert dipencoder.labels_.dtype == np.int32
     assert dipencoder.labels_.shape == labels.shape
     # Test if random state is working
-    dipencoder2 = DipEncoder(3, pretrain_epochs=3, clustering_epochs=3, random_state=1)
+    dipencoder2 = DipEncoder(3, pretrain_epochs=3, clustering_epochs=3, random_state=1, debug=True)
     dipencoder2.fit(X)
     assert np.array_equal(dipencoder.labels_, dipencoder2.labels_)
     assert np.allclose(dipencoder.projection_axes_, dipencoder2.projection_axes_, atol=1e-1)
