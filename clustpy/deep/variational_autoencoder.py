@@ -1,7 +1,7 @@
 """
 @authors:
-Lukas Miklautz
-Donatella Novakovic
+Lukas Miklautz,
+Donatella Novakovic,
 Collin Leiber
 """
 
