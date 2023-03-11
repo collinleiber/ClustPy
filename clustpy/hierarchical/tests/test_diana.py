@@ -1,7 +1,7 @@
-from clustpy.data import load_wine
 from clustpy.hierarchical import Diana
 from clustpy.hierarchical.diana import _split_cluster, _get_cluster_with_max_diameter
 import numpy as np
+from sklearn.datasets import make_blobs
 
 
 def test_get_cluster_with_max_diameter():
@@ -48,8 +48,8 @@ Tests regarding the DIANA object
 """
 
 
-def test_simple_Diana_with_wine():
-    X, labels = load_wine()
+def test_simple_Diana():
+    X, labels = make_blobs(200, 4, centers=3, random_state=1)
     # Without any parameters
     diana = Diana()
     assert not hasattr(diana, "labels_")
@@ -77,7 +77,7 @@ def test_simple_Diana_with_wine():
 
 
 def test_pruning_tree():
-    X, labels = load_wine()
+    X, labels = make_blobs(200, 4, centers=3, random_state=1)
     diana = Diana()
     diana.fit(X)
     assert np.unique(diana.labels_).shape[0] == X.shape[0]

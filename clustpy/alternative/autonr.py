@@ -39,7 +39,7 @@ def _autonr(X: np.ndarray, nrkmeans_repetitions: int, outliers: bool, max_subspa
     similarity_threshold : float
         threshold that defines if the noise space has not changed for two subsequent iterations by checking the subspace costs
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int
+        use a fixed random state to get a repeatable solution
     debug : bool
         If true, additional information will be printed to the console
 
@@ -249,7 +249,7 @@ def _check_input_parameters(X: np.ndarray, nrkmeans_repetitions: int, max_subspa
 
 
 def _execute_nrkmeans(X: np.ndarray, n_clusters: list, nrkmeans_repetitions: int,
-                      random_state: np.random.RandomState = None, centers: list = None, V: np.ndarray = None,
+                      random_state: np.random.RandomState, centers: list = None, V: np.ndarray = None,
                       P: list = None, outliers: bool = False, mdl_for_noisespace: bool = True,
                       max_distance: float = None, precision: float = None, debug: float = False) -> (
         NrKmeans, float, list):
@@ -266,7 +266,7 @@ def _execute_nrkmeans(X: np.ndarray, n_clusters: list, nrkmeans_repetitions: int
     nrkmeans_repetitions : int
         number of NrKmeans repetitions
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
+        use a fixed random state to get a repeatable solution
     centers : list
         list containing the cluster centers for each subspace (default: None)
     V : np.ndarray
@@ -379,7 +379,7 @@ def _split_noise_space(X_subspace: np.ndarray, subspace_nr: int, best_nrkmeans: 
     similarity_threshold : float
         threshold that defines if the noise space has not changed for two subsequent iterations by checking the subspace costs
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int
+        use a fixed random state to get a repeatable solution
     debug : bool
         If true, additional information will be printed to the console
 
@@ -502,7 +502,7 @@ def _split_cluster_space(X_subspace: np.ndarray, subspace_nr: int, best_nrkmeans
     precision : float
         precision used to convert probability densities to actual probabilities
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int
+        use a fixed random state to get a repeatable solution
     debug : bool
         If true, additional information will be printed to the console
 
@@ -678,7 +678,7 @@ def _merge_spaces(X: np.ndarray, best_nrkmeans: NrKmeans, best_mdl_overall: floa
     outliers : bool
         defines if outliers should be identified through MDL
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int
+        use a fixed random state to get a repeatable solution
     mdl_for_noisespace : bool
         defines if MDL should be used to identify noise space dimensions instead of only considering negative eigenvalues when running NrKmeans
     max_distance : float
@@ -1147,6 +1147,8 @@ class AutoNR(BaseEstimator, ClusterMixin):
 
     Attributes
     ----------
+    n_clusters_ : list
+        The final number of clusters in each subspace
     labels_ : np.ndarray
         The final labels. Shape equals (n_samples x n_subspaces)
     nrkmeans_ : NrKmeans
@@ -1201,6 +1203,7 @@ class AutoNR(BaseEstimator, ClusterMixin):
                                                      self.max_distance, self.precision, self.similarity_threshold,
                                                      self.random_state, self.debug)
         # Output
+        self.n_clusters_ = nrkmeans.n_clusters
         self.nrkmeans_ = nrkmeans
         self.mdl_costs_ = mdl_costs
         self.all_mdl_costs_ = all_mdl_costs

@@ -31,7 +31,7 @@ def _lda_kmeans(X: np.ndarray, n_clusters: int, n_dims: int, max_iter: int, kmea
     kmeans_repetitions : int
             Number of repetitions when executing KMeans. For more information see sklearn.cluster.KMeans (default: 10)
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int
+        use a fixed random state to get a repeatable solution
 
     Returns
     -------

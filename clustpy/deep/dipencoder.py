@@ -9,7 +9,7 @@ from clustpy.utils import dip_test
 import torch
 import numpy as np
 from clustpy.partition.skinnydip import _dip_mirrored_data
-from clustpy.deep._utils import detect_device, encode_batchwise
+from clustpy.deep._utils import detect_device, encode_batchwise, set_torch_seed
 from clustpy.deep._data_utils import get_dataloader
 from clustpy.deep._train_utils import get_trained_autoencoder
 import matplotlib.pyplot as plt
@@ -710,7 +710,7 @@ class DipEncoder(BaseEstimator, ClusterMixin):
         self.embedding_size = embedding_size
         self.max_cluster_size_diff_factor = max_cluster_size_diff_factor
         self.random_state = check_random_state(random_state)
-        torch.manual_seed(self.random_state.get_state()[1][0])
+        set_torch_seed(self.random_state)
         self.debug = debug
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DipEncoder':

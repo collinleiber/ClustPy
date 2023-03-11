@@ -36,7 +36,7 @@ def _proj_dipmeans(X: np.ndarray, significance: float, n_random_projections: int
     max_n_clusters : int
         Maximum number of clusters. Must be larger than n_clusters_init
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int
+        use a fixed random state to get a repeatable solution
 
     Returns
     -------
@@ -93,7 +93,7 @@ def _get_projected_data(X: np.ndarray, n_random_projections: int, random_state: 
     n_random_projections : int
         Number of random projections that should be applied in addition to the projections from PCA
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int
+        use a fixed random state to get a repeatable solution
 
     Returns
     -------

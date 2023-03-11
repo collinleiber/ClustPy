@@ -7,8 +7,8 @@ from scipy.spatial.distance import cdist
 import numpy as np
 from clustpy.utils import dip_test, dip_pval
 import torch
-from clustpy.deep._utils import detect_device, encode_batchwise, \
-    squared_euclidean_distance, int_to_one_hot
+from clustpy.deep._utils import detect_device, encode_batchwise, squared_euclidean_distance, int_to_one_hot, \
+    set_torch_seed
 from clustpy.deep._data_utils import get_dataloader
 from clustpy.deep._train_utils import get_trained_autoencoder
 from sklearn.cluster import KMeans
@@ -184,7 +184,7 @@ def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_thresho
     n_boots : int
         Number of bootstraps used to calculate dip-p-values. Only necessary if pval_strategy is 'bootstrap'
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int
+        use a fixed random state to get a repeatable solution
     debug : bool
         If true, additional information will be printed to the console
 
@@ -356,7 +356,7 @@ def _merge_by_dip_value(X: np.ndarray, embedded_data: np.ndarray, cluster_labels
     n_boots : int
         Number of bootstraps used to calculate dip-p-values. Only necessary if pval_strategy is 'bootstrap'
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int
+        use a fixed random state to get a repeatable solution
 
     Returns
     -------
@@ -484,7 +484,7 @@ def _get_dip_matrix(embedded_data: np.ndarray, embedded_centers_cpu: np.ndarray,
     n_boots : int
         Number of bootstraps used to calculate dip-p-values. Only necessary if pval_strategy is 'bootstrap'
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int
+        use a fixed random state to get a repeatable solution
 
     Returns
     -------
@@ -624,7 +624,7 @@ class DipDECK(BaseEstimator, ClusterMixin):
         self.pval_strategy = pval_strategy
         self.n_boots = n_boots
         self.random_state = check_random_state(random_state)
-        torch.manual_seed(self.random_state.get_state()[1][0])
+        set_torch_seed(self.random_state)
         self.debug = debug
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DipDECK':

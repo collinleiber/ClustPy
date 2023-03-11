@@ -29,8 +29,8 @@ except:
         from sklearn.cluster._kmeans import _k_init as kpp
 
 
-def _kmeans_plus_plus(X: np.ndarray, n_clusters: int, x_squared_norms: np.ndarray = None,
-                      random_state: np.random.RandomState = None, n_local_trials: int = None):
+def _kmeans_plus_plus(X: np.ndarray, n_clusters: int, x_squared_norms: np.ndarray,
+                      random_state: np.random.RandomState, n_local_trials: int = None):
     """
     Initializes the cluster centers for Kmeans using the kmeans++ procedure.
     This method is only a wrapper for the Sklearn kmeans++ implementation.
@@ -45,9 +45,9 @@ def _kmeans_plus_plus(X: np.ndarray, n_clusters: int, x_squared_norms: np.ndarra
     x_squared_norms : np.ndarray
         Row-wise (squared) Euclidean norm of X. See sklearn.utils.extmath.row_norms
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int
+        use a fixed random state to get a repeatable solution
     n_local_trials : int
-        Number of local trials.
+        Number of local trials (default: None)
 
     Returns
     -------
@@ -106,7 +106,7 @@ def _nrkmeans(X: np.ndarray, n_clusters: list, V: np.ndarray, m: list, P: list, 
     precision : float
         precision used to convert probability densities to actual probabilities. Only relevant if a MDL strategy is used
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int
+        use a fixed random state to get a repeatable solution
     debug : bool
         If true, additional information will be printed to the console
 
@@ -205,7 +205,7 @@ def _initialize_nrkmeans_parameters(X: np.ndarray, n_clusters: list, V: np.ndarr
     max_iter : int
         maximum number of iterations for the algorithm
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int
+        use a fixed random state to get a repeatable solution
 
     Returns
     -------

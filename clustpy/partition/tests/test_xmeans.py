@@ -1,7 +1,7 @@
 import numpy as np
 from clustpy.partition import XMeans
 from clustpy.partition.xmeans import _execute_two_means, _merge_clusters, _initial_kmeans_clusters
-from clustpy.data import load_wine
+from sklearn.datasets import make_blobs
 from sklearn.metrics import normalized_mutual_info_score as nmi
 
 
@@ -72,13 +72,13 @@ def test_merge_clusters():
 
 
 """
-Tests regarding the GMeans object
+Tests regarding the XMeans object
 """
 
 
-def test_simple_GMeans_with_wine():
-    X, labels = load_wine()
-    xmeans = XMeans()
+def test_simple_XMeans():
+    X, labels = make_blobs(200, 4, centers=3, random_state=1)
+    xmeans = XMeans(random_state=1)
     assert not hasattr(xmeans, "labels_")
     xmeans.fit(X)
     assert xmeans.labels_.dtype == np.int32
@@ -86,6 +86,12 @@ def test_simple_GMeans_with_wine():
     assert xmeans.cluster_centers_.shape == (xmeans.n_clusters_, X.shape[1])
     assert len(np.unique(xmeans.labels_)) == xmeans.n_clusters_
     assert np.array_equal(np.unique(xmeans.labels_), np.arange(xmeans.n_clusters_))
+    # Test if random state is working
+    xmeans2 = XMeans(random_state=1)
+    xmeans2.fit(X)
+    assert np.array_equal(xmeans.n_clusters_, xmeans2.n_clusters_)
+    assert np.array_equal(xmeans.labels_, xmeans2.labels_)
+    assert np.array_equal(xmeans.cluster_centers_, xmeans2.cluster_centers_)
     # Test with parameters
     xmeans = XMeans(n_clusters_init=3, max_n_clusters=5, check_global_score=False, allow_merging=True, n_split_trials=5,
                     random_state=1)

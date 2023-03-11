@@ -3,7 +3,7 @@ from clustpy.partition import SubKmeans
 from clustpy.partition.subkmeans import _transform_subkmeans_P_to_nrkmeans_P, \
     _transform_subkmeans_scatter_to_nrkmeans_scatters, _transform_subkmeans_centers_to_nrkmeans_centers, \
     _transform_subkmeans_m_to_nrkmeans_m
-from clustpy.data import load_wine
+from clustpy.data import create_subspace_data
 from unittest.mock import patch
 
 
@@ -48,23 +48,29 @@ Tests regarding the SubKmeans object
 """
 
 
-def test_simple_subkmeans_with_wine():
-    X, labels = load_wine()
-    subkm = SubKmeans(3)
+def test_simple_subkmeans():
+    X, labels = create_subspace_data(200, subspace_features=(3, 5), random_state=1)
+    subkm = SubKmeans(3, random_state=1)
     assert not hasattr(subkm, "labels_")
     subkm.fit(X)
     assert subkm.labels_.dtype == np.int32
     assert subkm.labels_.shape == labels.shape
+    # Test if random state is working
+    subkm2 = SubKmeans(3, random_state=1)
+    subkm2.fit(X)
+    assert np.array_equal(subkm.labels_, subkm2.labels_)
+    assert np.array_equal(subkm.cluster_centers, subkm2.cluster_centers)
+    assert np.array_equal(subkm.V, subkm2.V)
     # Check if input parameters are working
-    subkm_2 = SubKmeans(3, random_state=1, m=4, cluster_centers=np.ones((3, X.shape[1])))
+    subkm_2 = SubKmeans(3, random_state=1, m=3, cluster_centers=np.r_[[np.zeros(X.shape[1]) + 0.1], [np.zeros(X.shape[1]) + 0.5], [np.zeros(X.shape[1]) + 0.9]])
     assert not hasattr(subkm_2, "labels_")
     subkm_2.fit(X)
     assert subkm_2.labels_.shape == labels.shape
 
 
 @patch("matplotlib.pyplot.show")  # Used to test plots (show will not be called)
-def test_plot_subkmeans_result_with_wine(mock_fig):
-    X, labels = load_wine()
+def test_plot_subkmeans_result(mock_fig):
+    X, labels = create_subspace_data(200, subspace_features=(3, 5), random_state=1)
     subkm = SubKmeans(3, max_iter=1)
     subkm.fit(X)
     assert None == subkm.plot_clustered_space(X, None, True, labels, True)

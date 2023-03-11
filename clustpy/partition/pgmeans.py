@@ -40,7 +40,7 @@ def _pgmeans(X, significance, n_projections, n_samples, n_new_centers, amount_ra
     max_n_clusters : int
         Maximum number of clusters. Must be larger than n_clusters_init
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int
+        use a fixed random state to get a repeatable solution
 
     Returns
     -------
@@ -100,7 +100,7 @@ def _project_model(gmm: GMM, projection_vector: np.ndarray, n_clusters: int,
     n_clusters : int
         The current number of clusters
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int
+        use a fixed random state to get a repeatable solution
 
     Returns
     -------
@@ -132,7 +132,7 @@ def _update_gmm_with_new_center(X: np.ndarray, n_clusters: int, current_gmm: GMM
     X : np.ndarray
         the given data set
     n_clusters : int
-        The current number of clusters
+        The updated number of clusters (number of clusters in current_gmm + 1)
     current_gmm : GMM
         The current GMM
     n_new_non_random_centers : int
@@ -140,7 +140,7 @@ def _update_gmm_with_new_center(X: np.ndarray, n_clusters: int, current_gmm: GMM
     n_new_random_centers : int
         Number of random centers that should be tested
     random_state : np.ndarray
-        use a fixed random state to get a repeatable solution. Can also be of type int
+        use a fixed random state to get a repeatable solution
 
     Returns
     -------
@@ -148,12 +148,12 @@ def _update_gmm_with_new_center(X: np.ndarray, n_clusters: int, current_gmm: GMM
         The updated GMM with an additional center added
     """
     best_gmm = None
-    best_log_likelihood = -np.inf
+    best_log_likelihood = np.inf
     if n_new_non_random_centers > 0:
         # Non-random centers are chosen through lowest probability regarding current GMM
-        min_probability_densities = np.min(current_gmm.predict_proba(X), axis=1)
-        min_probability_densities[min_probability_densities == 0] = np.inf
-        possible_non_random_samples = np.argsort(min_probability_densities)
+        max_probability_densities = np.max(current_gmm.predict_proba(X), axis=1)
+        # Get minimum max probabilities
+        possible_non_random_samples = np.argsort(max_probability_densities)
     for c in range(n_new_non_random_centers + n_new_random_centers):
         if c < n_new_non_random_centers:
             # Add non random centers
@@ -161,10 +161,11 @@ def _update_gmm_with_new_center(X: np.ndarray, n_clusters: int, current_gmm: GMM
         else:
             # Add random centers
             new_center = X[random_state.choice(np.arange(X.shape[0]))]
-        new_gmm = GMM(n_components=n_clusters, n_init=1, means_init=np.r_[current_gmm.means_, [new_center]])
+        new_gmm = GMM(n_components=n_clusters, n_init=1, means_init=np.r_[current_gmm.means_, [new_center]],
+                      random_state=random_state)
         new_gmm.fit(X)
         # Check error of new GMM
-        if new_gmm.lower_bound_ > best_log_likelihood:
+        if new_gmm.lower_bound_ < best_log_likelihood:
             best_log_likelihood = new_gmm.lower_bound_
             best_gmm = new_gmm
     return best_gmm
@@ -186,7 +187,7 @@ def _initial_gmm_clusters(X: np.ndarray, n_clusters_init: int, gmm_repetitions: 
     gmm_repetitions : int
         Number of repetitions for the initial GMM
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int
+        use a fixed random state to get a repeatable solution
 
     Returns
     -------

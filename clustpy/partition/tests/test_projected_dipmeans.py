@@ -1,7 +1,7 @@
 import numpy as np
 from clustpy.partition import ProjectedDipMeans
 from clustpy.partition.projected_dipmeans import _get_projected_data
-from clustpy.data import load_wine
+from sklearn.datasets import make_blobs
 
 
 def test_get_projected_data():
@@ -22,9 +22,9 @@ Tests regarding the ProjectedDipMeans object
 """
 
 
-def test_simple_ProjectedDipMeans_with_wine():
-    X, labels = load_wine()
-    pdipmeans = ProjectedDipMeans()
+def test_simple_ProjectedDipMeans():
+    X, labels = make_blobs(200, 4, centers=3, random_state=1)
+    pdipmeans = ProjectedDipMeans(random_state=1)
     assert not hasattr(pdipmeans, "labels_")
     pdipmeans.fit(X)
     assert pdipmeans.labels_.dtype == np.int32
@@ -32,6 +32,12 @@ def test_simple_ProjectedDipMeans_with_wine():
     assert pdipmeans.cluster_centers_.shape == (pdipmeans.n_clusters_, X.shape[1])
     assert len(np.unique(pdipmeans.labels_)) == pdipmeans.n_clusters_
     assert np.array_equal(np.unique(pdipmeans.labels_), np.arange(pdipmeans.n_clusters_))
+    # Test if random state is working
+    pdipmeans2 = ProjectedDipMeans(random_state=1)
+    pdipmeans2.fit(X)
+    assert np.array_equal(pdipmeans.n_clusters_, pdipmeans2.n_clusters_)
+    assert np.array_equal(pdipmeans.labels_, pdipmeans2.labels_)
+    assert np.array_equal(pdipmeans.cluster_centers_, pdipmeans2.cluster_centers_)
     # Test with parameters
     pdipmeans = ProjectedDipMeans(significance=0.1, n_random_projections=3, pval_strategy="bootstrap", n_boots=10,
                                   n_split_trials=2, n_clusters_init=3, max_n_clusters=5, random_state=1)

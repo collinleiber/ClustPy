@@ -6,7 +6,7 @@ Collin Leiber
 """
 
 import torch
-from clustpy.deep._utils import detect_device
+from clustpy.deep._utils import detect_device, set_torch_seed
 from clustpy.deep._data_utils import get_dataloader
 from clustpy.deep._train_utils import get_trained_autoencoder
 from clustpy.deep.variational_autoencoder import VariationalAutoencoder, _vae_sampling
@@ -537,7 +537,7 @@ class VaDE(BaseEstimator, ClusterMixin):
         self.embedding_size = embedding_size
         self.n_gmm_initializations = n_gmm_initializations
         self.random_state = check_random_state(random_state)
-        torch.manual_seed(self.random_state.get_state()[1][0])
+        set_torch_seed(self.random_state)
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'VaDE':
         """

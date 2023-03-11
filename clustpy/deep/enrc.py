@@ -6,9 +6,10 @@ Lukas Miklautz
 import torch
 from sklearn.base import BaseEstimator, ClusterMixin
 import numpy as np
-from ._utils import int_to_one_hot, squared_euclidean_distance, encode_batchwise, detect_device
-from ._data_utils import get_dataloader
-from ._train_utils import get_trained_autoencoder
+from clustpy.deep._utils import int_to_one_hot, squared_euclidean_distance, encode_batchwise, detect_device, \
+    set_torch_seed
+from clustpy.deep._data_utils import get_dataloader
+from clustpy.deep._train_utils import get_trained_autoencoder
 from clustpy.alternative import NrKmeans
 from sklearn.utils import check_random_state
 from sklearn.metrics import normalized_mutual_info_score
@@ -348,7 +349,7 @@ class _ENRC_Module(torch.nn.Module):
         # Apply reclustering in the rotated space, because V does not have to be orthogonal, so it could learn a mapping that is not recoverable by nrkmeans.
         centers_reclustered, P, new_V, beta_weights = enrc_init(data=embedded_rot, n_clusters=n_clusters, rounds=rounds,
                                                                 max_iter=300, learning_rate=self.learning_rate,
-                                                                init="auto", verbose=False)
+                                                                init="auto", debug=False)
 
         # Update V, because we applied the reclustering in the rotated space
         new_V = np.matmul(V, new_V)
@@ -363,7 +364,7 @@ class _ENRC_Module(torch.nn.Module):
 
     def fit(self, data: torch.Tensor, optimizer: torch.optim.Optimizer, max_epochs: int, model: torch.nn.Module,
             batch_size: int, loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(),
-            device: torch.device = torch.device("cpu"), print_step: int = 10, verbose: bool = True,
+            device: torch.device = torch.device("cpu"), print_step: int = 10, debug: bool = True,
             scheduler: torch.optim.lr_scheduler = None, fix_rec_error: bool = False,
             tolerance_threshold: float = None) -> (torch.nn.Module, '_ENRC_Module'):
         """
@@ -387,7 +388,7 @@ class _ENRC_Module(torch.nn.Module):
             device to be trained on (default: torch.device('cpu'))
         print_step : int
             specifies how often the losses are printed (default: 10)
-        verbose : bool
+        debug : bool
             if True than training errors will be printed (default: True)
         scheduler : torch.optim.lr_scheduler
             parameterized learning rate scheduler that should be used (default: None)
@@ -453,7 +454,7 @@ class _ENRC_Module(torch.nn.Module):
                 with torch.no_grad():
                     # Rotation loss is calculated to check if its deviation from an orthogonal matrix
                     rotation_loss = self.rotation_loss()
-                    if verbose:
+                    if debug:
                         print(
                             f"Epoch {epoch_i}/{max_epochs - 1}: summed_loss: {summed_loss.item():.4f}, subspace_losses: {subspace_loss.item():.4f}, rec_loss: {rec_loss.item():.4f}, rotation_loss: {rotation_loss.item():.4f}")
 
@@ -464,7 +465,7 @@ class _ENRC_Module(torch.nn.Module):
             labels_new = self.predict_batchwise(model=model, dataloader=evalloader, device=device, use_P=True)
             if _are_labels_equal(labels_new=labels_new, labels_old=labels_old, threshold=tolerance_threshold):
                 # training has converged
-                if verbose:
+                if debug:
                     print("Clustering has converged")
                 break
             else:
@@ -863,7 +864,7 @@ def calculate_beta_weight(data: torch.Tensor, centers: list, V: torch.Tensor, P:
 
 
 def nrkmeans_init(data: np.ndarray, n_clusters: list, rounds: int = 10, max_iter: int = 100, input_centers: list = None,
-                  P: list = None, V: np.ndarray = None, random_state: np.random.RandomState = None, verbose=True) -> (
+                  P: list = None, V: np.ndarray = None, random_state: np.random.RandomState = None, debug=True) -> (
         list, list, np.ndarray, np.ndarray):
     """
     Initialization strategy based on the NrKmeans Algorithm. This strategy is preferred for small data sets, but the orthogonality
@@ -888,7 +889,7 @@ def nrkmeans_init(data: np.ndarray, n_clusters: list, rounds: int = 10, max_iter
         orthogonal rotation matrix (optional) (default: None)
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
-    verbose : bool
+    debug : bool
         if True then the cost of each round will be printed (default: True)
 
     Returns
@@ -907,7 +908,7 @@ def nrkmeans_init(data: np.ndarray, n_clusters: list, rounds: int = 10, max_iter
         nrkmeans.fit(X=data)
         centers_i, P_i, V_i, scatter_matrices_i = nrkmeans.cluster_centers, nrkmeans.P, nrkmeans.V, nrkmeans.scatter_matrices_
         if len(P_i) != len(n_clusters):
-            if verbose:
+            if debug:
                 print(
                     f"WARNING: Lost Subspace. Found only {len(P_i)} subspaces for {len(n_clusters)} clusterings. Try to increase the size of the embedded space or the number of iterations of nrkmeans to avoid this from happening.")
         else:
@@ -915,7 +916,7 @@ def nrkmeans_init(data: np.ndarray, n_clusters: list, rounds: int = 10, max_iter
             if lowest > cost:
                 best = [centers_i, P_i, V_i, ]
                 lowest = cost
-            if verbose:
+            if debug:
                 print(f"Round {i}: Found solution with: {cost} (current best: {lowest})")
     # Best parameters
     centers, P, V = best
@@ -932,7 +933,7 @@ def nrkmeans_init(data: np.ndarray, n_clusters: list, rounds: int = 10, max_iter
 
 def random_nrkmeans_init(data: np.ndarray, n_clusters: list, rounds: int = 10, input_centers: list = None,
                          P: list = None, V: np.ndarray = None, random_state: np.random.RandomState = None,
-                         verbose: bool = True) -> (list, list, np.ndarray, np.ndarray):
+                         debug: bool = True) -> (list, list, np.ndarray, np.ndarray):
     """
     Initialization strategy based on the NrKmeans Algorithm. For documentation see nrkmeans_init function.
     Same as nrkmeans_init, but max_iter is set to 5, so the results will be faster and more random.
@@ -953,7 +954,7 @@ def random_nrkmeans_init(data: np.ndarray, n_clusters: list, rounds: int = 10, i
         orthogonal rotation matrix (optional) (default: None)
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
-    verbose : bool
+    debug : bool
         if True then the cost of each round will be printed (default: True)
 
     Returns
@@ -965,7 +966,7 @@ def random_nrkmeans_init(data: np.ndarray, n_clusters: list, rounds: int = 10, i
         weights for softmax function to get beta values.
     """
     return nrkmeans_init(data=data, n_clusters=n_clusters, rounds=rounds, max_iter=5,
-                         input_centers=input_centers, P=P, V=V, random_state=random_state, verbose=verbose)
+                         input_centers=input_centers, P=P, V=V, random_state=random_state, debug=debug)
 
 
 def _determine_sgd_init_costs(enrc: _ENRC_Module, dataloader: torch.utils.data.DataLoader,
@@ -1003,7 +1004,7 @@ def _determine_sgd_init_costs(enrc: _ENRC_Module, dataloader: torch.utils.data.D
 def sgd_init(data: np.ndarray, n_clusters: list, learning_rate: float, batch_size: int = 128,
              optimizer_class: torch.optim.Optimizer = None, rounds: int = 2, epochs: int = 10,
              random_state: np.random.RandomState = None, input_centers: list = None, P: list = None,
-             V: np.ndarray = None, device: torch.device = torch.device("cpu"), verbose: bool = True) -> (
+             V: np.ndarray = None, device: torch.device = torch.device("cpu"), debug: bool = True) -> (
         list, list, np.ndarray, np.ndarray):
     """
     Initialization strategy based on optimizing ENRC's parameters V and beta in isolation from the autoencoder using a mini-batch gradient descent optimizer.
@@ -1036,7 +1037,7 @@ def sgd_init(data: np.ndarray, n_clusters: list, learning_rate: float, batch_siz
         orthogonal rotation matrix (optional) (default: None)
     device : torch.device
         device on which should be trained on (default: torch.device('cpu'))
-    verbose : bool
+    debug : bool
         if True then the cost of each round will be printed (default: True)
 
     Returns
@@ -1056,7 +1057,7 @@ def sgd_init(data: np.ndarray, n_clusters: list, learning_rate: float, batch_siz
         # start with random initialization
         init_centers, P_init, V_init, _ = random_nrkmeans_init(data=data, n_clusters=n_clusters, rounds=10,
                                                                input_centers=input_centers,
-                                                               P=P, V=V, verbose=False)
+                                                               P=P, V=V, debug=False)
 
         # Initialize betas with uniform distribution
         enrc_module = _ENRC_Module(init_centers, P_init, V_init, beta_init_value=1.0 / len(P_init)).to_device(device)
@@ -1078,7 +1079,7 @@ def sgd_init(data: np.ndarray, n_clusters: list, learning_rate: float, batch_siz
                         loss_fn=torch.nn.MSELoss(),
                         batch_size=batch_size,
                         device=device,
-                        verbose=False,
+                        debug=False,
                         fix_rec_error=True)
 
         cost = _determine_sgd_init_costs(enrc=enrc_module, dataloader=dataloader, loss_fn=torch.nn.MSELoss(),
@@ -1086,7 +1087,7 @@ def sgd_init(data: np.ndarray, n_clusters: list, learning_rate: float, batch_siz
         if lowest > cost:
             best = [enrc_module.centers, enrc_module.P, enrc_module.V, enrc_module.beta_weights]
             lowest = cost
-        if verbose:
+        if debug:
             print(f"Round {round_i}: Found solution with: {cost} (current best: {lowest})")
 
     centers, P, V, beta_weights = best
@@ -1100,7 +1101,7 @@ def sgd_init(data: np.ndarray, n_clusters: list, learning_rate: float, batch_siz
 def enrc_init(data: np.ndarray, n_clusters: list, init: str = "auto", rounds: int = 10, input_centers: list = None,
               P: list = None, V: np.ndarray = None, random_state: np.random.RandomState = None, max_iter: int = 100,
               learning_rate: float = None, optimizer_class: torch.optim.Optimizer = None, batch_size: int = 128,
-              epochs: int = 10, device: torch.device = torch.device("cpu"), verbose: bool = True,
+              epochs: int = 10, device: torch.device = torch.device("cpu"), debug: bool = True,
               init_kwargs: dict = None) -> (list, list, np.ndarray, np.ndarray):
     """
     Initialization strategy for the ENRC algorithm.
@@ -1150,7 +1151,7 @@ def enrc_init(data: np.ndarray, n_clusters: list, init: str = "auto", rounds: in
         number of epochs for the actual clustering procedure. Only used for init='sgd' (default: 10)
     device : torch.device
         device on which should be trained on. Only used for init='sgd' (default: torch.device('cpu'))
-    verbose : bool
+    debug : bool
         if True then the cost of each round will be printed (default: True)
     init_kwargs : dict
         additional parameters that are used if init is a callable (optional) (default: None)
@@ -1170,16 +1171,16 @@ def enrc_init(data: np.ndarray, n_clusters: list, init: str = "auto", rounds: in
     if init == "nrkmeans":
         centers, P, V, beta_weights = nrkmeans_init(data=data, n_clusters=n_clusters, rounds=rounds,
                                                     input_centers=input_centers, P=P, V=V, random_state=random_state,
-                                                    verbose=verbose)
+                                                    debug=debug)
     elif init == "random":
         centers, P, V, beta_weights = random_nrkmeans_init(data=data, n_clusters=n_clusters, rounds=rounds,
                                                            input_centers=input_centers, P=P, V=V,
-                                                           random_state=random_state, verbose=verbose)
+                                                           random_state=random_state, debug=debug)
     elif init == "sgd":
         centers, P, V, beta_weights = sgd_init(data=data, n_clusters=n_clusters, learning_rate=learning_rate,
                                                rounds=rounds, epochs=epochs, input_centers=input_centers, P=P, V=V,
                                                optimizer_class=optimizer_class, batch_size=batch_size,
-                                               random_state=random_state, device=device, verbose=verbose)
+                                               random_state=random_state, device=device, debug=debug)
     elif init == "auto":
         if data.shape[0] > 100000 or data.shape[1] > 1000:
             init = "sgd"
@@ -1189,7 +1190,7 @@ def enrc_init(data: np.ndarray, n_clusters: list, init: str = "auto", rounds: in
                                                 rounds=rounds, input_centers=input_centers,
                                                 P=P, V=V, random_state=random_state, max_iter=max_iter,
                                                 learning_rate=learning_rate, optimizer_class=optimizer_class,
-                                                epochs=epochs, verbose=verbose)
+                                                epochs=epochs, debug=debug)
     elif callable(init):
         if init_kwargs is not None:
             centers, P, V, beta_weights = init(data, n_clusters, **init_kwargs)
@@ -1441,7 +1442,7 @@ def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers
           degree_of_space_distortion: float, degree_of_space_preservation: float, autoencoder: torch.nn.Module,
           embedding_size: int, init: str, random_state: np.random.RandomState, device: torch.device,
           scheduler: torch.optim.lr_scheduler, scheduler_params: dict, tolerance_threshold: float, init_kwargs: dict,
-          init_subsample_size: int, verbose: bool) -> (
+          init_subsample_size: int, debug: bool) -> (
         np.ndarray, list, np.ndarray, list, np.ndarray, list, list, torch.nn.Module):
     """
     Start the actual ENRC clustering procedure on the input data set.
@@ -1498,7 +1499,7 @@ def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers
         additional parameters that are used if init is a callable
     init_subsample_size : int
         specify if only a subsample of size 'init_subsample_size' of the data should be used for the initialization
-    verbose : bool
+    debug : bool
         if True additional information during the training will be printed
 
     Returns
@@ -1538,7 +1539,7 @@ def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers
     # Run ENRC init
     print("Run ENRC init: ", init)
     input_centers, P, V, beta_weights = enrc_init(data=embedded_data, n_clusters=n_clusters, device=device, init=init,
-                                                  rounds=10, epochs=10, batch_size=batch_size, verbose=verbose,
+                                                  rounds=10, epochs=10, batch_size=batch_size, debug=debug,
                                                   input_centers=input_centers, P=P, V=V, random_state=random_state,
                                                   max_iter=100, learning_rate=clustering_learning_rate,
                                                   optimizer_class=optimizer_class, init_kwargs=init_kwargs)
@@ -1571,7 +1572,7 @@ def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers
                     device=device,
                     scheduler=scheduler,
                     tolerance_threshold=tolerance_threshold,
-                    verbose=verbose)
+                    debug=debug)
 
     # Recluster
     print("Recluster")
@@ -1640,8 +1641,17 @@ class ENRC(BaseEstimator, ClusterMixin):
         additional parameters that are used if init is a callable (optional) (default: None)
     init_subsample_size: int
         specify if only a subsample of size 'init_subsample_size' of the data should be used for the initialization (optional) (default: None)
-    verbose: bool
+    debug: bool
         if True additional information during the training will be printed (default: False)
+
+    Attributes
+    ----------
+    labels_ : np.ndarray
+        The final labels
+    cluster_centers_ : np.ndarray
+        The final cluster centers
+    autoencoder : torch.nn.Module
+        The final autoencoder
 
     Raises
     ----------
@@ -1662,7 +1672,7 @@ class ENRC(BaseEstimator, ClusterMixin):
                  autoencoder: torch.nn.Module = None, embedding_size: int = 20, init: str = "nrkmeans",
                  device: torch.device = None, scheduler: torch.optim.lr_scheduler = None,
                  scheduler_params: dict = None, init_kwargs: dict = None, init_subsample_size: int = None,
-                 random_state: np.random.RandomState = None, verbose: bool = False):
+                 random_state: np.random.RandomState = None, debug: bool = False):
         self.n_clusters = n_clusters.copy()
         self.device = device
         self.batch_size = batch_size
@@ -1682,8 +1692,8 @@ class ENRC(BaseEstimator, ClusterMixin):
         self.init_kwargs = init_kwargs
         self.init_subsample_size = init_subsample_size
         self.random_state = check_random_state(random_state)
-        torch.manual_seed(self.random_state.get_state()[1][0])
-        self.verbose = verbose
+        set_torch_seed(self.random_state)
+        self.debug = debug
 
         if len(self.n_clusters) < 2:
             raise ValueError(f"n_clusters={n_clusters}, but should be <= 2.")
@@ -1739,7 +1749,7 @@ class ENRC(BaseEstimator, ClusterMixin):
                                                                                          scheduler_params=self.scheduler_params,
                                                                                          init_kwargs=self.init_kwargs,
                                                                                          init_subsample_size=self.init_subsample_size,
-                                                                                         verbose=self.verbose)
+                                                                                         debug=self.debug)
         # Update class variables
         self.labels_ = cluster_labels
         self.cluster_centers_ = cluster_centers

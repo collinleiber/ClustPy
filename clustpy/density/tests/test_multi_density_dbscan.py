@@ -1,6 +1,6 @@
-from clustpy.data import load_wine
 from clustpy.density import MultiDensityDBSCAN
 from clustpy.density.multi_density_dbscan import _sort_neighbors_by_densities, _add_neighbors_to_neighbor_list
+from sklearn.datasets import make_blobs
 import numpy as np
 
 
@@ -34,8 +34,8 @@ def test_sort_neighbors_by_densities():
     assert np.array_equal([0, 1, 2, 4, 6, 7], sorted_neighbors)
 
 
-def test_simple_MutliDensityDBSCAN_with_wine():
-    X, labels = load_wine()
+def test_simple_MutliDensityDBSCAN():
+    X, labels = make_blobs(200, 4, centers=3, random_state=1)
     # With additional queue sorting
     md_dbscan = MultiDensityDBSCAN()
     assert not hasattr(md_dbscan, "labels_")

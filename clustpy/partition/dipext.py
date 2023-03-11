@@ -12,7 +12,7 @@ from sklearn.utils import check_random_state
 
 
 def _dip_ext(X: np.ndarray, n_components: int, do_dip_scaling: bool, step_size: float, momentum: float,
-             dip_threshold: float, n_starting_vectors: int, consider_duplicates: bool,
+             dip_threshold: float, n_starting_vectors: int, ambiguous_triangle_strategy: str,
              random_state: np.random.RandomState) -> (np.ndarray, np.ndarray, list, np.ndarray):
     """
     Start the actual DipExt dimensionality-reduction procedure on the input data set.
@@ -33,10 +33,12 @@ def _dip_ext(X: np.ndarray, n_components: int, do_dip_scaling: bool, step_size: 
         Defines the number of components if n_components is None. If an identified feature has a dip-value below the maximum dip-value times dip_threshold, DipExt will terminate
     n_starting_vectors : int
         The number of starting vectors for gradient descent
-    consider_duplicates : bool
-        If multiple instances on the projection axis share a value, the gradient is not unambigous. If those duplicate values should be considered a random instances will be choses for furhter calculations. Beware: The calculation will not be deterministic anymore
+    ambiguous_triangle_strategy : str
+        The strategy with which to handle an ambiguous modal triangle. Can be 'ignore', 'random' or 'all'.
+        In the case of 'random', a valid triangle is created at random.
+        In the case of 'all', for each possible triangle the gradient is calculated and it is checked for which gradient the following result looks most promising - this strategy can increase the runtime noticeably
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int. Only used if consider_duplicates is True
+        use a fixed random state to get a repeatable solution. Only used if ambiguous_triangle_strategy is 'random'
 
     Returns
     -------
@@ -49,6 +51,10 @@ def _dip_ext(X: np.ndarray, n_components: int, do_dip_scaling: bool, step_size: 
     assert n_components is None or n_components < X.shape[
         1], "n_components must be None or smaller than the dimensionality of the data set."
     assert dip_threshold <= 1 and dip_threshold >= 0, "dip_threshold must be within [0, 1]"
+    assert type(ambiguous_triangle_strategy) is str, "ambiguous_triangle_strategy must be of type str"
+    ambiguous_triangle_strategy = ambiguous_triangle_strategy.lower()
+    assert ambiguous_triangle_strategy in ["ignore", "random",
+                                           "all"], "ambiguous_triangle_strategy must be 'ignore', 'random' or 'all'"
     # Initial values
     subspace = np.zeros((X.shape[0], 0))
     projection_axes = []
@@ -58,7 +64,7 @@ def _dip_ext(X: np.ndarray, n_components: int, do_dip_scaling: bool, step_size: 
     # Find multimodal axes
     while True:
         dip_value, projection, projected_data = _find_max_dip_by_sgd(remaining_X, step_size, momentum,
-                                                                     n_starting_vectors, consider_duplicates,
+                                                                     n_starting_vectors, ambiguous_triangle_strategy,
                                                                      random_state)
         if dip_value < max_dip * dip_threshold and n_components is None:
             break
@@ -83,7 +89,7 @@ def _dip_ext(X: np.ndarray, n_components: int, do_dip_scaling: bool, step_size: 
 
 
 def _find_max_dip_by_sgd(X: np.ndarray, step_size: float, momentum: float, n_starting_vectors: int,
-                         consider_duplicates: bool, random_state: np.random.RandomState) -> (
+                         ambiguous_triangle_strategy: str, random_state: np.random.RandomState) -> (
         float, np.ndarray, np.ndarray):
     """
     Find the axes with n_starting_vectors highest dip-values and start gradient descent from there.
@@ -98,10 +104,12 @@ def _find_max_dip_by_sgd(X: np.ndarray, step_size: float, momentum: float, n_sta
         Momentum used for gradient descent
     n_starting_vectors : int
         The number of starting vectors for gradient descent
-    consider_duplicates : bool
-        If multiple instances on the projection axis share a value, the gradient is not unambigous. If those duplicate values should be considered a random instances will be choses for furhter calculations. Beware: The calculation will not be deterministic anymore
+    ambiguous_triangle_strategy : str
+        The strategy with which to handle an ambiguous modal triangle. Can be 'ignore', 'random' or 'all'.
+        In the case of 'random', a valid triangle is created at random.
+        In the case of 'all', for each possible triangle the gradient is calculated and it is checked for which gradient the following result looks most promising - this strategy can increase the runtime noticeably
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int. Only used if consider_duplicates is True
+        use a fixed random state to get a repeatable solution. Only used if ambiguous_triangle_strategy is 'random'
 
     Returns
     -------
@@ -127,7 +135,7 @@ def _find_max_dip_by_sgd(X: np.ndarray, step_size: float, momentum: float, n_sta
         start_projection = np.zeros(X.shape[1])
         start_projection[dips_argsorted[i]] = 1
         dip_value, projection, projected_data = _find_max_dip_by_sgd_with_start(X, start_projection, step_size,
-                                                                                momentum, consider_duplicates,
+                                                                                momentum, ambiguous_triangle_strategy,
                                                                                 random_state)
         if dip_value > max_dip:
             max_dip = dip_value
@@ -137,7 +145,7 @@ def _find_max_dip_by_sgd(X: np.ndarray, step_size: float, momentum: float, n_sta
 
 
 def _find_max_dip_by_sgd_with_start(X: np.ndarray, projection: np.ndarray, step_size: float, momentum: float,
-                                    consider_duplicates: bool, random_state: np.random.RandomState) -> (
+                                    ambiguous_triangle_strategy: str, random_state: np.random.RandomState) -> (
         float, np.ndarray, np.ndarray):
     """
     Perform gradient descent to find the projection vector with the maximum dip-value.
@@ -152,10 +160,12 @@ def _find_max_dip_by_sgd_with_start(X: np.ndarray, projection: np.ndarray, step_
         Step size used for gradient descent
     momentum : float
         Momentum used for gradient descent
-    consider_duplicates : bool
-        If multiple instances on the projection axis share a value, the gradient is not unambigous. If those duplicate values should be considered a random instances will be choses for furhter calculations. Beware: The calculation will not be deterministic anymore
+    ambiguous_triangle_strategy : str
+        The strategy with which to handle an ambiguous modal triangle. Can be 'ignore', 'random' or 'all'.
+        In the case of 'random', a valid triangle is created at random.
+        In the case of 'all', for each possible triangle the gradient is calculated and it is checked for which gradient the following result looks most promising - this strategy can increase the runtime noticeably
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int. Only used if consider_duplicates is True
+        use a fixed random state to get a repeatable solution. Only used if ambiguous_triangle_strategy is 'random'
 
     Returns
     -------
@@ -174,12 +184,25 @@ def _find_max_dip_by_sgd_with_start(X: np.ndarray, projection: np.ndarray, step_
     while True:
         # Ensure unit vector
         projection = projection / np.linalg.norm(projection)
-        gradient, dip_value, projected_data = _get_max_dip_using_gradient(X, projection, consider_duplicates,
+        gradient, dip_value, projected_data = _get_max_dip_using_gradient(X, projection, ambiguous_triangle_strategy,
                                                                           random_state)
         if dip_value > max_dip:
             max_dip = dip_value
             best_projection = projection
             best_projected_data = projected_data
+        # Normally there is only one gradient. But there can be multiple if ambiguous_triangle_strategy is 'all'
+        if ambiguous_triangle_strategy == "all":
+            tmp_max_dip = 0
+            tmp_best_gradient = None
+            for tmp_gradient in gradient:
+                tmp_direction = momentum * direction + step_size * tmp_gradient
+                tmp_projection = projection + tmp_direction
+                tmp_projected_data = np.matmul(X, tmp_projection)
+                tmp_dip_value = dip_test(tmp_projected_data, just_dip=True, is_data_sorted=False)
+                if tmp_dip_value > tmp_max_dip:
+                    tmp_max_dip = tmp_dip_value
+                    tmp_best_gradient = tmp_gradient
+            gradient = tmp_best_gradient
         # Update parameters
         direction = momentum * direction + step_size * gradient
         new_projection = projection + direction
@@ -195,8 +218,9 @@ def _find_max_dip_by_sgd_with_start(X: np.ndarray, projection: np.ndarray, step_
     return max_dip, best_projection, best_projected_data
 
 
-def _get_max_dip_using_gradient(X: np.ndarray, projection_vector: np.ndarray, consider_duplicates: bool,
-                                random_state: np.random.RandomState) -> (np.ndarray, float, np.ndarray):
+def _get_max_dip_using_gradient(X: np.ndarray, projection_vector: np.ndarray, ambiguous_triangle_strategy: str,
+                                random_state: np.random.RandomState) -> (
+        np.ndarray, float, np.ndarray):
     """
     Use current projection_vector to calculate the dip value and a corresponding modal_triangle.
     The modal_triangle is then used to calculate the gradient of the used projection axis.
@@ -207,54 +231,154 @@ def _get_max_dip_using_gradient(X: np.ndarray, projection_vector: np.ndarray, co
         the given data set
     projection_vector : np.ndarray
         the current projection vector
-    consider_duplicates : bool
-        If multiple instances on the projection axis share a value, the gradient is not unambigous. If those duplicate values should be considered a random instances will be choses for furhter calculations. Beware: The calculation will not be deterministic anymore
+    ambiguous_triangle_strategy : str
+        The strategy with which to handle an ambiguous modal triangle. Can be 'ignore', 'random' or 'all'.
+        In the case of 'random', a valid triangle is created at random.
+        In the case of 'all', for each possible triangle the gradient is calculated and it is checked for which gradient the following result looks most promising - this strategy can increase the runtime noticeably
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int
+        use a fixed random state to get a repeatable solution. Only used if ambiguous_triangle_strategy is 'random'
 
     Returns
     -------
     tuple : (np.ndarray, float, np.ndarray)
-        The gradient of the dip regarding the projection axis,
+        The gradient of the dip regarding the projection axis (can contain multiple gradients if ambiguous_triangle_strategy is 'all'),
         The dip-value,
         The data set projected onto the current projection axis
     """
     # Project data (making a univariate sample)
     projected_data = np.matmul(X, projection_vector)
     # Sort data
-    sortedIndices = np.argsort(projected_data)
-    sorted_projected_data = projected_data[sortedIndices]
+    sorted_indices = np.argsort(projected_data)
+    sorted_projected_data = projected_data[sorted_indices]
     # Calculate dip, capturing the output which we need for touching-triangle calculations
     dip_value, _, modal_triangle = dip_test(sorted_projected_data, just_dip=False, is_data_sorted=True)
     if modal_triangle[0] == -1:
         return np.zeros(X.shape[1]), dip_value, projected_data
-    if consider_duplicates:
-        # If duplicate values should be considered, get random modal triangle
-        modal_triangle = _get_random_modal_triangle(sorted_projected_data, modal_triangle, random_state)
-    # Calculate the partial derivative for all dimensions
-    gradient = dip_gradient(X, projected_data, sortedIndices, modal_triangle)
+    if ambiguous_triangle_strategy == "all":
+        # Calculate all possible gradients. Beware: in this case, gradient is a list!
+        gradient = _ambiguous_modal_triangle_all(X, projected_data, sorted_projected_data, sorted_indices,
+                                                 modal_triangle)
+    else:
+        if ambiguous_triangle_strategy == "random":
+            # If duplicate values should be considered, get random reordering of sorted_indices
+            sorted_indices = _ambiguous_modal_triangle_random(sorted_projected_data, sorted_indices, modal_triangle,
+                                                              random_state)
+        # Calculate the gradient
+        gradient = dip_gradient(X, projected_data, sorted_indices, modal_triangle)
     return gradient, dip_value, projected_data
 
 
-def _get_random_modal_triangle(sorted_projected_data: np.ndarray, modal_triangle: tuple,
-                               random_state: np.random.RandomState) -> tuple:
+"""
+Handle ambiguous modal triangle
+"""
+
+
+def _ambiguous_modal_triangle_random(sorted_projected_data: np.ndarray, sorted_indices: np.ndarray,
+                                     modal_triangle: tuple, random_state: np.random.RandomState) -> np.ndarray:
     """
-    If on a projection axis multiple values share a coordinate, the modal_triangle is not unambigous.
-    Therefore, if consider_duplicates is True the random_state will be used to randomly generate a valid modal_triangle.
+    If on a projection axis multiple values share a coordinate, the modal_triangle is ambiguous.
+    In this case the random_state will be used to randomly switch the positions of entries that share the coordinate in sorted_indices.
+    This has an influence on the following gradient calculation.
+
+    Parameters
+    ----------
+    sorted_projected_data : np.ndarray
+        The data set projected onto the projection axis and sorted afterwards
+    sorted_indices : np.ndarray
+        The indices of the sorted univariate data set
+    modal_triangle : tuple
+        The modal triangle as returned by the dip-test
+    random_state : np.random.RandomState
+        use a fixed random state to get a repeatable solution
+
+    Returns
+    -------
+    sorted_indices : np.ndarray
+        The updated indices of the sorted univariate data set
+    """
+    triangle_possibilities = _get_ambiguous_modal_triangle_possibilities(sorted_projected_data, modal_triangle)
+    # Change order of samples with same value using random ordering
+    for i in range(len(modal_triangle)):
+        # Get random change
+        new_modal_triangle_obj = random_state.choice(triangle_possibilities[i])
+        if i < 2 and len(triangle_possibilities[i]) > 1 and sorted_projected_data[modal_triangle[i]] == \
+                sorted_projected_data[modal_triangle[i + 1]]:
+            # Remove value from list since its triangle coordinate should not be used twice
+            triangle_possibilities[i + 1].remove(new_modal_triangle_obj)
+        original_index = sorted_indices[modal_triangle[i]]
+        sorted_indices[modal_triangle[i]] = sorted_indices[new_modal_triangle_obj]
+        sorted_indices[new_modal_triangle_obj] = original_index
+    return sorted_indices
+
+
+def _ambiguous_modal_triangle_all(X: np.ndarray, projected_data: np.ndarray, sorted_projected_data: np.ndarray,
+                                  sorted_indices: np.ndarray, modal_triangle: tuple) -> np.ndarray:
+    """
+    If on a projection axis multiple values share a coordinate, the modal_triangle is ambiguous.
+    Therefore, all possible gradients will be calculated and returned.
+    This allows the following SGD step to be performed for each gradient and the dip value to be calculated.
+    The best value is then used for the further SGD process.
+
+    Parameters
+    ----------
+    X : np.ndarray
+        the given data set
+    projected_data : np.ndarray
+        The univariate projected data set
+    sorted_projected_data : np.ndarray
+        The data set projected onto the projection axis and sorted afterwards
+    sorted_indices : np.ndarray
+        The indices of the sorted univariate data set
+    modal_triangle : tuple
+        The modal triangle as returned by the dip-test
+
+    Returns
+    -------
+    gradient : np.ndarray
+        Array containing all the calculated gradients
+    """
+    triangle_possibilities = _get_ambiguous_modal_triangle_possibilities(sorted_projected_data, modal_triangle)
+    gradients = []
+    # Test all ordering possibilities
+    for i0 in triangle_possibilities[0]:
+        for i1 in triangle_possibilities[1]:
+            for i2 in triangle_possibilities[2]:
+                # Skip if we have a coordinate twice
+                if (i0 == i1 and len(triangle_possibilities[0]) > 1) or (
+                        i1 == i2 and len(triangle_possibilities[1]) > 1):
+                    continue
+                # Update ordering
+                sorted_indices_copy = sorted_indices.copy()
+                original_index_0 = sorted_indices_copy[modal_triangle[0]]
+                sorted_indices_copy[modal_triangle[0]] = sorted_indices_copy[i0]
+                sorted_indices_copy[i0] = original_index_0
+                original_index_1 = sorted_indices_copy[modal_triangle[1]]
+                sorted_indices_copy[modal_triangle[1]] = sorted_indices_copy[i1]
+                sorted_indices_copy[i1] = original_index_1
+                original_index_2 = sorted_indices_copy[modal_triangle[2]]
+                sorted_indices_copy[modal_triangle[2]] = sorted_indices_copy[i2]
+                sorted_indices_copy[i2] = original_index_2
+                # Get gradient if we would use that ordering
+                gradient_new = dip_gradient(X, projected_data, sorted_indices_copy, modal_triangle)
+                gradients.append(gradient_new)
+    return np.array(gradients)
+
+
+def _get_ambiguous_modal_triangle_possibilities(sorted_projected_data: np.ndarray, modal_triangle: np.ndarray) -> list:
+    """
+    Get all the possibilities for the modal triangle by checking if the surrounding values are equal to the triangle values.
 
     Parameters
     ----------
     sorted_projected_data : np.ndarray
         The data set projected onto the projection axis and sorted afterwards
     modal_triangle : tuple
-        Theoriginal modal triangle as returned by the dip-test
-    random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int
+        The modal triangle as returned by the dip-test
 
     Returns
     -------
-    modal_triangle : tuple
-        The randomly created modal triangle
+    triangle_possibilities : list
+        List containing a separate list for each triangle component which contains the ids of samples with an equal value
     """
     triangle_possibilities = [[modal_triangle[0]], [modal_triangle[1]], [modal_triangle[2]]]
     # Add indices with same value to triangle
@@ -271,20 +395,12 @@ def _get_random_modal_triangle(sorted_projected_data: np.ndarray, modal_triangle
                 sorted_projected_data[triangle_point]:
             triangle_possibilities[j].append(triangle_point + i)
             i += 1
-    # Build random modal triangle
-    min_index = 0
-    max_index = len(triangle_possibilities[1])
-    if sorted_projected_data[modal_triangle[0]] == sorted_projected_data[modal_triangle[1]] and len(triangle_possibilities[1]) != 1:
-        # modal_triangle[1] should be larger than modal_triangle[0] => one position must be saved for modal_triangle[0]
-        min_index = 1
-    if sorted_projected_data[modal_triangle[1]] == sorted_projected_data[modal_triangle[2]] and len(triangle_possibilities[1]) != 1:
-        # modal_triangle[2] should be larger than modal_triangle[1] => one position must be saved for modal_triangle[2]
-        max_index = -1
-    modal_triangle_1 = random_state.choice(triangle_possibilities[1][min_index:max_index])
-    modal_triangle = (random_state.choice([x for x in triangle_possibilities[0] if x < modal_triangle_1 or len(triangle_possibilities[1]) == 1]),
-                      modal_triangle_1,
-                      random_state.choice([x for x in triangle_possibilities[2] if x > modal_triangle_1 or len(triangle_possibilities[1]) == 1]))
-    return modal_triangle
+    return triangle_possibilities
+
+
+"""
+Utils
+"""
 
 
 def _transform_using_projections(X: np.ndarray, projection_axes: list, do_dip_scaling: bool,
@@ -434,6 +550,11 @@ def _dip_init(subspace: np.ndarray, n_clusters: int) -> (np.ndarray, np.ndarray)
     return km.labels_, km.cluster_centers_
 
 
+"""
+DipExt object
+"""
+
+
 class DipExt(TransformerMixin, BaseEstimator):
     """
     Execute the DipExt algorithm to reduce the number of features.
@@ -454,10 +575,12 @@ class DipExt(TransformerMixin, BaseEstimator):
         Defines the number of components if n_components is None. If an identified feature has a dip-value below the maximum dip-value times dip_threshold, DipExt will terminate (default: 0.5)
     n_starting_vectors : int
         The number of starting vectors for gradient descent. Can be None, in that case it will be equal to log(data dimensionality) + 1 (default: None)
-    consider_duplicates : bool
-        If multiple instances on the projection axis share a value, the gradient is not unambigous. If those duplicate values should be considered a random instances will be choses for furhter calculations. Beware: The calculation will not be deterministic anymore (default: False)
+    ambiguous_triangle_strategy : str
+        The strategy with which to handle an ambiguous modal triangle. Can be 'ignore', 'random' or 'all'.
+        In the case of 'random', a valid triangle is created at random.
+        In the case of 'all', for each possible triangle the gradient is calculated and it is checked for which gradient the following result looks most promising - this strategy can increase the runtime noticeably (default: 'ignore')
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int. Only used if consider_duplicates is True (default: None)
+        use a fixed random state to get a repeatable solution. Can also be of type int. Only used if ambiguous_triangle_strategy is 'random' (default: None)
 
     Attributes
     ----------
@@ -476,14 +599,14 @@ class DipExt(TransformerMixin, BaseEstimator):
 
     def __init__(self, n_components: int = None, do_dip_scaling: bool = True, step_size: float = 0.1,
                  momentum: float = 0.95, dip_threshold: float = 0.5, n_starting_vectors: int = None,
-                 consider_duplicates: bool = False, random_state: np.random.RandomState = None):
+                 ambiguous_triangle_strategy: str = "ignore", random_state: np.random.RandomState = None):
         self.n_components = n_components
         self.do_dip_scaling = do_dip_scaling
         self.step_size = step_size
         self.momentum = momentum
         self.dip_threshold = dip_threshold
         self.n_starting_vectors = n_starting_vectors
-        self.consider_duplicates = consider_duplicates
+        self.ambiguous_triangle_strategy = ambiguous_triangle_strategy
         self.random_state = check_random_state(random_state)
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DipExt':
@@ -544,7 +667,8 @@ class DipExt(TransformerMixin, BaseEstimator):
             self.n_starting_vectors = _n_starting_vectors_default(X.shape[1])
         subspace, dip_values, projections, argsorted_dip = _dip_ext(X, self.n_components, self.do_dip_scaling,
                                                                     self.step_size, self.momentum, self.dip_threshold,
-                                                                    self.n_starting_vectors, self.consider_duplicates,
+                                                                    self.n_starting_vectors,
+                                                                    self.ambiguous_triangle_strategy,
                                                                     self.random_state)
         self.n_components = len(dip_values)
         self.dip_values_ = dip_values
@@ -578,10 +702,12 @@ class DipInit(DipExt, BaseEstimator, ClusterMixin):
         Defines the number of components if n_components is None. If an identified feature has a dip-value below the maximum dip-value times dip_threshold, DipExt will terminate (default: 0.5)
     n_starting_vectors : int
         The number of starting vectors for gradient descent. Can be None, in that case it will be equal to log(data dimensionality) + 1 (default: None)
-    consider_duplicates : bool
-        If multiple instances on the projection axis share a value, the gradient is not unambigous. If those duplicate values should be considered a random instances will be choses for furhter calculations. Beware: The calculation will not be deterministic anymore (default: False)
+    ambiguous_triangle_strategy : str
+        The strategy with which to handle an ambiguous modal triangle. Can be 'ignore', 'random' or 'all'.
+        In the case of 'random', a valid triangle is created at random.
+        In the case of 'all', for each possible triangle the gradient is calculated and it is checked for which gradient the following result looks most promising - this strategy can increase the runtime noticeably (default: 'ignore')
     random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution. Can also be of type int. Only used if consider_duplicates is True (default: None)
+        use a fixed random state to get a repeatable solution. Can also be of type int. Only used if ambiguous_triangle_strategy is 'random' (default: None)
 
     Attributes
     ----------
@@ -598,9 +724,9 @@ class DipInit(DipExt, BaseEstimator, ClusterMixin):
 
     def __init__(self, n_clusters: int, n_components: int = None, do_dip_scaling: bool = True, step_size: float = 0.1,
                  momentum: float = 0.95, dip_threshold: float = 0.5, n_starting_vectors: int = None,
-                 consider_duplicates: bool = False, random_state: np.random.RandomState = None):
+                 ambiguous_triangle_strategy: str = "ignore", random_state: np.random.RandomState = None):
         super().__init__(n_components, do_dip_scaling, step_size, momentum, dip_threshold, n_starting_vectors,
-                         consider_duplicates, random_state)
+                         ambiguous_triangle_strategy, random_state)
         self.n_clusters = n_clusters
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DipInit':

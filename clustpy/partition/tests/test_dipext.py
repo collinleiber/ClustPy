@@ -1,7 +1,8 @@
 import numpy as np
 from clustpy.partition import DipExt, DipInit
-from clustpy.partition.dipext import _dip_scaling, _n_starting_vectors_default, _angle, _get_random_modal_triangle
-from clustpy.data import load_wine
+from clustpy.partition.dipext import _dip_scaling, _n_starting_vectors_default, _angle, \
+    _ambiguous_modal_triangle_random, _get_ambiguous_modal_triangle_possibilities, _ambiguous_modal_triangle_all
+from clustpy.data import create_subspace_data
 
 
 def test_angle():
@@ -29,20 +30,50 @@ def test_dip_scaling():
                          [0.5 * 0.5, 0.5 * 0.1, 0.5 * 0.2],
                          [0.75 * 0.5, 0.1, 0.75 * 0.2],
                          [0.5, 0.1, 0.2]])
-    np.array_equal(subspace, X_result)
+    assert np.array_equal(subspace, X_result)
 
 
-def test_get_random_modal_triangle():
+def test_get_ambiguous_modal_triangle_possibilities():
     sorted_data = np.array([0, 1, 1, 1, 1, 2, 2, 3, 4])
-    modal_triangle_orig = (1, 4, 6)
-    for i in range(10):
+    modal_triangle = (1, 4, 6)
+    possibilities = _get_ambiguous_modal_triangle_possibilities(sorted_data, modal_triangle)
+    assert possibilities[0] == [1, 2, 3, 4]
+    assert possibilities[1] == [1, 2, 3, 4]
+    assert possibilities[2] == [5, 6]
+
+
+def test_consider_ambiguous_modal_triangle():
+    data = np.array([1, 4, 1, 1, 1, 2, 0, 2, 3])
+    sorted_indices_orig = np.array([6, 0, 2, 3, 4, 5, 7, 8, 1])
+    sorted_data = np.array([0, 1, 1, 1, 1, 2, 2, 3, 4])
+    modal_triangle = (1, 4, 6)
+    for i in range(100):
         random_state = np.random.RandomState(i)
-        modal_triangle = _get_random_modal_triangle(sorted_data, modal_triangle_orig, random_state)
-        assert modal_triangle[0] > 0 and modal_triangle[0] < 4
-        assert modal_triangle[1] > 1 and modal_triangle[0] < 5
-        assert modal_triangle[2] > 4 and modal_triangle[2] < 7
-        assert modal_triangle[0] < modal_triangle[1]
-        assert modal_triangle[1] < modal_triangle[2]
+        sorted_indices = _ambiguous_modal_triangle_random(sorted_data, sorted_indices_orig.copy(),
+                                                          modal_triangle, random_state)
+        assert data[sorted_indices_orig[modal_triangle[0]]] == data[sorted_indices[modal_triangle[0]]]
+        assert data[sorted_indices_orig[modal_triangle[1]]] == data[sorted_indices[modal_triangle[1]]]
+        assert data[sorted_indices_orig[modal_triangle[2]]] == data[sorted_indices[modal_triangle[2]]]
+        assert sorted_indices[modal_triangle[0]] != sorted_indices[modal_triangle[1]]
+        assert data[sorted_indices[modal_triangle[0]]] == data[sorted_indices[modal_triangle[1]]]
+        assert sorted_indices[modal_triangle[1]] != sorted_indices[modal_triangle[2]]
+        assert data[sorted_indices[modal_triangle[1]]] != data[sorted_indices[modal_triangle[2]]]
+
+
+def test_ambiguous_modal_triangle_all():
+    X = np.array(
+        [[1, 1, 0], [4, 1.1, 2], [1, 1.5, 4], [4, 1.7, 6], [1, 1.2, 8], [2, 1.9, 10], [0, 1.1, 12], [2, 2.9, 14], [3, 2.1, 16]])
+    X_proj = np.array([1, 4, 1, 4, 1, 2, 0, 2, 3])
+    X_proj_argsort = np.array([6, 0, 2, 4, 5, 7, 8, 1, 3])
+    X_proj_sorted = np.array([0, 1, 1, 1, 2, 2, 3, 4, 4])
+    modal_triangle = (2, 4, 8)
+    gradients = _ambiguous_modal_triangle_all(X, X_proj, X_proj_sorted, X_proj_argsort, modal_triangle)
+    assert gradients.shape[0] == 2*2*3
+    for i in range(gradients.shape[0] - 1):
+        assert gradients[i].shape == (3,)
+        for j in range(i + 1, gradients.shape[0]):
+            assert gradients[j].shape == (3,)
+            assert not np.array_equal(gradients[i], gradients[j])
 
 
 """
@@ -50,13 +81,13 @@ Tests regarding the DipExt object
 """
 
 
-def test_simple_DipExt_with_wine():
-    X, labels = load_wine()
-    dipext = DipExt()
+def test_simple_DipExt():
+    X, labels = create_subspace_data(200, subspace_features=(3, 5), random_state=1)
+    dipext = DipExt(random_state=1)
     subspace = dipext.fit_transform(X)
     assert subspace.shape[0] == X.shape[0]
     # Check if fit + transform equals fit_transform
-    dipext2 = DipExt()
+    dipext2 = DipExt(random_state=1)
     dipext2.fit(X)
     subspace2 = dipext2.transform(X)
     assert subspace.shape == subspace2.shape
@@ -69,17 +100,22 @@ def test_simple_DipExt_with_wine():
     assert np.array_equal(subspace, subspace2)
 
 
-def test_DipExt_with_parameters_with_wine():
-    X, labels = load_wine()
+def test_DipExt_with_parameters():
+    X, labels = create_subspace_data(200, subspace_features=(3, 5), random_state=1)
     # Check if input parameters are working
-    dipext = DipExt(n_components=5, do_dip_scaling=False, consider_duplicates=True,
-                    n_starting_vectors=5)
+    dipext = DipExt(n_components=3, do_dip_scaling=False, ambiguous_triangle_strategy="random",
+                    n_starting_vectors=2, random_state=1)
     subspace = dipext.fit_transform(X)
-    assert subspace.shape == (X.shape[0], 5)
+    assert subspace.shape == (X.shape[0], 3)
+    # Test all gradients
+    dipext = DipExt(n_components=3, do_dip_scaling=False, ambiguous_triangle_strategy="all",
+                    n_starting_vectors=2, random_state=1)
+    subspace = dipext.fit_transform(X)
+    assert subspace.shape == (X.shape[0], 3)
     # Check if random_state is working
-    dipext = DipExt(consider_duplicates=True, random_state=1)
+    dipext = DipExt(ambiguous_triangle_strategy="random", random_state=1)
     subspace = dipext.fit_transform(X)
-    dipext2 = DipExt(consider_duplicates=True, random_state=1)
+    dipext2 = DipExt(ambiguous_triangle_strategy="random", random_state=1)
     subspace2 = dipext2.fit_transform(X)
     assert np.array_equal(subspace, subspace2)
 
@@ -89,9 +125,9 @@ Tests regarding the DipInit object
 """
 
 
-def test_simple_DipInit_with_wine():
-    X, labels = load_wine()
-    dipinit = DipInit(3)
+def test_simple_DipInit():
+    X, labels = create_subspace_data(200, subspace_features=(3, 5), random_state=1)
+    dipinit = DipInit(3, random_state=1)
     assert not hasattr(dipinit, "labels_")
     dipinit.fit(X)
     assert dipinit.labels_.dtype == np.int32
