@@ -56,10 +56,13 @@ def dip_test(X: np.ndarray, just_dip: bool = True, is_data_sorted: bool = False,
     assert not return_gcm_lcm_mn_mj or not just_dip, "If GCM, LCM, mn and mj should be returned, 'just_dip' must be False"
     if not is_data_sorted:
         X = np.sort(X)
+    # Obtain results
     if X.shape[0] < 4 or X[0] == X[-1]:
-        d = 0.0
-        return d if just_dip else (d, (0, X.shape[0] - 1), None)
-    if use_c:
+        dip_value = 0.0
+        modal_interval = (0, X.shape[0] - 1)
+        modal_triangle = (-1, -1, -1)
+        mn, mj = None, None
+    elif use_c:
         try:
             dip_value, modal_interval, modal_triangle, _, _, mn, mj = _dip_c_impl(X, debug)
         except Exception as e:
@@ -68,10 +71,14 @@ def dip_test(X: np.ndarray, just_dip: bool = True, is_data_sorted: bool = False,
             dip_value, modal_interval, modal_triangle, _, _, mn, mj = _dip_python_impl(X, debug)
     else:
         dip_value, modal_interval, modal_triangle, _, _, mn, mj = _dip_python_impl(X, debug)
+    # Return results
     if just_dip:
         return dip_value
     elif return_gcm_lcm_mn_mj:
-        gcm, lcm = _get_complete_gcm_lcm(mn, mj, modal_interval)
+        if mn is not None and mj is not None:
+            gcm, lcm = _get_complete_gcm_lcm(mn, mj, modal_interval)
+        else:
+            gcm, lcm = None, None
         return dip_value, modal_interval, modal_triangle, gcm, lcm, mn, mj
     else:
         return dip_value, modal_interval, modal_triangle

@@ -193,7 +193,7 @@ def _find_max_dip_by_sgd_with_start(X: np.ndarray, projection: np.ndarray, step_
         # Normally there is only one gradient. But there can be multiple if ambiguous_triangle_strategy is 'all'
         if ambiguous_triangle_strategy == "all":
             tmp_max_dip = 0
-            tmp_best_gradient = None
+            tmp_best_result = None
             for tmp_gradient in gradient:
                 tmp_direction = momentum * direction + step_size * tmp_gradient
                 tmp_projection = projection + tmp_direction
@@ -201,17 +201,16 @@ def _find_max_dip_by_sgd_with_start(X: np.ndarray, projection: np.ndarray, step_
                 tmp_dip_value = dip_test(tmp_projected_data, just_dip=True, is_data_sorted=False)
                 if tmp_dip_value > tmp_max_dip:
                     tmp_max_dip = tmp_dip_value
-                    tmp_best_gradient = tmp_gradient
-            gradient = tmp_best_gradient
-        # Update parameters
-        direction = momentum * direction + step_size * gradient
-        new_projection = projection + direction
+                    tmp_best_result = (tmp_direction, tmp_projection)
+            direction, new_projection = tmp_best_result
+        else:
+            # Update parameters
+            direction = momentum * direction + step_size * gradient
+            new_projection = projection + direction
+        # Get new angle and new total angle and use new projection for following iteration
         new_angle = _angle(projection, new_projection)
         total_angle += new_angle
         projection = new_projection
-        # if np.isnan(new_angle): # TODO Check if this can still happen
-        #     print("Angle is NaN")
-        #     new_angle = 0.1
         # We converge if the projection vector barely moves anymore and has no intention (momentum) to do so in the future
         if (new_angle <= 0.1 and np.linalg.norm(direction) < 0.1) or total_angle > 360:
             break
