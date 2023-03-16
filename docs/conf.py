@@ -12,6 +12,7 @@
 
 import os
 import sys
+import clustpy
 sys.path.insert(0, os.path.abspath('.'))
 
 
@@ -22,7 +23,7 @@ copyright = '2023, Collin Leiber'
 author = 'Collin Leiber'
 
 # The full version, including alpha/beta/rc tags
-release = 'v0.0.1-alpha'
+release = clustpy.__version__
 
 
 # -- General configuration ---------------------------------------------------
