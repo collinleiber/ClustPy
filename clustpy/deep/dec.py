@@ -353,11 +353,11 @@ class DEC(BaseEstimator, ClusterMixin):
 
     Examples
     ----------
-    from clustpy.data import load_mnist
-    from clustpy.deep import DEC
-    data, labels = load_mnist()
-    dec = DEC(n_clusters=10)
-    dec.fit(data)
+    >>> from clustpy.data import create_subspace_data
+    >>> from clustpy.deep import DEC
+    >>> data, labels = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    >>> dec = DEC(n_clusters=3, pretrain_epochs=3, clustering_epochs=3)
+    >>> dec.fit(data)
 
     References
     ----------
@@ -472,11 +472,11 @@ class IDEC(DEC):
 
     Examples
     ----------
-    from clustpy.data import load_mnist
-    from clustpy.deep import IDEC
-    data, labels = load_mnist()
-    idec = IDEC(n_clusters=10)
-    idec.fit(data)
+    >>> from clustpy.data import create_subspace_data
+    >>> from clustpy.deep import IDEC
+    >>> data, labels = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    >>> idec = IDEC(n_clusters=3, pretrain_epochs=3, clustering_epochs=3)
+    >>> idec.fit(data)
 
     References
     ----------

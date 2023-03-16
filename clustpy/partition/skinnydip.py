@@ -666,10 +666,10 @@ class SkinnyDip(BaseEstimator, ClusterMixin):
 
     Examples
     ----------
-    from sklearn.datasets import make_blobs
-    X, L = make_blobs(1000, 3, centers=5)
-    sk = SkinnyDip()
-    sk.fit(X)
+    >>> from sklearn.datasets import make_blobs
+    >>> X, L = make_blobs(1000, 3, centers=5)
+    >>> sk = SkinnyDip()
+    >>> sk.fit(X)
 
     References
     ----------

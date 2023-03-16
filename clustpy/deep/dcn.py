@@ -350,11 +350,11 @@ class DCN(BaseEstimator, ClusterMixin):
 
     Examples
     ----------
-    from clustpy.data import load_mnist
-    from clustpy.deep import DCN
-    data, labels = load_mnist()
-    dcn = DCN(n_clusters=10)
-    dcn.fit(data)
+    >>> from clustpy.data import create_subspace_data
+    >>> from clustpy.deep import DCN
+    >>> data, labels = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    >>> dcn = DCN(n_clusters=3, pretrain_epochs=3, clustering_epochs=3)
+    >>> dcn.fit(data)
 
     References
     ----------

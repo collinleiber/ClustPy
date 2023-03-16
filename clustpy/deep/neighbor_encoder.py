@@ -37,15 +37,14 @@ def get_neighbors_batchwise(X: np.ndarray, n_neighbors: int, metric: str = "sqeu
 
     Examples
     --------
-    from clustpy.data import load_optdigits
-    from clustpy.deep import get_dataloader
-
-    X, L = load_optdigits()
-    n_neighbors = 3
-    neighbors = get_neighbors_batchwise(X, n_neighbors)
-    dataloader = get_dataloader(X, 256, True, additional_inputs=neighbors)
-    neighbor_encoder = NeighborEncoder(layers=[X.shape[1], 512, 256, 10], n_neighbors=n_neighbors)
-    neighbor_encoder.fit(dataloader=dataloader, n_epochs=100, lr=1e-3)
+    >>> from clustpy.data import create_subspace_data
+    >>> from clustpy.deep import get_dataloader
+    >>> X, L = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    >>> n_neighbors = 3
+    >>> neighbors = get_neighbors_batchwise(X, n_neighbors)
+    >>> dataloader = get_dataloader(X, 256, True, additional_inputs=neighbors)
+    >>> neighbor_encoder = NeighborEncoder(layers=[X.shape[1], 512, 256, 10], n_neighbors=n_neighbors)
+    >>> neighbor_encoder.fit(dataloader=dataloader, n_epochs=5, lr=1e-3)
     """
     # batch_size should not be larger than the dataset
     batch_size = min(X.shape[0], batch_size)
@@ -110,23 +109,23 @@ class NeighborEncoder(FlexibleAutoencoder):
 
     Examples
     --------
-    from clustpy.data import load_optdigits
-    from clustpy.deep import get_dataloader
-    from clustpy.deep._utils import detect_device
-    from scipy.spatial.distance import pdist, squareform
+    >>> from clustpy.data import create_subspace_data
+    >>> from clustpy.deep import get_dataloader
+    >>> from clustpy.deep._utils import detect_device
+    >>> from scipy.spatial.distance import pdist, squareform
 
-    X, L = load_optdigits()
-    device = detect_device()
-    n_neighbors = 3
+    >>> X, L = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    >>> device = detect_device()
+    >>> n_neighbors = 3
 
-    dist_matrix = squareform(pdist(X))
-    neighbor_ids = np.argsort(dist_matrix, axis=1)
-    neighbors = [X[neighbor_ids[:, 1 + i]] for i in range(n_neighbors)]
-    # Alternatively: neighbors = get_neighbors_batchwise(X, n_neighbors)
+    >>> dist_matrix = squareform(pdist(X))
+    >>> neighbor_ids = np.argsort(dist_matrix, axis=1)
+    >>> neighbors = [X[neighbor_ids[:, 1 + i]] for i in range(n_neighbors)]
+    >>> # Alternatively: neighbors = get_neighbors_batchwise(X, n_neighbors)
 
-    dataloader = get_dataloader(X, 256, True, additional_inputs=neighbors)
-    neighbor_encoder = NeighborEncoder(layers=[X.shape[1], 512, 256, 10], n_neighbors=n_neighbors, decode_self=False)
-    neighbor_encoder.fit(dataloader=dataloader, device=device, n_epochs=100, lr=1e-3)
+    >>> dataloader = get_dataloader(X, 256, True, additional_inputs=neighbors)
+    >>> neighbor_encoder = NeighborEncoder(layers=[X.shape[1], 512, 256, 10], n_neighbors=n_neighbors, decode_self=False)
+    >>> neighbor_encoder.fit(dataloader=dataloader, device=device, n_epochs=5, lr=1e-3)
 
     References
     ----------

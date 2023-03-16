@@ -675,11 +675,11 @@ class DipEncoder(BaseEstimator, ClusterMixin):
 
     Examples
     ----------
-    from clustpy.data import load_mnist
-    from clustpy.deep import DipEncoder
-    data, labels = load_mnist()
-    dipencoder = DipEncoder(10)
-    dipencoder.fit(data)
+    >>> from clustpy.data import create_subspace_data
+    >>> from clustpy.deep import DipEncoder
+    >>> data, labels = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    >>> dipencoder = DipEncoder(3, pretrain_epochs=3, clustering_epochs=3)
+    >>> dipencoder.fit(data)
 
     References
     ----------

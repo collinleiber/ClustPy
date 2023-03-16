@@ -373,17 +373,17 @@ class XMeans(BaseEstimator, ClusterMixin):
 
     Examples
     ----------
-    from clustpy.partition import XMeans
-    from sklearn.datasets import make_blobs
-    from clustpy.utils import plot_with_transformation
-    rs = np.random.RandomState(11)
-    X, L = make_blobs(500, 2, centers=1, cluster_std=2, random_state=rs)
-    X2, L2 = make_blobs(1000, 2, centers=4, cluster_std=0.5, random_state=rs)
-    X = np.r_[X, X2]
-    for b in [False, True]:
-        xm = XMeans(allow_merging=b, random_state=rs)
-        xm.fit(X)
-        plot_with_transformation(X, xm.labels_, xm.cluster_centers_)
+    >>> from clustpy.partition import XMeans
+    >>> from sklearn.datasets import make_blobs
+    >>> from clustpy.utils import plot_with_transformation
+    >>> rs = np.random.RandomState(11)
+    >>> X, L = make_blobs(500, 2, centers=1, cluster_std=2, random_state=rs)
+    >>> X2, L2 = make_blobs(1000, 2, centers=4, cluster_std=0.5, random_state=rs)
+    >>> X = np.r_[X, X2]
+    >>> for b in [False, True]:
+    >>>     xm = XMeans(allow_merging=b, random_state=rs)
+    >>>     xm.fit(X)
+    >>>     plot_with_transformation(X, xm.labels_, xm.cluster_centers_)
 
     References
     ----------

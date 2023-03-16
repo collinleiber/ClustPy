@@ -381,14 +381,14 @@ class MultipleLabelingsConfusionMatrix(ConfusionMatrix):
 
     Examples
     ----------
-    # Calculate average redundancy
-    from clustpy.metrics import variation_of_information as vi
-    labels = np.array([[1, 1, 1, 1, 0, 0, 0, 0],
-                       [0, 0, 0, 0, 1, 1, 1, 1],
-                       [0, 0, 1, 1, 1, 1, 1, 1],
-                       [1, 2, 3, 4, 5, 6, 7, 8]]).T
-    mlcm = MultipleLabelingsConfusionMatrix(labels, labels, metric=vi)
-    mlcm.aggregate("mean_wo_diag")
+    >>> # Calculate average redundancy
+    >>> from clustpy.metrics import variation_of_information as vi
+    >>> labels = np.array([[1, 1, 1, 1, 0, 0, 0, 0],
+    >>>                    [0, 0, 0, 0, 1, 1, 1, 1],
+    >>>                    [0, 0, 1, 1, 1, 1, 1, 1],
+    >>>                    [1, 2, 3, 4, 5, 6, 7, 8]]).T
+    >>> mlcm = MultipleLabelingsConfusionMatrix(labels, labels, metric=vi)
+    >>> mlcm.aggregate("mean_wo_diag")
     """
 
     def __init__(self, labels_true: np.ndarray, labels_pred: np.ndarray, metric: Callable = nmi,
@@ -465,17 +465,17 @@ class MultipleLabelingsConfusionMatrix(ConfusionMatrix):
 
         Examples
         ----------
-        from clustpy.metrics import MultipleLabelingsConfusionMatrix
-        mlcm = MultipleLabelingsConfusionMatrix(np.array([0, 1]), np.array([0, 1]))
-        # Overwrite confusion matrix (for demonstration purposes only)
-        mlcm.confusion_matrix = np.array([[0., 0.1, 0.2],
-                                          [1, 0.9, 0.8],
-                                          [0, 0.2, 0.3]])
-        mlcm.aggregate("max") == 1.5 / 3 # True
-        mlcm.aggregate("min") == 0.8 / 3 # True
-        mlcm.aggregate("permut-max") == 1.4 / 3 # True
-        mlcm.aggregate("permut-min") == 0.9 / 3 # True
-        mlcm.aggregate("mean") == 3.5 / 9 # True
+        >>> from clustpy.metrics import MultipleLabelingsConfusionMatrix
+        >>> mlcm = MultipleLabelingsConfusionMatrix(np.array([0, 1]), np.array([0, 1]))
+        >>> # Overwrite confusion matrix (for demonstration purposes only)
+        >>> mlcm.confusion_matrix = np.array([[0., 0.1, 0.2],
+        >>>                                   [1, 0.9, 0.8],
+        >>>                                   [0, 0.2, 0.3]])
+        >>> mlcm.aggregate("max") == 1.5 / 3 # True
+        >>> mlcm.aggregate("min") == 0.8 / 3 # True
+        >>> mlcm.aggregate("permut-max") == 1.4 / 3 # True
+        >>> mlcm.aggregate("permut-min") == 0.9 / 3 # True
+        >>> mlcm.aggregate("mean") == 3.5 / 9 # True
         """
         possible_aggregations = ["max", "min", "permut-max", "permut-min", "mean", "mean_wo_diag"]
         aggregation_strategy = aggregation_strategy.lower()

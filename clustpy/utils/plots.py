@@ -271,12 +271,11 @@ def plot_image(img_data: np.ndarray, black_and_white: bool = False, image_shape:
 
     Examples
     ----------
-    from clustpy.data import load_nrletters, load_optdigits
-    X, _ = load_nrletters()
-    plot_image(X[0], False, (9, 7, 3), 255, 0, show_plot=True)
-
-    X, _ = load_optdigits()
-    plot_image(X[0], True, (8, 8), 255, 0, show_plot=True)
+    >>> from clustpy.data import load_nrletters, load_optdigits
+    >>> X, _ = load_nrletters()
+    >>> plot_image(X[0], False, (9, 7, 3), 255, 0, show_plot=True)
+    >>> X, _ = load_optdigits()
+    >>> plot_image(X[0], True, (8, 8), 255, 0, show_plot=True)
     """
     assert img_data.ndim <= 3, "Image data can not have more than 3 dimensions."
     # Data range must match float between [0..1] or int between [0..255] -> use min-max transform

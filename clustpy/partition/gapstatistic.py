@@ -200,12 +200,12 @@ class GapStatistic(BaseEstimator, ClusterMixin):
 
     Examples
     ----------
-    from sklearn.datasets import make_blobs
-    X,L = make_blobs(1000, 2, centers=7, cluster_std=0.7)
-    gs = GapStatistic()
-    gs.fit(X)
-    print(gs.n_clusters_)
-    gs.plot()
+    >>> from sklearn.datasets import make_blobs
+    >>> X, L = make_blobs(1000, 2, centers=7, cluster_std=0.7)
+    >>> gs = GapStatistic()
+    >>> gs.fit(X)
+    >>> print(gs.n_clusters_)
+    >>> gs.plot()
 
     References
     ----------

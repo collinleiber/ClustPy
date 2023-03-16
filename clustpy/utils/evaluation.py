@@ -116,28 +116,24 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
 
     Examples
     ----------
-    from sklearn.cluster import KMeans, DBSCAN
-    from sklearn.metrics import normalized_mutual_info_score as nmi, silhouette_score as silhouette
-
-    X = np.array([[0, 0], [1, 1], [2, 2], [5, 5], [6, 6], [7, 7]])
-    L = np.array([0] * 3 + [1] * 3)
-
-    n_repetitions = 2
-    aggregations = [np.mean, np.std, np.max]
-
-    algorithms = [
-        EvaluationAlgorithm(name="KMeans", algorithm=KMeans, params={"n_clusters": 2}),
-        EvaluationAlgorithm(name="KMeans_with_preprocess", algorithm=KMeans, params={"n_clusters": 2},
-                            preprocess_methods=[_add_value],
-                            preprocess_params=[{"value": 1}]),
-        EvaluationAlgorithm(name="DBSCAN", algorithm=DBSCAN, params={"eps": 0.5, "min_samples": 2}, deterministic=True)]
-    metrics = [EvaluationMetric(name="nmi", metric=nmi, params={"average_method": "geometric"}, use_gt=True),
-               EvaluationMetric(name="silhouette", metric=silhouette, use_gt=False)]
-
-    df = evaluate_dataset(X=X, evaluation_algorithms=algorithms, evaluation_metrics=metrics, labels_true=L,
-                          n_repetitions=n_repetitions, aggregation_functions=aggregations, add_runtime=True,
-                          add_n_clusters=True, save_path=None, ignore_algorithms=["KMeans_with_preprocess"],
-                          random_state=1)
+    >>> from sklearn.cluster import KMeans, DBSCAN
+    >>> from sklearn.metrics import normalized_mutual_info_score as nmi, silhouette_score as silhouette
+    >>> X = np.array([[0, 0], [1, 1], [2, 2], [5, 5], [6, 6], [7, 7]])
+    >>> L = np.array([0] * 3 + [1] * 3)
+    >>> n_repetitions = 2
+    >>> aggregations = [np.mean, np.std, np.max]
+    >>> algorithms = [
+    >>>     EvaluationAlgorithm(name="KMeans", algorithm=KMeans, params={"n_clusters": 2}),
+    >>>     EvaluationAlgorithm(name="KMeans_with_preprocess", algorithm=KMeans, params={"n_clusters": 2},
+    >>>                         preprocess_methods=[_add_value],
+    >>>                         preprocess_params=[{"value": 1}]),
+    >>>     EvaluationAlgorithm(name="DBSCAN", algorithm=DBSCAN, params={"eps": 0.5, "min_samples": 2}, deterministic=True)]
+    >>> metrics = [EvaluationMetric(name="nmi", metric=nmi, params={"average_method": "geometric"}, use_gt=True),
+    >>>            EvaluationMetric(name="silhouette", metric=silhouette, use_gt=False)]
+    >>> df = evaluate_dataset(X=X, evaluation_algorithms=algorithms, evaluation_metrics=metrics, labels_true=L,
+    >>>                       n_repetitions=n_repetitions, aggregation_functions=aggregations, add_runtime=True,
+    >>>                       add_n_clusters=True, save_path=None, ignore_algorithms=["KMeans_with_preprocess"],
+    >>>                       random_state=1)
     """
     assert evaluation_metrics is not None or add_runtime or add_n_clusters, \
         "Either evaluation metrics must be defined or add_runtime/add_n_clusters must be True"
@@ -288,35 +284,31 @@ def evaluate_multiple_datasets(evaluation_datasets: list, evaluation_algorithms:
     ----------
     See the readme.md
 
-    from sklearn.cluster import KMeans, DBSCAN
-    from sklearn.metrics import normalized_mutual_info_score as nmi, silhouette_score as silhouette
-    from clustpy.data import load_iris
-
-    X = np.array([[0, 0], [1, 1], [2, 2], [5, 5], [6, 6], [7, 7]])
-    L = np.array([0] * 3 + [1] * 3)
-    X2 = np.c_[X, L]
-
-    n_repetitions = 2
-    aggregations = [np.mean, np.std, np.max]
-
-    algorithms = [
-        EvaluationAlgorithm(name="KMeans", algorithm=KMeans, params={"n_clusters": 2}),
-        EvaluationAlgorithm(name="KMeans_with_preprocess", algorithm=KMeans, params={"n_clusters": 2},
-                            preprocess_methods=[_add_value],
-                            preprocess_params=[{"value": 1}]),
-        EvaluationAlgorithm(name="DBSCAN", algorithm=DBSCAN, params={"eps": 0.5, "min_samples": 2}, deterministic=True)]
-    metrics = [EvaluationMetric(name="nmi", metric=nmi, params={"average_method": "geometric"}, use_gt=True),
-               EvaluationMetric(name="silhouette", metric=silhouette, use_gt=False)]
-    datasets = [EvaluationDataset(name="iris", data=load_iris, preprocess_methods=[_add_value],
-                                  preprocess_params=[{"value": 2}]),
-                EvaluationDataset(name="X", data=X, labels_true=L),
-                EvaluationDataset(name="X2", data=X2, labels_true=-1, ignore_algorithms=["KMeans_with_preprocess"])
-                ]
-
-    df = evaluate_multiple_datasets(evaluation_datasets=datasets, evaluation_algorithms=algorithms,
-                                    evaluation_metrics=metrics, n_repetitions=n_repetitions,
-                                    aggregation_functions=aggregations, add_runtime=True, add_n_clusters=True,
-                                    save_path=None, save_intermediate_results=False, random_state=1)
+    >>> from sklearn.cluster import KMeans, DBSCAN
+    >>> from sklearn.metrics import normalized_mutual_info_score as nmi, silhouette_score as silhouette
+    >>> from clustpy.data import load_iris
+    >>> X = np.array([[0, 0], [1, 1], [2, 2], [5, 5], [6, 6], [7, 7]])
+    >>> L = np.array([0] * 3 + [1] * 3)
+    >>> X2 = np.c_[X, L]
+    >>> n_repetitions = 2
+    >>> aggregations = [np.mean, np.std, np.max]
+    >>> algorithms = [
+    >>>     EvaluationAlgorithm(name="KMeans", algorithm=KMeans, params={"n_clusters": 2}),
+    >>>     EvaluationAlgorithm(name="KMeans_with_preprocess", algorithm=KMeans, params={"n_clusters": 2},
+    >>>                         preprocess_methods=[_add_value],
+    >>>                         preprocess_params=[{"value": 1}]),
+    >>>     EvaluationAlgorithm(name="DBSCAN", algorithm=DBSCAN, params={"eps": 0.5, "min_samples": 2}, deterministic=True)]
+    >>> metrics = [EvaluationMetric(name="nmi", metric=nmi, params={"average_method": "geometric"}, use_gt=True),
+    >>>            EvaluationMetric(name="silhouette", metric=silhouette, use_gt=False)]
+    >>> datasets = [EvaluationDataset(name="iris", data=load_iris, preprocess_methods=[_add_value],
+    >>>                               preprocess_params=[{"value": 2}]),
+    >>>             EvaluationDataset(name="X", data=X, labels_true=L),
+    >>>             EvaluationDataset(name="X2", data=X2, labels_true=-1, ignore_algorithms=["KMeans_with_preprocess"])
+    >>>             ]
+    >>> df = evaluate_multiple_datasets(evaluation_datasets=datasets, evaluation_algorithms=algorithms,
+    >>>                                 evaluation_metrics=metrics, n_repetitions=n_repetitions,
+    >>>                                 aggregation_functions=aggregations, add_runtime=True, add_n_clusters=True,
+    >>>                                 save_path=None, save_intermediate_results=False, random_state=1)
     """
     assert not save_intermediate_results or save_path is not None, "save_path can not be None if " \
                                                                    "save_intermediate_results is True"
@@ -391,35 +383,7 @@ class EvaluationDataset():
 
     Examples
     ----------
-    from sklearn.cluster import KMeans, DBSCAN
-    from sklearn.metrics import normalized_mutual_info_score as nmi, silhouette_score as silhouette
-    from clustpy.data import load_iris
-
-    X = np.array([[0, 0], [1, 1], [2, 2], [5, 5], [6, 6], [7, 7]])
-    L = np.array([0] * 3 + [1] * 3)
-    X2 = np.c_[X, L]
-
-    n_repetitions = 2
-    aggregations = [np.mean, np.std, np.max]
-
-    algorithms = [
-        EvaluationAlgorithm(name="KMeans", algorithm=KMeans, params={"n_clusters": 2}),
-        EvaluationAlgorithm(name="KMeans_with_preprocess", algorithm=KMeans, params={"n_clusters": 2},
-                            preprocess_methods=[_add_value],
-                            preprocess_params=[{"value": 1}]),
-        EvaluationAlgorithm(name="DBSCAN", algorithm=DBSCAN, params={"eps": 0.5, "min_samples": 2}, deterministic=True)]
-    metrics = [EvaluationMetric(name="nmi", metric=nmi, params={"average_method": "geometric"}, use_gt=True),
-               EvaluationMetric(name="silhouette", metric=silhouette, use_gt=False)]
-    datasets = [EvaluationDataset(name="iris", data=load_iris, preprocess_methods=[_add_value],
-                                  preprocess_params=[{"value": 2}]),
-                EvaluationDataset(name="X", data=X, labels_true=L),
-                EvaluationDataset(name="X2", data=X2, labels_true=-1, ignore_algorithms=["KMeans_with_preprocess"])
-                ]
-
-    df = evaluate_multiple_datasets(evaluation_datasets=datasets, evaluation_algorithms=algorithms,
-                                    evaluation_metrics=metrics, n_repetitions=n_repetitions,
-                                    aggregation_functions=aggregations, add_runtime=True, add_n_clusters=True,
-                                    save_path=None, save_intermediate_results=False, random_state=1)
+    See evaluate_multiple_datasets()
     """
 
     def __init__(self, name: str, data: np.ndarray, labels_true: np.ndarray = None, file_reader_params: dict = {},
@@ -464,35 +428,7 @@ class EvaluationMetric():
 
     Examples
     ----------
-    from sklearn.cluster import KMeans, DBSCAN
-    from sklearn.metrics import normalized_mutual_info_score as nmi, silhouette_score as silhouette
-    from clustpy.data import load_iris
-
-    X = np.array([[0, 0], [1, 1], [2, 2], [5, 5], [6, 6], [7, 7]])
-    L = np.array([0] * 3 + [1] * 3)
-    X2 = np.c_[X, L]
-
-    n_repetitions = 2
-    aggregations = [np.mean, np.std, np.max]
-
-    algorithms = [
-        EvaluationAlgorithm(name="KMeans", algorithm=KMeans, params={"n_clusters": 2}),
-        EvaluationAlgorithm(name="KMeans_with_preprocess", algorithm=KMeans, params={"n_clusters": 2},
-                            preprocess_methods=[_add_value],
-                            preprocess_params=[{"value": 1}]),
-        EvaluationAlgorithm(name="DBSCAN", algorithm=DBSCAN, params={"eps": 0.5, "min_samples": 2}, deterministic=True)]
-    metrics = [EvaluationMetric(name="nmi", metric=nmi, params={"average_method": "geometric"}, use_gt=True),
-               EvaluationMetric(name="silhouette", metric=silhouette, use_gt=False)]
-    datasets = [EvaluationDataset(name="iris", data=load_iris, preprocess_methods=[_add_value],
-                                  preprocess_params=[{"value": 2}]),
-                EvaluationDataset(name="X", data=X, labels_true=L),
-                EvaluationDataset(name="X2", data=X2, labels_true=-1, ignore_algorithms=["KMeans_with_preprocess"])
-                ]
-
-    df = evaluate_multiple_datasets(evaluation_datasets=datasets, evaluation_algorithms=algorithms,
-                                    evaluation_metrics=metrics, n_repetitions=n_repetitions,
-                                    aggregation_functions=aggregations, add_runtime=True, add_n_clusters=True,
-                                    save_path=None, save_intermediate_results=False, random_state=1)
+    See evaluate_multiple_datasets()
     """
 
     def __init__(self, name: str, metric: Callable, params: dict = {}, use_gt: bool = True):
@@ -532,35 +468,7 @@ class EvaluationAlgorithm():
 
     Examples
     ----------
-    from sklearn.cluster import KMeans, DBSCAN
-    from sklearn.metrics import normalized_mutual_info_score as nmi, silhouette_score as silhouette
-    from clustpy.data import load_iris
-
-    X = np.array([[0, 0], [1, 1], [2, 2], [5, 5], [6, 6], [7, 7]])
-    L = np.array([0] * 3 + [1] * 3)
-    X2 = np.c_[X, L]
-
-    n_repetitions = 2
-    aggregations = [np.mean, np.std, np.max]
-
-    algorithms = [
-        EvaluationAlgorithm(name="KMeans", algorithm=KMeans, params={"n_clusters": 2}),
-        EvaluationAlgorithm(name="KMeans_with_preprocess", algorithm=KMeans, params={"n_clusters": 2},
-                            preprocess_methods=[_add_value],
-                            preprocess_params=[{"value": 1}]),
-        EvaluationAlgorithm(name="DBSCAN", algorithm=DBSCAN, params={"eps": 0.5, "min_samples": 2}, deterministic=True)]
-    metrics = [EvaluationMetric(name="nmi", metric=nmi, params={"average_method": "geometric"}, use_gt=True),
-               EvaluationMetric(name="silhouette", metric=silhouette, use_gt=False)]
-    datasets = [EvaluationDataset(name="iris", data=load_iris, preprocess_methods=[_add_value],
-                                  preprocess_params=[{"value": 2}]),
-                EvaluationDataset(name="X", data=X, labels_true=L),
-                EvaluationDataset(name="X2", data=X2, labels_true=-1, ignore_algorithms=["KMeans_with_preprocess"])
-                ]
-
-    df = evaluate_multiple_datasets(evaluation_datasets=datasets, evaluation_algorithms=algorithms,
-                                    evaluation_metrics=metrics, n_repetitions=n_repetitions,
-                                    aggregation_functions=aggregations, add_runtime=True, add_n_clusters=True,
-                                    save_path=None, save_intermediate_results=False, random_state=1)
+    See evaluate_multiple_datasets()
     """
 
     def __init__(self, name: str, algorithm: ClusterMixin, params: dict = {}, deterministic: bool = False,

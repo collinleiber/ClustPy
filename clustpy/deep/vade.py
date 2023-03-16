@@ -508,11 +508,11 @@ class VaDE(BaseEstimator, ClusterMixin):
 
     Examples
     ----------
-    from clustpy.data import load_mnist
-    data, labels = load_mnist()
-    data = (data - np.mean(data)) / np.std(data)
-    vade = VaDE(n_clusters=10)
-    vade.fit(data)
+    >>> from clustpy.data import create_subspace_data
+    >>> data, labels = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    >>> data = (data - np.mean(data)) / np.std(data)
+    >>> vade = VaDE(n_clusters=3, pretrain_epochs=3, clustering_epochs=3)
+    >>> vade.fit(data)
 
     References
     ----------
