@@ -14,7 +14,7 @@ sphinx:
 
 # Build HTML only
 formats:
-  - epub
+  - htmlzip
   - pdf
 
 # Optionally set the version of Python and requirements required to build your docs
