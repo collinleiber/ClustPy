@@ -10,6 +10,7 @@ Welcome to ClustPy's documentation!
    :maxdepth: 2
    :caption: Contents:
 
+   ./readme.md
    modules
 
 
