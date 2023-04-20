@@ -118,6 +118,10 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
     ----------
     >>> from sklearn.cluster import KMeans, DBSCAN
     >>> from sklearn.metrics import normalized_mutual_info_score as nmi, silhouette_score as silhouette
+    >>>
+    >>> def _add_value(x, value):
+    >>>     return x + value
+    >>>
     >>> X = np.array([[0, 0], [1, 1], [2, 2], [5, 5], [6, 6], [7, 7]])
     >>> L = np.array([0] * 3 + [1] * 3)
     >>> n_repetitions = 2
@@ -287,6 +291,10 @@ def evaluate_multiple_datasets(evaluation_datasets: list, evaluation_algorithms:
     >>> from sklearn.cluster import KMeans, DBSCAN
     >>> from sklearn.metrics import normalized_mutual_info_score as nmi, silhouette_score as silhouette
     >>> from clustpy.data import load_iris
+    >>>
+    >>> def _add_value(x, value):
+    >>>     return x + value
+    >>>
     >>> X = np.array([[0, 0], [1, 1], [2, 2], [5, 5], [6, 6], [7, 7]])
     >>> L = np.array([0] * 3 + [1] * 3)
     >>> X2 = np.c_[X, L]
@@ -384,6 +392,11 @@ class EvaluationDataset():
     Examples
     ----------
     See evaluate_multiple_datasets()
+
+    >>> from clustpy.data import load_iris, load_wine
+    >>> ed1 = EvaluationDataset(name="iris", data=load_iris)
+    >>> X, L = load_wine()
+    >>> ed2 = EvaluationDataset(name="wine", data=X, labels_true=L)
     """
 
     def __init__(self, name: str, data: np.ndarray, labels_true: np.ndarray = None, file_reader_params: dict = {},
@@ -429,6 +442,10 @@ class EvaluationMetric():
     Examples
     ----------
     See evaluate_multiple_datasets()
+
+    >>> from sklearn.metrics import normalized_mutual_info_score as nmi, silhouette_score as silhouette
+    >>> em1 = EvaluationMetric(name="nmi", metric=nmi, params={"average_method": "geometric"}, use_gt=True),
+    >>> em2 = EvaluationMetric(name="silhouette", metric=silhouette, use_gt=False)
     """
 
     def __init__(self, name: str, metric: Callable, params: dict = {}, use_gt: bool = True):
@@ -446,6 +463,7 @@ class EvaluationAlgorithm():
     """
     The EvaluationAlgorithm object is a wrapper for clustering algorithms.
     It contains all the information necessary to evaluate a data set using the evaluate_dataset or evaluate_multiple_datasets method.
+    If the algorithm requires the number of clusters as input parameter, params should contain {"n_clusters": None}.
 
     Parameters
     ----------
@@ -454,7 +472,9 @@ class EvaluationAlgorithm():
     algorithm : ClusterMixin
         The actual object of the clustering algorithm
     params : dict
-        Parameters given to the clustering algorithm (default: {})
+        Parameters given to the clustering algorithm.
+        If the algorithm uses a n_clusters parameter, it can be set to None, e.g., params={"n_clusters": None}.
+        In this case the evaluation methods will automatically use the correct number of clusters for the specific data set (default: {})
     deterministic : bool
         Defines if the algorithm produces a deterministic clustering result (e.g. like DBSCAN).
         In this case the algorithm will only be executed once even though a higher number of repetitions is specified when evaluating a data set (default: False)
@@ -469,6 +489,11 @@ class EvaluationAlgorithm():
     Examples
     ----------
     See evaluate_multiple_datasets()
+
+    >>> from sklearn.cluster import DBSCAN
+    >>> from clustpy.partition import SubKmeans
+    >>> ea1 = EvaluationAlgorithm(name="DBSCAN", algorithm=DBSCAN, params={"eps": 0.5, "min_samples": 2}, deterministic=True)
+    >>> ea2 = EvaluationAlgorithm(name="SubKMeans", algorithm=SubKmeans, params={"n_clusters": None})
     """
 
     def __init__(self, name: str, algorithm: ClusterMixin, params: dict = {}, deterministic: bool = False,

@@ -1,4 +1,4 @@
-from clustpy.deep import FlexibleAutoencoder
+from clustpy.deep.autoencoders import FlexibleAutoencoder
 from clustpy.data import create_subspace_data
 import torch
 

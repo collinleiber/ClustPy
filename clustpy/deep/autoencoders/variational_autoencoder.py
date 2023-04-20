@@ -6,7 +6,7 @@ Collin Leiber
 """
 
 import torch
-from clustpy.deep.flexible_autoencoder import FullyConnectedBlock, FlexibleAutoencoder
+from clustpy.deep.autoencoders.flexible_autoencoder import FullyConnectedBlock, FlexibleAutoencoder
 
 
 def _vae_sampling(q_mean: torch.Tensor, q_logvar: torch.Tensor) -> torch.Tensor:
@@ -52,7 +52,11 @@ class VariationalAutoencoder(FlexibleAutoencoder):
         list of different layer sizes from embedding to output of the decoder. If set to None, will be symmetric to layers (default: None)
     decoder_output_fn : torch.nn.Module
         activation function from torch.nn, set the activation function for the decoder output layer, if None then it will be linear.
-        e.g. set to torch.nn.Sigmoid if you want to scale the decoder output between 0 and 1 (default: torch.nn.Sigmoid)
+        E.g. set to torch.nn.Sigmoid if you want to scale the decoder output between 0 and 1 (default: torch.nn.Sigmoid)
+    reusable : bool
+        If set to true, deep clustering algorithms will optimize a copy of the autoencoder and not the autoencoder itself.
+        Ensures that the same autoencoder can be used by multiple deep clustering algorithms.
+        As copies of this object are created, the memory requirement increases (default: True)
 
     Attributes
     ----------
@@ -65,7 +69,9 @@ class VariationalAutoencoder(FlexibleAutoencoder):
     log_variance : torch.nn.Linear
         logarithmic variance of the central layer (use logarithm of variance - numerical purposes)
     fitted  : bool
-        boolean value indicating whether the autoencoder is already fitted.
+        boolean value indicating whether the autoencoder is already fitted
+    reusable : bool
+        indicates whether the autoencoder should be reused by mutliple deep clustering algorithms
 
     References
     ----------
@@ -73,10 +79,10 @@ class VariationalAutoencoder(FlexibleAutoencoder):
     """
 
     def __init__(self, layers: list, batch_norm: bool = False, dropout: float = None,
-                 activation_fn: torch.nn.Module = torch.nn.LeakyReLU,
-                 bias: bool = True, decoder_layers: list = None, decoder_output_fn: torch.nn.Module = torch.nn.Sigmoid):
+                 activation_fn: torch.nn.Module = torch.nn.LeakyReLU, bias: bool = True, decoder_layers: list = None,
+                 decoder_output_fn: torch.nn.Module = torch.nn.Sigmoid, reusable: bool = True):
         super(VariationalAutoencoder, self).__init__(layers, batch_norm, dropout, activation_fn, bias,
-                                                     decoder_layers, decoder_output_fn)
+                                                     decoder_layers, decoder_output_fn, reusable)
         # Get size of embedding from last dimension of layers
         embedding_size = layers[-1]
         # Overwrite encoder from FlexibleAutoencoder, leave out the last layer

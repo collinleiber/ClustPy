@@ -148,8 +148,8 @@ def plot_1d_data(X: np.ndarray, labels: np.ndarray = None, centers: np.ndarray =
 
 
 def plot_2d_data(X: np.ndarray, labels: np.ndarray = None, centers: np.ndarray = None, true_labels: np.ndarray = None,
-                 show_legend: bool = True, scattersize: int = 10, equal_axis: bool = False, container: plt.Axes = plt,
-                 show_plot: bool = True) -> None:
+                 add_text: bool = False, show_legend: bool = True, title: str = None, scattersize: int = 10,
+                 equal_axis: bool = False, container: plt.Axes = plt, show_plot: bool = True) -> None:
     """
     Plot a two-dimensional data set.
 
@@ -163,8 +163,12 @@ def plot_2d_data(X: np.ndarray, labels: np.ndarray = None, centers: np.ndarray =
         The cluster centers. Will be plotted as red dots labeled by the corresponding cluster id. Can be None (default: None)
     true_labels : np.ndarray
         The ground truth labels. Specifies the symbol of the plotted objects. Can be None (default: None)
+    add_text : bool
+        Add the id of a predicted cluster as text into the center of that cluster (default: False)
     show_legend : bool
         Defines whether a legend should be shown (default: True)
+    title : str
+        Title of the plot (default: None)
     scattersize : float
         The size of the scatters (default: 10)
     equal_axis : bool
@@ -186,6 +190,11 @@ def plot_2d_data(X: np.ndarray, labels: np.ndarray = None, centers: np.ndarray =
             container.scatter(X[true_labels == true_lab, 0], X[true_labels == true_lab, 1], s=scattersize,
                               c=labels if labels is None else labels[true_labels == true_lab], marker=marker,
                               vmin=np.min(labels), vmax=np.max(labels))
+    if add_text:
+        unique_labels = np.unique(labels)
+        mean_positions = [np.mean(X[labels == pred_lab], axis=0) for pred_lab in unique_labels]
+        for i, mp in enumerate(mean_positions):
+            plt.text(mp[0], mp[1], unique_labels[i])
     if centers is not None:
         container.scatter(centers[:, 0], centers[:, 1], s=scattersize * 1.5, color="red", marker="s")
         for j in range(len(centers)):
@@ -195,6 +204,8 @@ def plot_2d_data(X: np.ndarray, labels: np.ndarray = None, centers: np.ndarray =
     if show_legend and labels is not None:
         unique_labels, cmap, norm = _get_cmap_and_norm(labels)
         _add_legend(container, unique_labels, cmap, norm)
+    if title is not None:
+        plt.title(title)
     if show_plot:
         container.show()
 
