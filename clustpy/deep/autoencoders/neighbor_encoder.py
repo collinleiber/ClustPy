@@ -6,7 +6,7 @@ Collin Leiber
 import torch
 import numpy as np
 from scipy.spatial.distance import cdist
-from clustpy.deep.flexible_autoencoder import FullyConnectedBlock, FlexibleAutoencoder
+from clustpy.deep.autoencoders.flexible_autoencoder import FullyConnectedBlock, FlexibleAutoencoder
 
 
 def get_neighbors_batchwise(X: np.ndarray, n_neighbors: int, metric: str = "sqeuclidean",
@@ -93,7 +93,11 @@ class NeighborEncoder(FlexibleAutoencoder):
         list of different layer sizes from embedding to output of the decoder. If set to None, will be symmetric to layers (default: None)
     decoder_output_fn : torch.nn.Module
         activation function from torch.nn, set the activation function for the decoder output layer, if None then it will be linear.
-        e.g. set to torch.nn.Sigmoid if you want to scale the decoder output between 0 and 1 (default: None)
+        E.g. set to torch.nn.Sigmoid if you want to scale the decoder output between 0 and 1 (default: None)
+    reusable : bool
+        If set to true, deep clustering algorithms will optimize a copy of the autoencoder and not the autoencoder itself.
+        Ensures that the same autoencoder can be used by multiple deep clustering algorithms.
+        As copies of this object are created, the memory requirement increases (default: True)
 
     Attributes
     ----------
@@ -102,10 +106,12 @@ class NeighborEncoder(FlexibleAutoencoder):
     decoder : FullyConnectedBlock
         decoder part of the autoencoder, responsible for reconstructing the data point itself (class is FullyConnectedBlock).
         Only used if decode_self is true.
-    fitted  : bool
-        boolean value indicating whether the autoencoder is already fitted.
     neighbor_decoders : list
         list containing one decoder network (class is FullyConnectedBlock) for each nearest neighbor
+    fitted  : bool
+        boolean value indicating whether the autoencoder is already fitted
+    reusable : bool
+        indicates whether the autoencoder should be reused by mutliple deep clustering algorithms
 
     Examples
     --------
@@ -133,11 +139,11 @@ class NeighborEncoder(FlexibleAutoencoder):
     """
 
     def __init__(self, layers: list, n_neighbors: int, decode_self: bool = False, batch_norm: bool = False,
-                 dropout: float = None, activation_fn: torch.nn.Module = torch.nn.LeakyReLU,
-                 bias: bool = True, decoder_layers: list = None, decoder_output_fn: torch.nn.Module = None):
+                 dropout: float = None, activation_fn: torch.nn.Module = torch.nn.LeakyReLU, bias: bool = True,
+                 decoder_layers: list = None, decoder_output_fn: torch.nn.Module = None, reusable: bool = True):
         assert n_neighbors > 0 or decode_self, "n_neighbors must be an integer larger than 0 or decode_self must be true"
         super(NeighborEncoder, self).__init__(layers, batch_norm, dropout, activation_fn, bias,
-                                              decoder_layers, decoder_output_fn)
+                                              decoder_layers, decoder_output_fn, reusable)
         self.n_neighbors = n_neighbors
         self.decode_self = decode_self
         neighbor_decoders = torch.nn.ModuleList([FullyConnectedBlock(layers=self.decoder.layers, batch_norm=batch_norm,

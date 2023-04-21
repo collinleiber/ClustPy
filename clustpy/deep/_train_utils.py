@@ -1,5 +1,6 @@
-from clustpy.deep.flexible_autoencoder import FlexibleAutoencoder
+from clustpy.deep.autoencoders.flexible_autoencoder import FlexibleAutoencoder
 import torch
+import copy
 
 
 def _get_default_layers(input_dim: int, embedding_size: int) -> list:
@@ -70,13 +71,16 @@ def get_trained_autoencoder(trainloader: torch.utils.data.DataLoader, learning_r
             embedding_size = input_dim
         # Init Autoencoder parameters
         layers = _get_default_layers(input_dim, embedding_size)
-        autoencoder = autoencoder_class(layers=layers).to(device)
-    else:
-        autoencoder.to(device)
+        autoencoder = autoencoder_class(layers=layers)
     assert hasattr(autoencoder,
-                   "fitted"), "Autoencoder has no attribute 'fitted' and is therefore not compatible. Check documentation of fitted clustpy.deep.flexible_autoencoder.FlexibleAutoencoder"
+                   "fitted"), "Autoencoder has no attribute 'fitted' and is therefore not compatible. Check documentation of fitted clustpy.deep.autoencoders.flexible_autoencoder.FlexibleAutoencoder"
+    # Save autoencoder to device
+    autoencoder.to(device)
     if not autoencoder.fitted:
         # Pretrain Autoencoder
         autoencoder.fit(n_epochs=n_epochs, lr=learning_rate, dataloader=trainloader,
                         device=device, optimizer_class=optimizer_class, loss_fn=loss_fn)
+    if autoencoder.reusable:
+        # If autoencoder is used by multiple deep clustering algorithms, create a deep copy of the object
+        autoencoder = copy.deepcopy(autoencoder)
     return autoencoder

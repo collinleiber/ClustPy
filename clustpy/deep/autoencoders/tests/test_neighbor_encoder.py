@@ -1,5 +1,6 @@
-from clustpy.deep import get_dataloader, NeighborEncoder
-from clustpy.deep.neighbor_encoder import get_neighbors_batchwise
+from clustpy.deep.autoencoders import NeighborEncoder
+from clustpy.deep import get_dataloader
+from clustpy.deep.autoencoders.neighbor_encoder import get_neighbors_batchwise
 from clustpy.data import create_subspace_data
 from scipy.spatial.distance import pdist, squareform
 import torch

@@ -9,7 +9,7 @@ import torch
 from clustpy.deep._utils import detect_device, set_torch_seed
 from clustpy.deep._data_utils import get_dataloader
 from clustpy.deep._train_utils import get_trained_autoencoder
-from clustpy.deep.variational_autoencoder import VariationalAutoencoder, _vae_sampling
+from clustpy.deep.autoencoders.variational_autoencoder import VariationalAutoencoder, _vae_sampling
 import numpy as np
 from sklearn.mixture import GaussianMixture
 from sklearn.base import BaseEstimator, ClusterMixin

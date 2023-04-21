@@ -5,8 +5,8 @@ Lukas Miklautz
 
 import torch
 import numpy as np
-from ._early_stopping import EarlyStopping
-from ._data_utils import get_dataloader
+from clustpy.deep._early_stopping import EarlyStopping
+from clustpy.deep._data_utils import get_dataloader
 
 
 class FullyConnectedBlock(torch.nn.Module):
@@ -100,7 +100,11 @@ class FlexibleAutoencoder(torch.nn.Module):
         list of different layer sizes from embedding to output of the decoder. If set to None, will be symmetric to layers (default: None)
     decoder_output_fn : torch.nn.Module
         activation function from torch.nn, set the activation function for the decoder output layer, if None then it will be linear.
-        e.g. set to torch.nn.Sigmoid if you want to scale the decoder output between 0 and 1 (default: None)
+        E.g. set to torch.nn.Sigmoid if you want to scale the decoder output between 0 and 1 (default: None)
+    reusable : bool
+        If set to true, deep clustering algorithms will optimize a copy of the autoencoder and not the autoencoder itself.
+        Ensures that the same autoencoder can be used by multiple deep clustering algorithms.
+        As copies of this object are created, the memory requirement increases (default: True)
 
     Attributes
     ----------
@@ -109,7 +113,9 @@ class FlexibleAutoencoder(torch.nn.Module):
     decoder : FullyConnectedBlock
         decoder part of the autoencoder, responsible for reconstructing data points from the embedding (class is FullyConnectedBlock)
     fitted  : bool
-        boolean value indicating whether the autoencoder is already fitted.
+        indicates whether the autoencoder is already fitted
+    reusable : bool
+        indicates whether the autoencoder should be reused by mutliple deep clustering algorithms
 
     References
     ----------
@@ -118,9 +124,10 @@ class FlexibleAutoencoder(torch.nn.Module):
 
     def __init__(self, layers: list, batch_norm: bool = False, dropout: float = None,
                  activation_fn: torch.nn.Module = torch.nn.LeakyReLU, bias: bool = True, decoder_layers: list = None,
-                 decoder_output_fn: torch.nn.Module = None):
+                 decoder_output_fn: torch.nn.Module = None, reusable: bool = True):
         super(FlexibleAutoencoder, self).__init__()
         self.fitted = False
+        self.reusable = reusable
         if decoder_layers is None:
             decoder_layers = layers[::-1]
         if (layers[-1] != decoder_layers[0]):
@@ -238,7 +245,7 @@ class FlexibleAutoencoder(torch.nn.Module):
         """
         with torch.no_grad():
             self.eval()
-            loss = 0
+            loss = torch.tensor(0)
             for batch in dataloader:
                 loss += self.loss(batch, loss_fn, device)
             loss /= len(dataloader)

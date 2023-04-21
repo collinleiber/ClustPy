@@ -9,7 +9,7 @@
 The package provides a simple way to cluster data in Python.
 For this purpose it provides a variety of algorithms from different domains. 
 Additionally, ClustPy includes methods that are often needed for research purposes, such as plots, clustering metrics or evaluation methods.
-Further, it integrates various frequently used datasets (e.g. from the [UCI repository](https://archive.ics.uci.edu/ml/index.php)) through largely automated loading options. 
+Further, it integrates various frequently used datasets (e.g., from the [UCI repository](https://archive.ics.uci.edu/)) through largely automated loading options. 
 
 The focus of the ClustPy package is not on efficiency (here we recommend e.g. [pyclustering](https://pyclustering.github.io/)), 
 but on the possibility to try out a wide range of modern scientific methods.
@@ -31,7 +31,7 @@ The current stable version can be installed by the following command:
 Note that a gcc compiler is required for installation.
 Therefore, in case of an installation error, make sure that:
 - Windows: [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/de/visual-cpp-build-tools/) is installed
-- Linux: Python dev is installed (e.g. by running `apt-get install python-dev` - the exact command may differ depending on the linux distribution)
+- Linux: Python dev is installed (e.g., by running `apt-get install python-dev` - the exact command may differ depending on the linux distribution)
 
 The error messages may look like this:
 - 'Could not build wheels for clustpy, which is required to install pyproject.toml-based projects'
@@ -74,13 +74,13 @@ Remove clustpy via pip to avoid ambiguities during development, e.g., when chang
 - Partition-based clustering
     - DipExt + DipInit [[Source](https://link.springer.com/chapter/10.1007/978-3-030-67658-2_6)]
     - Dip-Means [[Source](https://proceedings.neurips.cc/paper/2012/hash/a8240cb8235e9c493a0c30607586166c-Abstract.html)]
-    - Dip'n'sub
+    - Dip'n'sub [[Source](https://epubs.siam.org/doi/abs/10.1137/1.9781611977653.ch13)]
     - GapStatistic [[Source](https://rss.onlinelibrary.wiley.com/doi/abs/10.1111/1467-9868.00293)]
     - G-Means [[Source](https://proceedings.neurips.cc/paper/2003/hash/234833147b97bb6aed53a8f4f1c7a7d8-Abstract.html)]
     - LDA-K-Means [[Source](https://dl.acm.org/doi/abs/10.1145/1273496.1273562)]
     - PG-Means [[Source](https://proceedings.neurips.cc/paper/2006/hash/a9986cb066812f440bc2bb6e3c13696c-Abstract.html)]
     - Projected Dip-Means [[Source](https://dl.acm.org/doi/abs/10.1145/3200947.3201008)]
-    - SkinnyDip + UniDip [[Source](https://dl.acm.org/doi/abs/10.1145/2939672.2939740)] & TailoredDip
+    - SkinnyDip + UniDip [[Source](https://dl.acm.org/doi/abs/10.1145/2939672.2939740)] & TailoredDip [[Source](https://epubs.siam.org/doi/abs/10.1137/1.9781611977653.ch13)]
     - SubKmeans [[Source](https://dl.acm.org/doi/abs/10.1145/3097983.3097989)]
     - X-Means [[Source](https://web.cs.dal.ca/~shepherd/courses/csci6403/clustering/xmeans.pdf)]
 - Density-based clustering
@@ -110,18 +110,31 @@ Remove clustpy via pip to avoid ambiguities during development, e.g., when chang
     - Confusion Matrix
     - Information-Theoretic External Cluster-Validity Measure (DOM) [[Source](https://dl.acm.org/doi/10.5555/2073876.2073893)]
     - Pair Counting Scores (f1, rand, jaccard, recall, precision) [[Source](https://link.springer.com/article/10.1007/s10115-008-0150-6)]
-    - Unsupervised Clustering Accuracy [[Source](https://ieeexplore.ieee.org/abstract/document/5454426)]
-    - Variation of information [[Source](https://link.springer.com/chapter/10.1007/978-3-540-45167-9_14)]
     - Scores for multiple labelings (see alternative clustering algorithms)
         - Multiple Labelings Confusion Matrix
         - Multiple Labelings Pair Counting Scores [[Source](https://ieeexplore.ieee.org/abstract/document/6228189)]
+    - Unsupervised Clustering Accuracy [[Source](https://ieeexplore.ieee.org/abstract/document/5454426)]
+    - Variation of information [[Source](https://link.springer.com/chapter/10.1007/978-3-540-45167-9_14)]
 - Utils
     - Automatic evaluation methods
     - Hartigans Dip-test [[Source](https://www.jstor.org/stable/2241144)]
     - Various plots
 - Datasets
-    - Synthetic dataset creator for subspace and alternative clustering 
-    - Various real-world datasets (e.g. Iris, Wine, Mice protein, Optdigits, MNIST, ...)
+    - Synthetic dataset creators for subspace and alternative clustering 
+    - Real-world dataset loaders (e.g., Iris, Wine, Mice protein, Optdigits, MNIST, ...)
+        - UCI Repository [[Source](https://archive.ics.uci.edu/)]
+        - UEA & UCR Time Series Classification Repository [[Source](http://www.timeseriesclassification.com/)]
+        - MedMNIST [[Source](https://medmnist.com/)]
+        - Torchvision Datasets [[Source](https://pytorch.org/vision/stable/datasets.html)]
+        - Sklearn Datasets [[Source](https://scikit-learn.org/stable/modules/classes.html#module-sklearn.datasets)]
+        - Others
+    - Dataset loaders for datasets with multiple labelings
+        - ALOI (subset) [[Source](https://aloi.science.uva.nl/)]
+        - CMU Face [[Source](http://archive.ics.uci.edu/ml/datasets/cmu+face+images)]
+        - Dancing Stickfigures [[Source](https://dl.acm.org/doi/abs/10.1145/2623330.2623734)]
+        - Fruit [[Source](https://link.springer.com/article/10.1007/s10115-016-0998-9)]
+        - NRLetters [[Source](https://epubs.siam.org/doi/abs/10.1137/1.9781611977172.26)]
+        - WebKB [[Source](http://www.cs.cmu.edu/~webkb/)]
     
 ## Compatible packages
 
