@@ -77,10 +77,12 @@ def get_trained_autoencoder(trainloader: torch.utils.data.DataLoader, learning_r
     # Save autoencoder to device
     autoencoder.to(device)
     if not autoencoder.fitted:
+        print("Autoencoder is not fitted  yet, will be pretrained.")
         # Pretrain Autoencoder
         autoencoder.fit(n_epochs=n_epochs, lr=learning_rate, dataloader=trainloader,
                         device=device, optimizer_class=optimizer_class, loss_fn=loss_fn)
     if autoencoder.reusable:
         # If autoencoder is used by multiple deep clustering algorithms, create a deep copy of the object
         autoencoder = copy.deepcopy(autoencoder)
+
     return autoencoder

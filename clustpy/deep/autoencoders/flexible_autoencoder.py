@@ -363,6 +363,8 @@ class FlexibleAutoencoder(torch.nn.Module):
                     break
                 if scheduler is not None and eval_step_scheduler:
                     scheduler.step(val_loss)
+        # change to eval mode after training
+        self.eval()
         # Save last version of model
         if evalloader is None and model_path is not None:
             torch.save(self.state_dict(), model_path)

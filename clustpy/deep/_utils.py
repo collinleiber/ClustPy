@@ -104,6 +104,67 @@ def encode_batchwise(dataloader: torch.utils.data.DataLoader, module: torch.nn.M
     embeddings_numpy = torch.cat(embeddings, dim=0).numpy()
     return embeddings_numpy
 
+def decode_batchwise(dataloader: torch.utils.data.DataLoader, module: torch.nn.Module,
+                     device: torch.device) -> np.ndarray:
+    """
+    Utility function for decoding the whole data set in a mini-batch fashion with an autoencoder.
+    Note: Assumes an implemented decode function
+
+    Parameters
+    ----------
+    dataloader : torch.utils.data.DataLoader
+        dataloader to be used
+    module : torch.nn.Module
+        the module that is used for the decoding (e.g. an autoencoder)
+    device : torch.device
+        device to be trained on
+
+    Returns
+    -------
+    reconstructions_numpy : np.ndarray
+        The reconstructed data set
+    """
+    reconstructions = []
+    for batch in dataloader:
+        batch_data = batch[1].to(device)
+        embedding = module.encode(batch_data)
+        reconstructions.append(module.decode(embedding).detach().cpu())
+    reconstructions_numpy = torch.cat(reconstructions, dim=0).numpy()
+    return reconstructions_numpy
+
+def encode_decode_batchwise(dataloader: torch.utils.data.DataLoader, module: torch.nn.Module,
+                            device: torch.device) -> [np.ndarray, np.ndarray]:
+    """
+    Utility function for encoding and decoding the whole data set in a mini-batch fashion with an autoencoder.
+    Note: Assumes an implemented decode function
+
+    Parameters
+    ----------
+    dataloader : torch.utils.data.DataLoader
+        dataloader to be used
+    module : torch.nn.Module
+        the module that is used for the encoding and decoding (e.g. an autoencoder)
+    device : torch.device
+        device to be trained on
+
+    Returns
+    -------
+    embeddings_numpy : np.ndarray
+        The embedded data set
+    reconstructions_numpy : np.ndarray
+        The reconstructed data set
+    """
+    embeddings = []
+    reconstructions = []
+    for batch in dataloader:
+        batch_data = batch[1].to(device)
+        embedding = module.encode(batch_data)
+        reconstructions.append(module.decode(embedding).detach().cpu())
+        embeddings.append(embedding.detach().cpu())
+    embeddings_numpy = torch.cat(embeddings, dim=0).numpy()
+    reconstructions_numpy = torch.cat(reconstructions, dim=0).numpy()
+    return embeddings_numpy, reconstructions_numpy
+
 
 def predict_batchwise(dataloader: torch.utils.data.DataLoader, module: torch.nn.Module, cluster_module: torch.nn.Module,
                       device: torch.device) -> np.ndarray:

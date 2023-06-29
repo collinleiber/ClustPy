@@ -364,7 +364,7 @@ class _ENRC_Module(torch.nn.Module):
 
     def fit(self, data: torch.Tensor, optimizer: torch.optim.Optimizer, max_epochs: int, model: torch.nn.Module,
             batch_size: int, loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(),
-            device: torch.device = torch.device("cpu"), print_step: int = 10, debug: bool = True,
+            device: torch.device = torch.device("cpu"), print_step: int = 1, debug: bool = True,
             scheduler: torch.optim.lr_scheduler = None, fix_rec_error: bool = False,
             tolerance_threshold: float = None) -> (torch.nn.Module, '_ENRC_Module'):
         """
@@ -387,7 +387,7 @@ class _ENRC_Module(torch.nn.Module):
         device : torch.device
             device to be trained on (default: torch.device('cpu'))
         print_step : int
-            specifies how often the losses are printed (default: 10)
+            specifies how often the losses are printed (default: 5)
         debug : bool
             if True than training errors will be printed (default: True)
         scheduler : torch.optim.lr_scheduler
@@ -1524,20 +1524,20 @@ def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers
 
     # Use subsample of the data if specified
     if init_subsample_size is not None and init_subsample_size > 0:
-        rng = np.random.default_rng(random_state)
-        rand_idx = rng.choice(X.shape[0], init_subsample_size, replace=False)
+        rand_idx = random_state.choice(X.shape[0], init_subsample_size, replace=False)
         subsampleloader = get_dataloader(X[rand_idx], batch_size=batch_size, shuffle=False, drop_last=False)
     else:
         subsampleloader = testloader
-
+    print("Setup autoencoder")
     # Setup autoencoder
     autoencoder = get_trained_autoencoder(trainloader, pretrain_learning_rate, pretrain_epochs, device,
                                           optimizer_class, loss_fn, X.shape[1], embedding_size, autoencoder)
 
-    embedded_data = encode_batchwise(subsampleloader, autoencoder, device)
-
     # Run ENRC init
     print("Run ENRC init: ", init)
+    print("Start encoding")
+    embedded_data = encode_batchwise(subsampleloader, autoencoder, device)
+    print("Start initializing parameters")
     input_centers, P, V, beta_weights = enrc_init(data=embedded_data, n_clusters=n_clusters, device=device, init=init,
                                                   rounds=10, epochs=10, batch_size=batch_size, debug=debug,
                                                   input_centers=input_centers, P=P, V=V, random_state=random_state,
