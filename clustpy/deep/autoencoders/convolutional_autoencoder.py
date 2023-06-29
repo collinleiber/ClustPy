@@ -79,7 +79,7 @@ class ConvolutionalAutoencoder(torch.nn.Module):
             fc_decoder_layers = fc_layers[::-1]
         if (fc_layers[-1] != fc_decoder_layers[0]):
             raise ValueError(
-                f"Innermost hidden layer and first decoder layer do not match, they are {layers[-1]} and {fc_decoder_layers[0]} respectively.")
+                f"Innermost hidden layer and first decoder layer do not match, they are {fc_layers[-1]} and {fc_decoder_layers[0]} respectively.")
         if (fc_layers[0] != fc_decoder_layers[-1]):
             raise ValueError(
                 f"Output and input dimension do not match, they are {fc_layers[0]} and {fc_decoder_layers[-1]} respectively.")
