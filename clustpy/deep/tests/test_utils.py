@@ -1,5 +1,5 @@
 from clustpy.deep._utils import squared_euclidean_distance, detect_device, encode_batchwise, predict_batchwise, window, \
-    int_to_one_hot
+    int_to_one_hot, decode_batchwise, encode_decode_batchwise
 from clustpy.deep.tests._helpers_for_tests import _get_test_dataloader, _TestAutoencoder, _TestClusterModule
 from clustpy.data import create_subspace_data
 import torch
@@ -58,6 +58,31 @@ def test_predict_batchwise():
     # Check whether sum of the features (= embedded samples) is larger than the threshold
     desired = (np.sum(data, axis=1) >= threshold) * 1
     assert np.array_equal(predictions, desired)
+
+
+def test_decode_batchwise():
+    # Load dataset
+    data, _ = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    embedding_size = 5
+    device = torch.device('cpu')
+    dataloader = _get_test_dataloader(data, 256, False, False)
+    autoencoder = _TestAutoencoder(data.shape[1], embedding_size)
+    decoded = decode_batchwise(dataloader, autoencoder, device)
+    assert data.shape == decoded.shape
+
+def test_encode_decode_batchwise():
+    # Load dataset
+    data, _ = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    embedding_size = 5
+    device = torch.device('cpu')
+    dataloader = _get_test_dataloader(data, 256, False, False)
+    autoencoder = _TestAutoencoder(data.shape[1], embedding_size)
+    encoded, decoded = encode_decode_batchwise(dataloader, autoencoder, device)
+    # Each embedded feature should match the sum of the original features
+    desired = np.sum(data, axis=1).reshape((-1, 1))
+    desired = np.tile(desired, embedding_size)
+    assert np.allclose(encoded, desired, atol=1e-5)
+    assert data.shape == decoded.shape
 
 
 def test_window():
