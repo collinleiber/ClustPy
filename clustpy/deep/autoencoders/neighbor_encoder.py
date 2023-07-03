@@ -166,7 +166,7 @@ class NeighborEncoder(FlexibleAutoencoder):
         Returns
         -------
         decoded_neighbors : torch.Tensor
-            returns the reconstruction of embedded concerning each neighbor
+            returns the reconstructions of the embedded sample concerning its neighbor decoders
         """
         assert embedded.shape[1] == self.decoder.layers[0], "Input layer of the decoder does not match input sample"
         n_decoded_objects = self.n_neighbors + 1 if self.decode_self else self.n_neighbors
@@ -177,7 +177,8 @@ class NeighborEncoder(FlexibleAutoencoder):
             decoded_neighbors[-1] = self.decoder(embedded)
         return decoded_neighbors
 
-    def loss(self, batch: list, loss_fn: torch.nn.modules.loss._Loss, device: torch.device) -> torch.Tensor:
+    def loss(self, batch: list, loss_fn: torch.nn.modules.loss._Loss, device: torch.device) -> (
+            torch.Tensor, torch.Tensor, torch.Tensor):
         """
         Calculate the loss of a single batch of data.
         Corresponds to the sum of losses concerning each neighbor.
@@ -194,22 +195,25 @@ class NeighborEncoder(FlexibleAutoencoder):
 
         Returns
         -------
-        loss : torch.Tensor
-            returns the sum of the reconstruction losses of the input sample
+        loss : (torch.Tensor, torch.Tensor, torch.Tensor)
+            the sum of the reconstruction losses of the input sample,
+            the embedded input sample,
+            the reconstructions of the embedded sample concerning its neighbor decoders
         """
         assert type(batch) is list, "batch must come from a dataloader and therefore be of type list"
         batch_data = batch[1].to(device)
-        decoded_neighbors = self.forward(batch_data)
-        loss = 0
+        embedded = self.encode(batch_data)
+        decoded_neighbors = self.decode(embedded)
+        loss = torch.tensor(0.)
         for i in range(self.n_neighbors):  # TODO: Maybe use functorch.vmap in the future for vectorization
             neighbors = batch[2 + i].to(device)
             loss = loss + loss_fn(decoded_neighbors[i], neighbors)
         if self.decode_self:
             reconstruction = decoded_neighbors[-1]
             loss = loss + loss_fn(reconstruction, batch_data)
-        return loss
+        return loss, embedded, decoded_neighbors
 
-    def fit(self, n_epochs: int, lr: float, batch_size: int = 128,
+    def fit(self, n_epochs: int, optimizer_params: dict, batch_size: int = 128,
             dataloader: torch.utils.data.DataLoader = None, evalloader: torch.utils.data.DataLoader = None,
             optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
             loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), patience: int = 5,
@@ -225,8 +229,8 @@ class NeighborEncoder(FlexibleAutoencoder):
         ----------
         n_epochs : int
             number of epochs for training
-        lr : float
-            learning rate to be used for the optimizer_class
+        optimizer_params : dict
+            parameters of the optimizer, includes the learning rate
         batch_size : int
             size of the data batches (default: 128)
         dataloader : torch.utils.data.DataLoader
@@ -256,6 +260,7 @@ class NeighborEncoder(FlexibleAutoencoder):
         self : NeighborEncoder
             this instance of the NeighborEncoder
         """
-        super().fit(n_epochs, lr, batch_size, None, None, dataloader, evalloader, optimizer_class, loss_fn, patience,
+        super().fit(n_epochs, optimizer_params, batch_size, None, None, dataloader, evalloader, optimizer_class,
+                    loss_fn, patience,
                     scheduler, scheduler_params, device, model_path, print_step)
         return self

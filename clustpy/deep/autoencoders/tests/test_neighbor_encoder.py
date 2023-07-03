@@ -1,5 +1,5 @@
 from clustpy.deep.autoencoders import NeighborEncoder
-from clustpy.deep import get_dataloader
+from clustpy.deep import get_dataloader, DCN
 from clustpy.deep.autoencoders.neighbor_encoder import get_neighbors_batchwise
 from clustpy.data import create_subspace_data
 from scipy.spatial.distance import pdist, squareform
@@ -11,6 +11,7 @@ def test_simple_neighbor_encoder():
     data, _ = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
     embedding_dim = 10
     n_neighbors = 3
+    # Get dataloader with neighbors
     dist_matrix = squareform(pdist(data))
     neighbor_ids = np.argsort(dist_matrix, axis=1)
     neighbors = [data[neighbor_ids[:, 1 + i]] for i in range(n_neighbors)]
@@ -19,7 +20,7 @@ def test_simple_neighbor_encoder():
     neighborencoder = NeighborEncoder(layers=[data.shape[1], 128, 64, embedding_dim], n_neighbors=n_neighbors,
                                       decode_self=False)
     assert neighborencoder.fitted is False
-    neighborencoder.fit(n_epochs=5, lr=1e-3, dataloader=dataloader)
+    neighborencoder.fit(n_epochs=5, optimizer_params={"lr": 1e-3}, dataloader=dataloader)
     assert neighborencoder.fitted is True
     # Test encoding
     batch_size = 256
@@ -38,11 +39,32 @@ def test_simple_neighbor_encoder():
     neighborencoder_2 = NeighborEncoder(layers=[data.shape[1], 128, 64, embedding_dim], n_neighbors=n_neighbors,
                                         decode_self=True)
     assert neighborencoder_2.fitted is False
-    neighborencoder_2.fit(n_epochs=5, lr=1e-3, dataloader=dataloader)
+    neighborencoder_2.fit(n_epochs=5, optimizer_params={"lr": 1e-3}, dataloader=dataloader)
     assert neighborencoder_2.fitted is True
     # Test encoding
     forwarded = neighborencoder_2.forward(data_batch)
     assert forwarded.shape == (n_neighbors + 1, batch_size, data.shape[1])
+
+
+def test_neighbor_encoder_in_deep_clustering():
+    data, labels = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    embedding_dim = 10
+    n_neighbors = 3
+    # Get dataloader with neighbors
+    dist_matrix = squareform(pdist(data))
+    neighbor_ids = np.argsort(dist_matrix, axis=1)
+    neighbors = [data[neighbor_ids[:, 1 + i]] for i in range(n_neighbors)]
+    trainloader = get_dataloader(data, 256, True, additional_inputs=neighbors)
+    testloader = get_dataloader(data, 256, False, additional_inputs=neighbors)
+    custom_dataloaders = (trainloader, testloader)
+    # Test combining the NeighborEncoder with DCN
+    neighborencoder = NeighborEncoder(layers=[data.shape[1], 128, 64, embedding_dim], n_neighbors=n_neighbors,
+                                      decode_self=False)
+    dcn = DCN(3, pretrain_epochs=3, clustering_epochs=3, autoencoder=neighborencoder,
+              custom_dataloaders=custom_dataloaders, random_state=1)
+    dcn.fit(data)
+    assert dcn.labels_.dtype == np.int32
+    assert dcn.labels_.shape == labels.shape
 
 
 def test_get_neighbors_batchwise():

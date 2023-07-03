@@ -10,7 +10,7 @@ def test_simple_variational_autoencoder():
     # Test fitting
     autoencoder = VariationalAutoencoder(layers=[data.shape[1], 128, 64, embedding_dim])
     assert autoencoder.fitted is False
-    autoencoder.fit(n_epochs=5, lr=1e-3, data=data)
+    autoencoder.fit(n_epochs=5, optimizer_params={"lr": 1e-3}, data=data)
     assert autoencoder.fitted is True
     # Test encoding
     batch_size = 256

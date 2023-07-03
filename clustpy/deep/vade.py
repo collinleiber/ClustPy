@@ -16,10 +16,11 @@ from sklearn.base import BaseEstimator, ClusterMixin
 from sklearn.utils import check_random_state
 
 
-def _vade(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_learning_rate: float,
-          clustering_learning_rate: float, pretrain_epochs: int, clustering_epochs: int,
+def _vade(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_params: dict,
+          clustering_optimizer_params: dict, pretrain_epochs: int, clustering_epochs: int,
           optimizer_class: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss, autoencoder: torch.nn.Module,
-          embedding_size: int, n_gmm_initializations: int, random_state: np.random.RandomState) -> (
+          embedding_size: int, n_gmm_initializations: int, custom_dataloaders: tuple,
+          random_state: np.random.RandomState) -> (
         np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, torch.nn.Module):
     """
     Start the actual VaDE clustering procedure on the input data set.
@@ -32,10 +33,10 @@ def _vade(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_learning_rat
         number of clusters
     batch_size : int
         size of the data batches
-    pretrain_learning_rate : float
-        learning rate for the pretraining of the autoencoder
-    clustering_learning_rate : float
-        learning rate of the actual clustering procedure
+    pretrain_optimizer_params : dict
+        parameters of the optimizer for the pretraining of the autoencoder, includes the learning rate
+    clustering_optimizer_params : dict
+        parameters of the optimizer for the actual clustering procedure, includes the learning rate
     pretrain_epochs : int
         number of epochs for the pretraining of the autoencoder
     clustering_epochs : int
@@ -50,6 +51,9 @@ def _vade(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_learning_rat
         size of the embedding within the autoencoder (central layer with mean and variance)
     n_gmm_initializations : int
         number of initializations for the initial GMM clustering within the embedding
+    custom_dataloaders : tuple
+        tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
+        If None, the default dataloaders will be used
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution
 
@@ -65,9 +69,12 @@ def _vade(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_learning_rat
         The final autoencoder
     """
     device = detect_device()
-    trainloader = get_dataloader(X, batch_size, True, False)
-    testloader = get_dataloader(X, batch_size, False, False)
-    autoencoder = get_trained_autoencoder(trainloader, pretrain_learning_rate, pretrain_epochs, device,
+    if custom_dataloaders is None:
+        trainloader = get_dataloader(X, batch_size, True, False)
+        testloader = get_dataloader(X, batch_size, False, False)
+    else:
+        trainloader, testloader = custom_dataloaders
+    autoencoder = get_trained_autoencoder(trainloader, pretrain_optimizer_params, pretrain_epochs, device,
                                           optimizer_class, loss_fn, X.shape[1], embedding_size, autoencoder,
                                           _VaDE_VAE)
     # Execute EM in embedded space
@@ -78,9 +85,9 @@ def _vade(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_learning_rat
     # Initialize VaDE
     vade_module = _VaDE_Module(n_clusters=n_clusters, embedding_size=embedding_size, weights=gmm.weights_,
                                means=gmm.means_, variances=gmm.covariances_).to(device)
-    # Use vade learning_rate (usually pretrain_learning_rate reduced by a magnitude of 10)
+    # Use vade learning_rate (usually pretrain_optimizer_params reduced by a magnitude of 10)
     optimizer = optimizer_class(list(autoencoder.parameters()) + list(vade_module.parameters()),
-                                lr=clustering_learning_rate)
+                                **clustering_optimizer_params)
     # Vade Training loop
     vade_module.fit(autoencoder, trainloader, clustering_epochs, device, optimizer, loss_fn)
     # Get labels
@@ -146,7 +153,7 @@ class _VaDE_VAE(VariationalAutoencoder):
         return z, q_mean, q_logvar, reconstruction
 
     def loss(self, batch: list, loss_fn: torch.nn.modules.loss._Loss, device: torch.device,
-             beta: float = 1) -> torch.Tensor:
+             beta: float = 1) -> (torch.Tensor, torch.Tensor, torch.Tensor):
         """
         Calculate the loss of a single batch of data.
         Matches loss calculation from FlexibleAutoencoder for pretraining and from VariationalAutoencoder afterwards.
@@ -165,19 +172,21 @@ class _VaDE_VAE(VariationalAutoencoder):
 
         Returns
         -------
-        loss: torch.Tensor
-            returns the loss of the input samples
+        loss: (torch.Tensor, torch.Tensor, torch.Tensor)
+            the reconstruction loss of the input sample,
+            the sampling,
+            the reconstruction of the data point
         """
         assert type(batch) is list, "batch must come from a dataloader and therefore be of type list"
         if not self.fitted:
             # While pretraining a loss similar to a regular autoencoder (FlexibleAutoencoder) should be used
             batch_data = batch[1].to(device)
-            _, _, _, reconstruction = self.forward(batch_data)
+            z, _, _, reconstruction = self.forward(batch_data)
             loss = loss_fn(reconstruction, batch_data)
         else:
             # After pretraining the usual loss of a VAE should be used. Super() uses function from VariationalAutoencoder
             loss = super().loss(batch, loss_fn, beta)
-        return loss
+        return loss, z, reconstruction
 
 
 class _VaDE_Module(torch.nn.Module):
@@ -468,10 +477,10 @@ class VaDE(BaseEstimator, ClusterMixin):
         number of clusters
     batch_size : int
         size of the data batches (default: 256)
-    pretrain_learning_rate : float
-        learning rate for the pretraining of the autoencoder (default: 1e-3)
-    clustering_learning_rate : float
-        learning rate of the actual clustering procedure (default: 1e-4)
+    pretrain_optimizer_params : dict
+        parameters of the optimizer for the pretraining of the autoencoder, includes the learning rate (default: {"lr": 1e-3})
+    clustering_optimizer_params : dict
+        parameters of the optimizer for the actual clustering procedure, includes the learning rate (default: {"lr": 1e-4})
     pretrain_epochs : int
         number of epochs for the pretraining of the autoencoder (default: 100)
     clustering_epochs : int
@@ -486,6 +495,9 @@ class VaDE(BaseEstimator, ClusterMixin):
         size of the embedding within the autoencoder (central layer with mean and variance) (default: 10)
     n_gmm_initializations : int
         number of initializations for the initial GMM clustering within the embedding (default: 100)
+    custom_dataloaders : tuple
+        tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
+        If None, the default dataloaders will be used (default: None)
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
@@ -519,16 +531,16 @@ class VaDE(BaseEstimator, ClusterMixin):
     Jiang, Zhuxi, et al. "Variational Deep Embedding: An Unsupervised and Generative Approach to Clustering." IJCAI. 2017.
     """
 
-    def __init__(self, n_clusters: int, batch_size: int = 256, pretrain_learning_rate: float = 1e-3,
-                 clustering_learning_rate: float = 1e-4, pretrain_epochs: int = 100, clustering_epochs: int = 150,
-                 optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
+    def __init__(self, n_clusters: int, batch_size: int = 256, pretrain_optimizer_params: dict = {"lr": 1e-3},
+                 clustering_optimizer_params: dict = {"lr": 1e-4}, pretrain_epochs: int = 100,
+                 clustering_epochs: int = 150, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  loss_fn: torch.nn.modules.loss._Loss = torch.nn.BCELoss(), autoencoder: torch.nn.Module = None,
-                 embedding_size: int = 10, n_gmm_initializations: int = 100,
+                 embedding_size: int = 10, n_gmm_initializations: int = 100, custom_dataloaders: tuple = None,
                  random_state: np.random.RandomState = None):
         self.n_clusters = n_clusters
         self.batch_size = batch_size
-        self.pretrain_learning_rate = pretrain_learning_rate
-        self.clustering_learning_rate = clustering_learning_rate
+        self.pretrain_optimizer_params = pretrain_optimizer_params
+        self.clustering_optimizer_params = clustering_optimizer_params
         self.pretrain_epochs = pretrain_epochs
         self.clustering_epochs = clustering_epochs
         self.optimizer_class = optimizer_class
@@ -536,6 +548,7 @@ class VaDE(BaseEstimator, ClusterMixin):
         self.autoencoder = autoencoder
         self.embedding_size = embedding_size
         self.n_gmm_initializations = n_gmm_initializations
+        self.custom_dataloaders = custom_dataloaders
         self.random_state = check_random_state(random_state)
         set_torch_seed(self.random_state)
 
@@ -559,8 +572,8 @@ class VaDE(BaseEstimator, ClusterMixin):
         gmm_labels, gmm_means, gmm_covariances, vade_labels, vade_centers, vade_covariances, autoencoder = _vade(X,
                                                                                                                  self.n_clusters,
                                                                                                                  self.batch_size,
-                                                                                                                 self.pretrain_learning_rate,
-                                                                                                                 self.clustering_learning_rate,
+                                                                                                                 self.pretrain_optimizer_params,
+                                                                                                                 self.clustering_optimizer_params,
                                                                                                                  self.pretrain_epochs,
                                                                                                                  self.clustering_epochs,
                                                                                                                  self.optimizer_class,
@@ -568,6 +581,7 @@ class VaDE(BaseEstimator, ClusterMixin):
                                                                                                                  self.autoencoder,
                                                                                                                  self.embedding_size,
                                                                                                                  self.n_gmm_initializations,
+                                                                                                                 self.custom_dataloaders,
                                                                                                                  self.random_state)
         self.labels_ = gmm_labels
         self.cluster_centers_ = gmm_means

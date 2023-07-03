@@ -200,7 +200,8 @@ class FlexibleAutoencoder(torch.nn.Module):
         reconstruction = self.decode(embedded)
         return reconstruction
 
-    def loss(self, batch: list, loss_fn: torch.nn.modules.loss._Loss, device: torch.device) -> torch.Tensor:
+    def loss(self, batch: list, loss_fn: torch.nn.modules.loss._Loss, device: torch.device) -> (
+            torch.Tensor, torch.Tensor, torch.Tensor):
         """
         Calculate the loss of a single batch of data.
 
@@ -215,14 +216,17 @@ class FlexibleAutoencoder(torch.nn.Module):
 
         Returns
         -------
-        loss : torch.Tensor
-            returns the reconstruction loss of the input sample
+        loss : (torch.Tensor, torch.Tensor, torch.Tensor)
+            the reconstruction loss of the input sample,
+            the embedded input sample,
+            the reconstructed input sample
         """
         assert type(batch) is list, "batch must come from a dataloader and therefore be of type list"
         batch_data = batch[1].to(device)
-        reconstruction = self.forward(batch_data)
-        loss = loss_fn(reconstruction, batch_data)
-        return loss
+        embedded = self.encode(batch_data)
+        reconstructed = self.decode(embedded)
+        loss = loss_fn(reconstructed, batch_data)
+        return loss, embedded, reconstructed
 
     def evaluate(self, dataloader: torch.utils.data.DataLoader, loss_fn: torch.nn.modules.loss._Loss,
                  device: torch.device = torch.device("cpu")) -> torch.Tensor:
@@ -245,16 +249,16 @@ class FlexibleAutoencoder(torch.nn.Module):
         """
         with torch.no_grad():
             self.eval()
-            loss = torch.tensor(0)
+            loss = torch.tensor(0.)
             for batch in dataloader:
-                loss += self.loss(batch, loss_fn, device)
+                new_loss, _, _ = self.loss(batch, loss_fn, device)
+                loss += new_loss
             loss /= len(dataloader)
         return loss
 
-    def fit(self, n_epochs: int, lr: float, batch_size: int = 128, data: np.ndarray = None,
-            data_eval: np.ndarray = None,
-            dataloader: torch.utils.data.DataLoader = None, evalloader: torch.utils.data.DataLoader = None,
-            optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
+    def fit(self, n_epochs: int, optimizer_params: dict, batch_size: int = 128, data: np.ndarray = None,
+            data_eval: np.ndarray = None, dataloader: torch.utils.data.DataLoader = None,
+            evalloader: torch.utils.data.DataLoader = None, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
             loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), patience: int = 5,
             scheduler: torch.optim.lr_scheduler = None, scheduler_params: dict = None,
             device: torch.device = torch.device("cpu"), model_path: str = None,
@@ -266,8 +270,8 @@ class FlexibleAutoencoder(torch.nn.Module):
         ----------
         n_epochs : int
             number of epochs for training
-        lr : float
-            learning rate to be used for the optimizer_class
+        optimizer_params : dict
+            parameters of the optimizer, includes the learning rate
         batch_size : int
             size of the data batches (default: 128)
         data : np.ndarray
@@ -314,8 +318,7 @@ class FlexibleAutoencoder(torch.nn.Module):
         if evalloader is None:
             if data_eval is not None:
                 evalloader = get_dataloader(data_eval, batch_size, False)
-        params_dict = {'params': self.parameters(), 'lr': lr}
-        optimizer = optimizer_class(**params_dict)
+        optimizer = optimizer_class(params=self.parameters(), **optimizer_params)
 
         early_stopping = EarlyStopping(patience=patience)
         if scheduler is not None:
@@ -333,7 +336,7 @@ class FlexibleAutoencoder(torch.nn.Module):
         for epoch_i in range(n_epochs):
             self.train()
             for batch in dataloader:
-                loss = self.loss(batch, loss_fn, device)
+                loss, _, _ = self.loss(batch, loss_fn, device)
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()

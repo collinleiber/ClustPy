@@ -18,10 +18,10 @@ from sklearn.utils import check_random_state
 
 def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, cluster_loss_weight: float,
               max_n_clusters: int, min_n_clusters: int, batch_size: int,
-              pretrain_learning_rate: float, clustering_learning_rate: float, pretrain_epochs: int,
+              pretrain_optimizer_params: dict, clustering_optimizer_params: dict, pretrain_epochs: int,
               clustering_epochs: int, optimizer_class: torch.optim.Optimizer,
               loss_fn: torch.nn.modules.loss._Loss, autoencoder: torch.nn.Module, embedding_size: int,
-              max_cluster_size_diff_factor: float, pval_strategy: str, n_boots: int,
+              max_cluster_size_diff_factor: float, pval_strategy: str, n_boots: int, custom_dataloaders: tuple,
               random_state: np.random.RandomState, debug: bool) -> (np.ndarray, int, np.ndarray, torch.nn.Module):
     """
     Start the actual DipDECK clustering procedure on the input data set.
@@ -43,10 +43,10 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
         When this number of clusters is reached, all further merge processes will be hindered
     batch_size : int
         size of the data batches
-    pretrain_learning_rate : float
-        learning rate for the pretraining of the autoencoder
-    clustering_learning_rate : float
-        learning rate of the actual clustering procedure
+    pretrain_optimizer_params : dict
+        parameters of the optimizer for the pretraining of the autoencoder, includes the learning rate
+    clustering_optimizer_params : dict
+        parameters of the optimizer for the actual clustering procedure, includes the learning rate
     pretrain_epochs : int
         number of epochs for the pretraining of the autoencoder
     clustering_epochs : int
@@ -66,6 +66,9 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
         Defines which strategy to use to receive dip-p-vales. Possibilities are 'table', 'function' and 'bootstrap'
     n_boots : int
         Number of bootstraps used to calculate dip-p-values. Only necessary if pval_strategy is 'bootstrap'
+    custom_dataloaders : tuple
+        tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
+        If None, the default dataloaders will be used
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution
     debug : bool
@@ -88,9 +91,12 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
     if dip_merge_threshold < 0 or dip_merge_threshold > 1:
         raise Exception("dip_merge_threshold must be between 0 and 1")
     device = detect_device()
-    trainloader = get_dataloader(X, batch_size, True, False)
-    testloader = get_dataloader(X, batch_size, False, False)
-    autoencoder = get_trained_autoencoder(trainloader, pretrain_learning_rate, pretrain_epochs, device,
+    if custom_dataloaders is None:
+        trainloader = get_dataloader(X, batch_size, True, False)
+        testloader = get_dataloader(X, batch_size, False, False)
+    else:
+        trainloader, testloader = custom_dataloaders
+    autoencoder = get_trained_autoencoder(trainloader, pretrain_optimizer_params, pretrain_epochs, device,
                                           optimizer_class, loss_fn, X.shape[1], embedding_size, autoencoder)
     # Execute kmeans in embedded space - initial clustering
     embedded_data = encode_batchwise(testloader, autoencoder, device)
@@ -103,8 +109,8 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
     # Initial dip values
     dip_matrix_cpu = _get_dip_matrix(embedded_data, embedded_centers_cpu, cluster_labels_cpu, n_clusters_init,
                                      max_cluster_size_diff_factor, pval_strategy, n_boots, random_state)
-    # Use DipDECK learning_rate (usually pretrain_learning_rate reduced by a magnitude of 10)
-    optimizer = optimizer_class(autoencoder.parameters(), lr=clustering_learning_rate)
+    # Use DipDECK optimizer parameters (usually learning rate is reduced by a magnitude of 10)
+    optimizer = optimizer_class(autoencoder.parameters(), **clustering_optimizer_params)
     # Start training
     cluster_labels_cpu, n_clusters_current, centers_cpu, autoencoder = _dip_deck_training(X, n_clusters_init,
                                                                                           dip_merge_threshold,
@@ -207,12 +213,10 @@ def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_thresho
         # Iterate over batches
         for batch in trainloader:
             ids = batch[0]
-            batch_data = batch[1].to(device)
-            embedded = autoencoder.encode(batch_data)
-            reconstruction = autoencoder.decode(embedded)
-            embedded_centers_torch = autoencoder.encode(centers_torch)
             # Reconstruction Loss
-            ae_loss = loss_fn(reconstruction, batch_data)
+            ae_loss, embedded, _ = autoencoder.loss(batch, loss_fn, device)
+            # Encode centers
+            embedded_centers_torch = autoencoder.encode(centers_torch)
             # Get distances between points and centers. Get nearest center
             squared_diffs = squared_euclidean_distance(embedded, embedded_centers_torch)
             # Update labels? Pause is needed, so cluster labels can adjust to the new structure
@@ -545,10 +549,10 @@ class DipDECK(BaseEstimator, ClusterMixin):
         When this number of clusters is reached, all further merge processes will be hindered (default: 1)
     batch_size : int
         size of the data batches (default: 256)
-    pretrain_learning_rate : float
-        learning rate for the pretraining of the autoencoder (default: 1e-3)
-    clustering_learning_rate : float
-        learning rate of the actual clustering procedure (default: 1e-4)
+    pretrain_optimizer_params : dict
+        parameters of the optimizer for the pretraining of the autoencoder, includes the learning rate (default: {"lr": 1e-3})
+    clustering_optimizer_params : dict
+        parameters of the optimizer for the actual clustering procedure, includes the learning rate (default: {"lr": 1e-4})
     pretrain_epochs : int
         number of epochs for the pretraining of the autoencoder (default: 100)
     clustering_epochs : int
@@ -568,6 +572,9 @@ class DipDECK(BaseEstimator, ClusterMixin):
         Defines which strategy to use to receive dip-p-vales. Possibilities are 'table', 'function' and 'bootstrap' (default: 'table')
     n_boots : int
         Number of bootstraps used to calculate dip-p-values. Only necessary if pval_strategy is 'bootstrap' (default: 1000)
+    custom_dataloaders : tuple
+        tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
+        If None, the default dataloaders will be used (default: None)
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
     debug : bool
@@ -600,20 +607,21 @@ class DipDECK(BaseEstimator, ClusterMixin):
 
     def __init__(self, n_clusters_init: int = 35, dip_merge_threshold: float = 0.9, cluster_loss_weight: float = 1,
                  max_n_clusters: int = np.inf, min_n_clusters: int = 1, batch_size: int = 256,
-                 pretrain_learning_rate: float = 1e-3, clustering_learning_rate: float = 1e-4,
+                 pretrain_optimizer_params: dict = {"lr": 1e-3}, clustering_optimizer_params: dict = {"lr": 1e-4},
                  pretrain_epochs: int = 100, clustering_epochs: int = 50,
                  optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), autoencoder: torch.nn.Module = None,
                  embedding_size: int = 5, max_cluster_size_diff_factor: float = 2, pval_strategy: str = "table",
-                 n_boots: int = 1000, random_state: np.random.RandomState = None, debug: bool = False):
+                 n_boots: int = 1000, custom_dataloaders: tuple = None, random_state: np.random.RandomState = None,
+                 debug: bool = False):
         self.n_clusters_init = n_clusters_init
         self.dip_merge_threshold = dip_merge_threshold
         self.cluster_loss_weight = cluster_loss_weight
         self.max_n_clusters = max_n_clusters
         self.min_n_clusters = min_n_clusters
         self.batch_size = batch_size
-        self.pretrain_learning_rate = pretrain_learning_rate
-        self.clustering_learning_rate = clustering_learning_rate
+        self.pretrain_optimizer_params = pretrain_optimizer_params
+        self.clustering_optimizer_params = clustering_optimizer_params
         self.pretrain_epochs = pretrain_epochs
         self.clustering_epochs = clustering_epochs
         self.optimizer_class = optimizer_class
@@ -623,6 +631,7 @@ class DipDECK(BaseEstimator, ClusterMixin):
         self.max_cluster_size_diff_factor = max_cluster_size_diff_factor
         self.pval_strategy = pval_strategy
         self.n_boots = n_boots
+        self.custom_dataloaders = custom_dataloaders
         self.random_state = check_random_state(random_state)
         set_torch_seed(self.random_state)
         self.debug = debug
@@ -647,12 +656,13 @@ class DipDECK(BaseEstimator, ClusterMixin):
         labels, n_clusters, centers, autoencoder = _dip_deck(X, self.n_clusters_init, self.dip_merge_threshold,
                                                              self.cluster_loss_weight, self.max_n_clusters,
                                                              self.min_n_clusters, self.batch_size,
-                                                             self.pretrain_learning_rate, self.clustering_learning_rate,
+                                                             self.pretrain_optimizer_params,
+                                                             self.clustering_optimizer_params,
                                                              self.pretrain_epochs, self.clustering_epochs,
                                                              self.optimizer_class, self.loss_fn, self.autoencoder,
                                                              self.embedding_size, self.max_cluster_size_diff_factor,
-                                                             self.pval_strategy, self.n_boots, self.random_state,
-                                                             self.debug)
+                                                             self.pval_strategy, self.n_boots, self.custom_dataloaders,
+                                                             self.random_state, self.debug)
         self.labels_ = labels
         self.n_clusters_ = n_clusters
         self.cluster_centers_ = centers
