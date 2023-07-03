@@ -92,6 +92,7 @@ Remove clustpy via pip to avoid ambiguities during development, e.g., when chang
     - NR-Kmeans [[Source](https://dl.acm.org/doi/abs/10.1145/3219819.3219945)]
 - Deep clustering
     - Autoencoder
+        - Convolutional Autoencoder [[Source](https://openaccess.thecvf.com/content_cvpr_2016/html/He_Deep_Residual_Learning_CVPR_2016_paper.html)]
         - Flexible Autoencoder [[Source](https://www.aaai.org/Library/AAAI/1987/aaai87-050.php)]
         - Neighbor Encoder [[Source](https://arxiv.org/abs/1811.01557)]
         - Stacked Autoencoder [[Source](https://www.jmlr.org/papers/volume11/vincent10a/vincent10a.pdf?)]

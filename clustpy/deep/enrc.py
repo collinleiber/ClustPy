@@ -364,7 +364,7 @@ class _ENRC_Module(torch.nn.Module):
 
     def fit(self, data: torch.Tensor, optimizer: torch.optim.Optimizer, max_epochs: int, model: torch.nn.Module,
             batch_size: int, loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(),
-            device: torch.device = torch.device("cpu"), print_step: int = 1, debug: bool = True,
+            device: torch.device = torch.device("cpu"), print_step: int = 5, debug: bool = True,
             scheduler: torch.optim.lr_scheduler = None, fix_rec_error: bool = False,
             tolerance_threshold: float = None) -> (torch.nn.Module, '_ENRC_Module'):
         """
