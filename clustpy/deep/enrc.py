@@ -348,7 +348,7 @@ class _ENRC_Module(torch.nn.Module):
 
         # Apply reclustering in the rotated space, because V does not have to be orthogonal, so it could learn a mapping that is not recoverable by nrkmeans.
         centers_reclustered, P, new_V, beta_weights = enrc_init(data=embedded_rot, n_clusters=n_clusters, rounds=rounds,
-                                                                max_iter=300, learning_rate=self.learning_rate,
+                                                                max_iter=300, optimizer_params=self.optimizer_params,
                                                                 init="auto", debug=False)
 
         # Update V, because we applied the reclustering in the rotated space
@@ -411,7 +411,7 @@ class _ENRC_Module(torch.nn.Module):
         self.to_device(device)
 
         # Save learning rate for reclustering
-        self.learning_rate = optimizer.param_groups[0]["lr"]
+        self.optimizer_params = optimizer.param_groups[0]
         # Evalloader is used for checking label change. Only difference to the trainloader here is that shuffle=False.
         trainloader = get_dataloader(data, batch_size=batch_size, shuffle=True, drop_last=True)
         evalloader = get_dataloader(data, batch_size=batch_size, shuffle=False, drop_last=False)
@@ -1001,7 +1001,7 @@ def _determine_sgd_init_costs(enrc: _ENRC_Module, dataloader: torch.utils.data.D
     return cost.item()
 
 
-def sgd_init(data: np.ndarray, n_clusters: list, learning_rate: float, batch_size: int = 128,
+def sgd_init(data: np.ndarray, n_clusters: list, optimizer_params: dict, batch_size: int = 128,
              optimizer_class: torch.optim.Optimizer = None, rounds: int = 2, epochs: int = 10,
              random_state: np.random.RandomState = None, input_centers: list = None, P: list = None,
              V: np.ndarray = None, device: torch.device = torch.device("cpu"), debug: bool = True) -> (
@@ -1017,8 +1017,8 @@ def sgd_init(data: np.ndarray, n_clusters: list, learning_rate: float, batch_siz
         input data
     n_clusters : list
         list of ints, number of clusters for each clustering
-    learning_rate : float
-        learning rate for optimizer_class that is used to optimize V and beta
+    optimizer_params : dict
+        parameters of the optimizer used to optimize V and beta, includes the learning rate
     batch_size : int
         size of the data batches (default: 128)
     optimizer_class : torch.optim.Optimizer
@@ -1062,10 +1062,10 @@ def sgd_init(data: np.ndarray, n_clusters: list, learning_rate: float, batch_siz
         # Initialize betas with uniform distribution
         enrc_module = _ENRC_Module(init_centers, P_init, V_init, beta_init_value=1.0 / len(P_init)).to_device(device)
         enrc_module.to_device(device)
-        param_dict = [{'params': [enrc_module.V],
-                       'lr': learning_rate},
-                      {'params': [enrc_module.beta_weights],
-                       'lr': learning_rate * 10},
+        optimizer_beta_params = optimizer_params.copy()
+        optimizer_beta_params["lr"] = optimizer_beta_params["lr"] * 10
+        param_dict = [dict({'params': [enrc_module.V]}, **optimizer_params),
+                      dict({'params': [enrc_module.beta_weights]}, **optimizer_beta_params)
                       ]
         if optimizer_class is None:
             optimizer_class = torch.optim.Adam
@@ -1100,7 +1100,7 @@ def sgd_init(data: np.ndarray, n_clusters: list, learning_rate: float, batch_siz
 
 def enrc_init(data: np.ndarray, n_clusters: list, init: str = "auto", rounds: int = 10, input_centers: list = None,
               P: list = None, V: np.ndarray = None, random_state: np.random.RandomState = None, max_iter: int = 100,
-              learning_rate: float = None, optimizer_class: torch.optim.Optimizer = None, batch_size: int = 128,
+              optimizer_params: dict = None, optimizer_class: torch.optim.Optimizer = None, batch_size: int = 128,
               epochs: int = 10, device: torch.device = torch.device("cpu"), debug: bool = True,
               init_kwargs: dict = None) -> (list, list, np.ndarray, np.ndarray):
     """
@@ -1141,8 +1141,8 @@ def enrc_init(data: np.ndarray, n_clusters: list, init: str = "auto", rounds: in
         random state for reproducible results (default: None)
     max_iter : int
         maximum number of iterations of NrKmeans.  Only used for init='nrkmeans' (default: 100)
-    learning_rate : float
-        learning rate for optimizer_class that is used to optimize V and beta. Only used for init='sgd'.
+    optimizer_params : dict
+        parameters of the optimizer used to optimize V and beta, includes the learning rate. Only used for init='sgd'
     optimizer_class : torch.optim.Optimizer
         optimizer for training. If None then torch.optim.Adam will be used. Only used for init='sgd' (default: None)
     batch_size : int
@@ -1177,7 +1177,7 @@ def enrc_init(data: np.ndarray, n_clusters: list, init: str = "auto", rounds: in
                                                            input_centers=input_centers, P=P, V=V,
                                                            random_state=random_state, debug=debug)
     elif init == "sgd":
-        centers, P, V, beta_weights = sgd_init(data=data, n_clusters=n_clusters, learning_rate=learning_rate,
+        centers, P, V, beta_weights = sgd_init(data=data, n_clusters=n_clusters, optimizer_params=optimizer_params,
                                                rounds=rounds, epochs=epochs, input_centers=input_centers, P=P, V=V,
                                                optimizer_class=optimizer_class, batch_size=batch_size,
                                                random_state=random_state, device=device, debug=debug)
@@ -1189,7 +1189,7 @@ def enrc_init(data: np.ndarray, n_clusters: list, init: str = "auto", rounds: in
         centers, P, V, beta_weights = enrc_init(data=data, n_clusters=n_clusters, device=device, init=init,
                                                 rounds=rounds, input_centers=input_centers,
                                                 P=P, V=V, random_state=random_state, max_iter=max_iter,
-                                                learning_rate=learning_rate, optimizer_class=optimizer_class,
+                                                optimizer_params=optimizer_params, optimizer_class=optimizer_class,
                                                 epochs=epochs, debug=debug)
     elif callable(init):
         if init_kwargs is not None:
@@ -1437,12 +1437,12 @@ def _are_labels_equal(labels_new: np.ndarray, labels_old: np.ndarray, threshold:
 
 
 def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers: list, batch_size: int,
-          pretrain_learning_rate: float, clustering_learning_rate: float, pretrain_epochs: int, clustering_epochs: int,
+          pretrain_optimizer_params: dict, clustering_optimizer_params: dict, pretrain_epochs: int, clustering_epochs: int,
           optimizer_class: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss,
           degree_of_space_distortion: float, degree_of_space_preservation: float, autoencoder: torch.nn.Module,
           embedding_size: int, init: str, random_state: np.random.RandomState, device: torch.device,
           scheduler: torch.optim.lr_scheduler, scheduler_params: dict, tolerance_threshold: float, init_kwargs: dict,
-          init_subsample_size: int, debug: bool) -> (
+          init_subsample_size: int, custom_dataloaders: tuple, debug: bool) -> (
         np.ndarray, list, np.ndarray, list, np.ndarray, list, list, torch.nn.Module):
     """
     Start the actual ENRC clustering procedure on the input data set.
@@ -1461,10 +1461,10 @@ def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers
         list containing the cluster centers for each clustering
     batch_size : int
         size of the data batches
-    pretrain_learning_rate : float
-        learning rate for the pretraining of the autoencoder
-    clustering_learning_rate: float
-        learning rate of the actual clustering procedure
+    pretrain_optimizer_params : dict
+        parameters of the optimizer for the pretraining of the autoencoder, includes the learning rate
+    clustering_optimizer_params: dict
+        parameters of the optimizer for the actual clustering procedure, includes the learning rate
     pretrain_epochs : int
         number of epochs for the pretraining of the autoencoder
     clustering_epochs : int
@@ -1499,6 +1499,9 @@ def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers
         additional parameters that are used if init is a callable
     init_subsample_size : int
         specify if only a subsample of size 'init_subsample_size' of the data should be used for the initialization
+    custom_dataloaders : tuple
+        tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
+        If None, the default dataloaders will be used
     debug : bool
         if True additional information during the training will be printed
 
@@ -1519,8 +1522,11 @@ def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers
         device = detect_device()
 
     # Setup dataloaders
-    trainloader = get_dataloader(X, batch_size=batch_size, shuffle=True, drop_last=True)
-    testloader = get_dataloader(X, batch_size=batch_size, shuffle=False, drop_last=False)
+    if custom_dataloaders is None:
+        trainloader = get_dataloader(X, batch_size, True, False)
+        testloader = get_dataloader(X, batch_size, False, False)
+    else:
+        trainloader, testloader = custom_dataloaders
 
     # Use subsample of the data if specified
     if init_subsample_size is not None and init_subsample_size > 0:
@@ -1531,7 +1537,7 @@ def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers
         subsampleloader = testloader
 
     # Setup autoencoder
-    autoencoder = get_trained_autoencoder(trainloader, pretrain_learning_rate, pretrain_epochs, device,
+    autoencoder = get_trained_autoencoder(trainloader, pretrain_optimizer_params, pretrain_epochs, device,
                                           optimizer_class, loss_fn, X.shape[1], embedding_size, autoencoder)
 
     embedded_data = encode_batchwise(subsampleloader, autoencoder, device)
@@ -1541,20 +1547,18 @@ def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers
     input_centers, P, V, beta_weights = enrc_init(data=embedded_data, n_clusters=n_clusters, device=device, init=init,
                                                   rounds=10, epochs=10, batch_size=batch_size, debug=debug,
                                                   input_centers=input_centers, P=P, V=V, random_state=random_state,
-                                                  max_iter=100, learning_rate=clustering_learning_rate,
+                                                  max_iter=100, optimizer_params=clustering_optimizer_params,
                                                   optimizer_class=optimizer_class, init_kwargs=init_kwargs)
     # Setup ENRC Module
     enrc_module = _ENRC_Module(input_centers, P, V, degree_of_space_distortion=degree_of_space_distortion,
                                degree_of_space_preservation=degree_of_space_preservation,
                                beta_weights=beta_weights).to_device(device)
-
-    param_dict = [{'params': autoencoder.parameters(),
-                   'lr': clustering_learning_rate},
-                  {'params': [enrc_module.V],
-                   'lr': clustering_learning_rate},
-                  # In accordance to the original paper we update the betas 10 times faster
-                  {'params': [enrc_module.beta_weights],
-                   'lr': clustering_learning_rate * 10},
+    # In accordance to the original paper we update the betas 10 times faster
+    clustering_optimizer_beta_params = clustering_optimizer_params.copy()
+    clustering_optimizer_beta_params["lr"] = clustering_optimizer_beta_params["lr"] * 10
+    param_dict = [dict({'params': autoencoder.parameters()}, **clustering_optimizer_params),
+                  dict({'params': [enrc_module.V]}, **clustering_optimizer_params),
+                  dict({'params': [enrc_module.beta_weights]}, **clustering_optimizer_beta_params)
                   ]
     optimizer = optimizer_class(param_dict)
 
@@ -1603,10 +1607,10 @@ class ENRC(BaseEstimator, ClusterMixin):
         list containing the cluster centers for each clustering (optional) (default: None)
     batch_size : int
         size of the data batches (default: 128)
-    pretrain_learning_rate : float
-        learning rate for the pretraining of the autoencoder (default: 1e-3)
-    clustering_learning_rate : float
-        learning rate of the actual clustering procedure (default: 1e-4)
+    pretrain_optimizer_params : dict
+        parameters of the optimizer for the pretraining of the autoencoder, includes the learning rate (default: {"lr": 1e-3})
+    clustering_optimizer_params : dict
+        parameters of the optimizer for the actual clustering procedure, includes the learning rate (default: {"lr": 1e-4})
     pretrain_epochs : int
         number of epochs for the pretraining of the autoencoder (default: 100)
     clustering_epochs : int
@@ -1641,6 +1645,9 @@ class ENRC(BaseEstimator, ClusterMixin):
         additional parameters that are used if init is a callable (optional) (default: None)
     init_subsample_size: int
         specify if only a subsample of size 'init_subsample_size' of the data should be used for the initialization (optional) (default: None)
+    custom_dataloaders : tuple
+        tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
+        If None, the default dataloaders will be used (default: None)
     debug: bool
         if True additional information during the training will be printed (default: False)
 
@@ -1664,20 +1671,20 @@ class ENRC(BaseEstimator, ClusterMixin):
     """
 
     def __init__(self, n_clusters: list, V: np.ndarray = None, P: list = None, input_centers: list = None,
-                 batch_size: int = 128, pretrain_learning_rate: float = 1e-3,
-                 clustering_learning_rate: float = 1e-4, pretrain_epochs: int = 100, clustering_epochs: int = 150,
+                 batch_size: int = 128, pretrain_optimizer_params: dict = {"lr":1e-3},
+                 clustering_optimizer_params: dict = {"lr":1e-4}, pretrain_epochs: int = 100, clustering_epochs: int = 150,
                  tolerance_threshold: float = None, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(),
                  degree_of_space_distortion: float = 1.0, degree_of_space_preservation: float = 1.0,
                  autoencoder: torch.nn.Module = None, embedding_size: int = 20, init: str = "nrkmeans",
                  device: torch.device = None, scheduler: torch.optim.lr_scheduler = None,
                  scheduler_params: dict = None, init_kwargs: dict = None, init_subsample_size: int = None,
-                 random_state: np.random.RandomState = None, debug: bool = False):
+                 random_state: np.random.RandomState = None, custom_dataloaders: tuple = None, debug: bool = False):
         self.n_clusters = n_clusters.copy()
         self.device = device
         self.batch_size = batch_size
-        self.pretrain_learning_rate = pretrain_learning_rate
-        self.clustering_learning_rate = clustering_learning_rate
+        self.pretrain_optimizer_params = pretrain_optimizer_params
+        self.clustering_optimizer_params = clustering_optimizer_params
         self.pretrain_epochs = pretrain_epochs
         self.clustering_epochs = clustering_epochs
         self.tolerance_threshold = tolerance_threshold
@@ -1693,6 +1700,7 @@ class ENRC(BaseEstimator, ClusterMixin):
         self.init_subsample_size = init_subsample_size
         self.random_state = check_random_state(random_state)
         set_torch_seed(self.random_state)
+        self.custom_dataloaders = custom_dataloaders
         self.debug = debug
 
         if len(self.n_clusters) < 2:
@@ -1731,8 +1739,8 @@ class ENRC(BaseEstimator, ClusterMixin):
                                                                                          P=self.P,
                                                                                          input_centers=self.input_centers,
                                                                                          batch_size=self.batch_size,
-                                                                                         pretrain_learning_rate=self.pretrain_learning_rate,
-                                                                                         clustering_learning_rate=self.clustering_learning_rate,
+                                                                                         pretrain_optimizer_params=self.pretrain_optimizer_params,
+                                                                                         clustering_optimizer_params=self.clustering_optimizer_params,
                                                                                          pretrain_epochs=self.pretrain_epochs,
                                                                                          clustering_epochs=self.clustering_epochs,
                                                                                          tolerance_threshold=self.tolerance_threshold,
@@ -1749,6 +1757,7 @@ class ENRC(BaseEstimator, ClusterMixin):
                                                                                          scheduler_params=self.scheduler_params,
                                                                                          init_kwargs=self.init_kwargs,
                                                                                          init_subsample_size=self.init_subsample_size,
+                                                                                         custom_dataloaders=self.custom_dataloaders,
                                                                                          debug=self.debug)
         # Update class variables
         self.labels_ = cluster_labels

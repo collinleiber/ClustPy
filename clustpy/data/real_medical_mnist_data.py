@@ -65,7 +65,7 @@ def _load_medical_mnist_data(dataset_name: str, subset: str, normalize_channels:
     dataset = None  # is needed so that the test folder can be deleted after the unit tests have finished
     # If desired, normalize channels
     data_torch = torch.Tensor(data)
-    is_color_channel_last = 1 if colored else None
+    is_color_channel_last = True if colored else None
     if normalize_channels:
         data_torch = _torch_normalize_channels(data_torch, is_color_channel_last)
     # Flatten shape

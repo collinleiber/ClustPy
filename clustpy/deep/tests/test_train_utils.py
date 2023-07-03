@@ -23,7 +23,7 @@ def test_get_trained_autoencoder():
     dataloader = _get_test_dataloader(data, 256, True, False)
     # Get AE using the default AE class
     device = torch.device('cpu')
-    ae = get_trained_autoencoder(trainloader=dataloader, learning_rate=1e-3, n_epochs=5, device=device,
+    ae = get_trained_autoencoder(trainloader=dataloader, optimizer_params={"lr":1e-3}, n_epochs=5, device=device,
                                  optimizer_class=torch.optim.Adam,
                                  loss_fn=torch.nn.MSELoss(), input_dim=data.shape[1], embedding_size=10)
     # Check output of get_trained_autoencoder
@@ -37,7 +37,7 @@ def test_get_trained_autoencoder_with_custom_ae_class():
     dataloader = _get_test_dataloader(data, 256, True, False)
     # Get AE using a custom AE class
     device = torch.device('cpu')
-    ae = get_trained_autoencoder(trainloader=dataloader, learning_rate=1e-3, n_epochs=5, device=device,
+    ae = get_trained_autoencoder(trainloader=dataloader, optimizer_params={"lr":1e-3}, n_epochs=5, device=device,
                                  optimizer_class=torch.optim.Adam,
                                  loss_fn=torch.nn.MSELoss(), input_dim=data.shape[1], embedding_size=10,
                                  autoencoder_class=VariationalAutoencoder)
@@ -56,7 +56,7 @@ def test_get_trained_autoencoder_with_custom_ae():
     assert ae.fitted == False
     encoder_0_params = ae.encoder.block[0].weight.data.detach().clone()
     decoder_0_params = ae.decoder.block[0].weight.data.detach().clone()
-    ae_out = get_trained_autoencoder(trainloader=dataloader, learning_rate=1e-3, n_epochs=5, device=device,
+    ae_out = get_trained_autoencoder(trainloader=dataloader, optimizer_params={"lr":1e-3}, n_epochs=5, device=device,
                                  optimizer_class=torch.optim.Adam,
                                  loss_fn=torch.nn.MSELoss(), input_dim=data.shape[1], embedding_size=10,
                                  autoencoder=ae)
@@ -76,12 +76,12 @@ def test_get_trained_autoencoder_with_custom_pretrained_ae():
     device = torch.device('cpu')
     ae = FlexibleAutoencoder(layers=[data.shape[1], 256, 128, 64, 10], reusable=True)
     assert ae.fitted == False
-    ae.fit(dataloader=dataloader, lr=1e-3, n_epochs=5, device=device,
+    ae.fit(dataloader=dataloader, optimizer_params={"lr":1e-3}, n_epochs=5, device=device,
            optimizer_class=torch.optim.Adam,
            loss_fn=torch.nn.MSELoss())
     encoder_0_params = ae.encoder.block[0].weight.data.detach().clone()
     decoder_0_params = ae.decoder.block[0].weight.data.detach().clone()
-    ae_out = get_trained_autoencoder(trainloader=dataloader, learning_rate=1e-3, n_epochs=5, device=device,
+    ae_out = get_trained_autoencoder(trainloader=dataloader, optimizer_params={"lr":1e-3}, n_epochs=5, device=device,
                                  optimizer_class=torch.optim.Adam,
                                  loss_fn=torch.nn.MSELoss(), input_dim=data.shape[1], embedding_size=10,
                                  autoencoder=ae)

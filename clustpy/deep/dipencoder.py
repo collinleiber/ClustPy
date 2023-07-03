@@ -451,19 +451,17 @@ def _get_rec_loss_of_first_batch(trainloader: torch.utils.data.DataLoader, autoe
     autoencoder = autoencoder_class(layers=autoencoder.encoder.layers, decoder_layers=autoencoder.decoder.layers).to(
         device)
     # Get first batch of data and calculate reconstruction loss
-    batch_init = next(iter(trainloader))[1]
-    batch_init = batch_init.to(device)
-    reconstruction = autoencoder.forward(batch_init)
-    ae_loss = loss_fn(reconstruction, batch_init).detach()
-    return ae_loss
+    batch_init = next(iter(trainloader))
+    ae_loss, _, _ = autoencoder.loss(batch_init, loss_fn, device)
+    return ae_loss.detach()
 
 
 def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size: int,
                 optimizer_class: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss, clustering_epochs: int,
-                clustering_learning_rate: float, pretrain_batch_size: int, pretrain_epochs: int,
-                pretrain_learning_rate: float, autoencoder: torch.nn.Module, max_cluster_size_diff_factor: float,
-                labels_gt: np.ndarray, random_state: np.random.RandomState, debug: bool) -> (
-        np.ndarray, np.ndarray, dict, torch.nn.Module):
+                clustering_optimizer_params: dict, pretrain_batch_size: int, pretrain_epochs: int,
+                pretrain_optimizer_params: dict, autoencoder: torch.nn.Module, max_cluster_size_diff_factor: float,
+                reconstruction_loss_weight: float, custom_dataloaders: tuple, labels_gt: np.ndarray,
+                random_state: np.random.RandomState, debug: bool) -> (np.ndarray, np.ndarray, dict, torch.nn.Module):
     """
     Start the actual DipEncoder procedure on the input data set.
     If labels_gt is None this method will act as a clustering algorithm else it will only be used to learn an embedding.
@@ -484,19 +482,25 @@ def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size:
          loss function for the reconstruction
     clustering_epochs : int
         number of epochs for the actual clustering procedure
-    clustering_learning_rate : float
-        learning rate of the actual clustering procedure
+    clustering_optimizer_params : dict
+        parameters of the optimizer for the actual clustering procedure, includes the learning rate
     pretrain_batch_size : int
         size of the data batches for the pretraining
     pretrain_epochs : int
         number of epochs for the pretraining of the autoencoder
-    pretrain_learning_rate : float
-        learning rate for the pretraining of the autoencoder
+    pretrain_optimizer_params : dict
+        parameters of the optimizer for the pretraining of the autoencoder, includes the learning rate
     autoencoder : torch.nn.Module
         the input autoencoder. If None a new FlexibleAutoencoder will be created
     max_cluster_size_diff_factor : float
         The maximum different in size when comparing two clusters regarding the number of samples.
         If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) closest samples will be used
+    reconstruction_loss_weight : float
+        weight of the reconstruction loss compared to the clustering loss.
+        If None it will be equal to 1/(4L), where L is the reconstruction loss of the first batch of an untrained autoencoder
+    custom_dataloaders : tuple
+        tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
+        If None, the default dataloaders will be used
     labels_gt : no.ndarray
         Ground truth labels. If None, the DipEncoder will be used for clustering
     random_state : np.random.RandomState
@@ -516,11 +520,14 @@ def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size:
     # Deep Learning stuff
     device = detect_device()
     # sample random mini-batches from the data -> shuffle = True
-    trainloader = get_dataloader(X, batch_size, True, False)
-    testloader = get_dataloader(X, batch_size, False, False)
+    if custom_dataloaders is None:
+        trainloader = get_dataloader(X, batch_size, True, False)
+        testloader = get_dataloader(X, batch_size, False, False)
+    else:
+        trainloader, testloader = custom_dataloaders
     # Get initial AE
     pretrain_trainloader = get_dataloader(X, pretrain_batch_size, True, False)
-    autoencoder = get_trained_autoencoder(pretrain_trainloader, pretrain_learning_rate, pretrain_epochs, device,
+    autoencoder = get_trained_autoencoder(pretrain_trainloader, pretrain_optimizer_params, pretrain_epochs, device,
                                           optimizer_class, loss_fn, X.shape[1], embedding_size, autoencoder)
 
     # Get factor for AE loss
@@ -529,8 +536,10 @@ def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size:
     # data_max = np.max(X)
     # rand_samples_resized = (rand_samples * (data_max - data_min) + data_min).to(device)
     # rand_samples_reconstruction = autoencoder.forward(rand_samples_resized)
-    # ae_factor = loss_fn(rand_samples_reconstruction, rand_samples_resized).detach()
-    ae_factor = _get_rec_loss_of_first_batch(trainloader, autoencoder, loss_fn, device)
+    # reconstruction_loss_weight = loss_fn(rand_samples_reconstruction, rand_samples_resized).detach()
+    if reconstruction_loss_weight is None:
+        reconstruction_loss_weight = _get_rec_loss_of_first_batch(trainloader, autoencoder, loss_fn, device)
+        reconstruction_loss_weight = 1 / (4 * reconstruction_loss_weight)
     # Create initial projections
     n_cluster_combinations = int((n_clusters - 1) * n_clusters / 2)
     projections = np.zeros((n_cluster_combinations, embedding_size))
@@ -558,7 +567,7 @@ def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size:
     dip_module = _Dip_Module(projections).to(device)
     # Create SGD Optimizer
     optimizer = optimizer_class(list(autoencoder.parameters()) + list(dip_module.parameters()),
-                                lr=clustering_learning_rate)
+                                **clustering_optimizer_params)
     # Start Optimization
     for iteration in range(clustering_epochs + 1):
         # Update labels for clustering
@@ -577,12 +586,9 @@ def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size:
             ae_losses = []
         for batch in trainloader:
             ids = batch[0]
-            batch_data = batch[1].to(device)
-            embedded = autoencoder.encode(batch_data)
             # Reconstruction Loss
-            reconstruction = autoencoder.decode(embedded)
-            ae_loss_tmp = loss_fn(reconstruction, batch_data)
-            ae_loss = ae_loss_tmp / ae_factor / 4
+            ae_loss_tmp, embedded, reconstruction = autoencoder.loss(batch, loss_fn, device)
+            ae_loss = ae_loss_tmp * reconstruction_loss_weight
             # Get points within each cluster
             points_in_all_clusters = [torch.where(labels_torch[ids] == clus)[0].to(device) for clus in
                                       range(n_clusters)]
@@ -638,10 +644,10 @@ class DipEncoder(BaseEstimator, ClusterMixin):
     batch_size : int
         size of the data batches for the actual training of the DipEncoder.
         Should be larger the more clusters we have. If it is None, it will be set to (25 x n_clusters) (default: None)
-    pretrain_learning_rate : float
-        learning rate for the pretraining of the autoencoder (default: 1e-3)
-    clustering_learning_rate : float
-        learning rate of the actual clustering procedure (default: 1e-4)
+    pretrain_optimizer_params : dict
+        parameters of the optimizer for the pretraining of the autoencoder, includes the learning rate (default: {"lr": 1e-3})
+    clustering_optimizer_params : dict
+        parameters of the optimizer for the actual clustering procedure, includes the learning rate (default: {"lr": 1e-4})
     pretrain_epochs : int
         number of epochs for the pretraining of the autoencoder (default: 100)
     clustering_epochs : int
@@ -657,6 +663,12 @@ class DipEncoder(BaseEstimator, ClusterMixin):
     max_cluster_size_diff_factor : float
         The maximum different in size when comparing two clusters regarding the number of samples.
         If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) closest samples will be used (default: 3)
+    reconstruction_loss_weight : float
+        weight of the reconstruction loss compared to the clustering loss.
+        If None it will be equal to 1/(4L), where L is the reconstruction loss of the first batch of an untrained autoencoder (default: None)
+    custom_dataloaders : tuple
+        tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
+        If None, the default dataloaders will be used (default: None)
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
     debug : bool
@@ -689,19 +701,20 @@ class DipEncoder(BaseEstimator, ClusterMixin):
     """
 
     def __init__(self, n_clusters: int, pretrain_batch_size: int = 256, batch_size: int = None,
-                 pretrain_learning_rate: float = 1e-3, clustering_learning_rate: float = 1e-4,
+                 pretrain_optimizer_params: dict = {"lr": 1e-3}, clustering_optimizer_params: dict = {"lr": 1e-4},
                  pretrain_epochs: int = 100, clustering_epochs: int = 100,
                  optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), autoencoder: torch.nn.Module = None,
                  embedding_size: int = 10, max_cluster_size_diff_factor: float = 3,
+                 reconstruction_loss_weight: float = None, custom_dataloaders: tuple = None,
                  random_state: np.random.RandomState = None, debug: bool = False):
         self.n_clusters = n_clusters
         self.pretrain_batch_size = pretrain_batch_size
         if batch_size is None:
             batch_size = 25 * n_clusters
         self.batch_size = batch_size
-        self.pretrain_learning_rate = pretrain_learning_rate
-        self.clustering_learning_rate = clustering_learning_rate
+        self.pretrain_optimizer_params = pretrain_optimizer_params
+        self.clustering_optimizer_params = clustering_optimizer_params
         self.pretrain_epochs = pretrain_epochs
         self.clustering_epochs = clustering_epochs
         self.optimizer_class = optimizer_class
@@ -709,6 +722,8 @@ class DipEncoder(BaseEstimator, ClusterMixin):
         self.autoencoder = autoencoder
         self.embedding_size = embedding_size
         self.max_cluster_size_diff_factor = max_cluster_size_diff_factor
+        self.reconstruction_loss_weight = reconstruction_loss_weight
+        self.custom_dataloaders = custom_dataloaders
         self.random_state = check_random_state(random_state)
         set_torch_seed(self.random_state)
         self.debug = debug
@@ -735,11 +750,13 @@ class DipEncoder(BaseEstimator, ClusterMixin):
         labels, projection_axes, index_dict, autoencoder = _dipencoder(X, self.n_clusters, self.embedding_size,
                                                                        self.batch_size, self.optimizer_class,
                                                                        self.loss_fn, self.clustering_epochs,
-                                                                       self.clustering_learning_rate,
+                                                                       self.clustering_optimizer_params,
                                                                        self.pretrain_batch_size,
                                                                        self.pretrain_epochs,
-                                                                       self.pretrain_learning_rate, self.autoencoder,
+                                                                       self.pretrain_optimizer_params, self.autoencoder,
                                                                        self.max_cluster_size_diff_factor,
+                                                                       self.reconstruction_loss_weight,
+                                                                       self.custom_dataloaders,
                                                                        y, self.random_state, self.debug)
         self.labels_ = labels
         self.projection_axes_ = projection_axes

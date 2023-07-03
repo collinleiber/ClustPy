@@ -24,7 +24,7 @@ def _get_default_layers(input_dim: int, embedding_size: int) -> list:
     return layers
 
 
-def get_trained_autoencoder(trainloader: torch.utils.data.DataLoader, learning_rate: float, n_epochs: int, device,
+def get_trained_autoencoder(trainloader: torch.utils.data.DataLoader, optimizer_params: dict, n_epochs: int, device,
                             optimizer_class: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss,
                             input_dim: int, embedding_size: int, autoencoder: torch.nn.Module = None,
                             autoencoder_class: torch.nn.Module = FlexibleAutoencoder) -> torch.nn.Module:
@@ -38,8 +38,8 @@ def get_trained_autoencoder(trainloader: torch.utils.data.DataLoader, learning_r
     ----------
     trainloader : torch.utils.data.DataLoader
         dataloader used to train autoencoder
-    learning_rate : float
-        learning rate for the autoencoder training
+    optimizer_params : dict
+        parameters of the optimizer for the autoencoder training, includes the learning rate
     n_epochs : int
         number of training epochs
     device : torch.device
@@ -63,12 +63,10 @@ def get_trained_autoencoder(trainloader: torch.utils.data.DataLoader, learning_r
         The fitted autoencoder
     """
     if autoencoder is None:
-        # Train new autoencoder
         if embedding_size > input_dim:
             print(
-                "WARNING: embedding_size is larger than the dimensionality of the input dataset. Setting embedding_size to",
-                input_dim)
-            embedding_size = input_dim
+                "WARNING: embedding_size is larger than the dimensionality of the input dataset. embedding_size: {0} / input dimensionality: {1}".format(
+                    embedding_size, input_dim))
         # Init Autoencoder parameters
         layers = _get_default_layers(input_dim, embedding_size)
         autoencoder = autoencoder_class(layers=layers)
@@ -78,7 +76,7 @@ def get_trained_autoencoder(trainloader: torch.utils.data.DataLoader, learning_r
     autoencoder.to(device)
     if not autoencoder.fitted:
         # Pretrain Autoencoder
-        autoencoder.fit(n_epochs=n_epochs, lr=learning_rate, dataloader=trainloader,
+        autoencoder.fit(n_epochs=n_epochs, optimizer_params=optimizer_params, dataloader=trainloader,
                         device=device, optimizer_class=optimizer_class, loss_fn=loss_fn)
     if autoencoder.reusable:
         # If autoencoder is used by multiple deep clustering algorithms, create a deep copy of the object

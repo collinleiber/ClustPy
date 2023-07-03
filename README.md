@@ -53,7 +53,7 @@ If you have no sudo rights you can use:
 
 ### For Developers
 
-Clone the repository, go to the directory and do the following.
+Clone the repository, go to the directory and do the following (NumPy must be installed beforehand).
 
 Install package locally and compile C files:
 
