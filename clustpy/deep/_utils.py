@@ -274,7 +274,8 @@ def run_initial_clustering(X: np.ndarray, n_clusters: int, clustering_class: Clu
         The clustering object
     """
     # Get possible input parameters of the clustering algorithm
-    clustering_class_parameters = inspect.getfullargspec(clustering_class)[0]
+    clustering_class_parameters = inspect.getfullargspec(clustering_class).args + inspect.getfullargspec(
+        clustering_class).kwonlyargs
     # Check if n_clusters or n_components is contained in the possible parameters
     if "n_clusters" in clustering_class_parameters:
         if "random_state" in clustering_class_parameters:
@@ -303,5 +304,5 @@ def run_initial_clustering(X: np.ndarray, n_clusters: int, clustering_class: Clu
     else:  # in case of e.g., DBSCAN
         labels = clustering_algo.labels_
         centers = np.array([np.mean(X[labels == i], axis=0) for i in np.unique(labels) if i >= 0])
-    n_clusters = np.sum(np.unique(labels) >= 0) # Needed for DBSCAN, XMeans, GMeans, ...
+    n_clusters = np.sum(np.unique(labels) >= 0)  # Needed for DBSCAN, XMeans, GMeans, ...
     return n_clusters, labels, centers, clustering_algo
