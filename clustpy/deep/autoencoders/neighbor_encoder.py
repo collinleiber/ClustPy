@@ -6,7 +6,8 @@ Collin Leiber
 import torch
 import numpy as np
 from scipy.spatial.distance import cdist
-from clustpy.deep.autoencoders.flexible_autoencoder import FullyConnectedBlock, FlexibleAutoencoder
+from clustpy.deep.autoencoders.feedforward_autoencoder import FeedforwardAutoencoder
+from clustpy.deep.autoencoders._abstract_autoencoder import FullyConnectedBlock
 
 
 def get_neighbors_batchwise(X: np.ndarray, n_neighbors: int, metric: str = "sqeuclidean",
@@ -66,11 +67,11 @@ def get_neighbors_batchwise(X: np.ndarray, n_neighbors: int, metric: str = "sqeu
     return nearest_neigbors
 
 
-class NeighborEncoder(FlexibleAutoencoder):
+class NeighborEncoder(FeedforwardAutoencoder):
     """
     A NeighborEncoder. Does not compare the reconstruction of an object to itself but to its nearest neighbors.
     For more information see the stated reference.
-    If n_neighbors is 0 and decode_self is true, the NeighborEncoder will work as a regular FlexibleAutoencoder.
+    If n_neighbors is 0 and decode_self is true, the NeighborEncoder will work as a regular FeedforwardAutoencoder.
 
     Parameters
     ----------
@@ -111,7 +112,7 @@ class NeighborEncoder(FlexibleAutoencoder):
     fitted  : bool
         boolean value indicating whether the autoencoder is already fitted
     reusable : bool
-        indicates whether the autoencoder should be reused by mutliple deep clustering algorithms
+        indicates whether the autoencoder should be reused by multiple deep clustering algorithms
 
     Examples
     --------
@@ -222,7 +223,7 @@ class NeighborEncoder(FlexibleAutoencoder):
             print_step: int = 0) -> 'NeighborEncoder':
         """
         Trains the NeighborEncoder in place.
-        Equal to fit function of the FlexibleAutoencoder but does only work with a dataloader (not with a regular data array).
+        Equal to fit function of the FeedforwardAutoencoder but does only work with a dataloader (not with a regular data array).
         This is because the dataloader must contain the nearest neighbors of each point at the positions 2, 3, ....
 
         Parameters

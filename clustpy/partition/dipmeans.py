@@ -82,7 +82,7 @@ def _dipmeans(X: np.ndarray, significance: float, split_viewers_threshold: float
         if cluster_scores[cluster_id_to_split] > 0:
             # Split cluster using bisecting kmeans
             labels, centers, _ = _execute_two_means(X, ids_in_each_cluster, cluster_id_to_split, centers,
-                                                 n_split_trials, random_state)
+                                                    n_split_trials, random_state)
             n_clusters += 1
         else:
             break

@@ -6,7 +6,7 @@ Collin Leiber
 """
 
 import torch
-from clustpy.deep.autoencoders.flexible_autoencoder import FullyConnectedBlock, FlexibleAutoencoder
+from clustpy.deep.autoencoders.feedforward_autoencoder import FullyConnectedBlock, FeedforwardAutoencoder
 
 
 def _vae_sampling(q_mean: torch.Tensor, q_logvar: torch.Tensor) -> torch.Tensor:
@@ -31,7 +31,7 @@ def _vae_sampling(q_mean: torch.Tensor, q_logvar: torch.Tensor) -> torch.Tensor:
     return z
 
 
-class VariationalAutoencoder(FlexibleAutoencoder):
+class VariationalAutoencoder(FeedforwardAutoencoder):
     """
     A variational autoencoder (VAE).
 
@@ -85,7 +85,7 @@ class VariationalAutoencoder(FlexibleAutoencoder):
                                                      decoder_layers, decoder_output_fn, reusable)
         # Get size of embedding from last dimension of layers
         embedding_size = layers[-1]
-        # Overwrite encoder from FlexibleAutoencoder, leave out the last layer
+        # Overwrite encoder from FeedforwardAutoencoder, leave out the last layer
         self.encoder = FullyConnectedBlock(layers=layers[:-1], batch_norm=batch_norm, dropout=dropout,
                                            activation_fn=activation_fn, bias=bias, output_fn=activation_fn)
         self.mean = torch.nn.Linear(layers[-2], embedding_size)
@@ -94,7 +94,7 @@ class VariationalAutoencoder(FlexibleAutoencoder):
     def encode(self, x: torch.Tensor) -> (torch.Tensor, torch.Tensor):
         """
         Apply the encoder function to x.
-        Overwrites function from FlexibleAutoencoder.
+        Overwrites function from FeedforwardAutoencoder.
 
         Parameters
         ----------
@@ -117,7 +117,7 @@ class VariationalAutoencoder(FlexibleAutoencoder):
         """
         Applies both the encode and decode function.
         The forward function is automatically called if we call self(x).
-        Overwrites function from FlexibleAutoencoder.
+        Overwrites function from FeedforwardAutoencoder.
 
         Parameters
         ----------

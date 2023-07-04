@@ -93,7 +93,7 @@ Remove clustpy via pip to avoid ambiguities during development, e.g., when chang
 - Deep clustering
     - Autoencoder
         - Convolutional Autoencoder [[Source](https://openaccess.thecvf.com/content_cvpr_2016/html/He_Deep_Residual_Learning_CVPR_2016_paper.html)]
-        - Flexible Autoencoder [[Source](https://www.aaai.org/Library/AAAI/1987/aaai87-050.php)]
+        - Feedforward Autoencoder [[Source](https://www.aaai.org/Library/AAAI/1987/aaai87-050.php)]
         - Neighbor Encoder [[Source](https://arxiv.org/abs/1811.01557)]
         - Stacked Autoencoder [[Source](https://www.jmlr.org/papers/volume11/vincent10a/vincent10a.pdf?)]
         - Variational Autoencoder [[Source](https://arxiv.org/abs/1312.6114)]

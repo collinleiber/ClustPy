@@ -9,6 +9,8 @@ import numpy as np
 
 def test_simple_neighbor_encoder():
     data, _ = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    batch_size = 256
+    data_batch = torch.Tensor(data[:batch_size])
     embedding_dim = 10
     n_neighbors = 3
     # Get dataloader with neighbors
@@ -16,15 +18,9 @@ def test_simple_neighbor_encoder():
     neighbor_ids = np.argsort(dist_matrix, axis=1)
     neighbors = [data[neighbor_ids[:, 1 + i]] for i in range(n_neighbors)]
     dataloader = get_dataloader(data, 256, True, additional_inputs=neighbors)
-    # Test fitting
     neighborencoder = NeighborEncoder(layers=[data.shape[1], 128, 64, embedding_dim], n_neighbors=n_neighbors,
                                       decode_self=False)
-    assert neighborencoder.fitted is False
-    neighborencoder.fit(n_epochs=5, optimizer_params={"lr": 1e-3}, dataloader=dataloader)
-    assert neighborencoder.fitted is True
     # Test encoding
-    batch_size = 256
-    data_batch = torch.Tensor(data[:batch_size])
     embedded = neighborencoder.encode(data_batch)
     assert embedded.shape == (batch_size, embedding_dim)
     # Test decoding
@@ -33,13 +29,22 @@ def test_simple_neighbor_encoder():
     # Test forwarding
     forwarded = neighborencoder.forward(data_batch)
     assert torch.equal(decoded, forwarded)
-
+    # Test loss
+    device = torch.device('cpu')
+    loss_fn = torch.nn.MSELoss()
+    first_batch = next(iter(dataloader))
+    loss, embedded, decoded = neighborencoder.loss(first_batch, loss_fn, device)
+    assert loss.item() >= 0
+    # Test fitting (without self decoding)
+    assert neighborencoder.fitted is False
+    neighborencoder.fit(n_epochs=3, optimizer_params={"lr": 1e-3}, dataloader=dataloader)
+    assert neighborencoder.fitted is True
     # Test fitting with self decoding
     n_neighbors = 2
     neighborencoder_2 = NeighborEncoder(layers=[data.shape[1], 128, 64, embedding_dim], n_neighbors=n_neighbors,
                                         decode_self=True)
     assert neighborencoder_2.fitted is False
-    neighborencoder_2.fit(n_epochs=5, optimizer_params={"lr": 1e-3}, dataloader=dataloader)
+    neighborencoder_2.fit(n_epochs=3, optimizer_params={"lr": 1e-3}, dataloader=dataloader)
     assert neighborencoder_2.fitted is True
     # Test encoding
     forwarded = neighborencoder_2.forward(data_batch)

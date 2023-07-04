@@ -1,4 +1,4 @@
-from clustpy.deep.autoencoders.flexible_autoencoder import FlexibleAutoencoder
+from clustpy.deep.autoencoders import FeedforwardAutoencoder
 import torch
 import copy
 
@@ -27,12 +27,12 @@ def _get_default_layers(input_dim: int, embedding_size: int) -> list:
 def get_trained_autoencoder(trainloader: torch.utils.data.DataLoader, optimizer_params: dict, n_epochs: int, device,
                             optimizer_class: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss,
                             input_dim: int, embedding_size: int, autoencoder: torch.nn.Module = None,
-                            autoencoder_class: torch.nn.Module = FlexibleAutoencoder) -> torch.nn.Module:
+                            autoencoder_class: torch.nn.Module = FeedforwardAutoencoder) -> torch.nn.Module:
     """This function returns a trained autoencoder. The following cases are considered
        - If the autoencoder is initialized and trained (autoencoder.fitted==True), then return input autoencoder without training it again.
        - If the autoencoder is initialized and not trained (autoencoder.fitted==False), it will be fitted (autoencoder.fitted will be set to True) using default parameters.
        - If the autoencoder is None, a new autoencoder is created using autoencoder_class, and it will be fitted as described above.
-       Beware the input autoencoder_class or autoencoder object needs both a fit() function and the fitted attribute. See clustpy.deep.flexible_autoencoder.FlexibleAutoencoder for an example.
+       Beware the input autoencoder_class or autoencoder object needs both a fit() function and the fitted attribute. See clustpy.deep.feedforward_autoencoder.FeedforwardAutoencoder for an example.
 
     Parameters
     ----------
@@ -53,9 +53,9 @@ def get_trained_autoencoder(trainloader: torch.utils.data.DataLoader, optimizer_
     embedding_size : int
         dimension of the innermost layer of the autoencoder
     autoencoder : torch.nn.Module
-        autoencoder object to be trained (optional) (default=None)
+        autoencoder object to be trained (optional) (default: None)
     autoencoder_class : torch.nn.Module
-        FlexibleAutoencoder class used if autoencoder=None (optional) (default=FlexibleAutoencoder)
+        The autoencoder class that should be used (default: FeedforwardAutoencoder)
     
     Returns
     -------
@@ -71,7 +71,7 @@ def get_trained_autoencoder(trainloader: torch.utils.data.DataLoader, optimizer_
         layers = _get_default_layers(input_dim, embedding_size)
         autoencoder = autoencoder_class(layers=layers)
     assert hasattr(autoencoder,
-                   "fitted"), "Autoencoder has no attribute 'fitted' and is therefore not compatible. Check documentation of fitted clustpy.deep.autoencoders.flexible_autoencoder.FlexibleAutoencoder"
+                   "fitted"), "Autoencoder has no attribute 'fitted' and is therefore not compatible. Check documentation of fitted clustpy.deep.autoencoders._abstract_autoencoder._AbstractAutoencoder"
     # Save autoencoder to device
     autoencoder.to(device)
     if not autoencoder.fitted:

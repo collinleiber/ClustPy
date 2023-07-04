@@ -48,7 +48,7 @@ def _dec(X: np.ndarray, n_clusters: int, alpha: float, batch_size: int, pretrain
     loss_fn : torch.nn.modules.loss._Loss
          loss function for the reconstruction
     autoencoder : torch.nn.Module
-        the input autoencoder. If None a new FlexibleAutoencoder will be created
+        the input autoencoder. If None a new FeedforwardAutoencoder will be created
     embedding_size : int
         size of the embedding within the autoencoder
     use_reconstruction_loss : bool
@@ -333,7 +333,7 @@ class DEC(BaseEstimator, ClusterMixin):
     loss_fn : torch.nn.modules.loss._Loss
         loss function for the reconstruction (default: torch.nn.MSELoss())
     autoencoder : torch.nn.Module
-        the input autoencoder. If None a new FlexibleAutoencoder will be created (default: None)
+        the input autoencoder. If None a new FeedforwardAutoencoder will be created (default: None)
     embedding_size : int
         size of the embedding within the autoencoder (default: 10)
     cluster_loss_weight : float
@@ -460,7 +460,7 @@ class IDEC(DEC):
     loss_fn : torch.nn.modules.loss._Loss
         loss function for the reconstruction (default: torch.nn.MSELoss())
     autoencoder : torch.nn.Module
-        the input autoencoder. If None a new FlexibleAutoencoder will be created (default: None)
+        the input autoencoder. If None a new FeedforwardAutoencoder will be created (default: None)
     embedding_size : int
         size of the embedding within the autoencoder (default: 10)
     cluster_loss_weight : float

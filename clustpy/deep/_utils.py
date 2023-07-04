@@ -133,7 +133,7 @@ def decode_batchwise(dataloader: torch.utils.data.DataLoader, module: torch.nn.M
     return reconstructions_numpy
 
 def encode_decode_batchwise(dataloader: torch.utils.data.DataLoader, module: torch.nn.Module,
-                            device: torch.device) -> [np.ndarray, np.ndarray]:
+                            device: torch.device) -> (np.ndarray, np.ndarray):
     """
     Utility function for encoding and decoding the whole data set in a mini-batch fashion with an autoencoder.
     Note: Assumes an implemented decode function
@@ -149,9 +149,8 @@ def encode_decode_batchwise(dataloader: torch.utils.data.DataLoader, module: tor
 
     Returns
     -------
-    embeddings_numpy : np.ndarray
-        The embedded data set
-    reconstructions_numpy : np.ndarray
+    tuple : (np.ndarray, np.ndarray)
+        The embedded data set,
         The reconstructed data set
     """
     embeddings = []
@@ -159,8 +158,8 @@ def encode_decode_batchwise(dataloader: torch.utils.data.DataLoader, module: tor
     for batch in dataloader:
         batch_data = batch[1].to(device)
         embedding = module.encode(batch_data)
-        reconstructions.append(module.decode(embedding).detach().cpu())
         embeddings.append(embedding.detach().cpu())
+        reconstructions.append(module.decode(embedding).detach().cpu())
     embeddings_numpy = torch.cat(embeddings, dim=0).numpy()
     reconstructions_numpy = torch.cat(reconstructions, dim=0).numpy()
     return embeddings_numpy, reconstructions_numpy

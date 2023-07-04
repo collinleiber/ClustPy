@@ -491,7 +491,7 @@ def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size:
     pretrain_optimizer_params : dict
         parameters of the optimizer for the pretraining of the autoencoder, includes the learning rate
     autoencoder : torch.nn.Module
-        the input autoencoder. If None a new FlexibleAutoencoder will be created
+        the input autoencoder. If None a new FeedforwardAutoencoder will be created
     max_cluster_size_diff_factor : float
         The maximum different in size when comparing two clusters regarding the number of samples.
         If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) closest samples will be used
@@ -657,7 +657,7 @@ class DipEncoder(BaseEstimator, ClusterMixin):
     loss_fn : torch.nn.modules.loss._Loss
          loss function for the reconstruction (default: torch.nn.MSELoss())
     autoencoder : torch.nn.Module
-        the input autoencoder. If None a new FlexibleAutoencoder will be created (default: None)
+        the input autoencoder. If None a new FeedforwardAutoencoder will be created (default: None)
     embedding_size : int
         size of the embedding within the autoencoder (default: 10)
     max_cluster_size_diff_factor : float

@@ -106,7 +106,7 @@ class _VaDE_VAE(VariationalAutoencoder):
     """
     A special variational autoencoder used for VaDE.
     Has a slightly different forward function while pretraining the autoencoder.
-    Further, Loss function is more similar to the FlexibleAutoencoder while pretraining.
+    Further, Loss function is more similar to the FeedforwardAutoencoder while pretraining.
 
     Attributes
     ----------
@@ -126,7 +126,7 @@ class _VaDE_VAE(VariationalAutoencoder):
         """
         Applies both the encode and decode function.
         The forward function is automatically called if we call self(x).
-        Matches forward behavior from FlexibleAutoencoder for pretraining and from VariationalAutoencoder afterwards.
+        Matches forward behavior from FeedforwardAutoencoder for pretraining and from VariationalAutoencoder afterwards.
         Overwrites function from VariationalAutoencoder.
 
         Parameters
@@ -143,7 +143,7 @@ class _VaDE_VAE(VariationalAutoencoder):
             The reconstruction of the data point
         """
         if not self.fitted:
-            # While pretraining a forward method similar to a regular autoencoder (FlexibleAutoencoder) should be used
+            # While pretraining a forward method similar to a regular autoencoder (FeedforwardAutoencoder) should be used
             mean, _ = self.encode(x)
             reconstruction = self.decode(mean)
             z, q_mean, q_logvar = None, None, None
@@ -156,7 +156,7 @@ class _VaDE_VAE(VariationalAutoencoder):
              beta: float = 1) -> (torch.Tensor, torch.Tensor, torch.Tensor):
         """
         Calculate the loss of a single batch of data.
-        Matches loss calculation from FlexibleAutoencoder for pretraining and from VariationalAutoencoder afterwards.
+        Matches loss calculation from FeedforwardAutoencoder for pretraining and from VariationalAutoencoder afterwards.
         Overwrites function from VariationalAutoencoder.
 
         Parameters
@@ -179,7 +179,7 @@ class _VaDE_VAE(VariationalAutoencoder):
         """
         assert type(batch) is list, "batch must come from a dataloader and therefore be of type list"
         if not self.fitted:
-            # While pretraining a loss similar to a regular autoencoder (FlexibleAutoencoder) should be used
+            # While pretraining a loss similar to a regular autoencoder (FeedforwardAutoencoder) should be used
             batch_data = batch[1].to(device)
             z, _, _, reconstruction = self.forward(batch_data)
             loss = loss_fn(reconstruction, batch_data)

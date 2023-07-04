@@ -45,7 +45,7 @@ def _dcn(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_par
     loss_fn : torch.nn.modules.loss._Loss
          loss function for the reconstruction
     autoencoder : torch.nn.Module
-        the input autoencoder. If None a new FlexibleAutoencoder will be created
+        the input autoencoder. If None a new FeedforwardAutoencoder will be created
     embedding_size : int
         size of the embedding within the autoencoder
     degree_of_space_distortion : float
@@ -332,7 +332,7 @@ class DCN(BaseEstimator, ClusterMixin):
     degree_of_space_preservation : float
         weight of the reconstruction loss (default: 1.0)
     autoencoder : torch.nn.Module
-        the input autoencoder. If None a new FlexibleAutoencoder will be created (default: None)
+        the input autoencoder. If None a new FeedforwardAutoencoder will be created (default: None)
     embedding_size : int
         size of the embedding within the autoencoder (default: 10)
     custom_dataloaders : tuple

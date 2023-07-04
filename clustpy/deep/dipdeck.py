@@ -56,7 +56,7 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
     loss_fn : torch.nn.modules.loss._Loss
         loss function for the reconstruction
     autoencoder : torch.nn.Module
-        the input autoencoder. If None a new FlexibleAutoencoder will be created
+        the input autoencoder. If None a new FeedforwardAutoencoder will be created
     embedding_size : int
         size of the embedding within the autoencoder
     max_cluster_size_diff_factor : float
@@ -175,7 +175,7 @@ def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_thresho
     loss_fn : torch.nn.modules.loss._Loss
         loss function for the reconstruction
     autoencoder : torch.nn.Module
-        the input autoencoder. If None a new FlexibleAutoencoder will be created
+        the input autoencoder
     device : torch.device
         device to be trained on
     trainloader : torch.utils.data.DataLoader
@@ -562,7 +562,7 @@ class DipDECK(BaseEstimator, ClusterMixin):
     loss_fn : torch.nn.modules.loss._Loss
         loss function for the reconstruction (default: torch.nn.MSELoss())
     autoencoder : torch.nn.Module
-        the input autoencoder. If None a new FlexibleAutoencoder will be created (default: None)
+        the input autoencoder. If None a new FeedforwardAutoencoder will be created (default: None)
     embedding_size : int
         size of the embedding within the autoencoder (default: 10)
     max_cluster_size_diff_factor : float
