@@ -4,7 +4,7 @@ from clustpy.data import create_subspace_data
 import torch
 
 
-def test_simple_abstract_autoencoder():
+def test_abstract_autoencoder():
     data, _ = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
     batch_size = 256
     data_batch = torch.Tensor(data[:batch_size])
@@ -20,7 +20,7 @@ def test_simple_abstract_autoencoder():
     assert torch.equal(data_batch, forwarded)
 
 
-def test_abstract_autoencoder_with_parameter():
+def test_abstract_autoencoder_with_dummy_torch_parameter():
     data, _ = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
     batch_size = 256
     data_batch = [torch.arange(256), torch.Tensor(data[:batch_size])]

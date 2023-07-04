@@ -5,7 +5,7 @@ Dominik Mautz
 """
 
 from clustpy.deep._utils import detect_device, encode_batchwise, squared_euclidean_distance, predict_batchwise, \
-    set_torch_seed
+    set_torch_seed, run_initial_clustering
 from clustpy.deep._data_utils import get_dataloader
 from clustpy.deep._train_utils import get_trained_autoencoder
 import torch
@@ -19,8 +19,8 @@ def _dcn(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_par
          clustering_optimizer_params: dict, pretrain_epochs: int, clustering_epochs: int,
          optimizer_class: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss, autoencoder: torch.nn.Module,
          embedding_size: int, degree_of_space_distortion: float, degree_of_space_preservation: float,
-         custom_dataloaders: tuple, random_state: np.random.RandomState) -> (
-        np.ndarray, np.ndarray, np.ndarray, np.ndarray, torch.nn.Module):
+         custom_dataloaders: tuple, initial_clustering_class: ClusterMixin, initial_clustering_params: dict,
+         random_state: np.random.RandomState) -> (np.ndarray, np.ndarray, np.ndarray, np.ndarray, torch.nn.Module):
     """
     Start the actual DCN clustering procedure on the input data set.
 
@@ -29,7 +29,7 @@ def _dcn(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_par
     X : np.ndarray / torch.Tensor
         the given data set. Can be a np.ndarray or a torch.Tensor
     n_clusters : int
-        number of clusters
+        number of clusters. Can be None if a corresponding initial_clustering_class is given, e.g. DBSCAN
     batch_size : int
         size of the data batches
     pretrain_optimizer_params : dict
@@ -55,6 +55,10 @@ def _dcn(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_par
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         If None, the default dataloaders will be used
+    initial_clustering_class : ClusterMixin
+        clustering class to obtain the initial cluster labels after the pretraining
+    initial_clustering_params : dict
+        parameters for the initial clustering class
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution
 
@@ -75,11 +79,11 @@ def _dcn(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_par
         trainloader, testloader = custom_dataloaders
     autoencoder = get_trained_autoencoder(trainloader, pretrain_optimizer_params, pretrain_epochs, device,
                                           optimizer_class, loss_fn, X.shape[1], embedding_size, autoencoder)
-    # Execute kmeans in embedded space
+    # Execute initial clustering in embedded space
     embedded_data = encode_batchwise(testloader, autoencoder, device)
-    kmeans = KMeans(n_clusters=n_clusters, random_state=random_state)
-    kmeans.fit(embedded_data)
-    init_centers = kmeans.cluster_centers_
+    n_clusters, _, init_centers, _ = run_initial_clustering(embedded_data, n_clusters,
+                                                   initial_clustering_class,
+                                                   initial_clustering_params, random_state)
     # Setup DCN Module
     dcn_module = _DCN_Module(init_centers).to_device(device)
     # Use DCN optimizer parameters (usually learning rate is reduced by a magnitude of 10)
@@ -306,13 +310,13 @@ class DCN(BaseEstimator, ClusterMixin):
     """
     The Deep Clustering Network (DCN) algorithm.
     First, an autoencoder (AE) will be trained (will be skipped if input autoencoder is given).
-    Afterwards, KMeans identifies the initial clusters.
+    Afterward, KMeans identifies the initial clusters.
     Last, the AE will be optimized using the DCN loss function.
 
     Parameters
     ----------
     n_clusters : int
-        number of clusters
+        number of clusters. Can be None if a corresponding initial_clustering_class is given, e.g. DBSCAN
     batch_size : int
         size of the data batches (default: 256)
     pretrain_optimizer_params : dict
@@ -338,6 +342,10 @@ class DCN(BaseEstimator, ClusterMixin):
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         If None, the default dataloaders will be used (default: None)
+    initial_clustering_class : ClusterMixin
+        clustering class to obtain the initial cluster labels after the pretraining (default: KMeans)
+    initial_clustering_params : dict
+        parameters for the initial clustering class (default: {})
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
@@ -375,6 +383,7 @@ class DCN(BaseEstimator, ClusterMixin):
                  loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), degree_of_space_distortion: float = 0.05,
                  degree_of_space_preservation: float = 1.0, autoencoder: torch.nn.Module = None,
                  embedding_size: int = 10, custom_dataloaders: tuple = None,
+                 initial_clustering_class: ClusterMixin = KMeans, initial_clustering_params: dict = {},
                  random_state: np.random.RandomState = None):
         self.n_clusters = n_clusters
         self.batch_size = batch_size
@@ -389,6 +398,8 @@ class DCN(BaseEstimator, ClusterMixin):
         self.autoencoder = autoencoder
         self.embedding_size = embedding_size
         self.custom_dataloaders = custom_dataloaders
+        self.initial_clustering_class = initial_clustering_class
+        self.initial_clustering_params = initial_clustering_params
         self.random_state = check_random_state(random_state)
         set_torch_seed(self.random_state)
 
@@ -420,6 +431,8 @@ class DCN(BaseEstimator, ClusterMixin):
                                                                                    self.degree_of_space_distortion,
                                                                                    self.degree_of_space_preservation,
                                                                                    self.custom_dataloaders,
+                                                                                   self.initial_clustering_class,
+                                                                                   self.initial_clustering_params,
                                                                                    self.random_state)
         self.labels_ = kmeans_labels
         self.cluster_centers_ = kmeans_centers

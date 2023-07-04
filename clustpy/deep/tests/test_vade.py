@@ -8,13 +8,15 @@ def test_simple_vade():
     torch.use_deterministic_algorithms(True)
     X, labels = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
     X = (X - np.mean(X)) / np.std(X)
-    vade = VaDE(3, pretrain_epochs=3, clustering_epochs=3, n_gmm_initializations=1, random_state=1)
+    vade = VaDE(3, pretrain_epochs=3, clustering_epochs=3,
+                initial_clustering_params={"n_init": 1, "covariance_type": "diag"}, random_state=1)
     assert not hasattr(vade, "labels_")
     vade.fit(X)
     assert vade.labels_.dtype == np.int32
     assert vade.labels_.shape == labels.shape
     # Test if random state is working
-    vade2 = VaDE(3, pretrain_epochs=3, clustering_epochs=3, n_gmm_initializations=1, random_state=1)
+    vade2 = VaDE(3, pretrain_epochs=3, clustering_epochs=3,
+                 initial_clustering_params={"n_init": 1, "covariance_type": "diag"}, random_state=1)
     vade2.fit(X)
     assert np.array_equal(vade.labels_, vade2.labels_)
     assert np.array_equal(vade.cluster_centers_, vade2.cluster_centers_)

@@ -6,7 +6,7 @@ Collin Leiber
 """
 
 import torch
-from clustpy.deep._utils import detect_device, set_torch_seed
+from clustpy.deep._utils import detect_device, set_torch_seed, run_initial_clustering
 from clustpy.deep._data_utils import get_dataloader
 from clustpy.deep._train_utils import get_trained_autoencoder
 from clustpy.deep.autoencoders.variational_autoencoder import VariationalAutoencoder, _vae_sampling
@@ -19,8 +19,8 @@ from sklearn.utils import check_random_state
 def _vade(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_params: dict,
           clustering_optimizer_params: dict, pretrain_epochs: int, clustering_epochs: int,
           optimizer_class: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss, autoencoder: torch.nn.Module,
-          embedding_size: int, n_gmm_initializations: int, custom_dataloaders: tuple,
-          random_state: np.random.RandomState) -> (
+          embedding_size: int, custom_dataloaders: tuple, initial_clustering_class: ClusterMixin,
+          initial_clustering_params: dict, random_state: np.random.RandomState) -> (
         np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, torch.nn.Module):
     """
     Start the actual VaDE clustering procedure on the input data set.
@@ -30,7 +30,7 @@ def _vade(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_pa
     X : np.ndarray / torch.Tensor
         the given data set. Can be a np.ndarray or a torch.Tensor
     n_clusters : int
-        number of clusters
+        number of clusters. Can be None if a corresponding initial_clustering_class is given, e.g. DBSCAN
     batch_size : int
         size of the data batches
     pretrain_optimizer_params : dict
@@ -49,11 +49,13 @@ def _vade(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_pa
         the input autoencoder. If None a variation of a VariationalAutoencoder will be created
     embedding_size : int
         size of the embedding within the autoencoder (central layer with mean and variance)
-    n_gmm_initializations : int
-        number of initializations for the initial GMM clustering within the embedding
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         If None, the default dataloaders will be used
+    initial_clustering_class : ClusterMixin
+        clustering class to obtain the initial cluster labels after the pretraining
+    initial_clustering_params : dict
+        parameters for the initial clustering class
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution
 
@@ -77,14 +79,16 @@ def _vade(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_pa
     autoencoder = get_trained_autoencoder(trainloader, pretrain_optimizer_params, pretrain_epochs, device,
                                           optimizer_class, loss_fn, X.shape[1], embedding_size, autoencoder,
                                           _VaDE_VAE)
-    # Execute EM in embedded space
+    # Execute initial clustering in embedded space (usually GaussianMixture)
     embedded_data = _vade_encode_batchwise(testloader, autoencoder, device)
-    gmm = GaussianMixture(n_components=n_clusters, covariance_type='diag', n_init=n_gmm_initializations,
-                          random_state=random_state)
-    gmm.fit(embedded_data)
+    n_clusters, _, init_means, init_clustering_algo = run_initial_clustering(embedded_data, n_clusters,
+                                                                             initial_clustering_class,
+                                                                             initial_clustering_params, random_state)
+    init_weights = None if not hasattr(init_clustering_algo, "weights_") else init_clustering_algo.weights_
+    init_covs = None if not hasattr(init_clustering_algo, "covariances_") else init_clustering_algo.covariances_
     # Initialize VaDE
-    vade_module = _VaDE_Module(n_clusters=n_clusters, embedding_size=embedding_size, weights=gmm.weights_,
-                               means=gmm.means_, variances=gmm.covariances_).to(device)
+    vade_module = _VaDE_Module(n_clusters=n_clusters, embedding_size=embedding_size, weights=init_weights,
+                               means=init_means, variances=init_covs).to(device)
     # Use vade learning_rate (usually pretrain_optimizer_params reduced by a magnitude of 10)
     optimizer = optimizer_class(list(autoencoder.parameters()) + list(vade_module.parameters()),
                                 **clustering_optimizer_params)
@@ -96,7 +100,7 @@ def _vade(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_pa
     vade_covariances = vade_module.p_var.detach().cpu().numpy()
     # Do reclustering with GMM
     embedded_data = _vade_encode_batchwise(testloader, autoencoder, device)
-    gmm = GaussianMixture(n_components=n_clusters, covariance_type='diag', n_init=100, random_state=random_state)
+    gmm = GaussianMixture(n_components=n_clusters, covariance_type='full', n_init=10, random_state=random_state)
     gmm_labels = gmm.fit_predict(embedded_data).astype(np.int32)
     # Return results
     return gmm_labels, gmm.means_, gmm.covariances_, vade_labels, vade_centers, vade_covariances, autoencoder
@@ -231,6 +235,8 @@ class _VaDE_Module(torch.nn.Module):
         self.p_mean = torch.nn.Parameter(torch.tensor(means), requires_grad=True)
         if variances is None:
             variances = torch.ones(n_clusters, embedding_size)
+        assert variances.shape == (n_clusters,
+                                   embedding_size), "Shape of the initial variances for the Vade_Module must be (n_clusters, embedding_size)"
         self.p_var = torch.nn.Parameter(torch.tensor(variances), requires_grad=True)
         self.normalize_prob = torch.nn.Softmax(dim=0)
 
@@ -468,13 +474,13 @@ class VaDE(BaseEstimator, ClusterMixin):
     """
     The Variational Deep Embedding (VaDE) algorithm.
     First, an variational autoencoder (VAE) will be trained (will be skipped if input autoencoder is given).
-    Afterwards, a GMM will be fit to identify the initial clustering structures.
+    Afterward, a GMM will be fit to identify the initial clustering structures.
     Last, the VAE will be optimized using the VaDE loss function.
 
     Parameters
     ----------
     n_clusters : int
-        number of clusters
+        number of clusters. Can be None if a corresponding initial_clustering_class is given, e.g. DBSCAN
     batch_size : int
         size of the data batches (default: 256)
     pretrain_optimizer_params : dict
@@ -493,11 +499,13 @@ class VaDE(BaseEstimator, ClusterMixin):
         the input autoencoder. If None a variation of a VariationalAutoencoder will be created (default: None)
     embedding_size : int
         size of the embedding within the autoencoder (central layer with mean and variance) (default: 10)
-    n_gmm_initializations : int
-        number of initializations for the initial GMM clustering within the embedding (default: 100)
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         If None, the default dataloaders will be used (default: None)
+    initial_clustering_class : ClusterMixin
+        clustering class to obtain the initial cluster labels after the pretraining (default: GaussianMixture)
+    initial_clustering_params : dict
+        parameters for the initial clustering class (default: {"n_init": 10, "covariance_type": "diag"})
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
@@ -511,7 +519,7 @@ class VaDE(BaseEstimator, ClusterMixin):
         The covariance matrices as identified by a final Gaussian Mixture Model
     vade_labels_ : np.ndarray
         The labels as identified by VaDE after the training terminated
-    vade_cluster_centers_ : np.ndarray
+    vade_cluster_centers_ : np.ndarrayqgitq
         The cluster centers as identified by VaDE after the training terminated
     vade_covariances_ : np.ndarray
         The covariance matrices as identified by VaDE after the training terminated
@@ -535,7 +543,9 @@ class VaDE(BaseEstimator, ClusterMixin):
                  clustering_optimizer_params: dict = {"lr": 1e-4}, pretrain_epochs: int = 100,
                  clustering_epochs: int = 150, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  loss_fn: torch.nn.modules.loss._Loss = torch.nn.BCELoss(), autoencoder: torch.nn.Module = None,
-                 embedding_size: int = 10, n_gmm_initializations: int = 100, custom_dataloaders: tuple = None,
+                 embedding_size: int = 10, custom_dataloaders: tuple = None,
+                 initial_clustering_class: ClusterMixin = GaussianMixture,
+                 initial_clustering_params: dict = {"n_init": 10, "covariance_type": "diag"},
                  random_state: np.random.RandomState = None):
         self.n_clusters = n_clusters
         self.batch_size = batch_size
@@ -547,8 +557,9 @@ class VaDE(BaseEstimator, ClusterMixin):
         self.loss_fn = loss_fn
         self.autoencoder = autoencoder
         self.embedding_size = embedding_size
-        self.n_gmm_initializations = n_gmm_initializations
         self.custom_dataloaders = custom_dataloaders
+        self.initial_clustering_class = initial_clustering_class
+        self.initial_clustering_params = initial_clustering_params
         self.random_state = check_random_state(random_state)
         set_torch_seed(self.random_state)
 
@@ -580,8 +591,9 @@ class VaDE(BaseEstimator, ClusterMixin):
                                                                                                                  self.loss_fn,
                                                                                                                  self.autoencoder,
                                                                                                                  self.embedding_size,
-                                                                                                                 self.n_gmm_initializations,
                                                                                                                  self.custom_dataloaders,
+                                                                                                                 self.initial_clustering_class,
+                                                                                                                 self.initial_clustering_params,
                                                                                                                  self.random_state)
         self.labels_ = gmm_labels
         self.cluster_centers_ = gmm_means

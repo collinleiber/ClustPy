@@ -6,7 +6,7 @@ Collin Leiber
 """
 
 from clustpy.deep._utils import detect_device, encode_batchwise, squared_euclidean_distance, predict_batchwise, \
-    set_torch_seed
+    set_torch_seed, run_initial_clustering
 from clustpy.deep._data_utils import get_dataloader
 from clustpy.deep._train_utils import get_trained_autoencoder
 import torch
@@ -20,7 +20,8 @@ def _dec(X: np.ndarray, n_clusters: int, alpha: float, batch_size: int, pretrain
          clustering_optimizer_params: dict, pretrain_epochs: int, clustering_epochs: int,
          optimizer_class: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss,
          autoencoder: torch.nn.Module, embedding_size: int, use_reconstruction_loss: bool,
-         cluster_loss_weight: float, custom_dataloaders: tuple, random_state: np.random.RandomState) -> (
+         cluster_loss_weight: float, custom_dataloaders: tuple, initial_clustering_class: ClusterMixin,
+         initial_clustering_params: dict, random_state: np.random.RandomState) -> (
         np.ndarray, np.ndarray, np.ndarray, np.ndarray, torch.nn.Module):
     """
     Start the actual DEC clustering procedure on the input data set.
@@ -30,7 +31,7 @@ def _dec(X: np.ndarray, n_clusters: int, alpha: float, batch_size: int, pretrain
     X : np.ndarray / torch.Tensor
         the given data set. Can be a np.ndarray or a torch.Tensor
     n_clusters : int
-        number of clusters
+        number of clusters. Can be None if a corresponding initial_clustering_class is given, e.g. DBSCAN
     alpha : float
         alpha value for the prediction
     batch_size : int
@@ -58,6 +59,10 @@ def _dec(X: np.ndarray, n_clusters: int, alpha: float, batch_size: int, pretrain
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         If None, the default dataloaders will be used
+    initial_clustering_class : ClusterMixin
+        clustering class to obtain the initial cluster labels after the pretraining
+    initial_clustering_params : dict
+        parameters for the initial clustering class
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution
 
@@ -78,12 +83,11 @@ def _dec(X: np.ndarray, n_clusters: int, alpha: float, batch_size: int, pretrain
         trainloader, testloader = custom_dataloaders
     autoencoder = get_trained_autoencoder(trainloader, pretrain_optimizer_params, pretrain_epochs, device,
                                           optimizer_class, loss_fn, X.shape[1], embedding_size, autoencoder)
-
-    # Execute kmeans in embedded space - initial clustering
+    # Execute initial clustering in embedded space
     embedded_data = encode_batchwise(testloader, autoencoder, device)
-    kmeans = KMeans(n_clusters=n_clusters, random_state=random_state)
-    kmeans.fit(embedded_data)
-    init_centers = kmeans.cluster_centers_
+    n_clusters, _, init_centers, _ = run_initial_clustering(embedded_data, n_clusters,
+                                                            initial_clustering_class,
+                                                            initial_clustering_params, random_state)
     # Setup DEC Module
     dec_module = _DEC_Module(init_centers, alpha).to(device)
     # Use DEC optimizer parameters (usually learning rate is reduced by a magnitude of 10)
@@ -309,13 +313,13 @@ class DEC(BaseEstimator, ClusterMixin):
     """
     The Deep Embedded Clustering (DEC) algorithm.
     First, an autoencoder (AE) will be trained (will be skipped if input autoencoder is given).
-    Afterwards, KMeans identifies the initial clusters.
+    Afterward, KMeans identifies the initial clusters.
     Last, the AE will be optimized using the DEC loss function.
 
     Parameters
     ----------
     n_clusters : int
-        number of clusters
+        number of clusters. Can be None if a corresponding initial_clustering_class is given, e.g. DBSCAN
     alpha : float
         alpha value for the prediction (default: 1.0)
     batch_size : int
@@ -341,6 +345,10 @@ class DEC(BaseEstimator, ClusterMixin):
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         If None, the default dataloaders will be used (default: None)
+    initial_clustering_class : ClusterMixin
+        clustering class to obtain the initial cluster labels after the pretraining (default: KMeans)
+    initial_clustering_params : dict
+        parameters for the initial clustering class (default: {})
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
@@ -377,6 +385,7 @@ class DEC(BaseEstimator, ClusterMixin):
                  optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), autoencoder: torch.nn.Module = None,
                  embedding_size: int = 10, cluster_loss_weight: float = 1, custom_dataloaders: tuple = None,
+                 initial_clustering_class: ClusterMixin = KMeans, initial_clustering_params: dict = {},
                  random_state: np.random.RandomState = None):
         self.n_clusters = n_clusters
         self.alpha = alpha
@@ -391,6 +400,8 @@ class DEC(BaseEstimator, ClusterMixin):
         self.embedding_size = embedding_size
         self.cluster_loss_weight = cluster_loss_weight
         self.custom_dataloaders = custom_dataloaders
+        self.initial_clustering_class = initial_clustering_class
+        self.initial_clustering_params = initial_clustering_params
         self.random_state = check_random_state(random_state)
         self.use_reconstruction_loss = False
         set_torch_seed(self.random_state)
@@ -424,6 +435,8 @@ class DEC(BaseEstimator, ClusterMixin):
                                                                                    self.use_reconstruction_loss,
                                                                                    self.cluster_loss_weight,
                                                                                    self.custom_dataloaders,
+                                                                                   self.initial_clustering_class,
+                                                                                   self.initial_clustering_params,
                                                                                    self.random_state)
         self.labels_ = kmeans_labels
         self.cluster_centers_ = kmeans_centers
@@ -442,7 +455,7 @@ class IDEC(DEC):
     Parameters
     ----------
     n_clusters : int
-        number of clusters
+        number of clusters. Can be None if a corresponding initial_clustering_class is given, e.g. DBSCAN
     alpha : float
         alpha value for the prediction (default: 1.0)
     batch_size : int
@@ -468,6 +481,10 @@ class IDEC(DEC):
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         If None, the default dataloaders will be used (default: None)
+    initial_clustering_class : ClusterMixin
+        clustering class to obtain the initial cluster labels after the pretraining (default: KMeans)
+    initial_clustering_params : dict
+        parameters for the initial clustering class (default: {})
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
@@ -503,8 +520,10 @@ class IDEC(DEC):
                  clustering_epochs: int = 150, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), autoencoder: torch.nn.Module = None,
                  embedding_size: int = 10, cluster_loss_weight: float = 0.1, custom_dataloaders: tuple = None,
+                 initial_clustering_class: ClusterMixin = KMeans, initial_clustering_params: dict = {},
                  random_state: np.random.RandomState = None):
         super().__init__(n_clusters, alpha, batch_size, pretrain_optimizer_params, clustering_optimizer_params,
                          pretrain_epochs, clustering_epochs, optimizer_class, loss_fn, autoencoder, embedding_size,
-                         cluster_loss_weight, custom_dataloaders, random_state)
+                         cluster_loss_weight, custom_dataloaders,
+                         initial_clustering_class, initial_clustering_params, random_state)
         self.use_reconstruction_loss = True

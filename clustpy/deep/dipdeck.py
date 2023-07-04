@@ -8,7 +8,7 @@ import numpy as np
 from clustpy.utils import dip_test, dip_pval
 import torch
 from clustpy.deep._utils import detect_device, encode_batchwise, squared_euclidean_distance, int_to_one_hot, \
-    set_torch_seed
+    set_torch_seed, run_initial_clustering
 from clustpy.deep._data_utils import get_dataloader
 from clustpy.deep._train_utils import get_trained_autoencoder
 from sklearn.cluster import KMeans
@@ -22,6 +22,7 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
               clustering_epochs: int, optimizer_class: torch.optim.Optimizer,
               loss_fn: torch.nn.modules.loss._Loss, autoencoder: torch.nn.Module, embedding_size: int,
               max_cluster_size_diff_factor: float, pval_strategy: str, n_boots: int, custom_dataloaders: tuple,
+              initial_clustering_class: ClusterMixin, initial_clustering_params: dict,
               random_state: np.random.RandomState, debug: bool) -> (np.ndarray, int, np.ndarray, torch.nn.Module):
     """
     Start the actual DipDECK clustering procedure on the input data set.
@@ -31,7 +32,7 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
     X : np.ndarray / torch.Tensor
         the given data set. Can be a np.ndarray or a torch.Tensor
     n_clusters_init : int
-        initial number of clusters
+        initial number of clusters. Can be None if a corresponding initial_clustering_class is given, e.g. DBSCAN
     dip_merge_threshold : float
         threshold regarding the Dip-p-value that defines if two clusters should be merged. Must be bvetween 0 and 1
     cluster_loss_weight : float
@@ -69,6 +70,10 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         If None, the default dataloaders will be used
+    initial_clustering_class : ClusterMixin
+        clustering class to obtain the initial cluster labels after the pretraining
+    initial_clustering_params : dict
+        parameters for the initial clustering class
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution
     debug : bool
@@ -86,7 +91,7 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
         raise Exception("max_n_clusters can not be smaller than min_n_clusters")
     if min_n_clusters <= 0:
         raise Exception("min_n_clusters must be greater than zero")
-    if n_clusters_init < min_n_clusters:
+    if n_clusters_init < min_n_clusters and n_clusters_init is not None:
         raise Exception("n_clusters can not be smaller than min_n_clusters")
     if dip_merge_threshold < 0 or dip_merge_threshold > 1:
         raise Exception("dip_merge_threshold must be between 0 and 1")
@@ -98,12 +103,12 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
         trainloader, testloader = custom_dataloaders
     autoencoder = get_trained_autoencoder(trainloader, pretrain_optimizer_params, pretrain_epochs, device,
                                           optimizer_class, loss_fn, X.shape[1], embedding_size, autoencoder)
-    # Execute kmeans in embedded space - initial clustering
+    # Execute initial clustering in embedded space
     embedded_data = encode_batchwise(testloader, autoencoder, device)
-    kmeans = KMeans(n_clusters=n_clusters_init, random_state=random_state)
-    kmeans.fit(embedded_data)
-    init_centers = kmeans.cluster_centers_
-    cluster_labels_cpu = kmeans.labels_
+    n_clusters_init, cluster_labels_cpu, init_centers, _ = run_initial_clustering(embedded_data, n_clusters_init,
+                                                                                  initial_clustering_class,
+                                                                                  initial_clustering_params,
+                                                                                  random_state)
     # Get nearest points to optimal centers
     centers_cpu, embedded_centers_cpu = _get_nearest_points_to_optimal_centers(X, init_centers, embedded_data)
     # Initial dip values
@@ -530,14 +535,14 @@ class DipDECK(BaseEstimator, ClusterMixin):
     """
     The Deep Embedded Clustering with k-Estimation (DipDECK) algorithm.
     First, an autoencoder (AE) will be trained (will be skipped if input autoencoder is given).
-    Afterwards, KMeans identifies the initial clusters using an overestimated number of clusters.
+    Afterward, KMeans identifies the initial clusters using an overestimated number of clusters.
     Last, the AE will be optimized using the DipDECK loss function.
     If any Dip-value exceeds the dip_merge_threshold, the corresponding clusters will be merged.
 
     Parameters
     ----------
     n_clusters_init : int
-        initial number of clusters (default: 35)
+        initial number of clusters. Can be None if a corresponding initial_clustering_class is given, e.g. DBSCAN (default: 35)
     dip_merge_threshold : float
         threshold regarding the Dip-p-value that defines if two clusters should be merged. Must be bvetween 0 and 1 (default: 0.9)
     cluster_loss_weight : float
@@ -575,6 +580,10 @@ class DipDECK(BaseEstimator, ClusterMixin):
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         If None, the default dataloaders will be used (default: None)
+    initial_clustering_class : ClusterMixin
+        clustering class to obtain the initial cluster labels after the pretraining (default: KMeans)
+    initial_clustering_params : dict
+        parameters for the initial clustering class (default: {})
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
     debug : bool
@@ -612,8 +621,8 @@ class DipDECK(BaseEstimator, ClusterMixin):
                  optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), autoencoder: torch.nn.Module = None,
                  embedding_size: int = 5, max_cluster_size_diff_factor: float = 2, pval_strategy: str = "table",
-                 n_boots: int = 1000, custom_dataloaders: tuple = None, random_state: np.random.RandomState = None,
-                 debug: bool = False):
+                 n_boots: int = 1000, custom_dataloaders: tuple = None, initial_clustering_class: ClusterMixin = KMeans,
+                 initial_clustering_params: dict = {}, random_state: np.random.RandomState = None, debug: bool = False):
         self.n_clusters_init = n_clusters_init
         self.dip_merge_threshold = dip_merge_threshold
         self.cluster_loss_weight = cluster_loss_weight
@@ -632,6 +641,8 @@ class DipDECK(BaseEstimator, ClusterMixin):
         self.pval_strategy = pval_strategy
         self.n_boots = n_boots
         self.custom_dataloaders = custom_dataloaders
+        self.initial_clustering_class = initial_clustering_class
+        self.initial_clustering_params = initial_clustering_params
         self.random_state = check_random_state(random_state)
         set_torch_seed(self.random_state)
         self.debug = debug
@@ -662,7 +673,9 @@ class DipDECK(BaseEstimator, ClusterMixin):
                                                              self.optimizer_class, self.loss_fn, self.autoencoder,
                                                              self.embedding_size, self.max_cluster_size_diff_factor,
                                                              self.pval_strategy, self.n_boots, self.custom_dataloaders,
-                                                             self.random_state, self.debug)
+                                                             self.initial_clustering_class,
+                                                             self.initial_clustering_params, self.random_state,
+                                                             self.debug)
         self.labels_ = labels
         self.n_clusters_ = n_clusters
         self.cluster_centers_ = centers
