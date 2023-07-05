@@ -4,6 +4,7 @@ from clustpy.utils import plot_with_transformation, plot_1d_data, plot_2d_data, 
 import numpy as np
 from sklearn.decomposition import PCA, FastICA
 from clustpy.data import load_nrletters, load_optdigits
+import matplotlib.pyplot as plt
 
 
 def _get_data_labels_centers():
@@ -45,6 +46,7 @@ def test_plot_2d_data(mock_fig):
 def test_plot_3d_data(mock_fig):
     X, L, centers, L_true = _get_data_labels_centers()
     assert None == plot_3d_data(X[:, :3], L, centers[:, :3], L_true, True, 11, show_plot=True)
+    plt.figure()  # Create new figure for future plots
 
 
 @patch("matplotlib.pyplot.show")  # Used to test plots (show will not be called)

@@ -6,7 +6,7 @@ Collin Leiber
 """
 
 import torch
-from clustpy.deep.autoencoders.flexible_autoencoder import FullyConnectedBlock, FlexibleAutoencoder
+from clustpy.deep.autoencoders.feedforward_autoencoder import FullyConnectedBlock, FeedforwardAutoencoder
 
 
 def _vae_sampling(q_mean: torch.Tensor, q_logvar: torch.Tensor) -> torch.Tensor:
@@ -31,7 +31,7 @@ def _vae_sampling(q_mean: torch.Tensor, q_logvar: torch.Tensor) -> torch.Tensor:
     return z
 
 
-class VariationalAutoencoder(FlexibleAutoencoder):
+class VariationalAutoencoder(FeedforwardAutoencoder):
     """
     A variational autoencoder (VAE).
 
@@ -85,7 +85,7 @@ class VariationalAutoencoder(FlexibleAutoencoder):
                                                      decoder_layers, decoder_output_fn, reusable)
         # Get size of embedding from last dimension of layers
         embedding_size = layers[-1]
-        # Overwrite encoder from FlexibleAutoencoder, leave out the last layer
+        # Overwrite encoder from FeedforwardAutoencoder, leave out the last layer
         self.encoder = FullyConnectedBlock(layers=layers[:-1], batch_norm=batch_norm, dropout=dropout,
                                            activation_fn=activation_fn, bias=bias, output_fn=activation_fn)
         self.mean = torch.nn.Linear(layers[-2], embedding_size)
@@ -94,7 +94,7 @@ class VariationalAutoencoder(FlexibleAutoencoder):
     def encode(self, x: torch.Tensor) -> (torch.Tensor, torch.Tensor):
         """
         Apply the encoder function to x.
-        Overwrites function from FlexibleAutoencoder.
+        Overwrites function from FeedforwardAutoencoder.
 
         Parameters
         ----------
@@ -117,7 +117,7 @@ class VariationalAutoencoder(FlexibleAutoencoder):
         """
         Applies both the encode and decode function.
         The forward function is automatically called if we call self(x).
-        Overwrites function from FlexibleAutoencoder.
+        Overwrites function from FeedforwardAutoencoder.
 
         Parameters
         ----------
@@ -138,7 +138,7 @@ class VariationalAutoencoder(FlexibleAutoencoder):
         return z, q_mean, q_logvar, reconstruction
 
     def loss(self, batch: list, loss_fn: torch.nn.modules.loss._Loss, device: torch.device,
-             beta: float = 1) -> torch.Tensor:
+             beta: float = 1) -> (torch.Tensor, torch.Tensor, torch.Tensor):
         """
         Calculate the loss of a single batch of data.
 
@@ -155,16 +155,18 @@ class VariationalAutoencoder(FlexibleAutoencoder):
 
         Returns
         -------
-        total_loss: torch.Tensor
-            the reconstruction loss of the input sample
+        total_loss: (torch.Tensor, torch.Tensor, torch.Tensor)
+            the reconstruction loss of the input sample,
+            the sampling,
+            the reconstruction of the data point
         """
         assert type(batch) is list, "batch must come from a dataloader and therefore be of type list"
         batch_data = batch[1].to(device)
-        _, q_mean, q_logvar, reconstruction = self.forward(batch_data)
+        z, q_mean, q_logvar, reconstruction = self.forward(batch_data)
         rec_loss = loss_fn(reconstruction, batch_data)
 
         kl_loss = 0.5 * torch.sum(q_mean.pow(2) + torch.exp(q_logvar) - 1.0 - q_logvar)
         kl_loss /= batch_data.shape[0]
 
         total_loss = rec_loss + beta * kl_loss
-        return total_loss
+        return total_loss, z, reconstruction

@@ -19,3 +19,8 @@ def test_simple_enrc():
     assert np.array_equal(enrc.labels_, enrc2.labels_)
     for i in range(len(enrc.cluster_centers_)):
         assert np.allclose(enrc.cluster_centers_[i], enrc2.cluster_centers_[i])
+    # Test if sgd as init is working
+    enrc = ENRC([3, 3], pretrain_epochs=3, clustering_epochs=3, init="sgd")
+    enrc.fit(X)
+    assert enrc.labels_.dtype == np.int32
+    assert enrc.labels_.shape == labels.shape

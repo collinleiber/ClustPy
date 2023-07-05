@@ -4,17 +4,13 @@ from clustpy.data import create_subspace_data
 import torch
 
 
-def test_simple_variational_autoencoder():
+def test_variational_autoencoder():
     data, _ = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
-    embedding_dim = 10
-    # Test fitting
-    autoencoder = VariationalAutoencoder(layers=[data.shape[1], 128, 64, embedding_dim])
-    assert autoencoder.fitted is False
-    autoencoder.fit(n_epochs=5, lr=1e-3, data=data)
-    assert autoencoder.fitted is True
-    # Test encoding
     batch_size = 256
     data_batch = torch.Tensor(data[:batch_size])
+    embedding_dim = 10
+    autoencoder = VariationalAutoencoder(layers=[data.shape[1], 128, 64, embedding_dim])
+    # Test encoding
     embedded_mean, embedded_var = autoencoder.encode(data_batch)
     assert embedded_mean.shape == (batch_size, embedding_dim)
     assert embedded_var.shape == (batch_size, embedding_dim)
@@ -30,3 +26,7 @@ def test_simple_variational_autoencoder():
     assert torch.equal(forward_mean, embedded_mean)
     assert torch.equal(forward_var, embedded_var)
     assert torch.equal(forwarded_reconstruct, decoded)
+    # Test fitting
+    assert autoencoder.fitted is False
+    autoencoder.fit(n_epochs=3, optimizer_params={"lr": 1e-3}, data=data)
+    assert autoencoder.fitted is True
