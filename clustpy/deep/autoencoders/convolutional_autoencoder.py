@@ -15,6 +15,8 @@ _VALID_CONV_MODULES = {
     },
 }
 
+_CONV_MODULES_INPUT_DIM = {"resnet18": 512, "resnet50": 2048}
+
 
 class ConvolutionalAutoencoder(_AbstractAutoencoder):
     """
@@ -29,7 +31,7 @@ class ConvolutionalAutoencoder(_AbstractAutoencoder):
         If decoder_layers are not specified then the decoder is symmetric and goes in the same order from embedding to input.
     conv_encoder_name : str
         name of convolutional resnet encoder part of the autoencoder. Can be 'resnet18' or 'resnet50' (default: 'resnet18')
-    conv_decode_name : str
+    conv_decoder_name : str
         name of convolutional resnet decoder part of the autoencoder. Can be 'resnet18' or 'resnet50'. If None it will be the same as conv_encoder_name (default: None)
     activation_fn : torch.nn.Module
         activation function from torch.nn, set the activation function for the hidden layers, if None then it will be linear (default: torch.nn.LeakyReLU)
@@ -76,7 +78,7 @@ class ConvolutionalAutoencoder(_AbstractAutoencoder):
     """
 
     def __init__(self, input_height: int, fc_layers: list, conv_encoder_name: str = "resnet18",
-                 conv_decode_name: str = None, activation_fn: torch.nn.Module = torch.nn.ReLU,
+                 conv_decoder_name: str = None, activation_fn: torch.nn.Module = torch.nn.ReLU,
                  fc_decoder_layers: list = None, decoder_output_fn: torch.nn.Module = None,
                  pretrained_encoder_weights: Weights = None, pretrained_decoder_weights: Weights = None,
                  reusable: bool = True, **fc_kwargs):
@@ -84,34 +86,35 @@ class ConvolutionalAutoencoder(_AbstractAutoencoder):
         self.input_height = input_height
 
         # Check if layers match
-        if fc_layers[0] not in [512, 2048]:
-            raise ValueError(f"First input in fc_layers needs to be 512 or 2048, but is fc_layers[0] = {fc_layers[0]}")
         if fc_decoder_layers is None:
             fc_decoder_layers = fc_layers[::-1]
         if (fc_layers[-1] != fc_decoder_layers[0]):
             raise ValueError(
                 f"Innermost hidden layer and first decoder layer do not match, they are {fc_layers[-1]} and {fc_decoder_layers[0]} respectively.")
-        if (fc_layers[0] != fc_decoder_layers[-1]):
-            raise ValueError(
-                f"Output and input dimension do not match, they are {fc_layers[0]} and {fc_decoder_layers[-1]} respectively.")
 
         # Setup convolutional encoder and decoder
+        if conv_decoder_name is None:
+            conv_decoder_name = conv_encoder_name
         if conv_encoder_name in _VALID_CONV_MODULES:
+            if fc_layers[0] != _CONV_MODULES_INPUT_DIM[conv_encoder_name]:
+                raise ValueError(
+                    f"First input in fc_layers needs to be {_CONV_MODULES_INPUT_DIM[conv_encoder_name]} for {conv_encoder_name} architecture, but is fc_layers[0] = {fc_layers[0]}")
             self.conv_encoder = _VALID_CONV_MODULES[conv_encoder_name]["enc"](first_conv=True, maxpool1=True,
                                                                               pretrained_weights=pretrained_encoder_weights)
-            if conv_decode_name is None:
-                conv_decode_name = conv_encoder_name
-            if conv_decode_name in _VALID_CONV_MODULES:
-                self.conv_decoder = _VALID_CONV_MODULES[conv_decode_name]["dec"](latent_dim=fc_decoder_layers[-1],
-                                                                                 input_height=self.input_height,
-                                                                                 first_conv=True, maxpool1=True,
-                                                                                 pretrained_weights=pretrained_decoder_weights)
-            else:
-                raise ValueError(
-                    f"value for conv_decoder_name={conv_decode_name} is not valid. Has to be one of {list(_VALID_CONV_MODULES.keys())}")
         else:
             raise ValueError(
                 f"value for conv_encoder_name={conv_encoder_name} is not valid. Has to be one of {list(_VALID_CONV_MODULES.keys())}")
+        if conv_decoder_name in _VALID_CONV_MODULES:
+            # if fc_decoder_layers[-1] != _CONV_MODULES_INPUT_DIM[conv_decoder_name]:
+            #     raise ValueError(
+            #         f"Last input in fc_decoder_layers needs to be {_CONV_MODULES_INPUT_DIM[conv_decoder_name]} for {conv_decoder_name} architecture, but is fc_decoder_layers[0] = {fc_decoder_layers[-1]}")
+            self.conv_decoder = _VALID_CONV_MODULES[conv_decoder_name]["dec"](latent_dim=fc_decoder_layers[-1],
+                                                                              input_height=self.input_height,
+                                                                              first_conv=True, maxpool1=True,
+                                                                              pretrained_weights=pretrained_decoder_weights)
+        else:
+            raise ValueError(
+                f"value for conv_decoder_name={conv_decoder_name} is not valid. Has to be one of {list(_VALID_CONV_MODULES.keys())}")
 
         # Initialize encoder
         self.fc_encoder = FullyConnectedBlock(layers=fc_layers, activation_fn=activation_fn, output_fn=None,

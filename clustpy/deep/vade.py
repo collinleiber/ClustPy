@@ -519,7 +519,7 @@ class VaDE(BaseEstimator, ClusterMixin):
         The covariance matrices as identified by a final Gaussian Mixture Model
     vade_labels_ : np.ndarray
         The labels as identified by VaDE after the training terminated
-    vade_cluster_centers_ : np.ndarrayqgitq
+    vade_cluster_centers_ : np.ndarray
         The cluster centers as identified by VaDE after the training terminated
     vade_covariances_ : np.ndarray
         The covariance matrices as identified by VaDE after the training terminated
