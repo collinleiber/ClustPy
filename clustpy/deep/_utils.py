@@ -234,7 +234,7 @@ def int_to_one_hot(int_tensor: torch.Tensor, n_integers: int) -> torch.Tensor:
     int_tensor : torch.Tensor
         The original tensor containing integers
     n_integers : int
-        The number of different intgeres within int_tensor
+        The number of different integers within int_tensor
 
     Returns
     -------

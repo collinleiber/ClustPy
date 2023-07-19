@@ -5,8 +5,8 @@ Dominik Mautz
 """
 
 from clustpy.deep._utils import detect_device, encode_batchwise, squared_euclidean_distance, predict_batchwise, \
-    set_torch_seed, run_initial_clustering
-from clustpy.deep._data_utils import get_dataloader
+    set_torch_seed, run_initial_clustering, int_to_one_hot
+from clustpy.deep._data_utils import get_dataloader, augmentation_invariance_check
 from clustpy.deep._train_utils import get_trained_autoencoder
 import torch
 import numpy as np
@@ -19,7 +19,7 @@ def _dcn(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_par
          clustering_optimizer_params: dict, pretrain_epochs: int, clustering_epochs: int,
          optimizer_class: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss, autoencoder: torch.nn.Module,
          embedding_size: int, degree_of_space_distortion: float, degree_of_space_preservation: float,
-         custom_dataloaders: tuple, initial_clustering_class: ClusterMixin, initial_clustering_params: dict,
+         custom_dataloaders: tuple, augmentation_invariance: bool, initial_clustering_class: ClusterMixin, initial_clustering_params: dict,
          random_state: np.random.RandomState) -> (np.ndarray, np.ndarray, np.ndarray, np.ndarray, torch.nn.Module):
     """
     Start the actual DCN clustering procedure on the input data set.
@@ -55,6 +55,9 @@ def _dcn(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_par
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         If None, the default dataloaders will be used
+    augmentation_invariance : bool
+        If True, augmented samples provided in custom_dataloaders[0] will be used to learn 
+        cluster assignments that are invariant to the augmentation transformations (default: False)
     initial_clustering_class : ClusterMixin
         clustering class to obtain the initial cluster labels after the pretraining
     initial_clustering_params : dict
@@ -85,7 +88,7 @@ def _dcn(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_par
                                                    initial_clustering_class,
                                                    initial_clustering_params, random_state)
     # Setup DCN Module
-    dcn_module = _DCN_Module(init_centers).to_device(device)
+    dcn_module = _DCN_Module(init_centers, augmentation_invariance).to_device(device)
     # Use DCN optimizer parameters (usually learning rate is reduced by a magnitude of 10)
     optimizer = optimizer_class(list(autoencoder.parameters()), **clustering_optimizer_params)
     # DEC Training loop
@@ -150,11 +153,22 @@ class _DCN_Module(torch.nn.Module):
         the cluster centers
     """
 
-    def __init__(self, init_np_centers: np.ndarray):
+    def __init__(self, init_np_centers: np.ndarray, augmentation_invariance: bool = False):
         super().__init__()
+        self.augmentation_invariance = augmentation_invariance
         self.centers = torch.tensor(init_np_centers)
 
-    def dcn_loss(self, embedded: torch.Tensor, weights: torch.Tensor = None) -> torch.Tensor:
+    def compression_loss(self, embedded, weights=None, s=None)->torch.Tensor:
+        dist = squared_euclidean_distance(self.centers, embedded, weights=weights)
+        if s is None:
+            loss = (dist.min(dim=1)[0]).sum()/(embedded.shape[0]*embedded.shape[1])
+        else:
+            assignment_matrix = int_to_one_hot(s, self.centers.shape[0])
+            loss = (dist * assignment_matrix).sum()/(embedded.shape[0]*embedded.shape[1])
+        return loss  
+
+
+    def dcn_loss(self, embedded: torch.Tensor, assignment_matrix: torch.Tensor = None, weights: torch.Tensor = None) -> torch.Tensor:
         """
         Calculate the DCN loss of given embedded samples.
 
@@ -162,16 +176,22 @@ class _DCN_Module(torch.nn.Module):
         ----------
         embedded : torch.Tensor
             the embedded samples
+        assignment_matrix : torch.Tensor
+            cluster assignments per sample as a one-hot-matrix to compute the loss. 
+            If None then loss will be computed based on the closest centroids for each data sample (default: None)
         weights : torch.Tensor
             feature weights for the squared euclidean distance (default: None)
-
+        
         Returns
         -------
         loss: torch.Tensor
             the final DCN loss
         """
         dist = squared_euclidean_distance(embedded, self.centers, weights=weights)
-        loss = (dist.min(dim=1)[0]).mean()
+        if assignment_matrix is None:
+            loss = (dist.min(dim=1)[0]).mean()
+        else:
+            loss = (dist * assignment_matrix).mean()
         return loss
 
     def predict_hard(self, embedded: torch.Tensor, weights: torch.Tensor = None) -> torch.Tensor:
@@ -233,6 +253,55 @@ class _DCN_Module(torch.nn.Module):
         self.centers = self.centers.to(device)
         self.to(device)
         return self
+    
+    def _loss(self, batch, autoencoder, loss_fn, degree_of_space_preservation, degree_of_space_distortion, device):
+        """
+        Calculate the complete DCN + Autoencoder loss.
+
+        Parameters
+        ----------
+        batch : list
+            the minibatch
+        autoencoder : torch.nn.Module
+            the autoencoder
+        cluster_loss_weight : float
+            weight of the clustering loss compared to the reconstruction loss
+        loss_fn : torch.nn.modules.loss._Loss
+            loss function for the reconstruction
+        degree_of_space_distortion : float
+            weight of the clustering loss
+        degree_of_space_preservation : float
+            weight of the reconstruction loss
+        device : torch.device
+            device to be trained on
+
+        Returns
+        -------
+        loss : torch.Tensor
+            the final DCN loss
+        """
+        # compute reconstruction loss
+        if self.augmentation_invariance:
+            # Convention is that the augmented sample is at the first position and the original one at the second position
+            ae_loss, embedded, _ = autoencoder.loss([batch[0], batch[2]], loss_fn, device)
+            ae_loss_aug, embedded_aug, _ = autoencoder.loss([batch[0], batch[1]], loss_fn, device)
+            ae_loss = (ae_loss + ae_loss_aug) / 2
+        else:
+            ae_loss, embedded, _ = autoencoder.loss(batch, loss_fn, device)
+
+        # compute cluster loss
+        assignments = self.predict_hard(embedded)
+        assignment_matrix = int_to_one_hot(assignments, self.centers.shape[0])
+        cluster_loss = self.dcn_loss(embedded, assignment_matrix)
+        if self.augmentation_invariance:
+            # assign augmented samples to the same cluster as original samples
+            cluster_loss_aug = self.dcn_loss(embedded_aug, assignment_matrix)
+            cluster_loss = (cluster_loss + cluster_loss_aug) / 2
+
+        # compute total loss
+        loss = degree_of_space_preservation * ae_loss + 0.5 * degree_of_space_distortion * cluster_loss
+        
+        return loss
 
     def fit(self, autoencoder: torch.nn.Module, trainloader: torch.utils.data.DataLoader, n_epochs: int,
             device: torch.device, optimizer: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss,
@@ -271,12 +340,7 @@ class _DCN_Module(torch.nn.Module):
         for _ in range(n_epochs):
             # Update Network
             for batch in trainloader:
-                # compute reconstruction loss
-                ae_loss, embedded, _ = autoencoder.loss(batch, loss_fn, device)
-                # compute cluster loss
-                cluster_loss = self.dcn_loss(embedded)
-                # compute total loss
-                loss = degree_of_space_preservation * ae_loss + 0.5 * degree_of_space_distortion * cluster_loss
+                loss = self._loss(batch, autoencoder, loss_fn, degree_of_space_preservation, degree_of_space_distortion, device)
                 # Backward pass - update weights
                 optimizer.zero_grad()
                 loss.backward()
@@ -284,7 +348,12 @@ class _DCN_Module(torch.nn.Module):
             # Update Assignments and Centroids
             with torch.no_grad():
                 for batch in trainloader:
-                    batch_data = batch[1].to(device)
+                    if self.augmentation_invariance:
+                        # Convention is that the augmented sample is at the first position and the original one at the second position
+                        # We only use the original sample for updating the centroids and assignments
+                        batch_data = batch[2].to(device)
+                    else:
+                        batch_data = batch[1].to(device)
                     embedded = autoencoder.encode(batch_data)
 
                     ## update centroids [on gpu] About 40 seconds for 1000 iterations
@@ -342,6 +411,9 @@ class DCN(BaseEstimator, ClusterMixin):
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         If None, the default dataloaders will be used (default: None)
+    augmentation_invariance : bool
+        If True, augmented samples provided in custom_dataloaders[0] will be used to learn 
+        cluster assignments that are invariant to the augmentation transformations (default: False)
     initial_clustering_class : ClusterMixin
         clustering class to obtain the initial cluster labels after the pretraining (default: KMeans)
     initial_clustering_params : dict
@@ -382,7 +454,7 @@ class DCN(BaseEstimator, ClusterMixin):
                  clustering_epochs: int = 150, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), degree_of_space_distortion: float = 0.05,
                  degree_of_space_preservation: float = 1.0, autoencoder: torch.nn.Module = None,
-                 embedding_size: int = 10, custom_dataloaders: tuple = None,
+                 embedding_size: int = 10, custom_dataloaders: tuple = None, augmentation_invariance: bool = False,
                  initial_clustering_class: ClusterMixin = KMeans, initial_clustering_params: dict = {},
                  random_state: np.random.RandomState = None):
         self.n_clusters = n_clusters
@@ -398,10 +470,14 @@ class DCN(BaseEstimator, ClusterMixin):
         self.autoencoder = autoencoder
         self.embedding_size = embedding_size
         self.custom_dataloaders = custom_dataloaders
+        self.augmentation_invariance = augmentation_invariance
         self.initial_clustering_class = initial_clustering_class
         self.initial_clustering_params = initial_clustering_params
         self.random_state = check_random_state(random_state)
         set_torch_seed(self.random_state)
+
+        augmentation_invariance_check(self.augmentation_invariance, self.custom_dataloaders)
+
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DCN':
         """
@@ -431,6 +507,7 @@ class DCN(BaseEstimator, ClusterMixin):
                                                                                    self.degree_of_space_distortion,
                                                                                    self.degree_of_space_preservation,
                                                                                    self.custom_dataloaders,
+                                                                                   self.augmentation_invariance,
                                                                                    self.initial_clustering_class,
                                                                                    self.initial_clustering_params,
                                                                                    self.random_state)
