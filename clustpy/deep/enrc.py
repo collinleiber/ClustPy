@@ -8,14 +8,14 @@ from sklearn.base import BaseEstimator, ClusterMixin
 import numpy as np
 from clustpy.deep._utils import int_to_one_hot, squared_euclidean_distance, encode_batchwise, detect_device, \
     set_torch_seed
-from clustpy.deep._data_utils import get_dataloader
+from clustpy.deep._data_utils import get_dataloader, augmentation_invariance_check
 from clustpy.deep._train_utils import get_trained_autoencoder
 from clustpy.alternative import NrKmeans
 from sklearn.utils import check_random_state
 from sklearn.metrics import normalized_mutual_info_score
 from clustpy.utils.plots import plot_scatter_matrix
 from clustpy.alternative.nrkmeans import _get_total_cost_function
-
+from copy import deepcopy
 
 class _ENRC_Module(torch.nn.Module):
     """
@@ -42,6 +42,9 @@ class _ENRC_Module(torch.nn.Module):
         if True then centers are multiplied with V before they are used, because ENRC assumes that the centers lie already in the V-rotated space (default: False)
     beta_weights : np.ndarray
         initial beta weights for the softmax (optional). If not None, then beta_init_value will be ignored (default: None)
+    augmentation_invariance : bool
+        If True, augmented samples provided in will be used to learn 
+        cluster assignments that are invariant to the augmentation transformations (default: False)
 
     Attributes
     ----------
@@ -52,6 +55,7 @@ class _ENRC_Module(torch.nn.Module):
         list of torch.tensors, contains the average number of points assigned to each cluster in each clustering over the training.
     reinit_threshold : int
         threshold that indicates when a cluster should be reinitialized. Starts with 1 and increases during training with int(np.sqrt(i+1)), where i is the number of mini-batch iterations.
+    augmentation_invariance : bool (default: False)
 
     Raises
     ----------
@@ -60,7 +64,7 @@ class _ENRC_Module(torch.nn.Module):
 
     def __init__(self, centers: list, P: list, V: np.ndarray, beta_init_value: float = 0.9,
                  degree_of_space_distortion: float = 1.0, degree_of_space_preservation: float = 1.0,
-                 center_lr: float = 0.5, rotate_centers: bool = False, beta_weights: np.ndarray = None):
+                 center_lr: float = 0.5, rotate_centers: bool = False, beta_weights: np.ndarray = None, augmentation_invariance: bool = False):
         super().__init__()
 
         self.P = P
@@ -87,6 +91,7 @@ class _ENRC_Module(torch.nn.Module):
             self.lonely_centers_count.append(np.zeros((centers_i.shape[0], 1)).astype(int))
             self.mask_sum.append(torch.zeros((centers_i.shape[0], 1)))
         self.reinit_threshold = 1
+        self.augmentation_invariance = augmentation_invariance
 
     def to_device(self, device: torch.device) -> '_ENRC_Module':
         """
@@ -240,7 +245,7 @@ class _ENRC_Module(torch.nn.Module):
                                assignment_matrix_dict[subspace_i],
                                subspace_id=subspace_i)
 
-    def forward(self, z: torch.Tensor) -> (torch.Tensor, torch.Tensor, torch.Tensor, dict):
+    def forward(self, z: torch.Tensor, assignment_matrix_dict: dict = None) -> (torch.Tensor, torch.Tensor, torch.Tensor, dict):
         """
         Calculates the k-means loss and cluster assignments for each clustering.
 
@@ -248,6 +253,8 @@ class _ENRC_Module(torch.nn.Module):
         ----------
         z : torch.Tensor
             embedded input data point, can also be a mini-batch of embedded points
+        assignment_matrix_dict : dict
+            dict of torch.tensors, contains for each i^th clustering a one hot encoded matrix of cluster assignments (default: None)
 
         Returns
         -------
@@ -262,15 +269,26 @@ class _ENRC_Module(torch.nn.Module):
 
         subspace_betas = self.subspace_betas()
         subspace_losses = 0
-        assignment_matrix_dict = {}
+
+        if assignment_matrix_dict is None:
+            assignment_matrix_dict = {}
+            overwrite_assignments = True
+        else:
+            overwrite_assignments = False
+
         for i, centers_i in enumerate(self.centers):
             weighted_squared_diff = squared_euclidean_distance(z_rot, centers_i.detach(), weights=subspace_betas[i, :])
             weighted_squared_diff /= z_rot.shape[0]
-            assignments = weighted_squared_diff.detach().argmin(1)
-            one_hot_mask = int_to_one_hot(assignments, centers_i.shape[0])
+
+            if overwrite_assignments:
+                assignments = weighted_squared_diff.detach().argmin(1)
+                one_hot_mask = int_to_one_hot(assignments, centers_i.shape[0])
+                assignment_matrix_dict[i] = one_hot_mask
+            else:
+                one_hot_mask = assignment_matrix_dict[i]
             weighted_squared_diff_masked = weighted_squared_diff * one_hot_mask
             subspace_losses += weighted_squared_diff_masked.sum()
-            assignment_matrix_dict[i] = one_hot_mask
+            
         subspace_losses = subspace_losses / subspace_betas.shape[0]
         return subspace_losses, z_rot, z_rot_back, assignment_matrix_dict
 
@@ -320,7 +338,7 @@ class _ENRC_Module(torch.nn.Module):
         return predicted_labels
 
     def recluster(self, dataloader: torch.utils.data.DataLoader, model: torch.nn.Module,
-                  device: torch.device = torch.device('cpu'), rounds: int = 1) -> None:
+                  device: torch.device = torch.device('cpu'), rounds: int = 1, reclustering_strategy="auto", init_kwargs: dict = None) -> None:
         """
         Recluster ENRC inplace using NrKMeans or SGD (depending on the data set size, see init='auto' for details).
         Can lead to improved and more stable performance.
@@ -336,6 +354,10 @@ class _ENRC_Module(torch.nn.Module):
             device to be predicted on (default: torch.device('cpu'))
         rounds : int
             number of repetitions of the reclustering procedure (default: 1)
+        reclustering_strategy : string
+            choose which initialization strategy should be used. Has to be one of 'nrkmeans', 'random' or 'sgd' (default: 'nrkmeans')
+        init_kwargs : dict
+            additional parameters that are used if reclustering_strategy is a callable (optional) (default: None)
         """
 
         # Extract parameters
@@ -349,7 +371,7 @@ class _ENRC_Module(torch.nn.Module):
         # Apply reclustering in the rotated space, because V does not have to be orthogonal, so it could learn a mapping that is not recoverable by nrkmeans.
         centers_reclustered, P, new_V, beta_weights = enrc_init(data=embedded_rot, n_clusters=n_clusters, rounds=rounds,
                                                                 max_iter=300, optimizer_params=self.optimizer_params,
-                                                                init="auto", debug=False)
+                                                                init=reclustering_strategy, debug=False, init_kwargs=init_kwargs)
 
         # Update V, because we applied the reclustering in the rotated space
         new_V = np.matmul(V, new_V)
@@ -362,18 +384,21 @@ class _ENRC_Module(torch.nn.Module):
         self.centers = [torch.tensor(centers_sub, dtype=torch.float32) for centers_sub in centers_reclustered]
         self.to_device(device)
 
-    def fit(self, data: torch.Tensor, optimizer: torch.optim.Optimizer, max_epochs: int, model: torch.nn.Module,
+    def fit(self, trainloader: torch.utils.data.DataLoader, evalloader: torch.utils.data.DataLoader, 
+            optimizer: torch.optim.Optimizer, max_epochs: int, model: torch.nn.Module,
             batch_size: int, loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(),
             device: torch.device = torch.device("cpu"), print_step: int = 5, debug: bool = True,
             scheduler: torch.optim.lr_scheduler = None, fix_rec_error: bool = False,
-            tolerance_threshold: float = None) -> (torch.nn.Module, '_ENRC_Module'):
+            tolerance_threshold: float = None, data : torch.Tensor = None) -> (torch.nn.Module, '_ENRC_Module'):
         """
         Trains ENRC and the autoencoder in place.
 
         Parameters
         ----------
-        data : torch.Tensor / np.ndarray
-            dataset to be used for training
+        trainloader : torch.utils.data.DataLoader
+            dataloader to be used for training
+        evalloader : torch.utils.data.DataLoader
+            Evalloader is used for checking label change
         optimizer : torch.optim.Optimizer
             parameterized optimizer to be used
         max_epochs : int
@@ -397,8 +422,9 @@ class _ENRC_Module(torch.nn.Module):
         tolerance_threshold : float
             tolerance threshold to determine when the training should stop. If the NMI(old_labels, new_labels) >= (1-tolerance_threshold)
             for all clusterings then the training will stop before max_epochs is reached. If set high than training will stop earlier then max_epochs, and if set to 0 or None the training
-            will train as long as the labels are not changing anymore (default: None)
-
+            will train as long as max_epochs (default: None)
+        data : torch.Tensor / np.ndarray
+            dataset to be used for training (default: None)
         Returns
         -------
         tuple : (torch.nn.Module, _ENRC_Module)
@@ -412,20 +438,38 @@ class _ENRC_Module(torch.nn.Module):
 
         # Save learning rate for reclustering
         self.optimizer_params = optimizer.param_groups[0]
-        # Evalloader is used for checking label change. Only difference to the trainloader here is that shuffle=False.
-        trainloader = get_dataloader(data, batch_size=batch_size, shuffle=True, drop_last=True)
-        evalloader = get_dataloader(data, batch_size=batch_size, shuffle=False, drop_last=False)
+        
+        if trainloader is None and data is not None:
+            trainloader = get_dataloader(data, batch_size=batch_size, shuffle=True, drop_last=True)
+        elif trainloader is None and data is None:
+            raise ValueError("trainloader and data cannot be both None.")
+        if evalloader is None and data is not None:
+            # Evalloader is used for checking label change. Only difference to the trainloader here is that shuffle=False.
+            evalloader = get_dataloader(data, batch_size=batch_size, shuffle=False, drop_last=False)
 
         i = 0
         labels_old = None
         for epoch_i in range(max_epochs):
             for batch in trainloader:
-                batch = batch[1].to(device)
+                if self.augmentation_invariance:
+                    batch_data_aug = batch[1].to(device)
+                    batch_data = batch[2].to(device)
+                else:
+                    batch_data = batch[1].to(device)
 
-                z = model.encode(batch)
+                z = model.encode(batch_data)
                 subspace_loss, z_rot, z_rot_back, assignment_matrix_dict = self(z)
                 reconstruction = model.decode(z_rot_back)
-                rec_loss = loss_fn(reconstruction, batch)
+                rec_loss = loss_fn(reconstruction, batch_data)
+
+                if self.augmentation_invariance:
+                    z_aug = model.encode(batch_data_aug)
+                    # reuse assignments
+                    subspace_loss_aug, _, z_rot_back_aug, _ = self(z_aug, assignment_matrix_dict=assignment_matrix_dict)
+                    reconstruction_aug = model.decode(z_rot_back_aug)
+                    rec_loss_aug = loss_fn(reconstruction_aug, batch_data_aug)
+                    rec_loss = (rec_loss + rec_loss_aug) / 2
+                    subspace_loss = (subspace_loss + subspace_loss_aug) / 2
 
                 if fix_rec_error:
                     rec_weight = subspace_loss.item() / (rec_loss.item() + 1e-3)
@@ -455,21 +499,21 @@ class _ENRC_Module(torch.nn.Module):
                     # Rotation loss is calculated to check if its deviation from an orthogonal matrix
                     rotation_loss = self.rotation_loss()
                     if debug:
-                        print(
-                            f"Epoch {epoch_i}/{max_epochs - 1}: summed_loss: {summed_loss.item():.4f}, subspace_losses: {subspace_loss.item():.4f}, rec_loss: {rec_loss.item():.4f}, rotation_loss: {rotation_loss.item():.4f}")
+                        print(f"Epoch {epoch_i}/{max_epochs - 1}: summed_loss: {summed_loss.item():.4f}, subspace_losses: {subspace_loss.item():.4f}, rec_loss: {rec_loss.item():.4f}, rotation_loss: {rotation_loss.item():.4f}")
 
             if scheduler is not None:
                 scheduler.step()
 
-            # Check if labels have changed
-            labels_new = self.predict_batchwise(model=model, dataloader=evalloader, device=device, use_P=True)
-            if _are_labels_equal(labels_new=labels_new, labels_old=labels_old, threshold=tolerance_threshold):
-                # training has converged
-                if debug:
-                    print("Clustering has converged")
-                break
-            else:
-                labels_old = labels_new.copy()
+            if tolerance_threshold is not None and tolerance_threshold > 0:
+                # Check if labels have changed
+                labels_new = self.predict_batchwise(model=model, dataloader=evalloader, device=device, use_P=True)
+                if _are_labels_equal(labels_new=labels_new, labels_old=labels_old, threshold=tolerance_threshold):
+                    # training has converged
+                    if debug:
+                        print("Clustering has converged")
+                    break
+                else:
+                    labels_old = labels_new.copy()
 
         # Extract P and m
         self.P = self.get_P()
@@ -714,7 +758,7 @@ def available_init_strategies() -> list:
     Returns a list of strings of available initialization strategies for ENRC.
     At the moment following strategies are supported: nrkmeans, random, sgd, auto
     """
-    return ['nrkmeans', 'random', 'sgd', 'auto']
+    return ['nrkmeans', 'random', 'sgd', 'auto', 'subkmeans']
 
 
 def optimal_beta(kmeans_loss: torch.Tensor, other_losses_mean_sum: torch.Tensor) -> torch.Tensor:
@@ -904,7 +948,7 @@ def nrkmeans_init(data: np.ndarray, n_clusters: list, rounds: int = 10, max_iter
     lowest = np.inf
     for i in range(rounds):
         nrkmeans = NrKmeans(n_clusters=n_clusters, cluster_centers=input_centers, P=P, V=V, max_iter=max_iter,
-                            random_state=random_state)
+                            random_state=random_state, mdl_for_noisespace=True)
         nrkmeans.fit(X=data)
         centers_i, P_i, V_i, scatter_matrices_i = nrkmeans.cluster_centers, nrkmeans.P, nrkmeans.V, nrkmeans.scatter_matrices_
         if len(P_i) != len(n_clusters):
@@ -918,6 +962,7 @@ def nrkmeans_init(data: np.ndarray, n_clusters: list, rounds: int = 10, max_iter
                 lowest = cost
             if debug:
                 print(f"Round {i}: Found solution with: {cost} (current best: {lowest})")
+    
     # Best parameters
     centers, P, V = best
     # centers are expected to be rotated for ENRC
@@ -1168,7 +1213,7 @@ def enrc_init(data: np.ndarray, n_clusters: list, init: str = "auto", rounds: in
     ----------
     ValueError : if init variable is passed that is not implemented.
     """
-    if init == "nrkmeans":
+    if init == "nrkmeans" or init == "subkmeans":
         centers, P, V, beta_weights = nrkmeans_init(data=data, n_clusters=n_clusters, rounds=rounds,
                                                     input_centers=input_centers, P=P, V=V, random_state=random_state,
                                                     debug=debug)
@@ -1442,7 +1487,7 @@ def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers
           degree_of_space_distortion: float, degree_of_space_preservation: float, autoencoder: torch.nn.Module,
           embedding_size: int, init: str, random_state: np.random.RandomState, device: torch.device,
           scheduler: torch.optim.lr_scheduler, scheduler_params: dict, tolerance_threshold: float, init_kwargs: dict,
-          init_subsample_size: int, custom_dataloaders: tuple, debug: bool) -> (
+          init_subsample_size: int, custom_dataloaders: tuple, augmentation_invariance: bool, final_reclustering:bool, debug: bool) -> (
         np.ndarray, list, np.ndarray, list, np.ndarray, list, list, torch.nn.Module):
     """
     Start the actual ENRC clustering procedure on the input data set.
@@ -1502,6 +1547,11 @@ def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         If None, the default dataloaders will be used
+    augmentation_invariance : bool
+        If True, augmented samples provided in custom_dataloaders[0] will be used to learn 
+        cluster assignments that are invariant to the augmentation transformations (default: False)
+    final_reclustering : bool
+        If True, the final embedding will be reclustered with the provided init strategy. (defaul: False)
     debug : bool
         if True additional information during the training will be printed
 
@@ -1531,19 +1581,26 @@ def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers
     # Use subsample of the data if specified
     if init_subsample_size is not None and init_subsample_size > 0:
         rand_idx = random_state.choice(X.shape[0], init_subsample_size, replace=False)
-        subsampleloader = get_dataloader(X[rand_idx], batch_size=batch_size, shuffle=False, drop_last=False)
+        # pass preprocessing functions to the subsampleloader
+        if hasattr(trainloader.dataset, "orig_transforms_list"):
+            ds_kwargs = {"orig_transforms_list":deepcopy(trainloader.dataset.orig_transforms_list)}
+        else:
+            ds_kwargs = None
+        subsampleloader = get_dataloader(X[rand_idx], batch_size=batch_size, shuffle=False, drop_last=False, ds_kwargs=ds_kwargs)
+
     else:
         subsampleloader = testloader
-    print("Setup autoencoder")
+    if debug: print("Setup autoencoder")
     # Setup autoencoder
     autoencoder = get_trained_autoencoder(trainloader, pretrain_optimizer_params, pretrain_epochs, device,
                                           optimizer_class, loss_fn, X.shape[1], embedding_size, autoencoder)
 
     # Run ENRC init
-    print("Run ENRC init: ", init)
-    print("Start encoding")
+    if debug:
+        print("Run init: ", init)
+        print("Start encoding")
     embedded_data = encode_batchwise(subsampleloader, autoencoder, device)
-    print("Start initializing parameters")
+    if debug: print("Start initializing parameters")
     input_centers, P, V, beta_weights = enrc_init(data=embedded_data, n_clusters=n_clusters, device=device, init=init,
                                                   rounds=10, epochs=10, batch_size=batch_size, debug=debug,
                                                   input_centers=input_centers, P=P, V=V, random_state=random_state,
@@ -1552,7 +1609,7 @@ def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers
     # Setup ENRC Module
     enrc_module = _ENRC_Module(input_centers, P, V, degree_of_space_distortion=degree_of_space_distortion,
                                degree_of_space_preservation=degree_of_space_preservation,
-                               beta_weights=beta_weights).to_device(device)
+                               beta_weights=beta_weights, augmentation_invariance=augmentation_invariance).to_device(device)
     # In accordance to the original paper we update the betas 10 times faster
     clustering_optimizer_beta_params = clustering_optimizer_params.copy()
     clustering_optimizer_beta_params["lr"] = clustering_optimizer_beta_params["lr"] * 10
@@ -1566,8 +1623,9 @@ def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers
         scheduler = scheduler(optimizer, **scheduler_params)
 
     # Training loop
-    print("Start ENRC training")
-    enrc_module.fit(data=X,
+    if debug: print("Start training")
+    enrc_module.fit(trainloader=trainloader,
+                    evalloader=testloader,
                     max_epochs=clustering_epochs,
                     optimizer=optimizer,
                     loss_fn=loss_fn,
@@ -1577,10 +1635,11 @@ def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers
                     scheduler=scheduler,
                     tolerance_threshold=tolerance_threshold,
                     debug=debug)
-
     # Recluster
-    print("Recluster")
-    enrc_module.recluster(dataloader=subsampleloader, model=autoencoder, device=device)
+    if final_reclustering:
+        if debug: 
+            print("Recluster")
+        enrc_module.recluster(dataloader=subsampleloader, model=autoencoder, device=device, reclustering_strategy=init, init_kwargs=init_kwargs)
     # Predict labels and transfer other parameters to numpy
     cluster_labels = enrc_module.predict_batchwise(model=autoencoder, dataloader=testloader, device=device, use_P=True)
     cluster_centers = [centers_i.detach().cpu().numpy() for centers_i in enrc_module.centers]
@@ -1648,6 +1707,11 @@ class ENRC(BaseEstimator, ClusterMixin):
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         If None, the default dataloaders will be used (default: None)
+    augmentation_invariance : bool
+        If True, augmented samples provided in custom_dataloaders[0] will be used to learn 
+        cluster assignments that are invariant to the augmentation transformations (default: False)
+    final_reclustering : bool
+        If True, the final embedding will be reclustered with the provided init strategy. (defaul: False)
     debug: bool
         if True additional information during the training will be printed (default: False)
 
@@ -1679,9 +1743,11 @@ class ENRC(BaseEstimator, ClusterMixin):
                  autoencoder: torch.nn.Module = None, embedding_size: int = 20, init: str = "nrkmeans",
                  device: torch.device = None, scheduler: torch.optim.lr_scheduler = None,
                  scheduler_params: dict = None, init_kwargs: dict = None, init_subsample_size: int = None,
-                 random_state: np.random.RandomState = None, custom_dataloaders: tuple = None, debug: bool = False):
+                 random_state: np.random.RandomState = None, custom_dataloaders: tuple = None, augmentation_invariance: bool = False, final_reclustering: bool = True, debug: bool = False):
         self.n_clusters = n_clusters.copy()
         self.device = device
+        if self.device is None:
+            self.device = detect_device()
         self.batch_size = batch_size
         self.pretrain_optimizer_params = pretrain_optimizer_params
         self.clustering_optimizer_params = clustering_optimizer_params
@@ -1701,6 +1767,8 @@ class ENRC(BaseEstimator, ClusterMixin):
         self.random_state = check_random_state(random_state)
         set_torch_seed(self.random_state)
         self.custom_dataloaders = custom_dataloaders
+        self.augmentation_invariance = augmentation_invariance
+        self.final_reclustering = final_reclustering
         self.debug = debug
 
         if len(self.n_clusters) < 2:
@@ -1714,6 +1782,9 @@ class ENRC(BaseEstimator, ClusterMixin):
         self.V = V
         self.m = None
         self.P = P
+
+        augmentation_invariance_check(self.augmentation_invariance, self.custom_dataloaders)
+
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'ENRC':
         """
@@ -1758,6 +1829,8 @@ class ENRC(BaseEstimator, ClusterMixin):
                                                                                          init_kwargs=self.init_kwargs,
                                                                                          init_subsample_size=self.init_subsample_size,
                                                                                          custom_dataloaders=self.custom_dataloaders,
+                                                                                         augmentation_invariance=self.augmentation_invariance,
+                                                                                         final_reclustering=self.final_reclustering,
                                                                                          debug=self.debug)
         # Update class variables
         self.labels_ = cluster_labels
@@ -1770,7 +1843,7 @@ class ENRC(BaseEstimator, ClusterMixin):
         self.autoencoder = autoencoder
         return self
 
-    def predict(self, X: np.ndarray, y: np.ndarray = None, use_P: bool = True) -> np.ndarray:
+    def predict(self, X: np.ndarray = None, y: np.ndarray = None, use_P: bool = True, dataloader: torch.utils.data.DataLoader = None) -> np.ndarray:
         """
         Predicts the labels for each clustering of X in a mini-batch manner.
         
@@ -1788,7 +1861,8 @@ class ENRC(BaseEstimator, ClusterMixin):
         predicted_labels : np.ndarray
             n x c matrix, where n is the number of data points in X and c is the number of clusterings.
         """
-        dataloader = get_dataloader(X, batch_size=self.batch_size, shuffle=False, drop_last=False)
+        if dataloader is None:
+            dataloader = get_dataloader(X, batch_size=self.batch_size, shuffle=False, drop_last=False)
 
         self.autoencoder.to(self.device)
         predicted_labels = enrc_predict_batchwise(V=torch.from_numpy(self.V).float().to(self.device),
@@ -1824,7 +1898,7 @@ class ENRC(BaseEstimator, ClusterMixin):
         rotated = np.matmul(emb, self.V)
         return rotated
 
-    def transform_subspace(self, X: np.ndarray, subspace_index: int, embedded: bool = False) -> np.ndarray:
+    def transform_subspace(self, X: np.ndarray, subspace_index: int = 0, embedded: bool = False) -> np.ndarray:
         """
         Embedds the input dataset with the autoencoder and with the matrix V projected onto a special clusterspace_nr.
         
@@ -1833,7 +1907,7 @@ class ENRC(BaseEstimator, ClusterMixin):
         X : np.ndarray
             input data
         subspace_index: int
-            index of the subspace_nr
+            index of the subspace_nr (default: 0)
         embedded: bool
             if True, then X is assumed to be already embedded (default: False)
         
@@ -1851,7 +1925,7 @@ class ENRC(BaseEstimator, ClusterMixin):
         subspace = np.matmul(emb, cluster_space_V)
         return subspace
 
-    def plot_subspace(self, X: np.ndarray, subspace_index: int, labels: np.ndarray = None, plot_centers: bool = False,
+    def plot_subspace(self, X: np.ndarray, subspace_index: int = 0, labels: np.ndarray = None, plot_centers: bool = False,
                       gt: np.ndarray = None, equal_axis: bool = False) -> None:
         """
         Plot the specified subspace_nr as scatter matrix plot.
@@ -1860,7 +1934,8 @@ class ENRC(BaseEstimator, ClusterMixin):
         ----------
         X : np.ndarray
             input data
-        subspace_index: int, index of the subspace_nr
+        subspace_index: int
+            index of the subspace_nr (default: 0)
         labels: np.ndarray
             the labels to use for the plot (default: labels found by Nr-Kmeans) (default: None)
         plot_centers: bool
@@ -1883,14 +1958,14 @@ class ENRC(BaseEstimator, ClusterMixin):
                             self.cluster_centers_[subspace_index] if plot_centers else None,
                             true_labels=gt, equal_axis=equal_axis)
 
-    def reconstruct_subspace_centroids(self, subspace_index: int) -> np.ndarray:
+    def reconstruct_subspace_centroids(self, subspace_index: int = 0) -> np.ndarray:
         """
         Reconstructs the centroids in the specified subspace_nr.
 
         Parameters
         ----------
         subspace_index: int
-            index of the subspace_nr
+            index of the subspace_nr (default: 0)
 
         Returns
         -------
@@ -1902,3 +1977,108 @@ class ENRC(BaseEstimator, ClusterMixin):
         centers_rot_back = np.matmul(cluster_space_centers, self.V.transpose())
         centers_rec = self.autoencoder.decode(torch.from_numpy(centers_rot_back).float().to(self.device))
         return centers_rec.detach().cpu().numpy()
+
+
+
+class ACeDeC(ENRC):
+    """
+    Autoencoder Centroid-based Deep Cluster (ACeDeC) can be seen as a special case of ENRC where we have one
+    cluster space and one shared space with a single cluster.
+  
+    Parameters
+    ----------
+    n_clusters : int
+        number of clusters
+    V : np.ndarray
+        orthogonal rotation matrix (optional) (default: None)
+    P : list
+        list containing projections for clusters in clustered space and cluster in shared space (optional) (default: None)
+    input_centers : list
+        list containing the cluster centers for clusters in clustered space and cluster in shared space (optional) (default: None)
+    batch_size : int
+        size of the data batches (default: 128)
+    pretrain_optimizer_params : dict
+        parameters of the optimizer for the pretraining of the autoencoder, includes the learning rate (default: {"lr": 1e-3})
+    clustering_optimizer_params : dict
+        parameters of the optimizer for the actual clustering procedure, includes the learning rate (default: {"lr": 1e-4})
+    pretrain_epochs : int
+        number of epochs for the pretraining of the autoencoder (default: 100)
+    clustering_epochs : int
+        maximum number of epochs for the actual clustering procedure (default: 150)
+    tolerance_threshold : float
+        tolerance threshold to determine when the training should stop. If the NMI(old_labels, new_labels) >= (1-tolerance_threshold)
+        for all clusterings then the training will stop before max_epochs is reached. If set high than training will stop earlier then max_epochs, and if set to 0 or None the training
+        will train as long as the labels are not changing anymore (default: None)
+    optimizer_class : torch.optim.Optimizer
+        optimizer for pretraining and training (default: torch.optim.Adam)
+    loss_fn : torch.nn.modules.loss._Loss
+        loss function for the reconstruction (default: torch.nn.MSELoss())
+    degree_of_space_distortion : float
+        weight of the cluster loss term. The higher it is set the more the embedded space will be shaped to the assumed cluster structure (default: 1.0)
+    degree_of_space_preservation : float
+        weight of regularization loss term, e.g., reconstruction loss (default: 1.0)
+    autoencoder : torch.nn.Module
+        the input autoencoder. If None a new autoencoder will be created and trained (default: None)
+    embedding_size : int
+        size of the embedding within the autoencoder. Only used if autoencoder is None (default: 20)
+    init : str
+        choose which initialization strategy should be used. Has to be one of 'subkmeans', 'random' or 'sgd' (default: 'subkmeans')
+    random_state : np.random.RandomState
+        use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
+    device : torch.device
+        if device is None then it will be checked whether a gpu is available or not (default: None)
+    scheduler : torch.optim.lr_scheduler
+        learning rate scheduler that should be used (default: None)
+    scheduler_params : dict
+        dictionary of the parameters of the scheduler object (default: None)
+    init_kwargs : dict
+        additional parameters that are used if init is a callable (optional) (default: None)
+    init_subsample_size: int
+        specify if only a subsample of size 'init_subsample_size' of the data should be used for the initialization (optional) (default: None)
+    custom_dataloaders : tuple
+        tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
+        If None, the default dataloaders will be used (default: None)
+    augmentation_invariance : bool
+        If True, augmented samples provided in custom_dataloaders[0] will be used to learn 
+        cluster assignments that are invariant to the augmentation transformations (default: False)
+    final_reclustering : bool
+        If True, the final embedding will be reclustered with the provided init strategy. (defaul: False)
+    debug: bool
+        if True additional information during the training will be printed (default: False)
+
+    Attributes
+    ----------
+    labels_ : np.ndarray
+        The final labels
+    cluster_centers_ : np.ndarray
+        The final cluster centers
+    autoencoder : torch.nn.Module
+        The final autoencoder
+
+    Raises
+    ----------
+    ValueError : if init is not one of 'subkmeans', 'random', 'auto' or 'sgd'.
+
+    References
+    ----------
+    Lukas Miklautz, Lena G. M. Bauer, Dominik Mautz, Sebastian Tschiatschek, Christian Böhm, Claudia Plant:
+    Details (Don't) Matter: Isolating Cluster Information in Deep Embedded Spaces. IJCAI 2021: 2826-2832
+    """
+
+    def __init__(self, n_clusters: int, V: np.ndarray = None, P: list = None, input_centers: list = None,
+                 batch_size: int = 128, pretrain_optimizer_params: dict = {"lr":1e-3},
+                 clustering_optimizer_params: dict = {"lr":1e-4}, pretrain_epochs: int = 100, clustering_epochs: int = 150,
+                 tolerance_threshold: float = None, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
+                 loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(),
+                 degree_of_space_distortion: float = 1.0, degree_of_space_preservation: float = 1.0,
+                 autoencoder: torch.nn.Module = None, embedding_size: int = 20, init: str = "subkmeans",
+                 device: torch.device = None, scheduler: torch.optim.lr_scheduler = None,
+                 scheduler_params: dict = None, init_kwargs: dict = None, init_subsample_size: int = None,
+                 random_state: np.random.RandomState = None, custom_dataloaders: tuple = None, augmentation_invariance: bool = False, 
+                 final_reclustering: bool = True, debug: bool = False):
+        
+        super().__init__([n_clusters, 1], V, P, input_centers,
+                 batch_size, pretrain_optimizer_params, clustering_optimizer_params, pretrain_epochs, clustering_epochs,
+                 tolerance_threshold, optimizer_class, loss_fn, degree_of_space_distortion, degree_of_space_preservation,
+                 autoencoder, embedding_size, init, device, scheduler, scheduler_params, init_kwargs, init_subsample_size,
+                 random_state, custom_dataloaders, augmentation_invariance, final_reclustering, debug)

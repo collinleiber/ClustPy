@@ -146,11 +146,16 @@ class _DCN_Module(torch.nn.Module):
     ----------
     init_np_centers : np.ndarray
         The initial numpy centers
+    augmentation_invariance : bool
+        If True, augmented samples provided in will be used to learn 
+        cluster assignments that are invariant to the augmentation transformations (default: False)
+
 
     Attributes
     ----------
     centers : torch.Tensor
         the cluster centers
+    augmentation_invariance : bool (default: False)
     """
 
     def __init__(self, init_np_centers: np.ndarray, augmentation_invariance: bool = False):

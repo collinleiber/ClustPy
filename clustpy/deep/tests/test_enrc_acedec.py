@@ -1,4 +1,4 @@
-from clustpy.deep import ENRC
+from clustpy.deep import ENRC, ACeDeC
 from clustpy.data import create_nr_data
 import numpy as np
 import torch
@@ -23,4 +23,18 @@ def test_simple_enrc():
     enrc = ENRC([3, 3], pretrain_epochs=3, clustering_epochs=3, init="sgd")
     enrc.fit(X)
     assert enrc.labels_.dtype == np.int32
-    assert enrc.labels_.shape == labels.shape
+    assert enrc.labels_.shape == labels.shapes
+
+def test_simple_acedec():
+    torch.use_deterministic_algorithms(True)
+    X, labels = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    acedec = ACeDeC(3, pretrain_epochs=3, clustering_epochs=3, random_state=1)
+    assert not hasattr(acedec, "labels_")
+    acedec.fit(X)
+    assert acedec.labels_.dtype == np.int32
+    assert acedec.labels_.shape == labels.shape
+    # Test if random state is working
+    acedec2 = ACeDeC(3, pretrain_epochs=3, clustering_epochs=3, random_state=1)
+    acedec2.fit(X)
+    assert np.array_equal(acedec.labels_, acedec2.labels_)
+    assert np.allclose(acedec.cluster_centers_, acedec2.cluster_centers_, atol=1e-1)

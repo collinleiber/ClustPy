@@ -191,6 +191,9 @@ class _DEC_Module(torch.nn.Module):
         The initial cluster centers
     alpha : double
         alpha value for the prediction method
+    augmentation_invariance : bool
+        If True, augmented samples provided in will be used to learn 
+        cluster assignments that are invariant to the augmentation transformations (default: False)
 
     Attributes
     ----------
@@ -198,6 +201,7 @@ class _DEC_Module(torch.nn.Module):
         the alpha value
     centers : torch.Tensor:
         the cluster centers
+    augmentation_invariance : bool (default: False)
     """
 
     def __init__(self, init_centers: np.ndarray, alpha: float, augmentation_invariance: bool = False):
