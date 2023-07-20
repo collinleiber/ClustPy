@@ -28,8 +28,8 @@ def test_dcn_aug():
                      augmentation_invariance=True,
     )
     clusterer2.fit(X)
-    assert np.array_equal(dcn.labels_, clusterer2.labels_)
-    assert np.allclose(dcn.cluster_centers_, clusterer2.cluster_centers_, atol=1e-1)
+    assert np.array_equal(clusterer.labels_, clusterer2.labels_)
+    assert np.allclose(clusterer.cluster_centers_, clusterer2.cluster_centers_, atol=1e-1)
     assert np.array_equal(clusterer.dcn_labels_, clusterer2.dcn_labels_)
     assert np.allclose(clusterer.dcn_cluster_centers_, clusterer2.dcn_cluster_centers_, atol=1e-1)
 

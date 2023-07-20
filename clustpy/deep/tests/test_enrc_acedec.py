@@ -1,5 +1,5 @@
 from clustpy.deep import ENRC, ACeDeC
-from clustpy.data import create_nr_data
+from clustpy.data import create_nr_data, create_subspace_data
 import numpy as np
 import torch
 
