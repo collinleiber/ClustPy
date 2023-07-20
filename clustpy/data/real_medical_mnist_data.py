@@ -2,10 +2,10 @@ import numpy as np
 from clustpy.data._utils import _get_download_dir, _download_file
 import os
 import torch
-from clustpy.data.real_torchvision_data import _torch_normalize_channels, _torch_flatten_shape
+from clustpy.data.real_torchvision_data import _torch_normalize_and_flatten
 
 
-def _load_medical_mnist_data(dataset_name: str, subset: str, normalize_channels: bool, colored: bool,
+def _load_medical_mnist_data(dataset_name: str, subset: str, flatten: bool, normalize_channels: bool, colored: bool,
                              multiple_labelings: bool, downloads_path: str) -> (
         np.ndarray, np.ndarray):
     """
@@ -17,6 +17,9 @@ def _load_medical_mnist_data(dataset_name: str, subset: str, normalize_channels:
         name of the data set
     subset : str
         can be 'all', 'test', 'train' or 'val'. 'all' combines test, train and validation data
+    flatten : bool
+        should the image data be flatten, i.e. should the format be changed to a (N x d) array.
+        If false, color images will be returned in the CHW format
     normalize_channels : bool
         normalize each color-channel of the images
     colored : bool
@@ -66,10 +69,7 @@ def _load_medical_mnist_data(dataset_name: str, subset: str, normalize_channels:
     # If desired, normalize channels
     data_torch = torch.Tensor(data)
     is_color_channel_last = True if colored else None
-    if normalize_channels:
-        data_torch = _torch_normalize_channels(data_torch, is_color_channel_last)
-    # Flatten shape
-    data_torch = _torch_flatten_shape(data_torch, is_color_channel_last, normalize_channels)
+    data_torch = _torch_normalize_and_flatten(data_torch, flatten, normalize_channels, is_color_channel_last)
     # Move data to CPU
     data = data_torch.detach().cpu().numpy()
     # Sometimes the labels are contained in a separate dimension
@@ -81,8 +81,8 @@ def _load_medical_mnist_data(dataset_name: str, subset: str, normalize_channels:
     return data, labels
 
 
-def load_path_mnist(subset: str = "all", normalize_channels: bool = False, downloads_path: str = None) -> (
-        np.ndarray, np.ndarray):
+def load_path_mnist(subset: str = "all", flatten: bool = True, normalize_channels: bool = False,
+                    downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the PathMNIST data set. It consists of 107180 28x28 colored images belonging to one of 9 classes.
     The data set is composed of 89996 training, 10004 validation and 7180 test samples.
@@ -92,6 +92,9 @@ def load_path_mnist(subset: str = "all", normalize_channels: bool = False, downl
     ----------
     subset : str
         can be 'all', 'test', 'train' or 'val'. 'all' combines test, train and validation data (default: 'all')
+    flatten : bool
+        should the image data be flatten, i.e. should the format be changed to a (N x d) array.
+        If false, the image will be returned in the CHW format (default: True)
     normalize_channels : bool
         normalize each color-channel of the images (default: False)
     downloads_path : str
@@ -109,12 +112,13 @@ def load_path_mnist(subset: str = "all", normalize_channels: bool = False, downl
     Jakob Nikolas Kather, Johannes Krisam, et al., "Predicting survival from colorectal cancer histology slides using deep learning: A retrospective multicenter study,"
     PLOS Medicine, vol. 16, no. 1, pp. 1–22, 01 2019.
     """
-    data, labels = _load_medical_mnist_data("pathmnist", subset, normalize_channels, True, False, downloads_path)
+    data, labels = _load_medical_mnist_data("pathmnist", subset, flatten, normalize_channels, True, False,
+                                            downloads_path)
     return data, labels
 
 
-def load_chest_mnist(subset: str = "all", normalize_channels: bool = False, downloads_path: str = None) -> (
-        np.ndarray, np.ndarray):
+def load_chest_mnist(subset: str = "all", flatten: bool = True, normalize_channels: bool = False,
+                     downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the ChestMNIST data set. It consists of 112120 28x28 grayscale images.
     The ground truth labels consist of 14 labelings with 2 clusters each.
@@ -125,6 +129,8 @@ def load_chest_mnist(subset: str = "all", normalize_channels: bool = False, down
     ----------
     subset : str
         can be 'all', 'test', 'train' or 'val'. 'all' combines test, train and validation data (default: 'all')
+    flatten : bool
+        should the image data be flatten, i.e. should the format be changed to a (N x d) array (default: True)
     normalize_channels : bool
         normalize each color-channel of the images (default: False)
     downloads_path : str
@@ -142,12 +148,13 @@ def load_chest_mnist(subset: str = "all", normalize_channels: bool = False, down
     Xiaosong Wang, Yifan Peng, et al., "Chest x-ray8: Hospital-scale chest x-ray database and benchmarks on weakly-supervised classification and localization of common thorax diseases,"
     in CVPR, 2017, pp. 3462–3471.
     """
-    data, labels = _load_medical_mnist_data("chestmnist", subset, normalize_channels, False, True, downloads_path)
+    data, labels = _load_medical_mnist_data("chestmnist", subset, flatten, normalize_channels, False, True,
+                                            downloads_path)
     return data, labels
 
 
-def load_derma_mnist(subset: str = "all", normalize_channels: bool = False, downloads_path: str = None) -> (
-        np.ndarray, np.ndarray):
+def load_derma_mnist(subset: str = "all", flatten: bool = True, normalize_channels: bool = False,
+                     downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the DermaMNIST data set. It consists of 10015 28x28 colored images belonging to one of 7 classes.
     The data set is composed of 7007 training, 1003 validation and 2005 test samples.
@@ -157,6 +164,9 @@ def load_derma_mnist(subset: str = "all", normalize_channels: bool = False, down
     ----------
     subset : str
         can be 'all', 'test', 'train' or 'val'. 'all' combines test, train and validation data (default: 'all')
+    flatten : bool
+        should the image data be flatten, i.e. should the format be changed to a (N x d) array.
+        If false, the image will be returned in the CHW format (default: True)
     normalize_channels : bool
         normalize each color-channel of the images (default: False)
     downloads_path : str
@@ -177,12 +187,13 @@ def load_derma_mnist(subset: str = "all", normalize_channels: bool = False, down
     Noel Codella, Veronica Rotemberg, et al., “Skin Lesion Analysis Toward Melanoma Detection 2018: A Challenge Hosted by the International Skin Imaging Collaboration (ISIC)”,
     2018, arXiv:1902.03368.
     """
-    data, labels = _load_medical_mnist_data("dermamnist", subset, normalize_channels, True, False, downloads_path)
+    data, labels = _load_medical_mnist_data("dermamnist", subset, flatten, normalize_channels, True, False,
+                                            downloads_path)
     return data, labels
 
 
-def load_oct_mnist(subset: str = "all", normalize_channels: bool = False, downloads_path: str = None) -> (
-        np.ndarray, np.ndarray):
+def load_oct_mnist(subset: str = "all", flatten: bool = True, normalize_channels: bool = False,
+                   downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the OCTMNIST data set. It consists of 109309 28x28 grayscale images belonging to one of 4 classes.
     The data set is composed of 97477 training, 10832 validation and 1000 test samples.
@@ -192,6 +203,8 @@ def load_oct_mnist(subset: str = "all", normalize_channels: bool = False, downlo
     ----------
     subset : str
         can be 'all', 'test', 'train' or 'val'. 'all' combines test, train and validation data (default: 'all')
+    flatten : bool
+        should the image data be flatten, i.e. should the format be changed to a (N x d) array (default: True)
     normalize_channels : bool
         normalize each color-channel of the images (default: False)
     downloads_path : str
@@ -209,12 +222,13 @@ def load_oct_mnist(subset: str = "all", normalize_channels: bool = False, downlo
     Daniel S. Kermany, Michael Goldbaum, et al., "Identifying medical diagnoses and treatable diseases by image-based deep learning,"
     Cell, vol. 172, no. 5, pp. 1122 – 1131.e9, 2018.
     """
-    data, labels = _load_medical_mnist_data("octmnist", subset, normalize_channels, False, False, downloads_path)
+    data, labels = _load_medical_mnist_data("octmnist", subset, flatten, normalize_channels, False, False,
+                                            downloads_path)
     return data, labels
 
 
-def load_pneumonia_mnist(subset: str = "all", normalize_channels: bool = False, downloads_path: str = None) -> (
-        np.ndarray, np.ndarray):
+def load_pneumonia_mnist(subset: str = "all", flatten: bool = True, normalize_channels: bool = False,
+                         downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the PneumoniaMNIST data set. It consists of 5856 28x28 grayscale images belonging to one of 2 classes.
     The data set is composed of 4708 training, 524 validation and 624 test samples.
@@ -224,6 +238,8 @@ def load_pneumonia_mnist(subset: str = "all", normalize_channels: bool = False, 
     ----------
     subset : str
         can be 'all', 'test', 'train' or 'val'. 'all' combines test, train and validation data (default: 'all')
+    flatten : bool
+        should the image data be flatten, i.e. should the format be changed to a (N x d) array (default: True)
     normalize_channels : bool
         normalize each color-channel of the images (default: False)
     downloads_path : str
@@ -241,12 +257,13 @@ def load_pneumonia_mnist(subset: str = "all", normalize_channels: bool = False, 
     Daniel S. Kermany, Michael Goldbaum, et al., "Identifying medical diagnoses and treatable diseases by image-based deep learning,"
     Cell, vol. 172, no. 5, pp. 1122 – 1131.e9, 2018.
     """
-    data, labels = _load_medical_mnist_data("pneumoniamnist", subset, normalize_channels, False, False, downloads_path)
+    data, labels = _load_medical_mnist_data("pneumoniamnist", subset, flatten, normalize_channels, False, False,
+                                            downloads_path)
     return data, labels
 
 
-def load_retina_mnist(subset: str = "all", normalize_channels: bool = False, downloads_path: str = None) -> (
-        np.ndarray, np.ndarray):
+def load_retina_mnist(subset: str = "all", flatten: bool = True, normalize_channels: bool = False,
+                      downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the RetinaMNIST data set. It consists of 1600 28x28 colored images belonging to one of 5 classes.
     The data set is composed of 1080 training, 120 validation and 400 test samples.
@@ -256,6 +273,9 @@ def load_retina_mnist(subset: str = "all", normalize_channels: bool = False, dow
     ----------
     subset : str
         can be 'all', 'test', 'train' or 'val'. 'all' combines test, train and validation data (default: 'all')
+    flatten : bool
+        should the image data be flatten, i.e. should the format be changed to a (N x d) array.
+        If false, the image will be returned in the CHW format (default: True)
     normalize_channels : bool
         normalize each color-channel of the images (default: False)
     downloads_path : str
@@ -273,12 +293,13 @@ def load_retina_mnist(subset: str = "all", normalize_channels: bool = False, dow
     DeepDR Diabetic Retinopathy Image Dataset (DeepDRiD), "The 2nd diabetic retinopathy grading and image quality estimation challenge,"
     https://isbi.deepdr.org/data.html, 2020.
     """
-    data, labels = _load_medical_mnist_data("retinamnist", subset, normalize_channels, True, False, downloads_path)
+    data, labels = _load_medical_mnist_data("retinamnist", subset, flatten, normalize_channels, True, False,
+                                            downloads_path)
     return data, labels
 
 
-def load_breast_mnist(subset: str = "all", normalize_channels: bool = False, downloads_path: str = None) -> (
-        np.ndarray, np.ndarray):
+def load_breast_mnist(subset: str = "all", flatten: bool = True, normalize_channels: bool = False,
+                      downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the BreastMNIST data set. It consists of 780 28x28 grayscale images belonging to one of 2 classes.
     The data set is composed of 546 training, 78 validation and 156 test samples.
@@ -288,6 +309,8 @@ def load_breast_mnist(subset: str = "all", normalize_channels: bool = False, dow
     ----------
     subset : str
         can be 'all', 'test', 'train' or 'val'. 'all' combines test, train and validation data (default: 'all')
+    flatten : bool
+        should the image data be flatten, i.e. should the format be changed to a (N x d) array (default: True)
     normalize_channels : bool
         normalize each color-channel of the images (default: False)
     downloads_path : str
@@ -305,12 +328,13 @@ def load_breast_mnist(subset: str = "all", normalize_channels: bool = False, dow
     Walid Al-Dhabyani, Mohammed Gomaa, et al., "Dataset of breast ultrasound images,"
     Data in Brief, vol. 28, pp. 104863, 2020.
     """
-    data, labels = _load_medical_mnist_data("breastmnist", subset, normalize_channels, False, False, downloads_path)
+    data, labels = _load_medical_mnist_data("breastmnist", subset, flatten, normalize_channels, False, False,
+                                            downloads_path)
     return data, labels
 
 
-def load_blood_mnist(subset: str = "all", normalize_channels: bool = False, downloads_path: str = None) -> (
-        np.ndarray, np.ndarray):
+def load_blood_mnist(subset: str = "all", flatten: bool = True, normalize_channels: bool = False,
+                     downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the BloodMNIST data set. It consists of 17092 28x28 colored images belonging to one of 8 classes.
     The data set is composed of 11959 training, 1712 validation and 3421 test samples.
@@ -320,6 +344,8 @@ def load_blood_mnist(subset: str = "all", normalize_channels: bool = False, down
     ----------
     subset : str
         can be 'all', 'test', 'train' or 'val'. 'all' combines test, train and validation data (default: 'all')
+    flatten : bool
+        should the image data be flatten, i.e. should the format be changed to a (N x d) array (default: True)
     normalize_channels : bool
         normalize each color-channel of the images (default: False)
     downloads_path : str
@@ -337,12 +363,13 @@ def load_blood_mnist(subset: str = "all", normalize_channels: bool = False, down
     Andrea Acevedo, Anna Merino, et al., "A dataset of microscopic peripheral blood cell images for development of automatic recognition systems,"
     Data in Brief, vol. 30, pp. 105474, 2020.
     """
-    data, labels = _load_medical_mnist_data("bloodmnist", subset, normalize_channels, True, False, downloads_path)
+    data, labels = _load_medical_mnist_data("bloodmnist", subset, flatten, normalize_channels, True, False,
+                                            downloads_path)
     return data, labels
 
 
-def load_tissue_mnist(subset: str = "all", normalize_channels: bool = False, downloads_path: str = None) -> (
-        np.ndarray, np.ndarray):
+def load_tissue_mnist(subset: str = "all", flatten: bool = True, normalize_channels: bool = False,
+                      downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the TissueMNIST data set. It consists of 236386 28x28 grayscale images belonging to one of 8 classes.
     The data set is composed of 165466 training, 23640 validation and 47280 test samples.
@@ -352,6 +379,8 @@ def load_tissue_mnist(subset: str = "all", normalize_channels: bool = False, dow
     ----------
     subset : str
         can be 'all', 'test', 'train' or 'val'. 'all' combines test, train and validation data (default: 'all')
+    flatten : bool
+        should the image data be flatten, i.e. should the format be changed to a (N x d) array (default: True)
     normalize_channels : bool
         normalize each color-channel of the images (default: False)
     downloads_path : str
@@ -369,12 +398,13 @@ def load_tissue_mnist(subset: str = "all", normalize_channels: bool = False, dow
     Vebjorn Ljosa, Katherine L Sokolnicki, et al., “Annotated high-throughput microscopy imagesets for validation.,”
     Nature methods, vol. 9, no. 7, pp.637–637, 2012.
     """
-    data, labels = _load_medical_mnist_data("tissuemnist", subset, normalize_channels, False, False, downloads_path)
+    data, labels = _load_medical_mnist_data("tissuemnist", subset, flatten, normalize_channels, False, False,
+                                            downloads_path)
     return data, labels
 
 
-def load_organ_a_mnist(subset: str = "all", normalize_channels: bool = False, downloads_path: str = None) -> (
-        np.ndarray, np.ndarray):
+def load_organ_a_mnist(subset: str = "all", flatten: bool = True, normalize_channels: bool = False,
+                       downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the OrganAMNIST data set. It consists of 58850 28x28 grayscale images belonging to one of 11 classes.
     The data set is composed of 34581 training, 6491 validation and 17778 test samples.
@@ -384,6 +414,8 @@ def load_organ_a_mnist(subset: str = "all", normalize_channels: bool = False, do
     ----------
     subset : str
         can be 'all', 'test', 'train' or 'val'. 'all' combines test, train and validation data (default: 'all')
+    flatten : bool
+        should the image data be flatten, i.e. should the format be changed to a (N x d) array (default: True)
     normalize_channels : bool
         normalize each color-channel of the images (default: False)
     downloads_path : str
@@ -404,12 +436,13 @@ def load_organ_a_mnist(subset: str = "all", normalize_channels: bool = False, do
     Xuanang Xu, Fugen Zhou, et al., "Efficient multiple organ localization in ct image using 3d region proposal network,"
     IEEE Transactions on Medical Imaging, vol. 38, no. 8, pp. 1885–1898, 2019.
     """
-    data, labels = _load_medical_mnist_data("organamnist", subset, normalize_channels, False, False, downloads_path)
+    data, labels = _load_medical_mnist_data("organamnist", subset, flatten, normalize_channels, False, False,
+                                            downloads_path)
     return data, labels
 
 
-def load_organ_c_mnist(subset: str = "all", normalize_channels: bool = False, downloads_path: str = None) -> (
-        np.ndarray, np.ndarray):
+def load_organ_c_mnist(subset: str = "all", flatten: bool = True, normalize_channels: bool = False,
+                       downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the OrganCMNIST data set. It consists of 23660 28x28 grayscale images belonging to one of 11 classes.
     The data set is composed of 13000 training, 2392 validation and 8268 test samples.
@@ -419,6 +452,8 @@ def load_organ_c_mnist(subset: str = "all", normalize_channels: bool = False, do
     ----------
     subset : str
         can be 'all', 'test', 'train' or 'val'. 'all' combines test, train and validation data (default: 'all')
+    flatten : bool
+        should the image data be flatten, i.e. should the format be changed to a (N x d) array (default: True)
     normalize_channels : bool
         normalize each color-channel of the images (default: False)
     downloads_path : str
@@ -439,12 +474,13 @@ def load_organ_c_mnist(subset: str = "all", normalize_channels: bool = False, do
     Xuanang Xu, Fugen Zhou, et al., "Efficient multiple organ localization in ct image using 3d region proposal network,"
     IEEE Transactions on Medical Imaging, vol. 38, no. 8, pp. 1885–1898, 2019.
     """
-    data, labels = _load_medical_mnist_data("organcmnist", subset, normalize_channels, False, False, downloads_path)
+    data, labels = _load_medical_mnist_data("organcmnist", subset, flatten, normalize_channels, False, False,
+                                            downloads_path)
     return data, labels
 
 
-def load_organ_s_mnist(subset: str = "all", normalize_channels: bool = False, downloads_path: str = None) -> (
-        np.ndarray, np.ndarray):
+def load_organ_s_mnist(subset: str = "all", flatten: bool = True, normalize_channels: bool = False,
+                       downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the OrganSMNIST data set. It consists of 25221 28x28 grayscale images belonging to one of 11 classes.
     The data set is composed of 13940 training, 2452 validation and 8829 test samples.
@@ -454,6 +490,8 @@ def load_organ_s_mnist(subset: str = "all", normalize_channels: bool = False, do
     ----------
     subset : str
         can be 'all', 'test', 'train' or 'val'. 'all' combines test, train and validation data (default: 'all')
+    flatten : bool
+        should the image data be flatten, i.e. should the format be changed to a (N x d) array (default: True)
     normalize_channels : bool
         normalize each color-channel of the images (default: False)
     downloads_path : str
@@ -474,12 +512,13 @@ def load_organ_s_mnist(subset: str = "all", normalize_channels: bool = False, do
     Xuanang Xu, Fugen Zhou, et al., "Efficient multiple organ localization in ct image using 3d region proposal network,"
     IEEE Transactions on Medical Imaging, vol. 38, no. 8, pp. 1885–1898, 2019.
     """
-    data, labels = _load_medical_mnist_data("organsmnist", subset, normalize_channels, False, False, downloads_path)
+    data, labels = _load_medical_mnist_data("organsmnist", subset, flatten, normalize_channels, False, False,
+                                            downloads_path)
     return data, labels
 
 
-def load_organ_mnist_3d(subset: str = "all", normalize_channels: bool = False, downloads_path: str = None) -> (
-        np.ndarray, np.ndarray):
+def load_organ_mnist_3d(subset: str = "all", flatten: bool = True, normalize_channels: bool = False,
+                        downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the OrganMNIST3D data set. It consists of 1743 28x28x28 grayscale images belonging to one of 11 classes.
     The data set is composed of 972 training, 161 validation and 610 test samples.
@@ -489,6 +528,8 @@ def load_organ_mnist_3d(subset: str = "all", normalize_channels: bool = False, d
     ----------
     subset : str
         can be 'all', 'test', 'train' or 'val'. 'all' combines test, train and validation data (default: 'all')
+    flatten : bool
+        should the image data be flatten, i.e. should the format be changed to a (N x d) array (default: True)
     normalize_channels : bool
         normalize each color-channel of the images (default: False)
     downloads_path : str
@@ -509,12 +550,13 @@ def load_organ_mnist_3d(subset: str = "all", normalize_channels: bool = False, d
     Xuanang Xu, Fugen Zhou, et al., "Efficient multiple organ localization in ct image using 3d region proposal network,"
     IEEE Transactions on Medical Imaging, vol. 38, no. 8, pp. 1885–1898, 2019.
     """
-    data, labels = _load_medical_mnist_data("organmnist3d", subset, normalize_channels, False, False, downloads_path)
+    data, labels = _load_medical_mnist_data("organmnist3d", subset, flatten, normalize_channels, False, False,
+                                            downloads_path)
     return data, labels
 
 
-def load_nodule_mnist_3d(subset: str = "all", normalize_channels: bool = False, downloads_path: str = None) -> (
-        np.ndarray, np.ndarray):
+def load_nodule_mnist_3d(subset: str = "all", flatten: bool = True, normalize_channels: bool = False,
+                         downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the NoduleMNIST3D data set. It consists of 1633 28x28x28 grayscale images belonging to one of 2 classes.
     The data set is composed of 1158 training, 165 validation and 310 test samples.
@@ -524,6 +566,8 @@ def load_nodule_mnist_3d(subset: str = "all", normalize_channels: bool = False, 
     ----------
     subset : str
         can be 'all', 'test', 'train' or 'val'. 'all' combines test, train and validation data (default: 'all')
+    flatten : bool
+        should the image data be flatten, i.e. should the format be changed to a (N x d) array (default: True)
     normalize_channels : bool
         normalize each color-channel of the images (default: False)
     downloads_path : str
@@ -541,12 +585,13 @@ def load_nodule_mnist_3d(subset: str = "all", normalize_channels: bool = False, 
     Samuel G. Armato III, Geoffrey McLennan, et al., “The lung image database consortium (lidc) and image database resource initiative (idri): A completed reference databaseof lung nodules on ct scans,”
     Medical Physics, vol. 38,no. 2, pp. 915–931, 2011.
     """
-    data, labels = _load_medical_mnist_data("nodulemnist3d", subset, normalize_channels, False, False, downloads_path)
+    data, labels = _load_medical_mnist_data("nodulemnist3d", subset, flatten, normalize_channels, False, False,
+                                            downloads_path)
     return data, labels
 
 
-def load_adrenal_mnist_3d(subset: str = "all", normalize_channels: bool = False, downloads_path: str = None) -> (
-        np.ndarray, np.ndarray):
+def load_adrenal_mnist_3d(subset: str = "all", flatten: bool = True, normalize_channels: bool = False,
+                          downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the AdrenalMNIST3D data set. It consists of 1584 28x28x28 grayscale images belonging to one of 2 classes.
     The data set is composed of 1188 training, 98 validation and 298 test samples.
@@ -556,6 +601,8 @@ def load_adrenal_mnist_3d(subset: str = "all", normalize_channels: bool = False,
     ----------
     subset : str
         can be 'all', 'test', 'train' or 'val'. 'all' combines test, train and validation data (default: 'all')
+    flatten : bool
+        should the image data be flatten, i.e. should the format be changed to a (N x d) array (default: True)
     normalize_channels : bool
         normalize each color-channel of the images (default: False)
     downloads_path : str
@@ -570,11 +617,13 @@ def load_adrenal_mnist_3d(subset: str = "all", normalize_channels: bool = False,
     -------
     https://medmnist.com/
     """
-    data, labels = _load_medical_mnist_data("adrenalmnist3d", subset, normalize_channels, False, False, downloads_path)
+    data, labels = _load_medical_mnist_data("adrenalmnist3d", subset, flatten, normalize_channels, False, False,
+                                            downloads_path)
     return data, labels
 
 
-def load_fracture_mnist_3d(subset: str = "all", normalize_channels: bool = False, downloads_path: str = None) -> (
+def load_fracture_mnist_3d(subset: str = "all", flatten: bool = True, normalize_channels: bool = False,
+                           downloads_path: str = None) -> (
         np.ndarray, np.ndarray):
     """
     Load the FractureMNIST3D data set. It consists of 1370 28x28x28 grayscale images belonging to one of 3 classes.
@@ -585,6 +634,8 @@ def load_fracture_mnist_3d(subset: str = "all", normalize_channels: bool = False
     ----------
     subset : str
         can be 'all', 'test', 'train' or 'val'. 'all' combines test, train and validation data (default: 'all')
+    flatten : bool
+        should the image data be flatten, i.e. should the format be changed to a (N x d) array (default: True)
     normalize_channels : bool
         normalize each color-channel of the images (default: False)
     downloads_path : str
@@ -602,12 +653,13 @@ def load_fracture_mnist_3d(subset: str = "all", normalize_channels: bool = False
     Liang Jin, Jiancheng Yang, et al., “Deep-learning-assisted detection and segmentation of rib fractures from ct scans: Development and validation of fracnet,”
     EBioMedicine, vol. 62, pp. 103106, 2020.
     """
-    data, labels = _load_medical_mnist_data("fracturemnist3d", subset, normalize_channels, False, False, downloads_path)
+    data, labels = _load_medical_mnist_data("fracturemnist3d", subset, flatten, normalize_channels, False, False,
+                                            downloads_path)
     return data, labels
 
 
-def load_vessel_mnist_3d(subset: str = "all", normalize_channels: bool = False, downloads_path: str = None) -> (
-        np.ndarray, np.ndarray):
+def load_vessel_mnist_3d(subset: str = "all", flatten: bool = True, normalize_channels: bool = False,
+                         downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the VesselMNIST3D data set. It consists of 1909 28x28x28 grayscale images belonging to one of 2 classes.
     The data set is composed of 1335 training, 192 validation and 382 test samples.
@@ -617,6 +669,8 @@ def load_vessel_mnist_3d(subset: str = "all", normalize_channels: bool = False, 
     ----------
     subset : str
         can be 'all', 'test', 'train' or 'val'. 'all' combines test, train and validation data (default: 'all')
+    flatten : bool
+        should the image data be flatten, i.e. should the format be changed to a (N x d) array (default: True)
     normalize_channels : bool
         normalize each color-channel of the images (default: False)
     downloads_path : str
@@ -634,12 +688,13 @@ def load_vessel_mnist_3d(subset: str = "all", normalize_channels: bool = False, 
     Xi Yang, Ding Xia, et al., “Intra: 3d intracranial aneurysm dataset for deep learning,”
     in Proceedings of the IEEE/CVF Conference onComputer Vision and Pattern Recognition (CVPR), June 2020.
     """
-    data, labels = _load_medical_mnist_data("vesselmnist3d", subset, normalize_channels, False, False, downloads_path)
+    data, labels = _load_medical_mnist_data("vesselmnist3d", subset, flatten, normalize_channels, False, False,
+                                            downloads_path)
     return data, labels
 
 
-def load_synapse_mnist_3d(subset: str = "all", normalize_channels: bool = False, downloads_path: str = None) -> (
-        np.ndarray, np.ndarray):
+def load_synapse_mnist_3d(subset: str = "all", flatten: bool = True, normalize_channels: bool = False,
+                          downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the SynapseMNIST3D data set. It consists of 1759 28x28x28 grayscale images belonging to one of 2 classes.
     The data set is composed of 1230 training, 177 validation and 352 test samples.
@@ -649,6 +704,8 @@ def load_synapse_mnist_3d(subset: str = "all", normalize_channels: bool = False,
     ----------
     subset : str
         can be 'all', 'test', 'train' or 'val'. 'all' combines test, train and validation data (default: 'all')
+    flatten : bool
+        should the image data be flatten, i.e. should the format be changed to a (N x d) array (default: True)
     normalize_channels : bool
         normalize each color-channel of the images (default: False)
     downloads_path : str
@@ -663,5 +720,6 @@ def load_synapse_mnist_3d(subset: str = "all", normalize_channels: bool = False,
     -------
     https://medmnist.com/
     """
-    data, labels = _load_medical_mnist_data("synapsemnist3d", subset, normalize_channels, False, False, downloads_path)
+    data, labels = _load_medical_mnist_data("synapsemnist3d", subset, flatten, normalize_channels, False, False,
+                                            downloads_path)
     return data, labels

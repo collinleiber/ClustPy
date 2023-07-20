@@ -1,4 +1,4 @@
-from clustpy.data.tests.test_real_world_data import _helper_test_data_loader
+from clustpy.data.tests._helpers_for_tests import _helper_test_data_loader
 from clustpy.data import create_subspace_data, create_nr_data
 import numpy as np
 

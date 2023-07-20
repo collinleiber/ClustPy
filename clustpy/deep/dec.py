@@ -291,7 +291,7 @@ class _DEC_Module(torch.nn.Module):
         """
         for _ in range(n_epochs):
             for batch in trainloader:
-                loss = torch.tensor(0.)
+                loss = torch.tensor(0.).to(device)
                 # Reconstruction loss is not included in DEC
                 if use_reconstruction_loss:
                     ae_loss, embedded, _ = autoencoder.loss(batch, loss_fn, device)

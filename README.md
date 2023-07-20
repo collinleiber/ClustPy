@@ -4,7 +4,7 @@
 [![TestMain](https://github.com/collinleiber/clustpy/actions/workflows/test-main.yml/badge.svg)](https://github.com/collinleiber/ClustPy/actions/workflows/test-main.yml)
 [![CircleCI](https://dl.circleci.com/status-badge/img/gh/collinleiber/ClustPy/tree/main.svg?style=shield)](https://dl.circleci.com/status-badge/redirect/gh/collinleiber/ClustPy/tree/main)
 [![codecov](https://codecov.io/gh/collinleiber/ClustPy/branch/main/graph/badge.svg?token=5AJYQFIYFR)](https://codecov.io/gh/collinleiber/ClustPy)
-[![Docs](https://readthedocs.org/projects/clustpy/badge/?version=latest)](https://clustpy.readthedocs.io/en/latest/)
+[![Docs](https://readthedocs.org/projects/clustpy/badge/?version=latest)](https://clustpy.readthedocs.io/en/)
 
 The package provides a simple way to cluster data in Python.
 For this purpose it provides a variety of algorithms from different domains. 
@@ -18,11 +18,11 @@ In particular, this should also make lesser-known methods accessible in a simple
 Since it largely follows the implementation conventions of [sklearn clustering](https://scikit-learn.org/stable/modules/clustering.html), 
 it can be combined with many other packages (see below).
 
-## Installation
+# Installation
 
-### For Users
+## For Users
 
-#### Stable Version
+### Stable Version
 
 The current stable version can be installed by the following command:
 
@@ -31,13 +31,14 @@ The current stable version can be installed by the following command:
 Note that a gcc compiler is required for installation.
 Therefore, in case of an installation error, make sure that:
 - Windows: [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/de/visual-cpp-build-tools/) is installed
-- Linux: Python dev is installed (e.g., by running `apt-get install python-dev` - the exact command may differ depending on the linux distribution)
+- Linux/Mac: Python dev is installed (e.g., by running `apt-get install python-dev` - the exact command may differ depending on the linux distribution)
 
 The error messages may look like this:
+- 'error: command 'gcc' failed: No such file or directory'
 - 'Could not build wheels for clustpy, which is required to install pyproject.toml-based projects'
 - 'Microsoft Visual C++ 14.0 or greater is required. Get it with "Microsoft C++ Build Tools'
 
-#### Development Version
+### Development Version
 
 The current development version can be installed directly from git by executing:
 
@@ -51,7 +52,7 @@ If you have no sudo rights you can use:
 
 `python setup.py install --prefix ~/.local`
 
-### For Developers
+## For Developers
 
 Clone the repository, go to the directory and do the following (NumPy must be installed beforehand).
 
@@ -67,77 +68,77 @@ Remove clustpy via pip to avoid ambiguities during development, e.g., when chang
 
 `pip uninstall clustpy`
 
-## Components
+# Components
 
-### Algorithms
+## Clustering Algorithms
 
 - Partition-based clustering
-    - DipExt + DipInit [[Source](https://link.springer.com/chapter/10.1007/978-3-030-67658-2_6)]
-    - Dip-Means [[Source](https://proceedings.neurips.cc/paper/2012/hash/a8240cb8235e9c493a0c30607586166c-Abstract.html)]
-    - Dip'n'sub [[Source](https://epubs.siam.org/doi/abs/10.1137/1.9781611977653.ch13)]
-    - GapStatistic [[Source](https://rss.onlinelibrary.wiley.com/doi/abs/10.1111/1467-9868.00293)]
-    - G-Means [[Source](https://proceedings.neurips.cc/paper/2003/hash/234833147b97bb6aed53a8f4f1c7a7d8-Abstract.html)]
-    - LDA-K-Means [[Source](https://dl.acm.org/doi/abs/10.1145/1273496.1273562)]
-    - PG-Means [[Source](https://proceedings.neurips.cc/paper/2006/hash/a9986cb066812f440bc2bb6e3c13696c-Abstract.html)]
-    - Projected Dip-Means [[Source](https://dl.acm.org/doi/abs/10.1145/3200947.3201008)]
-    - SkinnyDip + UniDip [[Source](https://dl.acm.org/doi/abs/10.1145/2939672.2939740)] & TailoredDip [[Source](https://epubs.siam.org/doi/abs/10.1137/1.9781611977653.ch13)]
-    - SubKmeans [[Source](https://dl.acm.org/doi/abs/10.1145/3097983.3097989)]
-    - X-Means [[Source](https://web.cs.dal.ca/~shepherd/courses/csci6403/clustering/xmeans.pdf)]
+    - DipExt + DipInit [[Paper](https://link.springer.com/chapter/10.1007/978-3-030-67658-2_6)]
+    - Dip-Means [[Paper](https://proceedings.neurips.cc/paper/2012/hash/a8240cb8235e9c493a0c30607586166c-Abstract.html)]
+    - Dip'n'sub [[Paper](https://epubs.siam.org/doi/abs/10.1137/1.9781611977653.ch13)]
+    - GapStatistic [[Paper](https://rss.onlinelibrary.wiley.com/doi/abs/10.1111/1467-9868.00293)]
+    - G-Means [[Paper](https://proceedings.neurips.cc/paper/2003/hash/234833147b97bb6aed53a8f4f1c7a7d8-Abstract.html)]
+    - LDA-K-Means [[Paper](https://dl.acm.org/doi/abs/10.1145/1273496.1273562)]
+    - PG-Means [[Paper](https://proceedings.neurips.cc/paper/2006/hash/a9986cb066812f440bc2bb6e3c13696c-Abstract.html)]
+    - Projected Dip-Means [[Paper](https://dl.acm.org/doi/abs/10.1145/3200947.3201008)]
+    - SkinnyDip + UniDip [[Paper](https://dl.acm.org/doi/abs/10.1145/2939672.2939740)] & TailoredDip [[Paper](https://epubs.siam.org/doi/abs/10.1137/1.9781611977653.ch13)]
+    - SubKmeans [[Paper](https://dl.acm.org/doi/abs/10.1145/3097983.3097989)]
+    - X-Means [[Paper](https://web.cs.dal.ca/~shepherd/courses/csci6403/clustering/xmeans.pdf)]
 - Density-based clustering
-    - Multi Density DBSCAN [[Source](https://link.springer.com/chapter/10.1007/978-3-642-23878-9_53)]
+    - Multi Density DBSCAN [[Paper](https://link.springer.com/chapter/10.1007/978-3-642-23878-9_53)]
 - Hierarchical clustering
-    - Diana [[Source](https://www.jstor.org/stable/2290430?origin=crossref)]
+    - Diana [[Paper](https://www.jstor.org/stable/2290430?origin=crossref)]
 - Alternative clustering / Non-redundant clustering
-    - AutoNR [[Source](https://epubs.siam.org/doi/abs/10.1137/1.9781611977172.26)]
-    - NR-Kmeans [[Source](https://dl.acm.org/doi/abs/10.1145/3219819.3219945)]
+    - AutoNR [[Paper](https://epubs.siam.org/doi/abs/10.1137/1.9781611977172.26)]
+    - NR-Kmeans [[Paper](https://dl.acm.org/doi/abs/10.1145/3219819.3219945)]
 - Deep clustering
     - Autoencoder
-        - Convolutional Autoencoder [[Source](https://openaccess.thecvf.com/content_cvpr_2016/html/He_Deep_Residual_Learning_CVPR_2016_paper.html)]
-        - Feedforward Autoencoder [[Source](https://www.aaai.org/Library/AAAI/1987/aaai87-050.php)]
-        - Neighbor Encoder [[Source](https://arxiv.org/abs/1811.01557)]
-        - Stacked Autoencoder [[Source](https://www.jmlr.org/papers/volume11/vincent10a/vincent10a.pdf?)]
-        - Variational Autoencoder [[Source](https://arxiv.org/abs/1312.6114)]
-    - DCN [[Source](https://dl.acm.org/doi/abs/10.5555/3305890.3306080)]
-    - DEC [[Source](https://dl.acm.org/doi/abs/10.5555/3045390.3045442)]
-    - DipDECK [[Source](https://dl.acm.org/doi/10.1145/3447548.3467316)]
-    - DipEncoder [[Source](https://dl.acm.org/doi/10.1145/3534678.3539407)]
-    - ENRC [[Source](https://ojs.aaai.org/index.php/AAAI/article/view/5961)]
-    - IDEC [[Source](https://dl.acm.org/doi/abs/10.5555/3172077.3172131)]
-    - VaDE [[Source](https://dl.acm.org/doi/abs/10.5555/3172077.3172161)]
+        - Convolutional Autoencoder [[Paper](https://openaccess.thecvf.com/content_cvpr_2016/html/He_Deep_Residual_Learning_CVPR_2016_paper.html)]
+        - Feedforward Autoencoder [[Paper](https://www.aaai.org/Library/AAAI/1987/aaai87-050.php)]
+        - Neighbor Encoder [[Paper](https://arxiv.org/abs/1811.01557)]
+        - Stacked Autoencoder [[Paper](https://www.jmlr.org/papers/volume11/vincent10a/vincent10a.pdf?)]
+        - Variational Autoencoder [[Paper](https://arxiv.org/abs/1312.6114)]
+    - DCN [[Paper](https://dl.acm.org/doi/abs/10.5555/3305890.3306080)]
+    - DEC [[Paper](https://dl.acm.org/doi/abs/10.5555/3045390.3045442)]
+    - DipDECK [[Paper](https://dl.acm.org/doi/10.1145/3447548.3467316)]
+    - DipEncoder [[Paper](https://dl.acm.org/doi/10.1145/3534678.3539407)]
+    - ENRC [[Paper](https://ojs.aaai.org/index.php/AAAI/article/view/5961)]
+    - IDEC [[Paper](https://dl.acm.org/doi/abs/10.5555/3172077.3172131)]
+    - VaDE [[Paper](https://dl.acm.org/doi/abs/10.5555/3172077.3172161)]
     
-### Other implementations
+## Other implementations
 
 - Metrics
     - Confusion Matrix
-    - Information-Theoretic External Cluster-Validity Measure (DOM) [[Source](https://dl.acm.org/doi/10.5555/2073876.2073893)]
-    - Pair Counting Scores (f1, rand, jaccard, recall, precision) [[Source](https://link.springer.com/article/10.1007/s10115-008-0150-6)]
+    - Information-Theoretic External Cluster-Validity Measure (DOM) [[Paper](https://dl.acm.org/doi/10.5555/2073876.2073893)]
+    - Pair Counting Scores (f1, rand, jaccard, recall, precision) [[Paper](https://link.springer.com/article/10.1007/s10115-008-0150-6)]
     - Scores for multiple labelings (see alternative clustering algorithms)
         - Multiple Labelings Confusion Matrix
-        - Multiple Labelings Pair Counting Scores [[Source](https://ieeexplore.ieee.org/abstract/document/6228189)]
-    - Unsupervised Clustering Accuracy [[Source](https://ieeexplore.ieee.org/abstract/document/5454426)]
-    - Variation of information [[Source](https://link.springer.com/chapter/10.1007/978-3-540-45167-9_14)]
+        - Multiple Labelings Pair Counting Scores [[Paper](https://ieeexplore.ieee.org/abstract/document/6228189)]
+    - Unsupervised Clustering Accuracy [[Paper](https://ieeexplore.ieee.org/abstract/document/5454426)]
+    - Variation of information [[Paper](https://link.springer.com/chapter/10.1007/978-3-540-45167-9_14)]
 - Utils
     - Automatic evaluation methods
-    - Hartigans Dip-test [[Source](https://www.jstor.org/stable/2241144)]
+    - Hartigans Dip-test [[Paper](https://www.jstor.org/stable/2241144)]
     - Various plots
 - Datasets
     - Synthetic dataset creators for subspace and alternative clustering 
     - Real-world dataset loaders (e.g., Iris, Wine, Mice protein, Optdigits, MNIST, ...)
-        - UCI Repository [[Source](https://archive.ics.uci.edu/)]
-        - UEA & UCR Time Series Classification Repository [[Source](http://www.timeseriesclassification.com/)]
-        - MedMNIST [[Source](https://medmnist.com/)]
-        - Torchvision Datasets [[Source](https://pytorch.org/vision/stable/datasets.html)]
-        - Sklearn Datasets [[Source](https://scikit-learn.org/stable/modules/classes.html#module-sklearn.datasets)]
+        - UCI Repository [[Paper](https://archive.ics.uci.edu/)]
+        - UEA & UCR Time Series Classification Repository [[Paper](http://www.timeseriesclassification.com/)]
+        - MedMNIST [[Paper](https://medmnist.com/)]
+        - Torchvision Datasets [[Paper](https://pytorch.org/vision/stable/datasets.html)]
+        - Sklearn Datasets [[Paper](https://scikit-learn.org/stable/modules/classes.html#module-sklearn.datasets)]
         - Others
     - Dataset loaders for datasets with multiple labelings
-        - ALOI (subset) [[Source](https://aloi.science.uva.nl/)]
-        - CMU Face [[Source](http://archive.ics.uci.edu/ml/datasets/cmu+face+images)]
-        - Dancing Stickfigures [[Source](https://dl.acm.org/doi/abs/10.1145/2623330.2623734)]
-        - Fruit [[Source](https://link.springer.com/article/10.1007/s10115-016-0998-9)]
-        - NRLetters [[Source](https://epubs.siam.org/doi/abs/10.1137/1.9781611977172.26)]
-        - WebKB [[Source](http://www.cs.cmu.edu/~webkb/)]
+        - ALOI (subset) [[Paper](https://aloi.science.uva.nl/)]
+        - CMU Face [[Paper](http://archive.ics.uci.edu/ml/datasets/cmu+face+images)]
+        - Dancing Stickfigures [[Paper](https://dl.acm.org/doi/abs/10.1145/2623330.2623734)]
+        - Fruit [[Paper](https://link.springer.com/article/10.1007/s10115-016-0998-9)]
+        - NRLetters [[Paper](https://epubs.siam.org/doi/abs/10.1137/1.9781611977172.26)]
+        - WebKB [[Paper](http://www.cs.cmu.edu/~webkb/)]
     
-## Compatible packages
+# Compatible packages
 
 We stick as close as possible to the implementation details of sklean clustering. Therefore, our methods are compatible with many other packages. Examples are:
 
@@ -163,9 +164,9 @@ We stick as close as possible to the implementation details of sklean clustering
 - [Density Peak Clustering](https://github.com/colinwke/dpca)
     - DPC
 
-## Coding Examples
+# Coding Examples
 
-### 1)
+## 1)
 
 In this first example, the subspace algorithm SubKmeans is run on a synthetic subspace dataset.
 Afterwards, the clustering accuracy is calculated to evaluate the result.
@@ -182,7 +183,7 @@ acc_res = acc(labels, sk.labels_)
 print("Clustering accuracy:", acc_res)
 ```
 
-### 2)
+## 2)
 
 The second example covers the topic of non-redundant/alternative clustering.
 Here, the NrKmeans algorithm is run on the Fruit dataset.
@@ -206,7 +207,7 @@ print(mlcm.confusion_matrix)
 print(np.max(mlcm.confusion_matrix, axis=1))
 ```
 
-### 3)
+## 3)
 
 One mentionable feature of the ClustPy package is the ability to run various modern deep clustering algorithms out of the box. 
 For example, the following code runs the DEC algorithm on the Newsgroups dataset. 
@@ -224,7 +225,7 @@ my_ari = ari(labels, dec.labels_)
 print(my_ari)
 ```
 
-### 4)
+## 4)
 
 In this more complex example, we use ClustPy's evaluation functions, 
 which automatically run the specified algorithms multiple times on previously defined datasets.

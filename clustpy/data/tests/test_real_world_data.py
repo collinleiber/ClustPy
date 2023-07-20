@@ -1,10 +1,11 @@
+from clustpy.data.tests._helpers_for_tests import _helper_test_data_loader, _check_normalized_channels
 from clustpy.data import load_iris, load_wine, load_breast_cancer, load_newsgroups, load_reuters, load_banknotes, \
     load_spambase, load_seeds, load_skin, load_soybean_small, load_soybean_large, load_optdigits, load_pendigits, \
     load_ecoli, load_htru2, load_letterrecognition, load_har, load_statlog_shuttle, load_mice_protein, \
     load_user_knowledge, load_breast_tissue, load_forest_types, load_dermatology, load_multiple_features, \
-    load_statlog_australian_credit_approval, load_breast_cancer_wisconsin_original, load_semeion
+    load_statlog_australian_credit_approval, load_breast_cancer_wisconsin_original, load_semeion, load_imagenet_dog, \
+    load_imagenet10
 from pathlib import Path
-import numpy as np
 import os
 import shutil
 import pytest
@@ -21,43 +22,6 @@ def run_around_tests():
     yield
     # Code that will run after the tests
     shutil.rmtree(TEST_DOWNLOAD_PATH)
-
-
-def _helper_test_data_loader(data, labels, N, d, k, outliers=False):
-    """
-    Test loading of datasets.
-
-    Parameters
-    ----------
-    data : np.ndarray
-        The data array
-    labels : np.ndarray
-        The labels array
-    N : int
-        The number of data objects
-    d : int
-        The dimensionality of the dataset
-    k : int
-        The number of clusters. Should be a list for datasets with multiple labelings
-    outliers : bool
-        Defines if outliers are contained in the dataset. Should be a list for datasets with multiple labelings (default: False)
-    """
-    assert data.shape == (N, d)
-    assert np.issubdtype(labels.dtype, np.integer)
-    if type(k) is int:
-        assert labels.shape == (N,)
-        assert np.array_equal(np.unique(labels), range(k) if not outliers else range(-1, k))
-    else:
-        if type(outliers) is bool:
-            outliers = [outliers] * len(k)
-        # In case of datasets for alternative clusterings
-        assert labels.shape == (N, len(k))
-        unique_labels = [np.unique(labels[:, i]) for i in range(labels.shape[1])]
-        assert [len(l) for l in unique_labels] == [k[i] if not outliers[i] else k[i] + 1 for i in
-                                                   range(labels.shape[1])]  # Checks that number of labels is correct
-        for i, ul in enumerate(unique_labels):
-            assert np.array_equal(ul, range(k[i]) if not outliers[i] else range(-1, k[
-                i]))  # Checks that labels go from 0 to k
 
 
 @pytest.mark.data
@@ -159,6 +123,9 @@ def test_load_optdigits():
     # Test data set
     data, labels = load_optdigits("test", downloads_path=TEST_DOWNLOAD_PATH)
     _helper_test_data_loader(data, labels, 1797, 64, 10)
+    # Test non-flatten
+    data, _ = load_optdigits("all", flatten=False, downloads_path=TEST_DOWNLOAD_PATH)
+    assert data.shape == (5620, 8, 8)
 
 
 @pytest.mark.data
@@ -300,3 +267,46 @@ def test_load_breast_cancer_wisconsin_original():
 def test_load_semeion():
     data, labels = load_semeion(downloads_path=TEST_DOWNLOAD_PATH)
     _helper_test_data_loader(data, labels, 1593, 256, 10)
+    # Test non-flatten
+    data, _ = load_semeion(flatten=False, downloads_path=TEST_DOWNLOAD_PATH)
+    assert data.shape == (1593, 16, 16)
+
+
+@pytest.mark.data
+@pytest.mark.largedata
+def test_load_imagenet_dog():
+    # Full data set
+    data, labels = load_imagenet_dog("all", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True, breeds=None)
+    _helper_test_data_loader(data, labels, 20580, 150528, 120)
+    _check_normalized_channels(data, 3, True)
+    # Train data set
+    data, labels = load_imagenet_dog("train", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=False, breeds=None)
+    _helper_test_data_loader(data, labels, 12000, 150528, 120)
+    _check_normalized_channels(data, 3, False)
+    # Test data set
+    data, labels = load_imagenet_dog("test", downloads_path=TEST_DOWNLOAD_PATH, breeds=None)
+    _helper_test_data_loader(data, labels, 8580, 150528, 120)
+    _check_normalized_channels(data, 3, False)
+    # Test default breeds and different image size
+    data, labels = load_imagenet_dog("all", downloads_path=TEST_DOWNLOAD_PATH, image_size=(32, 32))
+    _helper_test_data_loader(data, labels, 2574, 3072, 15)
+    _check_normalized_channels(data, 3, False)
+    # Test non-flatten
+    data, _ = load_imagenet_dog("all", downloads_path=TEST_DOWNLOAD_PATH, flatten=False)
+    assert data.shape == (2574, 3, 224, 224)
+
+
+@pytest.mark.data
+@pytest.mark.largedata
+def test_load_imagenet10():
+    # Full data set
+    data, labels = load_imagenet10(downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)
+    _helper_test_data_loader(data, labels, 13000, 150528, 10)
+    _check_normalized_channels(data, 3, True)
+    # Test different image size
+    data, labels = load_imagenet10(downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=False, use_224_size=False)
+    _helper_test_data_loader(data, labels, 13000, 27648, 10)
+    _check_normalized_channels(data, 3, False)
+    # Test non-flatten
+    data, _ = load_imagenet10(downloads_path=TEST_DOWNLOAD_PATH, flatten=False)
+    assert data.shape == (13000, 3, 224, 224)
