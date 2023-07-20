@@ -2,7 +2,7 @@ from clustpy.deep import DCN
 from clustpy.deep import DEC, IDEC
 from clustpy.deep import ACeDeC
 from clustpy.data import load_optdigits
-from clustpy.deep.tests,_helpers_for_tests import _get_test_augmentation_dataloaders
+from clustpy.deep.tests._helpers_for_tests import _get_test_augmentation_dataloaders
 import torch
 import numpy as np
 import torchvision
