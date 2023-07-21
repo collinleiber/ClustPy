@@ -1,7 +1,7 @@
 import torch
 import torchvision
 import numpy as np
-from typing import Any, Callable, cast, Dict, List, Optional, Tuple, Union
+from typing import Callable, List
 
 from PIL import Image
 
@@ -18,12 +18,12 @@ class _ClustpyDataset(torch.utils.data.Dataset):
     ----------
     *tensors : torch.Tensor
         tensors that have the same size of the first dimension. Usually contains the data.
-    aug_transforms_list: List of torchvision.transforms
+    aug_transforms_list : List of torchvision.transforms
         List of augmentation torchvision.transforms for each tensor in tensors. Note that multiple torchvision.transforms can be combined using
         torchvision.transforms.Compose. If a tensor in the list should not be transformed add None to the list.
         For example, [transform0, None, transform1], will apply the transform0 to the first tensor, the second tensor will not be transformed
         and the third tensor will be transformed with transform1.
-    orig_transforms_list: List of torchvision.transforms
+    orig_transforms_list : List of torchvision.transforms
         List of torchvision.transforms for each original tensor in tensors, e.g., for preprocessing. If a tensor in the list should not be transformed add None to the list.
     
     Attributes
@@ -37,7 +37,9 @@ class _ClustpyDataset(torch.utils.data.Dataset):
     def __init__(self, *tensors: torch.Tensor, aug_transforms_list: List[Callable] = None, orig_transforms_list: List[Callable] = None):
         assert all(tensors[0].size(0) == tensor.size(0) for tensor in tensors), "Size mismatch between tensors"
         self.tensors = tensors
+        assert len(orig_transforms_list) == tensors.shape[0], "Size mismatch between tensors and orig_transforms_list"
         self.orig_transforms_list = orig_transforms_list
+        assert len(aug_transforms_list) == tensors.shape[0], "Size mismatch between tensors and aug_transforms_list"
         self.aug_transforms_list = aug_transforms_list
         
 
@@ -79,7 +81,7 @@ class _ClustpyDataset(torch.utils.data.Dataset):
                     
                 aug_list.append(orig_i)
                     
-            final_tuple = tuple([index] +  aug_list)
+            final_tuple = tuple([index] + aug_list)
         return final_tuple
     
     def __len__(self) -> int:
@@ -218,7 +220,7 @@ def get_dataloader(X: np.ndarray, batch_size: int, shuffle: bool = True, drop_la
     return dataloader
 
 
-def augmentation_invariance_check(augmentation_invariance: bool, custom_dataloaders: tuple):
+def augmentation_invariance_check(augmentation_invariance: bool, custom_dataloaders: tuple) -> None:
     """
     Check if the provided custom_dataloaders are compatible with the assumed structure for learning augmentation invariances.
 

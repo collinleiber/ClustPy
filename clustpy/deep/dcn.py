@@ -19,7 +19,8 @@ def _dcn(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_par
          clustering_optimizer_params: dict, pretrain_epochs: int, clustering_epochs: int,
          optimizer_class: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss, autoencoder: torch.nn.Module,
          embedding_size: int, degree_of_space_distortion: float, degree_of_space_preservation: float,
-         custom_dataloaders: tuple, augmentation_invariance: bool, initial_clustering_class: ClusterMixin, initial_clustering_params: dict,
+         custom_dataloaders: tuple, augmentation_invariance: bool, initial_clustering_class: ClusterMixin,
+         initial_clustering_params: dict,
          random_state: np.random.RandomState) -> (np.ndarray, np.ndarray, np.ndarray, np.ndarray, torch.nn.Module):
     """
     Start the actual DCN clustering procedure on the input data set.
@@ -85,8 +86,8 @@ def _dcn(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_par
     # Execute initial clustering in embedded space
     embedded_data = encode_batchwise(testloader, autoencoder, device)
     n_clusters, _, init_centers, _ = run_initial_clustering(embedded_data, n_clusters,
-                                                   initial_clustering_class,
-                                                   initial_clustering_params, random_state)
+                                                            initial_clustering_class,
+                                                            initial_clustering_params, random_state)
     # Setup DCN Module
     dcn_module = _DCN_Module(init_centers, augmentation_invariance).to_device(device)
     # Use DCN optimizer parameters (usually learning rate is reduced by a magnitude of 10)
@@ -163,17 +164,32 @@ class _DCN_Module(torch.nn.Module):
         self.augmentation_invariance = augmentation_invariance
         self.centers = torch.tensor(init_np_centers)
 
-    def compression_loss(self, embedded, weights=None, s=None)->torch.Tensor:
+    def compression_loss(self, embedded: torch.Tensor, weights: torch.Tensor = None, s=None) -> torch.Tensor:
+        """
+
+
+        Parameters
+        ----------
+        embedded : torch.Tensor
+            the embedded samples
+        weights : torch.Tensor
+            feature weights for the squared euclidean distance (default: None)
+        s
+
+        Returns
+        -------
+
+        """
         dist = squared_euclidean_distance(self.centers, embedded, weights=weights)
         if s is None:
-            loss = (dist.min(dim=1)[0]).sum()/(embedded.shape[0]*embedded.shape[1])
+            loss = (dist.min(dim=1)[0]).sum() / (embedded.shape[0] * embedded.shape[1])
         else:
             assignment_matrix = int_to_one_hot(s, self.centers.shape[0])
-            loss = (dist * assignment_matrix).sum()/(embedded.shape[0]*embedded.shape[1])
-        return loss  
+            loss = (dist * assignment_matrix).sum() / (embedded.shape[0] * embedded.shape[1])
+        return loss
 
-
-    def dcn_loss(self, embedded: torch.Tensor, assignment_matrix: torch.Tensor = None, weights: torch.Tensor = None) -> torch.Tensor:
+    def dcn_loss(self, embedded: torch.Tensor, assignment_matrix: torch.Tensor = None,
+                 weights: torch.Tensor = None) -> torch.Tensor:
         """
         Calculate the DCN loss of given embedded samples.
 
@@ -258,7 +274,7 @@ class _DCN_Module(torch.nn.Module):
         self.centers = self.centers.to(device)
         self.to(device)
         return self
-    
+
     def _loss(self, batch, autoencoder, loss_fn, degree_of_space_preservation, degree_of_space_distortion, device):
         """
         Calculate the complete DCN + Autoencoder loss.
@@ -305,7 +321,7 @@ class _DCN_Module(torch.nn.Module):
 
         # compute total loss
         loss = degree_of_space_preservation * ae_loss + 0.5 * degree_of_space_distortion * cluster_loss
-        
+
         return loss
 
     def fit(self, autoencoder: torch.nn.Module, trainloader: torch.utils.data.DataLoader, n_epochs: int,
@@ -345,7 +361,8 @@ class _DCN_Module(torch.nn.Module):
         for _ in range(n_epochs):
             # Update Network
             for batch in trainloader:
-                loss = self._loss(batch, autoencoder, loss_fn, degree_of_space_preservation, degree_of_space_distortion, device)
+                loss = self._loss(batch, autoencoder, loss_fn, degree_of_space_preservation, degree_of_space_distortion,
+                                  device)
                 # Backward pass - update weights
                 optimizer.zero_grad()
                 loss.backward()
@@ -482,7 +499,6 @@ class DCN(BaseEstimator, ClusterMixin):
         set_torch_seed(self.random_state)
 
         augmentation_invariance_check(self.augmentation_invariance, self.custom_dataloaders)
-
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DCN':
         """
