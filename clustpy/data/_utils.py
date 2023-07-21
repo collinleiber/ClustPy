@@ -55,7 +55,7 @@ def _download_file(file_url: str, filename_local: str) -> None:
 
 def _download_file_from_google_drive(file_id: str, filename_local: str, chunk_size: int = 32768) -> None:
     """
-    Downlaod a file from google drive.
+    Download a file from google drive.
     Code taken from:
     https://stackoverflow.com/questions/38511444/python-download-files-from-google-drive-using-url
 
