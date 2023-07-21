@@ -185,8 +185,9 @@ def load_cmu_faces(flatten: bool = True, downloads_path: str = None) -> (np.ndar
                 continue
             # get image data
             image_data = Image.open(path_images + "/" + image)
+            image_array = np.array(image_data)
             if flatten:
-                image_data = np.array(image_data).reshape(image_data.size[0] * image_data.size[1])
+                image_array = image_array.reshape(image_data.size[0] * image_data.size[1])
             # Get labels
             name_parts = image.split("_")
             user_id = np.argwhere(names == name_parts[0])[0][0]
@@ -195,7 +196,7 @@ def load_cmu_faces(flatten: bool = True, downloads_path: str = None) -> (np.ndar
             eye = np.argwhere(eyes == name_parts[3])[0][0]
             label_data = np.array([user_id, position, expression, eye])
             # Save data and labels
-            data_list.append(image_data)
+            data_list.append(image_array)
             label_list.append(label_data)
     labels = np.array(label_list, dtype=np.int32)
     data = np.array(data_list)
