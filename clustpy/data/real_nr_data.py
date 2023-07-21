@@ -75,11 +75,17 @@ def load_fruit() -> (np.ndarray, np.ndarray):
     return _load_nr_data("fruit.data", 2)
 
 
-def load_nrletters() -> (np.ndarray, np.ndarray):
+def load_nrletters(flatten: bool = True) -> (np.ndarray, np.ndarray):
     """
     Load the NRLetters data set. It consists of 10000 9x7 images of the letters A, B, C, X, Y and Z in pink, cyan and
     yellow. Additionally, each image highlights one corner in color.
     N=10000, d=189, k=[6,3,4].
+
+    Parameters
+    ----------
+    flatten : bool
+        should the image data be flatten, i.e. should the format be changed to a (N x d) array.
+        If false, the image will be returned in the CHW format (default: True)
 
     Returns
     -------
@@ -91,14 +97,23 @@ def load_nrletters() -> (np.ndarray, np.ndarray):
     Leiber, Collin, et al. "Automatic Parameter Selection for Non-Redundant Clustering." Proceedings of the 2022 SIAM
     International Conference on Data Mining (SDM). Society for Industrial and Applied Mathematics, 2022.
     """
-    return _load_nr_data("nrLetters.data", 3)
+    data, labels = _load_nr_data("nrLetters.data", 3)
+    if not flatten:
+        data = data.reshape((-1, 9, 7, 3))
+        data = np.transpose(data, (0, 3, 1, 2))
+    return data, labels
 
 
-def load_stickfigures() -> (np.ndarray, np.ndarray):
+def load_stickfigures(flatten: bool = True) -> (np.ndarray, np.ndarray):
     """
     Load the Dancing Stick Figures data set. It consists of 900 20x20 grayscale images of stick figures in different poses.
     The poses can be divided into three upp-body and three lower-body motions.
     N=900, d=400, k=[3,3].
+
+    Parameters
+    ----------
+    flatten : bool
+        should the image data be flatten, i.e. should the format be changed to a (N x d) array (default: True)
 
     Returns
     -------
@@ -110,7 +125,10 @@ def load_stickfigures() -> (np.ndarray, np.ndarray):
     Günnemann, Stephan, et al. "Smvc: semi-supervised multi-view clustering in subspace projections." Proceedings of
     the 20th ACM SIGKDD international conference on Knowledge discovery and data mining. 2014.
     """
-    return _load_nr_data("stickfigures.data", 2)
+    data, labels = _load_nr_data("stickfigures.data", 2)
+    if not flatten:
+        data = data.reshape((-1, 20, 20))
+    return data, labels
 
 
 """
@@ -118,7 +136,7 @@ UCI
 """
 
 
-def load_cmu_faces(downloads_path: str = None) -> (np.ndarray, np.ndarray):
+def load_cmu_faces(flatten: bool = True, downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the CMU Face Images data set. It consists of 640 30x32 grayscale images showing 20 persons in different poses
     (up, straight, left, right) und with different expressions (neutral, happy, sad, angry). Additionally, the persons
@@ -128,6 +146,8 @@ def load_cmu_faces(downloads_path: str = None) -> (np.ndarray, np.ndarray):
 
     Parameters
     -------
+    flatten : bool
+        should the image data be flatten, i.e. should the format be changed to a (N x d) array (default: True)
     downloads_path : str
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
@@ -165,7 +185,9 @@ def load_cmu_faces(downloads_path: str = None) -> (np.ndarray, np.ndarray):
                 continue
             # get image data
             image_data = Image.open(path_images + "/" + image)
-            image_data_vector = np.array(image_data).reshape(image_data.size[0] * image_data.size[1])
+            image_array = np.array(image_data)
+            if flatten:
+                image_array = image_array.reshape(image_data.size[0] * image_data.size[1])
             # Get labels
             name_parts = image.split("_")
             user_id = np.argwhere(names == name_parts[0])[0][0]
@@ -174,7 +196,7 @@ def load_cmu_faces(downloads_path: str = None) -> (np.ndarray, np.ndarray):
             eye = np.argwhere(eyes == name_parts[3])[0][0]
             label_data = np.array([user_id, position, expression, eye])
             # Save data and labels
-            data_list.append(image_data_vector)
+            data_list.append(image_array)
             label_list.append(label_data)
     labels = np.array(label_list, dtype=np.int32)
     data = np.array(data_list)

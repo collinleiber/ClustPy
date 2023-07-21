@@ -258,11 +258,12 @@ def plot_3d_data(X: np.ndarray, labels: np.ndarray = None, centers: np.ndarray =
         plt.show()
 
 
-def plot_image(img_data: np.ndarray, black_and_white: bool = False, image_shape: tuple = None, max_value: float = None,
-               min_value: float = None, show_plot: bool = True) -> None:
+def plot_image(img_data: np.ndarray, black_and_white: bool = False, image_shape: tuple = None,
+               is_color_channel_last: bool = False, max_value: float = None, min_value: float = None,
+               show_plot: bool = True) -> None:
     """
     Plot an image.
-    Expects a color image to occur in the HWC representation (height, width, color channels).
+    Color image should occur in the HWC representation (height, width, color channels) if is_color_channel_last is True and in the CHW if is_color_channel_last is False.
 
     Parameters
     ----------
@@ -271,7 +272,10 @@ def plot_image(img_data: np.ndarray, black_and_white: bool = False, image_shape:
     black_and_white : bool
         Specifies whether the image should be plotted in grayscale colors. Only relevant for images without color channels (default: False)
     image_shape : tuple
-        (height, width) for grayscale images or (height, width, number of channels) for color images (default: None)
+        (height, width) for grayscale images or HWC (height, width, color channels) / CHW for color images (default: None)
+    is_color_channel_last : bool
+        if true, the color channels should be in the last dimension, known as HWC representation. Alternatively the color channel can be at the first position, known as CHW representation.
+        Only relevant for color images (default: False)
     max_value : float
         maximum pixel value, used for min-max normalization. Is often 255, if None the maximum value in the data set will be used (default: None)
     min_value : float
@@ -293,10 +297,14 @@ def plot_image(img_data: np.ndarray, black_and_white: bool = False, image_shape:
         max_value = np.max(img_data)
     if min_value is None:
         min_value = np.min(img_data)
+    # Scale image to [0, 1]
     img_data = (img_data - min_value) / (max_value - min_value)
     # Reshape array data
     if img_data.ndim == 1:
         img_data = img_data.reshape(image_shape)
+    if img_data.ndim == 3 and not is_color_channel_last:
+        # Reshape image to HWC representation
+        img_data = np.transpose(img_data, (1, 2, 0))
     # Plot original image or a black-and-white version
     if black_and_white:
         plt.imshow(img_data, cmap="Greys")

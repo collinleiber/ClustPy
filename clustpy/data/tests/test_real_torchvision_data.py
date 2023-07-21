@@ -1,7 +1,6 @@
-from clustpy.data.tests.test_real_world_data import _helper_test_data_loader
+from clustpy.data.tests._helpers_for_tests import _helper_test_data_loader, _check_normalized_channels
 from clustpy.data import load_usps, load_mnist, load_fmnist, load_kmnist, load_cifar10, load_svhn, load_stl10
 import torchvision.datasets
-import numpy as np
 from pathlib import Path
 import os
 import shutil
@@ -19,27 +18,6 @@ def run_around_tests():
     yield
     # Code that will run after the tests
     shutil.rmtree(TEST_DOWNLOAD_PATH)
-
-
-def _check_normalized_channels(data, channels, should_be_normalized=True):
-    imprecision = 1e-4
-    # Check is simple if we only have a single channel, i.e. a grayscale image
-    if channels == 1:
-        if should_be_normalized:
-            assert np.mean(data) < imprecision
-            assert abs(np.std(data) - 1) < imprecision
-        else:
-            assert np.mean(data) > imprecision
-            assert abs(np.std(data) - 1) > imprecision
-    else:
-        # Else we have to check each channel separately
-        for i in range(channels):
-            if should_be_normalized:
-                assert np.mean(data[:, np.arange(data.shape[1]) % channels == i]) < imprecision
-                assert abs(np.std(data[:, np.arange(data.shape[1]) % channels == i]) - 1) < imprecision
-            else:
-                assert np.mean(data[:, np.arange(data.shape[1]) % channels == i]) > imprecision
-                assert abs(np.std(data[:, np.arange(data.shape[1]) % channels == i]) - 1) > imprecision
 
 
 # Check if loading methods still exist (could be renamed/moved)
@@ -69,6 +47,9 @@ def test_load_usps():
     data, labels = load_usps("test", downloads_path=TEST_DOWNLOAD_PATH)
     _helper_test_data_loader(data, labels, 2007, 256, 10)
     _check_normalized_channels(data, 1, False)
+    # Test non-flatten
+    data, _ = load_usps("all", downloads_path=TEST_DOWNLOAD_PATH, flatten=False)
+    assert data.shape == (9298, 16, 16)
 
 
 @pytest.mark.largedata
@@ -86,6 +67,9 @@ def test_load_mnist():
     data, labels = load_mnist("test", downloads_path=TEST_DOWNLOAD_PATH)
     _helper_test_data_loader(data, labels, 10000, 784, 10)
     _check_normalized_channels(data, 1, False)
+    # Test non-flatten
+    data, _ = load_mnist("all", downloads_path=TEST_DOWNLOAD_PATH, flatten=False)
+    assert data.shape == (70000, 28, 28)
 
 
 @pytest.mark.largedata
@@ -103,6 +87,9 @@ def test_load_kmnist():
     data, labels = load_kmnist("test", downloads_path=TEST_DOWNLOAD_PATH)
     _helper_test_data_loader(data, labels, 10000, 784, 10)
     _check_normalized_channels(data, 1, False)
+    # Test non-flatten
+    data, _ = load_kmnist("all", downloads_path=TEST_DOWNLOAD_PATH, flatten=False)
+    assert data.shape == (70000, 28, 28)
 
 
 @pytest.mark.largedata
@@ -120,6 +107,9 @@ def test_load_fmnist():
     data, labels = load_fmnist("test", downloads_path=TEST_DOWNLOAD_PATH)
     _helper_test_data_loader(data, labels, 10000, 784, 10)
     _check_normalized_channels(data, 1, False)
+    # Test non-flatten
+    data, _ = load_fmnist("all", downloads_path=TEST_DOWNLOAD_PATH, flatten=False)
+    assert data.shape == (70000, 28, 28)
 
 
 # Do not skip cifar10 as it is the smallest 3-channel dataset and can check channel normalization
@@ -137,6 +127,9 @@ def test_load_cifar10():
     data, labels = load_cifar10("test", downloads_path=TEST_DOWNLOAD_PATH)
     _helper_test_data_loader(data, labels, 10000, 3072, 10)
     _check_normalized_channels(data, 3, False)
+    # Test non-flatten
+    data, _ = load_cifar10("all", downloads_path=TEST_DOWNLOAD_PATH, flatten=False)
+    assert data.shape == (60000, 3, 32, 32)
 
 
 @pytest.mark.largedata
@@ -154,6 +147,9 @@ def test_load_svhn():
     data, labels = load_svhn("test", downloads_path=TEST_DOWNLOAD_PATH)
     _helper_test_data_loader(data, labels, 26032, 3072, 10)
     _check_normalized_channels(data, 3, False)
+    # Test non-flatten
+    data, _ = load_svhn("all", downloads_path=TEST_DOWNLOAD_PATH, flatten=False)
+    assert data.shape == (99289, 3, 32, 32)
 
 
 @pytest.mark.largedata
@@ -171,3 +167,6 @@ def test_load_stl10():
     data, labels = load_stl10("test", downloads_path=TEST_DOWNLOAD_PATH)
     _helper_test_data_loader(data, labels, 8000, 27648, 10)
     _check_normalized_channels(data, 3, False)
+    # Test non-flatten
+    data, _ = load_stl10("all", downloads_path=TEST_DOWNLOAD_PATH, flatten=False)
+    assert data.shape == (13000, 3, 96, 96)

@@ -1,4 +1,4 @@
-from clustpy.data.tests.test_real_world_data import _helper_test_data_loader
+from clustpy.data.tests._helpers_for_tests import _helper_test_data_loader
 from clustpy.data import load_motestrain, load_proximal_phalanx_outline, load_diatom_size_reduction, load_symbols, \
     load_olive_oil, load_plane, load_sony_aibo_robot_surface, load_two_patterns, load_lsst
 from pathlib import Path
