@@ -1,7 +1,12 @@
+import torch
 from clustpy.utils import evaluate_multiple_datasets, evaluate_dataset, EvaluationAlgorithm, EvaluationDataset, \
-    EvaluationMetric
+    EvaluationMetric, EvaluationAutoencoder, load_saved_autoencoder
 from clustpy.utils.evaluation import _preprocess_dataset, _get_n_clusters_from_algo
 import numpy as np
+from clustpy.deep.autoencoders import FeedforwardAutoencoder
+from clustpy.data import create_subspace_data
+import os
+import pytest
 
 
 def _add_value(X: np.ndarray, value: int = 1):
@@ -10,6 +15,33 @@ def _add_value(X: np.ndarray, value: int = 1):
 
 def _add_value1_divide_by_value2(X: np.ndarray, value1: int, value2: float):
     return (X + value1) / value2
+
+
+@pytest.fixture
+def cleanup_autoencoders():
+    yield
+    filename1 = "autoencoder1.ae"
+    if os.path.isfile(filename1):
+        os.remove(filename1)
+    filename2 = "autoencoder2.ae"
+    if os.path.isfile(filename2):
+        os.remove(filename2)
+
+
+@pytest.mark.usefixtures("cleanup_autoencoders")
+def test_load_saved_autoencoder():
+    path = "autoencoder1.ae"
+    layers = [4, 2]
+    X, _ = create_subspace_data(500, subspace_features=(2, 2), random_state=1)
+    ae = FeedforwardAutoencoder(layers=layers)
+    assert ae.fitted is False
+    ae.fit(2, optimizer_params={"lr": 1e-3}, data=X, model_path=path)
+    assert ae.fitted is True
+    ae2 = load_saved_autoencoder(path, FeedforwardAutoencoder, {"layers": layers})
+    assert ae2.fitted is True
+    # Check if all parameters are equal
+    for p1, p2 in zip(ae.parameters(), ae2.parameters()):
+        assert torch.equal(p1.data, p2.data)
 
 
 def test_preprocess_dataset():
@@ -67,6 +99,47 @@ def test_evaluate_dataset():
     assert df.shape == (n_repetitions + len(aggregations), len(algorithms) * (len(metrics) + 2))
 
 
+@pytest.mark.usefixtures("cleanup_autoencoders")
+def test_evaluate_dataset_with_autoencoders():
+    from sklearn.cluster import KMeans
+    from clustpy.deep import DEC
+    from sklearn.metrics import normalized_mutual_info_score as nmi, silhouette_score as silhouette
+    np.random.seed(10)
+    torch.use_deterministic_algorithms(True)
+    n_repetitions = 2
+    path1 = "autoencoder1.ae"
+    path2 = "autoencoder2.ae"
+    layers = [12, 5]
+    X, L = create_subspace_data(500, subspace_features=(2, 10), random_state=1)
+    aes = []
+    for path in [path1, path2]:
+        ae = FeedforwardAutoencoder(layers=layers)
+        ae.fit(2, optimizer_params={"lr": 1e-3}, data=X, model_path=path)
+        aes.append(ae)
+    autoencoders = [EvaluationAutoencoder(path1, FeedforwardAutoencoder, {"layers": layers}),
+                    EvaluationAutoencoder(path2, FeedforwardAutoencoder, {"layers": layers})]
+    algorithms = [
+        EvaluationAlgorithm(name="KMeans", algorithm=KMeans, params={"n_clusters": None, "random_state": 10}),
+        EvaluationAlgorithm(name="DEC1", algorithm=DEC,
+                            params={"n_clusters": None, "embedding_size": 5, "clustering_epochs": 0}),
+        EvaluationAlgorithm(name="DEC2", algorithm=DEC,
+                            params={"n_clusters": None, "embedding_size": 5, "clustering_epochs": 0}),
+    ]
+    metrics = [EvaluationMetric(name="nmi", metric=nmi, params={"average_method": "geometric"}, use_gt=True),
+               EvaluationMetric(name="silhouette", metric=silhouette, use_gt=False)]
+    df = evaluate_dataset(X=X, evaluation_algorithms=algorithms, evaluation_metrics=metrics,
+                          iteration_specific_autoencoders=autoencoders,
+                          labels_true=L, n_repetitions=n_repetitions, add_runtime=False, add_n_clusters=False,
+                          save_path=None, random_state=1)
+    # Check if scores are equal
+    assert abs(df.at[0, ("DEC1", "nmi")] - df.at[0, ("DEC2", "nmi")]) < 1e-8  # is equal
+    assert abs(df.at[0, ("DEC1", "silhouette")] - df.at[0, ("DEC2", "silhouette")]) < 1e-8  # is equal
+    assert abs(df.at[1, ("DEC1", "nmi")] - df.at[1, ("DEC2", "nmi")]) < 1e-8  # is equal
+    assert abs(df.at[1, ("DEC1", "silhouette")] - df.at[1, ("DEC2", "silhouette")]) < 1e-8  # is equal
+    assert abs(df.at[0, ("DEC1", "nmi")] - df.at[1, ("DEC1", "nmi")]) > 1e-2  # is not equal
+    assert abs(df.at[0, ("DEC1", "silhouette")] - df.at[1, ("DEC1", "silhouette")]) > 1e-2  # is not equal
+
+
 def test_evaluate_multiple_datasets():
     from sklearn.cluster import KMeans, DBSCAN
     from sklearn.metrics import normalized_mutual_info_score as nmi, silhouette_score as silhouette
@@ -81,7 +154,8 @@ def test_evaluate_multiple_datasets():
         EvaluationAlgorithm(name="KMeans_with_preprocess", algorithm=KMeans, params={"n_clusters": 2},
                             preprocess_methods=[_add_value],
                             preprocess_params=[{"value": 1}]),
-        EvaluationAlgorithm(name="DBSCAN", algorithm=DBSCAN, params={"eps": 0.5, "min_samples": 2}, deterministic=True)]
+        EvaluationAlgorithm(name="DBSCAN", algorithm=DBSCAN, params={"eps": 0.5, "min_samples": 2},
+                            deterministic=True)]
     metrics = [EvaluationMetric(name="nmi", metric=nmi, params={"average_method": "geometric"}, use_gt=True),
                EvaluationMetric(name="silhouette", metric=silhouette, use_gt=False)]
     datasets = [EvaluationDataset(name="iris", data=load_iris, preprocess_methods=[_add_value],

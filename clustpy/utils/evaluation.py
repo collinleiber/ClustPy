@@ -5,7 +5,30 @@ import time
 from sklearn.utils import check_random_state
 from sklearn.base import ClusterMixin
 from collections.abc import Callable
-from clustpy.deep import load_saved_autoencoder
+
+
+def load_saved_autoencoder(path: str, autoencoder_class: torch.nn.Module, params: dict = {}) -> torch.nn.Module:
+    """
+    Load the states of an already trained autoencoder.
+    It will be assumed that the autoencoder was already fitted, so the 'fitted' parameter will be set to True.
+
+    Parameters
+    ----------
+    path : str
+        Path to the state dict that should be loaded
+    autoencoder_class : torch.nn.Module
+        The actual autoencoder class
+    params : dict
+        Parameters given to the autoencoder class (default: {})
+
+    Returns
+    -------
+    The autoencoder with the loaded states
+    """
+    autoencoder = autoencoder_class(**params)
+    autoencoder.load_state_dict(torch.load(path))
+    autoencoder.fitted = True
+    return autoencoder
 
 
 def _preprocess_dataset(X: np.ndarray, preprocess_methods: list, preprocess_params: list) -> np.ndarray:
@@ -205,15 +228,15 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
                 np.random.seed(seeds[rep])
                 # Execute algorithm
                 start_time = time.time()
-                if not hasattr(eval_algo, "autoencoder") or iteration_specific_autoencoders is None:
-                    algo_obj = eval_algo.algorithm(**eval_algo.params)
-                else:
+                algo_obj = eval_algo.algorithm(**eval_algo.params)
+                # Check if algorithm uses an autoencoder and wether iteration_specific autoencoders are defined
+                if hasattr(algo_obj, "autoencoder") and iteration_specific_autoencoders is not None:
                     eval_autoencoder = iteration_specific_autoencoders[rep]
                     assert type(
                         eval_autoencoder) is EvaluationAutoencoder, "Each entry in iteration_specific_params must be a EvaluationAutoencoder"
                     autoencoder = load_saved_autoencoder(eval_autoencoder.path, eval_autoencoder.autoencoder_class,
                                                          eval_autoencoder.params)
-                    algo_obj = eval_algo.algorithm(autoencoder=autoencoder, **eval_algo.params)
+                    algo_obj.autoencoder = autoencoder
                 try:
                     algo_obj.fit(X_processed)
                 except Exception as e:
@@ -582,7 +605,7 @@ class EvaluationAutoencoder():
     def __init__(self, path: str, autoencoder_class: torch.nn.Module, params: dict = {}):
         assert type(path) is str, "path must be a string"
         self.path = path
-        assert type(autoencoder_class) is torch.nn.Module, "autoencoder_class must be a torch.nn.Module"
+        assert issubclass(autoencoder_class, torch.nn.Module), "autoencoder_class must be a torch.nn.Module"
         self.autoencoder_class = autoencoder_class
         assert type(params) is dict, "params must be a dict"
         self.params = params

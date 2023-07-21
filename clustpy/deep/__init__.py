@@ -6,8 +6,7 @@ from .dipencoder import DipEncoder
 from .enrc import ENRC
 from ._data_utils import get_dataloader
 from ._train_utils import get_trained_autoencoder
-from ._utils import encode_batchwise, decode_batchwise, encode_decode_batchwise, predict_batchwise, \
-    load_saved_autoencoder, detect_device
+from ._utils import encode_batchwise, decode_batchwise, encode_decode_batchwise, predict_batchwise, detect_device
 
 __all__ = ['DEC',
            'IDEC',
@@ -22,5 +21,4 @@ __all__ = ['DEC',
            'decode_batchwise',
            'encode_decode_batchwise',
            'predict_batchwise',
-           'load_saved_autoencoder',
            'detect_device']

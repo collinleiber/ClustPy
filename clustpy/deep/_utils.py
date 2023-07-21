@@ -6,28 +6,6 @@ from sklearn.base import ClusterMixin
 import inspect
 
 
-def load_saved_autoencoder(path: str, autoencoder_class: torch.nn.Module, params: dict = {}) -> torch.nn.Module:
-    """
-    Load the states of an already trained autoencoder.
-
-    Parameters
-    ----------
-    path : str
-        Path to the state dict that should be loaded
-    autoencoder_class : torch.nn.Module
-        The actual autoencoder class
-    params : dict
-        Parameters given to the autoencoder class (default: {})
-
-    Returns
-    -------
-    The autoencoder with the loaded states
-    """
-    autoencoder = autoencoder_class(**params)
-    autoencoder.load_state_dict(torch.load(path))
-    return autoencoder
-
-
 def set_torch_seed(random_state: np.random.RandomState) -> None:
     """
     Set the random state for torch applications.
