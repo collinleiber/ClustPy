@@ -1,5 +1,6 @@
 import numpy as np
 import urllib.request
+import requests
 import os
 from pathlib import Path
 import ssl
@@ -50,6 +51,31 @@ def _download_file(file_url: str, filename_local: str) -> None:
     ssl._create_default_https_context = ssl._create_unverified_context
     urllib.request.urlretrieve(file_url, filename_local)
     ssl._create_default_https_context = default_ssl
+
+
+def _download_file_from_google_drive(file_id: str, filename_local: str, chunk_size: int = 32768) -> None:
+    """
+    Download a file from google drive.
+    Code taken from:
+    https://stackoverflow.com/questions/38511444/python-download-files-from-google-drive-using-url
+
+    Parameters
+    ----------
+    file_id : str
+        ID of the file on google drive
+    filename_local : str
+        local name of the file after it has been downloaded
+    chunk_size : int
+        chink size when downloading the file (default: 32768)
+    """
+    print("Downloading data set {0} from Google Drive to {1}".format(file_id, filename_local))
+    URL = "https://docs.google.com/uc?export=download&confirm=1"
+    session = requests.Session()
+    response = session.get(URL, params={"id": file_id, "confirm": 1}, stream=True)
+    with open(filename_local, "wb") as f:
+        for chunk in response.iter_content(chunk_size):
+            if chunk:  # filter out keep-alive new chunks
+                f.write(chunk)
 
 
 def _load_data_file(filename_local: str, file_url: str, delimiter: str = ",", last_column_are_labels: bool = True) -> (

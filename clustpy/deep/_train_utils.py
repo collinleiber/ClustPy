@@ -75,7 +75,7 @@ def get_trained_autoencoder(trainloader: torch.utils.data.DataLoader, optimizer_
     # Save autoencoder to device
     autoencoder.to(device)
     if not autoencoder.fitted:
-        print("Autoencoder is not fitted  yet, will be pretrained.")
+        print("Autoencoder is not fitted yet, will be pretrained.")
         # Pretrain Autoencoder
         autoencoder.fit(n_epochs=n_epochs, optimizer_params=optimizer_params, dataloader=trainloader,
                         device=device, optimizer_class=optimizer_class, loss_fn=loss_fn)

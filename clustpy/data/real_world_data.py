@@ -1,12 +1,18 @@
-from clustpy.data._utils import _download_file, _get_download_dir, _decompress_z_file, _load_data_file
+from clustpy.data._utils import _download_file, _get_download_dir, _decompress_z_file, _load_data_file, \
+    _download_file_from_google_drive
 import os
 import numpy as np
 import zipfile
+import tarfile
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import LabelEncoder
 from sklearn.datasets import fetch_20newsgroups, fetch_rcv1, load_iris as sk_load_iris, load_wine as sk_load_wine, \
     load_breast_cancer as sk_load_breast_cancer
 import pandas as pd
+from scipy.io import loadmat
+from PIL import Image
+import torch
+from clustpy.data.real_torchvision_data import _torch_normalize_and_flatten
 
 # More datasets https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/multiclass.html#usps
 
@@ -367,7 +373,7 @@ def load_soybean_large(subset: str = "all", downloads_path: str = None) -> (np.n
     return data, labels
 
 
-def load_optdigits(subset: str = "all", downloads_path: str = None) -> (np.ndarray, np.ndarray):
+def load_optdigits(subset: str = "all", flatten: bool = True, downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the optdigits data set. It consists of 5620 8x8 grayscale images, each representing a digit (0 to 9).
     Each pixel depicts the number of marked pixel within a 4x4 block of the original 32x32 bitmaps.
@@ -378,6 +384,8 @@ def load_optdigits(subset: str = "all", downloads_path: str = None) -> (np.ndarr
     ----------
     subset : str
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
+    flatten : bool
+        should the image data be flatten, i.e. should the format be changed to a (N x d) array (default: True)
     downloads_path : str
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
@@ -407,6 +415,8 @@ def load_optdigits(subset: str = "all", downloads_path: str = None) -> (np.ndarr
         else:
             data = test_data
             labels = test_labels
+    if not flatten:
+        data = data.reshape((-1, 8, 8))
     return data, labels
 
 
@@ -707,7 +717,7 @@ def load_statlog_shuttle(subset: str = "all", downloads_path: str = None) -> (np
 def load_mice_protein(return_additional_labels: bool = False, downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the Mice Protein Expression data set. It consists of 1077 samples belonging to one of 8 classes.
-    Each features represents the expression level of one of 77 proteins.
+    Each feature represents the expression level of one of 77 proteins.
     Samples containing more than 43 NaN values (3 cases) will be removed. Afterwards, all columns containing NaN values
     will be removed. This reduces the number of features from 77 to 68.
     The classes can be further subdivided by using the return_additional_labels parameter. This gives the additional
@@ -1055,7 +1065,7 @@ def load_breast_cancer_wisconsin_original(downloads_path: str = None) -> (np.nda
     return data, labels
 
 
-def load_semeion(downloads_path: str = None) -> (np.ndarray, np.ndarray):
+def load_semeion(flatten: bool = True, downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the semeion data set. It consists of 1593 samples belonging to one of 10 classes.
     Each sample corresponds to a grayscale 16x16 scan of handwritten digits originating from about 80 different persons.
@@ -1064,6 +1074,8 @@ def load_semeion(downloads_path: str = None) -> (np.ndarray, np.ndarray):
 
     Parameters
     ----------
+    flatten : bool
+        should the image data be flatten, i.e. should the format be changed to a (N x d) array (default: True)
     downloads_path : str
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
@@ -1086,4 +1098,177 @@ def load_semeion(downloads_path: str = None) -> (np.ndarray, np.ndarray):
     labels = np.zeros(data.shape[0], dtype=np.int32)
     for i in range(1, 10):
         labels[datafile[:, -10 + i] == 1] = i
+    if not flatten:
+        data = data.reshape((-1, 16, 16))
+    return data, labels
+
+
+def load_imagenet_dog(subset: str = "all",
+                      image_size: tuple = (224, 224),
+                      breeds: list = ["n02085936-Maltese_dog", "n02086646-Blenheim_spaniel", "n02088238-basset",
+                                      "n02091467-Norwegian_elkhound", "n02097209-standard_schnauzer",
+                                      "n02099601-golden_retriever", "n02101388-Brittany_spaniel", "n02101556-clumber",
+                                      "n02102177-Welsh_springer_spaniel", "n02105056-groenendael", "n02105412-kelpie",
+                                      "n02105855-Shetland_sheepdog", "n02107142-Doberman", "n02110958-pug",
+                                      "n02112137-chow"],
+                      flatten: bool = True, normalize_channels: bool = False,
+                      downloads_path: str = None) -> (np.ndarray, np.ndarray):
+    """
+    Load the ImageNet Dog data set. It consists of 20580 color images of different sizes showing 120 breeds of dogs.
+    The data set is composed of 12000 training and 8580 test images.
+    Usually, a subset of 15 dog breeds is used (Maltese_dog, Blenheim_spaniel, Basset, Norwegian_elkhound,
+    Standard_schnauzer, Golden_retriever, Brittany_spaniel, Clumber, Welsh_springer_spaniel, Groenendael, Kelpie,
+    Shetland_sheepdog, Doberman, Pug, Chow), resulting in 2574 images for the "all" subset.
+    N=20580, d=image_size[0]*image_size[1]*3, k=120.
+
+    Parameters
+    ----------
+    subset : str
+        can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
+    image_size : tuple
+        the images of various sizes must be converted into a coherent size.
+        The tuple equals (width, height) of the images (default: (224, 224))
+    breeds : list
+        list containing all the identifiers of the dog breeds that should be extracted. All entries must be of type str.
+        If None, all breeds will be extracted.
+        Usually, a subset consisting of 15 breeds is extracted (default: list with 15 dog breeds)
+    flatten : bool
+        should the image data be flatten, i.e. should the format be changed to a (N x d) array.
+        If false, the image will be returned in the CHW format (default: True)
+    normalize_channels : bool
+        normalize each color-channel of the images (default: False)
+    downloads_path : bool
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
+
+    Returns
+    -------
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (20580 x image_size[0]*image_size[1]*3), the labels numpy array (20580)
+
+    References
+    -------
+    http://vision.stanford.edu/aditya86/ImageNetDogs/main.html
+    """
+    subset = subset.lower()
+    assert subset in ["all", "train",
+                      "test"], "subset must match 'all', 'train' or 'test'. Your input {0}".format(subset)
+    directory = _get_download_dir(downloads_path) + "/ImageNetDog/"
+    filename = directory + "images.tar"
+    if not os.path.isfile(filename):
+        if not os.path.isdir(directory):
+            os.mkdir(directory)
+        _download_file("http://vision.stanford.edu/aditya86/ImageNetDogs/images.tar",
+                       filename)
+        # Unpack zipfile
+        with tarfile.open(filename, "r") as tar:
+            tar.extractall(directory)
+    # Get files for test/train split
+    train_test_filename = directory + "lists.tar"
+    if not os.path.isfile(train_test_filename):
+        _download_file("http://vision.stanford.edu/aditya86/ImageNetDogs/lists.tar",
+                       train_test_filename)
+        # Unpack zipfile
+        with tarfile.open(train_test_filename, "r") as tar:
+            tar.extractall(directory)
+    # Check breeds list
+    if breeds is None:
+        breeds = os.listdir(directory + "/Images")
+    # Load data lists
+    data_list = []
+    if subset == "train":
+        object_list = loadmat(directory + "/train_list.mat")
+    elif subset == "test":
+        object_list = loadmat(directory + "/test_list.mat")
+    else:
+        object_list = loadmat(directory + "/file_list.mat")
+    labels = object_list["labels"]
+    file_list = object_list["file_list"]
+    # get image data
+    use_image = np.ones(labels.shape[0], dtype=bool)
+    for i, file in enumerate(file_list):
+        file = file[0][0]
+        if file.split("/")[0] in breeds:
+            image_data = Image.open(directory + "/Images/" + file).convert("RGB")
+            # Convert to coherent size
+            image_data = image_data.resize(image_size)
+            data_list.append(image_data)
+            use_image[i] = True
+        else:
+            use_image[i] = False
+    data = np.array(data_list)
+    # If desired, normalize channels
+    data_torch = torch.Tensor(data)
+    is_color_channel_last = True
+    data_torch = _torch_normalize_and_flatten(data_torch, flatten, normalize_channels, is_color_channel_last)
+    # Move data to CPU
+    data = data_torch.detach().cpu().numpy()
+    # Convert labels to int32 format
+    labels = labels[use_image, 0].astype(np.int32) - 1
+    if breeds is not None:
+        # Transform labels
+        LE = LabelEncoder()
+        labels = LE.fit_transform(labels)
+    return data, labels
+
+
+def load_imagenet10(use_224_size: bool = True, flatten: bool = True, normalize_channels: bool = False,
+                    downloads_path: str = None) -> (np.ndarray, np.ndarray):
+    """
+    Load the ImageNet-10 data set. This is a subset of the well-known ImageNet data set with only 10 classes.
+    It consists of 13000 224x224 (or 96x96) color images showing different objects.
+    N=13000, d=150528, k=10.
+
+    Parameters
+    ----------
+    use_224_size : bool
+        defines wheter the images should be loaded in the size (224 x 224) or (96 x 96) (default: True)
+    flatten : bool
+        should the image data be flatten, i.e. should the format be changed to a (N x d) array.
+        If false, the image will be returned in the CHW format (default: True)
+    normalize_channels : bool
+        normalize each color-channel of the images (default: False)
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
+
+    Returns
+    -------
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (13000 x 150528), the labels numpy array (13000)
+
+    References
+    -------
+    https://www.image-net.org/
+
+    and
+
+    https://drive.google.com/drive/folders/1XL0Nohi4vO2f1I4znf388n2pMP8PiKFd
+    """
+    directory = _get_download_dir(downloads_path) + "/ImageNet10"
+    if not os.path.isdir(directory):
+        os.mkdir(directory)
+    if use_224_size:
+        filename_data = directory + "/data_224.npy"
+        if not os.path.isfile(filename_data):
+            _download_file_from_google_drive("1sLfA0U9s9Q5Cf8o32GxYoyiyrzZN1K_6", filename_data)
+        filename_labels = directory + "/labels_224.npy"
+        if not os.path.isfile(filename_labels):
+            _download_file_from_google_drive("1OjAQwaGnAfJBW66HFkR7yODLFxnTZWWI", filename_labels)
+    else:
+        filename_data = directory + "/data_96.npy"
+        if not os.path.isfile(filename_data):
+            _download_file_from_google_drive("13VbP1qYz6bSeibnoR-w0J_jL9bQf6tGX", filename_data)
+        filename_labels = directory + "/labels_96.npy"
+        if not os.path.isfile(filename_labels):
+            _download_file_from_google_drive("1uiuYUdjyCITLURc5eo8ByP9b51MK_Uk6", filename_labels)
+    # Load data and labels
+    data = np.load(filename_data)
+    labels = np.load(filename_labels)
+    # If desired, normalize channels
+    data_torch = torch.Tensor(data)
+    is_color_channel_last = True
+    data_torch = _torch_normalize_and_flatten(data_torch, flatten, normalize_channels, is_color_channel_last)
+    # Move data to CPU
+    data = data_torch.detach().cpu().numpy()
+    # Convert labels to int32 format
+    labels = labels.astype(np.int32)
     return data, labels

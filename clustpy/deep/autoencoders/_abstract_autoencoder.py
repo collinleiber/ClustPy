@@ -7,6 +7,7 @@ import torch
 import numpy as np
 from clustpy.deep._early_stopping import EarlyStopping
 from clustpy.deep._data_utils import get_dataloader
+import os
 
 
 class FullyConnectedBlock(torch.nn.Module):
@@ -311,6 +312,9 @@ class _AbstractAutoencoder(torch.nn.Module):
                     best_epoch = epoch_i
                     # Save best model
                     if model_path is not None:
+                        # Check if directory exists
+                        if not os.path.isdir(os.path.dirname(model_path)):
+                            os.makedirs(os.path.dirname(model_path))
                         torch.save(self.state_dict(), model_path)
 
                 if early_stopping.early_stop:
@@ -324,6 +328,9 @@ class _AbstractAutoencoder(torch.nn.Module):
         self.eval()
         # Save last version of model
         if evalloader is None and model_path is not None:
+            # Check if directory exists
+            if not os.path.isdir(os.path.dirname(model_path)):
+                os.makedirs(os.path.dirname(model_path))
             torch.save(self.state_dict(), model_path)
         # Autoencoder is now pretrained
         self.fitted = True
