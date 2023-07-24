@@ -5,6 +5,7 @@ import time
 from sklearn.utils import check_random_state
 from sklearn.base import ClusterMixin
 from collections.abc import Callable
+import os
 
 
 def load_saved_autoencoder(path: str, autoencoder_class: torch.nn.Module, params: dict = {}) -> torch.nn.Module:
@@ -255,6 +256,9 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
                 if save_labels_path is not None:
                     save_labels_path_algo = None if save_labels_path is None else "{0}_{1}_{2}.{3}".format(
                         save_labels_path.split(".")[0], eval_algo.name, rep, save_labels_path.split(".")[1])
+                    # Check if directory exists
+                    if not os.path.isdir(os.path.dirname(save_labels_path_algo)):
+                        os.makedirs(os.path.dirname(save_labels_path_algo))
                     np.savetxt(save_labels_path_algo, algo_obj.labels_)
                 # Get result of all metrics
                 if evaluation_metrics is not None:
@@ -293,6 +297,9 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
     for agg in aggregation_functions:
         df.loc[agg.__name__] = agg(df.values, axis=0)
     if save_path is not None:
+        # Check if directory exists
+        if not os.path.isdir(os.path.dirname(save_path)):
+            os.makedirs(os.path.dirname(save_path))
         df.to_csv(save_path)
     return df
 
@@ -418,6 +425,9 @@ def evaluate_multiple_datasets(evaluation_datasets: list, evaluation_algorithms:
             print(e)
     all_dfs = pd.concat(df_list, keys=data_names)
     if save_path is not None:
+        # Check if directory exists
+        if not os.path.isdir(os.path.dirname(save_path)):
+            os.makedirs(os.path.dirname(save_path))
         all_dfs.to_csv(save_path)
     return all_dfs
 

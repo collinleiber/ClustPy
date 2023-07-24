@@ -1243,7 +1243,7 @@ def load_imagenet10(use_224_size: bool = True, flatten: bool = True, normalize_c
 
     https://drive.google.com/drive/folders/1XL0Nohi4vO2f1I4znf388n2pMP8PiKFd
     """
-    directory = _get_download_dir(downloads_path) + "/ImageNet10/"
+    directory = _get_download_dir(downloads_path) + "/ImageNet10"
     if not os.path.isdir(directory):
         os.mkdir(directory)
     if use_224_size:
