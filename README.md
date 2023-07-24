@@ -124,19 +124,19 @@ Remove clustpy via pip to avoid ambiguities during development, e.g., when chang
 - Datasets
     - Synthetic dataset creators for subspace and alternative clustering 
     - Real-world dataset loaders (e.g., Iris, Wine, Mice protein, Optdigits, MNIST, ...)
-        - UCI Repository [[Paper](https://archive.ics.uci.edu/)]
-        - UEA & UCR Time Series Classification Repository [[Paper](http://www.timeseriesclassification.com/)]
-        - MedMNIST [[Paper](https://medmnist.com/)]
-        - Torchvision Datasets [[Paper](https://pytorch.org/vision/stable/datasets.html)]
-        - Sklearn Datasets [[Paper](https://scikit-learn.org/stable/modules/classes.html#module-sklearn.datasets)]
+        - UCI Repository [[Website](https://archive.ics.uci.edu/)]
+        - UEA & UCR Time Series Classification Repository [[Website](http://www.timeseriesclassification.com/)]
+        - MedMNIST [[Website](https://medmnist.com/)]
+        - Torchvision Datasets [[Website](https://pytorch.org/vision/stable/datasets.html)]
+        - Sklearn Datasets [[Website](https://scikit-learn.org/stable/modules/classes.html#module-sklearn.datasets)]
         - Others
     - Dataset loaders for datasets with multiple labelings
-        - ALOI (subset) [[Paper](https://aloi.science.uva.nl/)]
-        - CMU Face [[Paper](http://archive.ics.uci.edu/ml/datasets/cmu+face+images)]
+        - ALOI (subset) [[Website](https://aloi.science.uva.nl/)]
+        - CMU Face [[Website](http://archive.ics.uci.edu/ml/datasets/cmu+face+images)]
         - Dancing Stickfigures [[Paper](https://dl.acm.org/doi/abs/10.1145/2623330.2623734)]
         - Fruit [[Paper](https://link.springer.com/article/10.1007/s10115-016-0998-9)]
         - NRLetters [[Paper](https://epubs.siam.org/doi/abs/10.1137/1.9781611977172.26)]
-        - WebKB [[Paper](http://www.cs.cmu.edu/~webkb/)]
+        - WebKB [[Website](http://www.cs.cmu.edu/~webkb/)]
     
 # Compatible packages
 
