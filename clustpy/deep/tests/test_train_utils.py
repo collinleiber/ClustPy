@@ -24,8 +24,7 @@ def test_get_trained_autoencoder():
     # Get AE using the default AE class
     device = torch.device('cpu')
     ae = get_trained_autoencoder(trainloader=dataloader, optimizer_params={"lr":1e-3}, n_epochs=5, device=device,
-                                 optimizer_class=torch.optim.Adam,
-                                 loss_fn=torch.nn.MSELoss(), input_dim=data.shape[1], embedding_size=10)
+                                 optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(), embedding_size=10)
     # Check output of get_trained_autoencoder
     assert type(ae) is FeedforwardAutoencoder
     assert ae.fitted == True
@@ -38,8 +37,7 @@ def test_get_trained_autoencoder_with_custom_ae_class():
     # Get AE using a custom AE class
     device = torch.device('cpu')
     ae = get_trained_autoencoder(trainloader=dataloader, optimizer_params={"lr":1e-3}, n_epochs=5, device=device,
-                                 optimizer_class=torch.optim.Adam,
-                                 loss_fn=torch.nn.MSELoss(), input_dim=data.shape[1], embedding_size=10,
+                                 optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(), embedding_size=10,
                                  autoencoder_class=VariationalAutoencoder)
     # Check output of get_trained_autoencoder
     assert type(ae) is VariationalAutoencoder
@@ -57,8 +55,7 @@ def test_get_trained_autoencoder_with_custom_ae():
     encoder_0_params = ae.encoder.block[0].weight.data.detach().clone()
     decoder_0_params = ae.decoder.block[0].weight.data.detach().clone()
     ae_out = get_trained_autoencoder(trainloader=dataloader, optimizer_params={"lr":1e-3}, n_epochs=5, device=device,
-                                 optimizer_class=torch.optim.Adam,
-                                 loss_fn=torch.nn.MSELoss(), input_dim=data.shape[1], embedding_size=10,
+                                 optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(), embedding_size=10,
                                  autoencoder=ae)
     # Check output of get_trained_autoencoder
     assert type(ae_out) is FeedforwardAutoencoder
@@ -82,8 +79,7 @@ def test_get_trained_autoencoder_with_custom_pretrained_ae():
     encoder_0_params = ae.encoder.block[0].weight.data.detach().clone()
     decoder_0_params = ae.decoder.block[0].weight.data.detach().clone()
     ae_out = get_trained_autoencoder(trainloader=dataloader, optimizer_params={"lr":1e-3}, n_epochs=5, device=device,
-                                 optimizer_class=torch.optim.Adam,
-                                 loss_fn=torch.nn.MSELoss(), input_dim=data.shape[1], embedding_size=10,
+                                 optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(), embedding_size=10,
                                  autoencoder=ae)
     # Check output of get_trained_autoencoder
     assert type(ae_out) is FeedforwardAutoencoder
