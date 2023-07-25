@@ -46,6 +46,7 @@ def test_acedec_augmentation():
     torch.use_deterministic_algorithms(True)
     data, labels = load_optdigits(flatten=False)
     data = data[:1000]
+    labels = labels[:1000]
     data = data.reshape(-1, 1, 8, 8)
     data = np.tile(data, (1, 3, 1, 1))
     aug_dl, orig_dl = _get_test_augmentation_dataloaders(data)

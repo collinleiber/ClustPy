@@ -3,7 +3,6 @@ import torchvision
 import numpy as np
 from typing import Callable, List
 
-from PIL import Image
 
 class _ClustpyDataset(torch.utils.data.Dataset):
     """
@@ -34,14 +33,16 @@ class _ClustpyDataset(torch.utils.data.Dataset):
     orig_transforms_list : List of torchvision.transforms
     """
 
-    def __init__(self, *tensors: torch.Tensor, aug_transforms_list: List[Callable] = None, orig_transforms_list: List[Callable] = None):
+    def __init__(self, *tensors: torch.Tensor, aug_transforms_list: List[Callable] = None,
+                 orig_transforms_list: List[Callable] = None):
         assert all(tensors[0].size(0) == tensor.size(0) for tensor in tensors), "Size mismatch between tensors"
         self.tensors = tensors
-        assert orig_transforms_list is None or len(orig_transforms_list) == len(tensors), "Size mismatch between tensors and orig_transforms_list"
+        assert orig_transforms_list is None or len(orig_transforms_list) == len(
+            tensors), "Size mismatch between tensors and orig_transforms_list"
         self.orig_transforms_list = orig_transforms_list
-        assert aug_transforms_list is None or len(aug_transforms_list) == len(tensors), "Size mismatch between tensors and aug_transforms_list"
+        assert aug_transforms_list is None or len(aug_transforms_list) == len(
+            tensors), "Size mismatch between tensors and aug_transforms_list"
         self.aug_transforms_list = aug_transforms_list
-        
 
     def __getitem__(self, index: int) -> tuple:
         """
@@ -57,7 +58,7 @@ class _ClustpyDataset(torch.utils.data.Dataset):
         final_tuple : tuple
             Tuple containing the sample. Consists of (index, data1, data2, ...), depending on the input tensors.
         """
-        
+
         if self.orig_transforms_list is None and self.aug_transforms_list is None:
             final_tuple = tuple([index] + [tensor[index] for tensor in self.tensors])
         else:
@@ -68,7 +69,7 @@ class _ClustpyDataset(torch.utils.data.Dataset):
                     aug_transforms_i = self.aug_transforms_list[i]
                     if aug_transforms_i is not None:
                         aug_list.append(aug_transforms_i(tensor[index]))
-                
+
                 if self.orig_transforms_list is not None:
                     # apply preprocessing
                     orig_transforms_i = self.orig_transforms_list[i]
@@ -78,12 +79,12 @@ class _ClustpyDataset(torch.utils.data.Dataset):
                         orig_i = orig_transforms_i(tensor[index])
                 else:
                     orig_i = tensor[index]
-                    
+
                 aug_list.append(orig_i)
-                    
+
             final_tuple = tuple([index] + aug_list)
         return final_tuple
-    
+
     def __len__(self) -> int:
         """
         Get length of the dataset which equals the length of the input tensors.
@@ -236,11 +237,15 @@ def augmentation_invariance_check(augmentation_invariance: bool, custom_dataload
         trainloader, testloader = custom_dataloaders
         batch = next(iter(trainloader))
         if len(batch) < 3:
-            raise ValueError(f"Augmentation_invariance is True, but custom_dataloaders[0] only returns a list of size {len(batch)} (index, tensor)")
+            raise ValueError(
+                f"Augmentation_invariance is True, but custom_dataloaders[0] only returns a list of size {len(batch)} (index, tensor)")
         if not (all(batch[0].size(0) == tensor.size(0) for tensor in batch) and batch[1].shape == batch[2].shape):
-            raise ValueError(f"Augmentation_invariance is True, but the shapes of the returned batch of custom_dataloaders[0] do not match.")
+            raise ValueError(
+                f"Augmentation_invariance is True, but the shapes of the returned batch of custom_dataloaders[0] do not match.")
         else:
             if torch.equal(batch[1], batch[2]):
-                raise ValueError(f"Augmentation_invariance is True, but custom_dataloaders[0] returns identical tensors in batch[1] and batch[2] indicating that no augmentation is applied to batch[1]")
+                raise ValueError(
+                    f"Augmentation_invariance is True, but custom_dataloaders[0] returns identical tensors in batch[1] and batch[2] indicating that no augmentation is applied to batch[1]")
     elif augmentation_invariance and custom_dataloaders is None:
-        raise ValueError("If augmentation_invariance is True, custom_dataloaders cannot be None, but should include augmented samples, e.g., using torchvision.transforms in get_dataloader.")
+        raise ValueError(
+            "If augmentation_invariance is True, custom_dataloaders cannot be None, but should include augmented samples, e.g., using torchvision.transforms in get_dataloader.")
