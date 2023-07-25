@@ -1,4 +1,4 @@
-<a href="url"><img src="https://raw.githubusercontent.com/collinleiber/ClustPy/main/docs/logo.png" height="175" ></a><br>
+<a href="https://github.com/collinleiber/ClustPy"><img src="https://raw.githubusercontent.com/collinleiber/ClustPy/main/docs/logo.png" height="175" ></a><br>
 ---
 [![PyPI version](https://badge.fury.io/py/clustpy.svg)](https://pypi.org/project/clustpy/)
 [![TestMain](https://github.com/collinleiber/clustpy/actions/workflows/test-main.yml/badge.svg)](https://github.com/collinleiber/ClustPy/actions/workflows/test-main.yml)

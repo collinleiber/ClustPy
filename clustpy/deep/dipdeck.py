@@ -102,7 +102,7 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
     else:
         trainloader, testloader = custom_dataloaders
     autoencoder = get_trained_autoencoder(trainloader, pretrain_optimizer_params, pretrain_epochs, device,
-                                          optimizer_class, loss_fn, X.shape[1], embedding_size, autoencoder)
+                                          optimizer_class, loss_fn, embedding_size, autoencoder)
     # Execute initial clustering in embedded space
     embedded_data = encode_batchwise(testloader, autoencoder, device)
     n_clusters_init, cluster_labels_cpu, init_centers, _ = run_initial_clustering(embedded_data, n_clusters_init,

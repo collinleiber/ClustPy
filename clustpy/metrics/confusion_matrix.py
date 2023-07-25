@@ -81,7 +81,7 @@ class ConfusionMatrix():
     """
     Create a Confusion Matrix of predicted and ground truth labels.
     Each row corresponds to a ground truth label and each column to a predicted label.
-    The number in each cell (i, j) indicates of many objects with ground truth label i have predicted label j.
+    The number in each cell (i, j) indicates how many objects with ground truth label i have been predicted label j.
 
     Parameters
     ----------

@@ -62,7 +62,7 @@ def _dec(X: np.ndarray, n_clusters: int, alpha: float, batch_size: int, pretrain
         If None, the default dataloaders will be used
     augmentation_invariance : bool
         If True, augmented samples provided in custom_dataloaders[0] will be used to learn 
-        cluster assignments that are invariant to the augmentation transformations (default: False)
+        cluster assignments that are invariant to the augmentation transformations
     initial_clustering_class : ClusterMixin
         clustering class to obtain the initial cluster labels after the pretraining
     initial_clustering_params : dict
@@ -86,7 +86,7 @@ def _dec(X: np.ndarray, n_clusters: int, alpha: float, batch_size: int, pretrain
     else:
         trainloader, testloader = custom_dataloaders
     autoencoder = get_trained_autoencoder(trainloader, pretrain_optimizer_params, pretrain_epochs, device,
-                                          optimizer_class, loss_fn, X.shape[1], embedding_size, autoencoder)
+                                          optimizer_class, loss_fn, embedding_size, autoencoder)
     # Execute initial clustering in embedded space
     embedded_data = encode_batchwise(testloader, autoencoder, device)
     n_clusters, _, init_centers, _ = run_initial_clustering(embedded_data, n_clusters,
@@ -202,7 +202,8 @@ class _DEC_Module(torch.nn.Module):
         the alpha value
     centers : torch.Tensor:
         the cluster centers
-    augmentation_invariance : bool (default: False)
+    augmentation_invariance : bool
+        Is augmentation invariance used
     """
 
     def __init__(self, init_centers: np.ndarray, alpha: float, augmentation_invariance: bool = False):
@@ -500,7 +501,6 @@ class DEC(BaseEstimator, ClusterMixin):
         self.random_state = check_random_state(random_state)
         self.use_reconstruction_loss = False
         set_torch_seed(self.random_state)
-
         augmentation_invariance_check(self.augmentation_invariance, self.custom_dataloaders)
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DEC':

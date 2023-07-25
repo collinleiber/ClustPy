@@ -37,9 +37,9 @@ class _ClustpyDataset(torch.utils.data.Dataset):
     def __init__(self, *tensors: torch.Tensor, aug_transforms_list: List[Callable] = None, orig_transforms_list: List[Callable] = None):
         assert all(tensors[0].size(0) == tensor.size(0) for tensor in tensors), "Size mismatch between tensors"
         self.tensors = tensors
-        assert len(orig_transforms_list) == tensors.shape[0], "Size mismatch between tensors and orig_transforms_list"
+        assert orig_transforms_list is None or len(orig_transforms_list) == len(tensors), "Size mismatch between tensors and orig_transforms_list"
         self.orig_transforms_list = orig_transforms_list
-        assert len(aug_transforms_list) == tensors.shape[0], "Size mismatch between tensors and aug_transforms_list"
+        assert aug_transforms_list is None or len(aug_transforms_list) == len(tensors), "Size mismatch between tensors and aug_transforms_list"
         self.aug_transforms_list = aug_transforms_list
         
 

@@ -257,8 +257,9 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
                     save_labels_path_algo = None if save_labels_path is None else "{0}_{1}_{2}.{3}".format(
                         save_labels_path.split(".")[0], eval_algo.name, rep, save_labels_path.split(".")[1])
                     # Check if directory exists
-                    if not os.path.isdir(os.path.dirname(save_labels_path_algo)):
-                        os.makedirs(os.path.dirname(save_labels_path_algo))
+                    parent_directory = os.path.dirname(save_labels_path_algo)
+                    if parent_directory != "" and not os.path.isdir(parent_directory):
+                        os.makedirs(parent_directory)
                     np.savetxt(save_labels_path_algo, algo_obj.labels_)
                 # Get result of all metrics
                 if evaluation_metrics is not None:
@@ -298,8 +299,9 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
         df.loc[agg.__name__] = agg(df.values, axis=0)
     if save_path is not None:
         # Check if directory exists
-        if not os.path.isdir(os.path.dirname(save_path)):
-            os.makedirs(os.path.dirname(save_path))
+        parent_directory = os.path.dirname(save_path)
+        if parent_directory != "" and not os.path.isdir(parent_directory):
+            os.makedirs(parent_directory)
         df.to_csv(save_path)
     return df
 
@@ -426,8 +428,9 @@ def evaluate_multiple_datasets(evaluation_datasets: list, evaluation_algorithms:
     all_dfs = pd.concat(df_list, keys=data_names)
     if save_path is not None:
         # Check if directory exists
-        if not os.path.isdir(os.path.dirname(save_path)):
-            os.makedirs(os.path.dirname(save_path))
+        parent_directory = os.path.dirname(save_path)
+        if parent_directory != "" and not os.path.isdir(parent_directory):
+            os.makedirs(parent_directory)
         all_dfs.to_csv(save_path)
     return all_dfs
 

@@ -58,7 +58,7 @@ def _dcn(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_par
         If None, the default dataloaders will be used
     augmentation_invariance : bool
         If True, augmented samples provided in custom_dataloaders[0] will be used to learn 
-        cluster assignments that are invariant to the augmentation transformations (default: False)
+        cluster assignments that are invariant to the augmentation transformations
     initial_clustering_class : ClusterMixin
         clustering class to obtain the initial cluster labels after the pretraining
     initial_clustering_params : dict
@@ -82,7 +82,7 @@ def _dcn(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_par
     else:
         trainloader, testloader = custom_dataloaders
     autoencoder = get_trained_autoencoder(trainloader, pretrain_optimizer_params, pretrain_epochs, device,
-                                          optimizer_class, loss_fn, X.shape[1], embedding_size, autoencoder)
+                                          optimizer_class, loss_fn, embedding_size, autoencoder)
     # Execute initial clustering in embedded space
     embedded_data = encode_batchwise(testloader, autoencoder, device)
     n_clusters, _, init_centers, _ = run_initial_clustering(embedded_data, n_clusters,
@@ -156,37 +156,14 @@ class _DCN_Module(torch.nn.Module):
     ----------
     centers : torch.Tensor
         the cluster centers
-    augmentation_invariance : bool (default: False)
+    augmentation_invariance : bool
+        Is augmentation invariance used
     """
 
     def __init__(self, init_np_centers: np.ndarray, augmentation_invariance: bool = False):
         super().__init__()
         self.augmentation_invariance = augmentation_invariance
         self.centers = torch.tensor(init_np_centers)
-
-    def compression_loss(self, embedded: torch.Tensor, weights: torch.Tensor = None, s=None) -> torch.Tensor:
-        """
-
-
-        Parameters
-        ----------
-        embedded : torch.Tensor
-            the embedded samples
-        weights : torch.Tensor
-            feature weights for the squared euclidean distance (default: None)
-        s
-
-        Returns
-        -------
-
-        """
-        dist = squared_euclidean_distance(self.centers, embedded, weights=weights)
-        if s is None:
-            loss = (dist.min(dim=1)[0]).sum() / (embedded.shape[0] * embedded.shape[1])
-        else:
-            assignment_matrix = int_to_one_hot(s, self.centers.shape[0])
-            loss = (dist * assignment_matrix).sum() / (embedded.shape[0] * embedded.shape[1])
-        return loss
 
     def dcn_loss(self, embedded: torch.Tensor, assignment_matrix: torch.Tensor = None,
                  weights: torch.Tensor = None) -> torch.Tensor:
@@ -275,7 +252,8 @@ class _DCN_Module(torch.nn.Module):
         self.to(device)
         return self
 
-    def _loss(self, batch, autoencoder, loss_fn, degree_of_space_preservation, degree_of_space_distortion, device):
+    def _loss(self, batch: list, autoencoder: torch.nn.Module, loss_fn: torch.nn.modules.loss._Loss,
+              degree_of_space_preservation: float, degree_of_space_distortion: float, device: torch.device):
         """
         Calculate the complete DCN + Autoencoder loss.
 
@@ -285,8 +263,6 @@ class _DCN_Module(torch.nn.Module):
             the minibatch
         autoencoder : torch.nn.Module
             the autoencoder
-        cluster_loss_weight : float
-            weight of the clustering loss compared to the reconstruction loss
         loss_fn : torch.nn.modules.loss._Loss
             loss function for the reconstruction
         degree_of_space_distortion : float
@@ -497,7 +473,6 @@ class DCN(BaseEstimator, ClusterMixin):
         self.initial_clustering_params = initial_clustering_params
         self.random_state = check_random_state(random_state)
         set_torch_seed(self.random_state)
-
         augmentation_invariance_check(self.augmentation_invariance, self.custom_dataloaders)
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DCN':

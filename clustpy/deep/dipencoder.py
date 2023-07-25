@@ -533,7 +533,7 @@ def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size:
     # Get initial AE
     pretrain_trainloader = get_dataloader(X, pretrain_batch_size, True, False)
     autoencoder = get_trained_autoencoder(pretrain_trainloader, pretrain_optimizer_params, pretrain_epochs, device,
-                                          optimizer_class, loss_fn, X.shape[1], embedding_size, autoencoder)
+                                          optimizer_class, loss_fn, embedding_size, autoencoder)
 
     # Get factor for AE loss
     # rand_samples = torch.rand((batch_size, X.shape[1]))
