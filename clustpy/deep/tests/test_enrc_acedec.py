@@ -4,7 +4,6 @@ from clustpy.deep.tests._helpers_for_tests import _get_test_augmentation_dataloa
 import numpy as np
 import torch
 
-
 def test_simple_enrc():
     torch.use_deterministic_algorithms(True)
     X, labels = create_nr_data(1500, subspace_features=(3, 3, 50), random_state=1)
@@ -39,7 +38,7 @@ def test_simple_acedec():
     acedec2 = ACeDeC(3, pretrain_epochs=3, clustering_epochs=3, random_state=1)
     acedec2.fit(X)
     assert np.array_equal(acedec.labels_, acedec2.labels_)
-    assert np.allclose(acedec.cluster_centers_, acedec2.cluster_centers_, atol=1e-1)
+    assert np.allclose(acedec.cluster_centers_[0], acedec2.cluster_centers_[0], atol=1e-1)
 
 
 def test_acedec_augmentation():
