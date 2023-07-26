@@ -374,7 +374,7 @@ class _ENRC_Module(torch.nn.Module):
         # Apply reclustering in the rotated space, because V does not have to be orthogonal, so it could learn a mapping that is not recoverable by nrkmeans.
         centers_reclustered, P, new_V, beta_weights = enrc_init(data=embedded_rot, n_clusters=n_clusters, rounds=rounds,
                                                                 max_iter=300, optimizer_params=optimizer_params,
-                                                                init=reclustering_strategy, debug=False, init_kwargs=init_kwargs, recluster=True)
+                                                                init=reclustering_strategy, debug=False, init_kwargs=init_kwargs)
 
         # Update V, because we applied the reclustering in the rotated space
         new_V = np.matmul(V, new_V)
@@ -453,6 +453,8 @@ class _ENRC_Module(torch.nn.Module):
         if fix_rec_error:
             if debug: print("Calculate initial reconstruction error")
             _, _, init_rec_loss = enrc_encode_decode_batchwise_with_loss(V=self.V, centers=self.centers, model=model, dataloader=evalloader, device=device, loss_fn=loss_fn)
+            # For numerical stability we add a small number
+            init_rec_loss += 1e-8
             if debug: print("Initial reconstruction error is ", init_rec_loss)
         i = 0
         labels_old = None
@@ -495,7 +497,7 @@ class _ENRC_Module(torch.nn.Module):
                 # Check if clusters have to be reinitialized
                 for subspace_i in range(len(self.centers)):
                     reinit_centers(enrc=self, subspace_id=subspace_i, dataloader=trainloader, model=model,
-                                   n_samples=512, kmeans_steps=10)
+                                   n_samples=512, kmeans_steps=10, debug=debug)
 
                 # Increase reinit_threshold over time
                 self.reinit_threshold = int(np.sqrt(i + 1))
@@ -862,7 +864,7 @@ def calculate_optimal_beta_weights_special_case(data: torch.Tensor, centers: lis
     optimal_beta_weights: torch.Tensor
         a c x d vector containing the optimal weights for the softmax to indicate which dimensions d are important for each clustering c.
     """
-    dataloader = get_dataloader(data, batch_size=batch_size, shuffle=True, drop_last=False)
+    dataloader = get_dataloader(data, batch_size=batch_size, shuffle=False, drop_last=False)
     device = V.device
     with torch.no_grad():
         # calculate kmeans losses for each clustering
@@ -874,14 +876,17 @@ def calculate_optimal_beta_weights_special_case(data: torch.Tensor, centers: lis
                 centers_i = centers_i.to(device)
                 weighted_squared_diff = squared_euclidean_distance(z_rot.unsqueeze(1), centers_i.unsqueeze(1))
                 assignments = weighted_squared_diff.detach().sum(2).argmin(1)
-                one_hot_mask = int_to_one_hot(assignments, centers_i.shape[0])
-                weighted_squared_diff_masked = weighted_squared_diff * one_hot_mask.unsqueeze(2)
+                if len(set(assignments.tolist())) > 1:
+                    one_hot_mask = int_to_one_hot(assignments, centers_i.shape[0])
+                    weighted_squared_diff_masked = weighted_squared_diff * one_hot_mask.unsqueeze(2)
+                else:
+                    weighted_squared_diff_masked = weighted_squared_diff
+
                 km_losses[i].append(weighted_squared_diff_masked.detach().cpu())
                 centers_i = centers_i.cpu()
         for i, km_loss in enumerate(km_losses):
             # Sum over samples and centers
-            km_losses[i] = torch.cat(km_loss, 0).mean(0).mean(0)
-
+            km_losses[i] = torch.cat(km_loss, 0).sum(0).sum(0)
         # calculate beta_weights for each dimension and clustering based on kmeans losses
         best_weights = []
         best_weights.append(optimal_beta(km_losses[0], km_losses[1]))
@@ -956,11 +961,9 @@ def calculate_beta_weight(data: torch.Tensor, centers: list, V: torch.Tensor, P:
     ValueError: If number of clusterings is smaller than 2
     """
     n_clusterings = len(centers)
-    # if n_clusterings == 2:
-    #     beta_weights = calculate_optimal_beta_weights_special_case(data=data, centers=centers, V=V)
-    # elif n_clusterings > 2:
-    #     beta_weights = beta_weights_init(P=P, n_dims=data.shape[1], high_value=high_beta_value)
-    if n_clusterings >= 2:
+    if n_clusterings == 2:
+        beta_weights = calculate_optimal_beta_weights_special_case(data=data, centers=centers, V=V)
+    elif n_clusterings > 2:
         beta_weights = beta_weights_init(P=P, n_dims=data.shape[1], high_value=high_beta_value)
     else:
         raise ValueError(f"Number of clusterings is {n_clusterings}, but should be >= 2")
@@ -1214,9 +1217,9 @@ def sgd_init(data: np.ndarray, n_clusters: list, optimizer_params: dict, batch_s
 
 
 def acedec_init(data: np.ndarray, n_clusters: list, optimizer_params: dict, batch_size: int = 128,
-             optimizer_class: torch.optim.Optimizer = None, rounds: int = None, epochs: int = 100,
+             optimizer_class: torch.optim.Optimizer = None, rounds: int = None, epochs: int = 10,
              random_state: np.random.RandomState = None, input_centers: list = None, P: list = None,
-             V: np.ndarray = None, device: torch.device = torch.device("cpu"), debug: bool = True, recluster: bool = False) -> (
+             V: np.ndarray = None, device: torch.device = torch.device("cpu"), debug: bool = True) -> (
         list, list, np.ndarray, np.ndarray):
     """
     Initialization strategy based on optimizing ACeDeC's parameters V and beta in isolation from the autoencoder using a mini-batch gradient descent optimizer.
@@ -1238,7 +1241,7 @@ def acedec_init(data: np.ndarray, n_clusters: list, optimizer_params: dict, batc
     rounds : int
         not used here (default: None)
     epochs : int
-        epochs is set to 100 if epochs is smaller than that, but pretraining will stop earlier if clustering does not change (default: 100)
+        epochs is automatically set to be close to 20.000 minibatch iterations as in the ACeDeC paper. If this determined value is smaller than the passed epochs, then epochs is used (default: 10)
     random_state : np.random.RandomState
         random state for reproducible results (default: None)
     input_centers : list
@@ -1265,8 +1268,11 @@ def acedec_init(data: np.ndarray, n_clusters: list, optimizer_params: dict, batc
     dataloader = get_dataloader(data, batch_size=batch_size, shuffle=True, drop_last=True)
     # only use one repeat as in ACeDeC paper
     acedec_rounds = 1
-    max_epochs = np.max([100, epochs])
-    print("Start ACeDeC init")
+    # acedec used 20.000 minibatch iterations for initialization. Thus we use a number of epochs corresponding to that
+    epochs_estimate = int( 20000 / (data.shape[0]/batch_size) )
+    max_epochs = np.max([epochs_estimate, epochs])
+    # max_epochs = epochs
+    if debug: print("Start ACeDeC init")
     for round_i in range(acedec_rounds):
         random_state = check_random_state(random_state)
         
@@ -1277,7 +1283,7 @@ def acedec_init(data: np.ndarray, n_clusters: list, optimizer_params: dict, batc
             # cluster and shared space centers
             input_centers = [kmeans.cluster_centers_, data.mean(0).reshape(1,-1)]
         # start with random initialization
-        print("Start with random init")
+        if debug: print("Start with random init")
         init_centers, P_init, V_init, _ = random_nrkmeans_init(data=data, n_clusters=n_clusters, rounds=10,
                                                                input_centers=input_centers,
                                                                P=P, V=V, debug=debug)
@@ -1294,10 +1300,10 @@ def acedec_init(data: np.ndarray, n_clusters: list, optimizer_params: dict, batc
         if optimizer_class is None:
             optimizer_class = torch.optim.Adam
         optimizer = optimizer_class(param_dict)
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=int(0.2*max_epochs), gamma=0.5)
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=int(0.8*max_epochs), gamma=0.5)
         # Training loop
         # For the initialization we increase the weight for the rec error to enforce close to orthogonal V by setting fix_rec_error=True
-        print("Start pretraining parameters with SGD")
+        if debug: print("Start pretraining parameters with SGD")
         enrc_module.fit(data=data,
                         trainloader=None,
                         evalloader=None,
@@ -1309,8 +1315,6 @@ def acedec_init(data: np.ndarray, n_clusters: list, optimizer_params: dict, batc
                         scheduler=scheduler,
                         device=device,
                         debug=debug,
-                        # use tolerance threshold to stop pretraining earlier
-                        tolerance_threshold=0.01,
                         fix_rec_error=True)
 
         cost, z_rot = _determine_sgd_init_costs(enrc=enrc_module, dataloader=dataloader, loss_fn=torch.nn.MSELoss(),
@@ -1330,9 +1334,8 @@ def acedec_init(data: np.ndarray, n_clusters: list, optimizer_params: dict, batc
             print(f"Round {round_i}: Found solution with: {cost} (current best: {lowest})")
 
     centers, P, V, beta_weights = best
-    if recluster:
-        if debug: print("Calculate Optimal Betas for reclustering")
-        beta_weights = calculate_beta_weight(data=torch.from_numpy(data).float(), centers=centers, V=V, P=P)
+    
+    beta_weights = calculate_beta_weight(data=torch.from_numpy(data).float(), centers=centers, V=V, P=P)
     centers = [centers_i.detach().cpu().numpy() for centers_i in centers]
     beta_weights = beta_weights.detach().cpu().numpy()
     V = V.detach().cpu().numpy()
@@ -1342,7 +1345,7 @@ def enrc_init(data: np.ndarray, n_clusters: list, init: str = "auto", rounds: in
               P: list = None, V: np.ndarray = None, random_state: np.random.RandomState = None, max_iter: int = 100,
               optimizer_params: dict = None, optimizer_class: torch.optim.Optimizer = None, batch_size: int = 128,
               epochs: int = 10, device: torch.device = torch.device("cpu"), debug: bool = True,
-              init_kwargs: dict = None, recluster: bool = False) -> (list, list, np.ndarray, np.ndarray):
+              init_kwargs: dict = None) -> (list, list, np.ndarray, np.ndarray):
     """
     Initialization strategy for the ENRC algorithm.
 
@@ -1395,8 +1398,6 @@ def enrc_init(data: np.ndarray, n_clusters: list, init: str = "auto", rounds: in
         if True then the cost of each round will be printed (default: True)
     init_kwargs : dict
         additional parameters that are used if init is a callable (optional) (default: None)
-    recluster : bool
-        indicates if init is used for reclustering. Changes behavior of some strategies if set to True.
     Returns
     -------
     tuple : (list, list, np.ndarray, np.ndarray)
@@ -1426,7 +1427,7 @@ def enrc_init(data: np.ndarray, n_clusters: list, init: str = "auto", rounds: in
         centers, P, V, beta_weights = acedec_init(data=data, n_clusters=n_clusters, optimizer_params=optimizer_params,
                                         rounds=rounds, epochs=epochs, input_centers=input_centers, P=P, V=V,
                                         optimizer_class=optimizer_class, batch_size=batch_size,
-                                        random_state=random_state, device=device, debug=debug, recluster=recluster)
+                                        random_state=random_state, device=device, debug=debug)
     elif init == "auto":
         if data.shape[0] > 100000 or data.shape[1] > 1000:
             init = "sgd"
@@ -1567,7 +1568,7 @@ def _random_reinit_cluster(embedded: torch.Tensor) -> torch.Tensor:
 
 def reinit_centers(enrc: _ENRC_Module, subspace_id: int, dataloader: torch.utils.data.DataLoader,
                    model: torch.nn.Module,
-                   n_samples: int = 512, kmeans_steps: int = 10, split: str = "random") -> None:
+                   n_samples: int = 512, kmeans_steps: int = 10, split: str = "random", debug: bool = False) -> None:
     """
     Reinitializes centers that have been lost, i.e. if they did not get any data point assigned. Before a center is reinitialized,
     this method checks whether a center has not get any points assigned over several mini-batch iterations and if this count is higher than
@@ -1591,10 +1592,12 @@ def reinit_centers(enrc: _ENRC_Module, subspace_id: int, dataloader: torch.utils
         {'random', 'cost'}, default='random', select how clusters should be split for renitialization.
         'random' : split a random point from the random sample of size=n_samples.
         'cost' : split the cluster with max kmeans cost.
+    debug : bool
+        if True than training errors will be printed (default: True)
     """
     N = len(dataloader.dataset)
     if n_samples > N:
-        print(f"WARNING: n_samples={n_samples} > number of data points={N}. Set n_samples=number of data points")
+        if debug: print(f"WARNING: n_samples={n_samples} > number of data points={N}. Set n_samples=number of data points")
         n_samples = N
     # Assumes that enrc and model are on the same device
     device = enrc.V.device
@@ -1603,7 +1606,7 @@ def reinit_centers(enrc: _ENRC_Module, subspace_id: int, dataloader: torch.utils
         subspace_betas = enrc.subspace_betas()
         for center_id, count_i in enumerate(enrc.lonely_centers_count[subspace_id].flatten()):
             if count_i > enrc.reinit_threshold:
-                print(f"Reinitialize cluster {center_id} in subspace {subspace_id}")
+                if debug: print(f"Reinitialize cluster {center_id} in subspace {subspace_id}")
                 if split == "cost":
                     embedding_rot, dists = _calculate_rotated_embeddings_and_distances_for_n_samples(enrc, model,
                                                                                                      dataloader,
@@ -1779,6 +1782,9 @@ def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers
         testloader = get_dataloader(X, batch_size, False, False)
     else:
         trainloader, testloader = custom_dataloaders
+
+    if trainloader.batch_size != batch_size:
+        batch_size = trainloader.batch_size
 
     # Use subsample of the data if specified
     if init_subsample_size is not None and init_subsample_size > 0:
