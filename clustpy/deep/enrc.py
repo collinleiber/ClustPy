@@ -439,9 +439,6 @@ class _ENRC_Module(torch.nn.Module):
         model.to(device)
         self.to_device(device)
 
-        # # Save learning rate for reclustering
-        # self.optimizer_params = optimizer.param_groups[0]
-        
         if trainloader is None and data is not None:
             trainloader = get_dataloader(data, batch_size=batch_size, shuffle=True, drop_last=True)
         elif trainloader is None and data is None:
