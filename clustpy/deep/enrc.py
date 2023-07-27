@@ -2266,7 +2266,7 @@ class ACeDeC(ENRC):
         If True, augmented samples provided in custom_dataloaders[0] will be used to learn 
         cluster assignments that are invariant to the augmentation transformations (default: False)
     final_reclustering : bool
-        If True, the final embedding will be reclustered with the provided init strategy. (defaul: False)
+        If True, the final embedding will be reclustered with the provided init strategy. (default: True)
     debug: bool
         if True additional information during the training will be printed (default: False)
 
