@@ -1,6 +1,7 @@
 from clustpy.deep import DipDECK
 from clustpy.deep.dipdeck import _get_nearest_points_to_optimal_centers, _get_nearest_points, _get_dip_matrix
-from clustpy.data import create_subspace_data
+from clustpy.data import create_subspace_data, load_optdigits
+from clustpy.deep.tests._helpers_for_tests import _get_test_augmentation_dataloaders
 import numpy as np
 import torch
 
@@ -18,6 +19,22 @@ def test_simple_dipdeck():
     dipdeck2.fit(X)
     assert np.array_equal(dipdeck.labels_, dipdeck2.labels_)
     assert np.array_equal(dipdeck.cluster_centers_, dipdeck2.cluster_centers_)
+
+
+def test_dipdeck_augmentation():
+    torch.use_deterministic_algorithms(True)
+    data, labels = load_optdigits(flatten=False)
+    data = data[:1000]
+    labels = labels[:1000]
+    data = data.reshape(-1, 1, 8, 8)
+    data = np.tile(data, (1, 3, 1, 1))
+    aug_dl, orig_dl = _get_test_augmentation_dataloaders(data)
+    clusterer = DipDECK(pretrain_epochs=3, clustering_epochs=3, random_state=1,
+                        custom_dataloaders=[aug_dl, orig_dl], augmentation_invariance=True)
+    assert not hasattr(clusterer, "labels_")
+    clusterer.fit(data)
+    assert clusterer.labels_.dtype == np.int32
+    assert clusterer.labels_.shape == labels.shape
 
 
 def test_get_nearest_points_to_optimal_centers():

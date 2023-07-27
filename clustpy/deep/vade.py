@@ -77,8 +77,7 @@ def _vade(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_pa
     else:
         trainloader, testloader = custom_dataloaders
     autoencoder = get_trained_autoencoder(trainloader, pretrain_optimizer_params, pretrain_epochs, device,
-                                          optimizer_class, loss_fn, X.shape[1], embedding_size, autoencoder,
-                                          _VaDE_VAE)
+                                          optimizer_class, loss_fn, embedding_size, autoencoder, _VaDE_VAE)
     # Execute initial clustering in embedded space (usually GaussianMixture)
     embedded_data = _vade_encode_batchwise(testloader, autoencoder, device)
     n_clusters, _, init_means, init_clustering_algo = run_initial_clustering(embedded_data, n_clusters,

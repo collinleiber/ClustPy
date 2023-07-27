@@ -10,7 +10,7 @@ import torch
 import numpy as np
 from clustpy.partition.skinnydip import _dip_mirrored_data
 from clustpy.deep._utils import detect_device, encode_batchwise, set_torch_seed, run_initial_clustering
-from clustpy.deep._data_utils import get_dataloader
+from clustpy.deep._data_utils import get_dataloader, augmentation_invariance_check
 from clustpy.deep._train_utils import get_trained_autoencoder
 import matplotlib.pyplot as plt
 from clustpy.utils import plot_scatter_matrix
@@ -458,9 +458,9 @@ def _get_rec_loss_of_first_batch(trainloader: torch.utils.data.DataLoader, autoe
 
 def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size: int,
                 optimizer_class: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss, clustering_epochs: int,
-                clustering_optimizer_params: dict, pretrain_batch_size: int, pretrain_epochs: int,
+                clustering_optimizer_params: dict, pretrain_epochs: int,
                 pretrain_optimizer_params: dict, autoencoder: torch.nn.Module, max_cluster_size_diff_factor: float,
-                reconstruction_loss_weight: float, custom_dataloaders: tuple,
+                reconstruction_loss_weight: float, custom_dataloaders: tuple, augmentation_invariance: bool,
                 initial_clustering_class: ClusterMixin, initial_clustering_params: dict, labels_gt: np.ndarray,
                 random_state: np.random.RandomState, debug: bool) -> (np.ndarray, np.ndarray, dict, torch.nn.Module):
     """
@@ -485,8 +485,6 @@ def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size:
         number of epochs for the actual clustering procedure
     clustering_optimizer_params : dict
         parameters of the optimizer for the actual clustering procedure, includes the learning rate
-    pretrain_batch_size : int
-        size of the data batches for the pretraining
     pretrain_epochs : int
         number of epochs for the pretraining of the autoencoder
     pretrain_optimizer_params : dict
@@ -502,6 +500,9 @@ def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size:
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         If None, the default dataloaders will be used
+    augmentation_invariance : bool
+        If True, augmented samples provided in custom_dataloaders[0] will be used to learn
+        cluster assignments that are invariant to the augmentation transformations
     initial_clustering_class : ClusterMixin
         clustering class to obtain the initial cluster labels after the pretraining
     initial_clustering_params : dict
@@ -531,9 +532,8 @@ def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size:
     else:
         trainloader, testloader = custom_dataloaders
     # Get initial AE
-    pretrain_trainloader = get_dataloader(X, pretrain_batch_size, True, False)
-    autoencoder = get_trained_autoencoder(pretrain_trainloader, pretrain_optimizer_params, pretrain_epochs, device,
-                                          optimizer_class, loss_fn, X.shape[1], embedding_size, autoencoder)
+    autoencoder = get_trained_autoencoder(trainloader, pretrain_optimizer_params, pretrain_epochs, device,
+                                          optimizer_class, loss_fn, embedding_size, autoencoder)
 
     # Get factor for AE loss
     # rand_samples = torch.rand((batch_size, X.shape[1]))
@@ -591,7 +591,12 @@ def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size:
         for batch in trainloader:
             ids = batch[0]
             # Reconstruction Loss
-            ae_loss_tmp, embedded, reconstruction = autoencoder.loss(batch, loss_fn, device)
+            if augmentation_invariance:
+                ae_loss_tmp, embedded, _ = autoencoder.loss([batch[0], batch[2]], loss_fn, device)
+                ae_loss_tmp_aug, embedded_aug, _ = autoencoder.loss([batch[0], batch[1]], loss_fn, device)
+                ae_loss_tmp = (ae_loss_tmp + ae_loss_tmp_aug) / 2
+            else:
+                ae_loss_tmp, embedded, _ = autoencoder.loss(batch, loss_fn, device)
             ae_loss = ae_loss_tmp * reconstruction_loss_weight
             # Get points within each cluster
             points_in_all_clusters = [torch.where(labels_torch[ids] == clus)[0].to(device) for clus in
@@ -607,6 +612,12 @@ def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size:
                     dip_loss_new = _get_dip_error(
                         dip_module, embedded, index_dict[(m, n)], points_in_all_clusters[m], points_in_all_clusters[n],
                         n_points_in_all_clusters[m], n_points_in_all_clusters[n], max_cluster_size_diff_factor, device)
+                    if augmentation_invariance:
+                        dip_loss_new_aug = _get_dip_error(
+                            dip_module, embedded_aug, index_dict[(m, n)], points_in_all_clusters[m],
+                            points_in_all_clusters[n], n_points_in_all_clusters[m], n_points_in_all_clusters[n],
+                            max_cluster_size_diff_factor, device)
+                        dip_loss_new = (dip_loss_new + dip_loss_new_aug) / 2
                     dip_loss = dip_loss + dip_loss_new
             final_dip_loss = torch.true_divide(dip_loss, n_cluster_combinations)
             total_loss = final_dip_loss + ae_loss
@@ -643,8 +654,6 @@ class DipEncoder(BaseEstimator, ClusterMixin):
     ----------
     n_clusters : int
         number of clusters. Can be None if a corresponding initial_clustering_class is given, e.g. DBSCAN
-    pretrain_batch_size : int
-        size of the data batches for the pretraining (default: 256)
     batch_size : int
         size of the data batches for the actual training of the DipEncoder.
         Should be larger the more clusters we have. If it is None, it will be set to (25 x n_clusters) (default: None)
@@ -673,6 +682,9 @@ class DipEncoder(BaseEstimator, ClusterMixin):
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         If None, the default dataloaders will be used (default: None)
+    augmentation_invariance : bool
+        If True, augmented samples provided in custom_dataloaders[0] will be used to learn
+        cluster assignments that are invariant to the augmentation transformations (default: False)
     initial_clustering_class : ClusterMixin
         clustering class to obtain the initial cluster labels after the pretraining (default: KMeans)
     initial_clustering_params : dict
@@ -708,17 +720,15 @@ class DipEncoder(BaseEstimator, ClusterMixin):
     Proceedings of the 28th ACM SIGKDD Conference on Knowledge Discovery & Data Mining. 2022.
     """
 
-    def __init__(self, n_clusters: int, pretrain_batch_size: int = 256, batch_size: int = None,
-                 pretrain_optimizer_params: dict = {"lr": 1e-3}, clustering_optimizer_params: dict = {"lr": 1e-4},
-                 pretrain_epochs: int = 100, clustering_epochs: int = 100,
-                 optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
+    def __init__(self, n_clusters: int, batch_size: int = None, pretrain_optimizer_params: dict = {"lr": 1e-3},
+                 clustering_optimizer_params: dict = {"lr": 1e-4}, pretrain_epochs: int = 100,
+                 clustering_epochs: int = 100, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), autoencoder: torch.nn.Module = None,
                  embedding_size: int = 10, max_cluster_size_diff_factor: float = 3,
                  reconstruction_loss_weight: float = None, custom_dataloaders: tuple = None,
-                 initial_clustering_class: ClusterMixin = KMeans, initial_clustering_params: dict = {},
-                 random_state: np.random.RandomState = None, debug: bool = False):
+                 augmentation_invariance: bool = False, initial_clustering_class: ClusterMixin = KMeans,
+                 initial_clustering_params: dict = {}, random_state: np.random.RandomState = None, debug: bool = False):
         self.n_clusters = n_clusters
-        self.pretrain_batch_size = pretrain_batch_size
         if batch_size is None:
             batch_size = 25 * n_clusters
         self.batch_size = batch_size
@@ -733,11 +743,13 @@ class DipEncoder(BaseEstimator, ClusterMixin):
         self.max_cluster_size_diff_factor = max_cluster_size_diff_factor
         self.reconstruction_loss_weight = reconstruction_loss_weight
         self.custom_dataloaders = custom_dataloaders
+        self.augmentation_invariance = augmentation_invariance
         self.initial_clustering_class = initial_clustering_class
         self.initial_clustering_params = initial_clustering_params
         self.random_state = check_random_state(random_state)
         set_torch_seed(self.random_state)
         self.debug = debug
+        augmentation_invariance_check(self.augmentation_invariance, self.custom_dataloaders)
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DipEncoder':
         """
@@ -762,12 +774,12 @@ class DipEncoder(BaseEstimator, ClusterMixin):
                                                                        self.batch_size, self.optimizer_class,
                                                                        self.loss_fn, self.clustering_epochs,
                                                                        self.clustering_optimizer_params,
-                                                                       self.pretrain_batch_size,
                                                                        self.pretrain_epochs,
                                                                        self.pretrain_optimizer_params, self.autoencoder,
                                                                        self.max_cluster_size_diff_factor,
                                                                        self.reconstruction_loss_weight,
                                                                        self.custom_dataloaders,
+                                                                       self.augmentation_invariance,
                                                                        self.initial_clustering_class,
                                                                        self.initial_clustering_params,
                                                                        y, self.random_state, self.debug)

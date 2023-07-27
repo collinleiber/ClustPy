@@ -1238,14 +1238,11 @@ def load_imagenet10(use_224_size: bool = True, flatten: bool = True, normalize_c
     References
     -------
     https://www.image-net.org/
-
-    and
-
-    https://drive.google.com/drive/folders/1XL0Nohi4vO2f1I4znf388n2pMP8PiKFd
     """
     directory = _get_download_dir(downloads_path) + "/ImageNet10"
     if not os.path.isdir(directory):
         os.mkdir(directory)
+    # Source: https://drive.google.com/drive/folders/1XL0Nohi4vO2f1I4znf388n2pMP8PiKFd
     if use_224_size:
         filename_data = directory + "/data_224.npy"
         if not os.path.isfile(filename_data):

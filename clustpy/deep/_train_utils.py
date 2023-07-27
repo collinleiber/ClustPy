@@ -26,7 +26,7 @@ def _get_default_layers(input_dim: int, embedding_size: int) -> list:
 
 def get_trained_autoencoder(trainloader: torch.utils.data.DataLoader, optimizer_params: dict, n_epochs: int, device,
                             optimizer_class: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss,
-                            input_dim: int, embedding_size: int, autoencoder: torch.nn.Module = None,
+                            embedding_size: int, autoencoder: torch.nn.Module = None,
                             autoencoder_class: torch.nn.Module = FeedforwardAutoencoder) -> torch.nn.Module:
     """This function returns a trained autoencoder. The following cases are considered
        - If the autoencoder is initialized and trained (autoencoder.fitted==True), then return input autoencoder without training it again.
@@ -48,8 +48,6 @@ def get_trained_autoencoder(trainloader: torch.utils.data.DataLoader, optimizer_
         optimizer for training.
     loss_fn : torch.nn.modules.loss._Loss
         loss function for the reconstruction.
-    input_dim : int
-        input dimension of the first layer of the autoencoder
     embedding_size : int
         dimension of the innermost layer of the autoencoder
     autoencoder : torch.nn.Module
@@ -63,6 +61,7 @@ def get_trained_autoencoder(trainloader: torch.utils.data.DataLoader, optimizer_
         The fitted autoencoder
     """
     if autoencoder is None:
+        input_dim = torch.numel(next(iter(trainloader))[1][0])  # Get input dimensions from first batch
         if embedding_size > input_dim:
             print(
                 "WARNING: embedding_size is larger than the dimensionality of the input dataset. embedding_size: {0} / input dimensionality: {1}".format(

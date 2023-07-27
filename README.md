@@ -1,4 +1,4 @@
-<a href="url"><img src="https://raw.githubusercontent.com/collinleiber/ClustPy/main/docs/logo.png" height="175" ></a><br>
+<a href="https://github.com/collinleiber/ClustPy"><img src="https://raw.githubusercontent.com/collinleiber/ClustPy/main/docs/logo.png" height="175" ></a><br>
 ---
 [![PyPI version](https://badge.fury.io/py/clustpy.svg)](https://pypi.org/project/clustpy/)
 [![TestMain](https://github.com/collinleiber/clustpy/actions/workflows/test-main.yml/badge.svg)](https://github.com/collinleiber/ClustPy/actions/workflows/test-main.yml)
@@ -98,6 +98,7 @@ Remove clustpy via pip to avoid ambiguities during development, e.g., when chang
         - Neighbor Encoder [[Paper](https://arxiv.org/abs/1811.01557)]
         - Stacked Autoencoder [[Paper](https://www.jmlr.org/papers/volume11/vincent10a/vincent10a.pdf?)]
         - Variational Autoencoder [[Paper](https://arxiv.org/abs/1312.6114)]
+    - ACe/DeC [[Paper](https://www.ijcai.org/proceedings/2021/389)]
     - DCN [[Paper](https://dl.acm.org/doi/abs/10.5555/3305890.3306080)]
     - DEC [[Paper](https://dl.acm.org/doi/abs/10.5555/3045390.3045442)]
     - DipDECK [[Paper](https://dl.acm.org/doi/10.1145/3447548.3467316)]

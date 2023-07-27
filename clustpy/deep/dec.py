@@ -7,7 +7,7 @@ Collin Leiber
 
 from clustpy.deep._utils import detect_device, encode_batchwise, squared_euclidean_distance, predict_batchwise, \
     set_torch_seed, run_initial_clustering
-from clustpy.deep._data_utils import get_dataloader
+from clustpy.deep._data_utils import get_dataloader, augmentation_invariance_check
 from clustpy.deep._train_utils import get_trained_autoencoder
 import torch
 import numpy as np
@@ -20,7 +20,8 @@ def _dec(X: np.ndarray, n_clusters: int, alpha: float, batch_size: int, pretrain
          clustering_optimizer_params: dict, pretrain_epochs: int, clustering_epochs: int,
          optimizer_class: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss,
          autoencoder: torch.nn.Module, embedding_size: int, use_reconstruction_loss: bool,
-         cluster_loss_weight: float, custom_dataloaders: tuple, initial_clustering_class: ClusterMixin,
+         cluster_loss_weight: float, custom_dataloaders: tuple, augmentation_invariance: bool,
+         initial_clustering_class: ClusterMixin,
          initial_clustering_params: dict, random_state: np.random.RandomState) -> (
         np.ndarray, np.ndarray, np.ndarray, np.ndarray, torch.nn.Module):
     """
@@ -59,6 +60,9 @@ def _dec(X: np.ndarray, n_clusters: int, alpha: float, batch_size: int, pretrain
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         If None, the default dataloaders will be used
+    augmentation_invariance : bool
+        If True, augmented samples provided in custom_dataloaders[0] will be used to learn 
+        cluster assignments that are invariant to the augmentation transformations
     initial_clustering_class : ClusterMixin
         clustering class to obtain the initial cluster labels after the pretraining
     initial_clustering_params : dict
@@ -82,14 +86,14 @@ def _dec(X: np.ndarray, n_clusters: int, alpha: float, batch_size: int, pretrain
     else:
         trainloader, testloader = custom_dataloaders
     autoencoder = get_trained_autoencoder(trainloader, pretrain_optimizer_params, pretrain_epochs, device,
-                                          optimizer_class, loss_fn, X.shape[1], embedding_size, autoencoder)
+                                          optimizer_class, loss_fn, embedding_size, autoencoder)
     # Execute initial clustering in embedded space
     embedded_data = encode_batchwise(testloader, autoencoder, device)
     n_clusters, _, init_centers, _ = run_initial_clustering(embedded_data, n_clusters,
                                                             initial_clustering_class,
                                                             initial_clustering_params, random_state)
     # Setup DEC Module
-    dec_module = _DEC_Module(init_centers, alpha).to(device)
+    dec_module = _DEC_Module(init_centers, alpha, augmentation_invariance).to(device)
     # Use DEC optimizer parameters (usually learning rate is reduced by a magnitude of 10)
     optimizer = optimizer_class(list(autoencoder.parameters()) + list(dec_module.parameters()),
                                 **clustering_optimizer_params)
@@ -156,7 +160,7 @@ def _dec_compression_value(pred_labels: torch.Tensor) -> torch.Tensor:
     return p
 
 
-def _dec_compression_loss_fn(pred_labels: torch.Tensor) -> torch.Tensor:
+def _dec_compression_loss_fn(pred_labels: torch.Tensor, target_p: torch.Tensor = None) -> torch.Tensor:
     """
     Calculate the loss of DEC by computing the DEC compression value.
 
@@ -164,14 +168,17 @@ def _dec_compression_loss_fn(pred_labels: torch.Tensor) -> torch.Tensor:
     ----------
     pred_labels : torch.Tensor
         the predictions of the embedded samples.
+    target_p : torch.Tensor
+        dec_compression_value used as pseudo target labels
 
     Returns
     -------
     loss : torch.Tensor
         The final loss
     """
-    p = _dec_compression_value(pred_labels).detach().data
-    loss = -1.0 * torch.mean(torch.sum(p * torch.log(pred_labels + 1e-8), dim=1))
+    if target_p is None:
+        target_p = _dec_compression_value(pred_labels).detach().data
+    loss = -1.0 * torch.mean(torch.sum(target_p * torch.log(pred_labels + 1e-8), dim=1))
     return loss
 
 
@@ -185,6 +192,9 @@ class _DEC_Module(torch.nn.Module):
         The initial cluster centers
     alpha : double
         alpha value for the prediction method
+    augmentation_invariance : bool
+        If True, augmented samples provided in will be used to learn 
+        cluster assignments that are invariant to the augmentation transformations (default: False)
 
     Attributes
     ----------
@@ -192,11 +202,14 @@ class _DEC_Module(torch.nn.Module):
         the alpha value
     centers : torch.Tensor:
         the cluster centers
+    augmentation_invariance : bool
+        Is augmentation invariance used
     """
 
-    def __init__(self, init_centers: np.ndarray, alpha: float):
+    def __init__(self, init_centers: np.ndarray, alpha: float, augmentation_invariance: bool = False):
         super().__init__()
         self.alpha = alpha
+        self.augmentation_invariance = augmentation_invariance
         # Centers are learnable parameters
         self.centers = torch.nn.Parameter(torch.tensor(init_centers), requires_grad=True)
 
@@ -259,6 +272,94 @@ class _DEC_Module(torch.nn.Module):
         loss = _dec_compression_loss_fn(prediction)
         return loss
 
+    def dec_augmentation_invariance_loss(self, embedded: torch.Tensor, embedded_aug: torch.Tensor,
+                                         weights: torch.Tensor = None) -> torch.Tensor:
+        """
+        Calculate the DEC loss of given embedded samples with augmentation invariance.
+
+        Parameters
+        ----------
+        embedded : torch.Tensor
+            the embedded samples
+        embedded_aug : torch.Tensor
+            the embedded augmented samples
+        weights : torch.Tensor
+            feature weights for the squared euclidean distance within the dec_predict method (default: None)
+
+        Returns
+        -------
+        loss : torch.Tensor
+            the final DEC loss
+        """
+        prediction = _dec_predict(self.centers, embedded, self.alpha, weights=weights)
+        # Predict pseudo cluster labels with clean samples
+        clean_target_p = _dec_compression_value(prediction).detach().data
+        # Calculate loss from clean prediction and clean targets
+        clean_loss = _dec_compression_loss_fn(prediction, clean_target_p)
+
+        # Predict pseudo cluster labels with augmented samples
+        aug_prediction = _dec_predict(self.centers, embedded_aug, self.alpha, weights=weights)
+        # Calculate loss from augmented prediction and reused clean targets to enforce that the cluster assignment is invariant against augmentations
+        aug_loss = _dec_compression_loss_fn(aug_prediction, clean_target_p)
+
+        # average losses
+        loss = (clean_loss + aug_loss) / 2
+        return loss
+
+    def _loss(self, batch, autoencoder, cluster_loss_weight, use_reconstruction_loss, loss_fn, device) -> torch.Tensor:
+        """
+        Calculate the complete DEC + optional Autoencoder loss.
+
+        Parameters
+        ----------
+        batch : list
+            the minibatch
+        autoencoder : torch.nn.Module
+            the autoencoder
+        cluster_loss_weight : float
+            weight of the clustering loss compared to the reconstruction loss
+        use_reconstruction_loss : bool
+            defines whether the reconstruction loss will be used during clustering training
+        loss_fn : torch.nn.modules.loss._Loss
+            loss function for the reconstruction
+        device : torch.device
+            device to be trained on
+
+        Returns
+        -------
+        loss : torch.Tensor
+            the final DEC loss
+        """
+        loss = torch.tensor(0.).to(device)
+        # Reconstruction loss is not included in DEC
+        if use_reconstruction_loss:
+            if self.augmentation_invariance:
+                # Convention is that the augmented sample is at the first position and the original one at the second position
+                ae_loss, embedded, _ = autoencoder.loss([batch[0], batch[2]], loss_fn, device)
+                ae_loss_aug, embedded_aug, _ = autoencoder.loss([batch[0], batch[1]], loss_fn, device)
+                loss += ((ae_loss + ae_loss_aug) / 2)
+            else:
+                ae_loss, embedded, _ = autoencoder.loss(batch, loss_fn, device)
+                loss += ae_loss
+        else:
+            if self.augmentation_invariance:
+                aug_data = batch[1].to(device)
+                embedded_aug = autoencoder.encode(aug_data)
+                orig_data = batch[2].to(device)
+                embedded = autoencoder.encode(orig_data)
+            else:
+                batch_data = batch[1].to(device)
+                embedded = autoencoder.encode(batch_data)
+
+        # CLuster loss
+        if self.augmentation_invariance:
+            cluster_loss = self.dec_augmentation_invariance_loss(embedded, embedded_aug)
+        else:
+            cluster_loss = self.dec_loss(embedded)
+        loss += cluster_loss * cluster_loss_weight
+
+        return loss
+
     def fit(self, autoencoder: torch.nn.Module, trainloader: torch.utils.data.DataLoader, n_epochs: int,
             device: torch.device, optimizer: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss,
             use_reconstruction_loss: bool, cluster_loss_weight: float) -> '_DEC_Module':
@@ -291,17 +392,7 @@ class _DEC_Module(torch.nn.Module):
         """
         for _ in range(n_epochs):
             for batch in trainloader:
-                loss = torch.tensor(0.).to(device)
-                # Reconstruction loss is not included in DEC
-                if use_reconstruction_loss:
-                    ae_loss, embedded, _ = autoencoder.loss(batch, loss_fn, device)
-                    loss += ae_loss
-                else:
-                    batch_data = batch[1].to(device)
-                    embedded = autoencoder.encode(batch_data)
-                cluster_loss = self.dec_loss(embedded)
-                loss += cluster_loss * cluster_loss_weight
-
+                loss = self._loss(batch, autoencoder, cluster_loss_weight, use_reconstruction_loss, loss_fn, device)
                 # Backward pass
                 optimizer.zero_grad()
                 loss.backward()
@@ -345,6 +436,9 @@ class DEC(BaseEstimator, ClusterMixin):
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         If None, the default dataloaders will be used (default: None)
+    augmentation_invariance : bool
+        If True, augmented samples provided in custom_dataloaders[0] will be used to learn 
+        cluster assignments that are invariant to the augmentation transformations (default: False)
     initial_clustering_class : ClusterMixin
         clustering class to obtain the initial cluster labels after the pretraining (default: KMeans)
     initial_clustering_params : dict
@@ -385,7 +479,8 @@ class DEC(BaseEstimator, ClusterMixin):
                  optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), autoencoder: torch.nn.Module = None,
                  embedding_size: int = 10, cluster_loss_weight: float = 1, custom_dataloaders: tuple = None,
-                 initial_clustering_class: ClusterMixin = KMeans, initial_clustering_params: dict = {},
+                 augmentation_invariance: bool = False, initial_clustering_class: ClusterMixin = KMeans,
+                 initial_clustering_params: dict = {},
                  random_state: np.random.RandomState = None):
         self.n_clusters = n_clusters
         self.alpha = alpha
@@ -400,11 +495,13 @@ class DEC(BaseEstimator, ClusterMixin):
         self.embedding_size = embedding_size
         self.cluster_loss_weight = cluster_loss_weight
         self.custom_dataloaders = custom_dataloaders
+        self.augmentation_invariance = augmentation_invariance
         self.initial_clustering_class = initial_clustering_class
         self.initial_clustering_params = initial_clustering_params
         self.random_state = check_random_state(random_state)
         self.use_reconstruction_loss = False
         set_torch_seed(self.random_state)
+        augmentation_invariance_check(self.augmentation_invariance, self.custom_dataloaders)
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DEC':
         """
@@ -435,6 +532,7 @@ class DEC(BaseEstimator, ClusterMixin):
                                                                                    self.use_reconstruction_loss,
                                                                                    self.cluster_loss_weight,
                                                                                    self.custom_dataloaders,
+                                                                                   self.augmentation_invariance,
                                                                                    self.initial_clustering_class,
                                                                                    self.initial_clustering_params,
                                                                                    self.random_state)
@@ -481,6 +579,9 @@ class IDEC(DEC):
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         If None, the default dataloaders will be used (default: None)
+    augmentation_invariance : bool
+        If True, augmented samples provided in custom_dataloaders[0] will be used to learn 
+        cluster assignments that are invariant to the augmentation transformations (default: False)
     initial_clustering_class : ClusterMixin
         clustering class to obtain the initial cluster labels after the pretraining (default: KMeans)
     initial_clustering_params : dict
@@ -520,10 +621,11 @@ class IDEC(DEC):
                  clustering_epochs: int = 150, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), autoencoder: torch.nn.Module = None,
                  embedding_size: int = 10, cluster_loss_weight: float = 0.1, custom_dataloaders: tuple = None,
-                 initial_clustering_class: ClusterMixin = KMeans, initial_clustering_params: dict = {},
+                 augmentation_invariance: bool = False, initial_clustering_class: ClusterMixin = KMeans,
+                 initial_clustering_params: dict = {},
                  random_state: np.random.RandomState = None):
         super().__init__(n_clusters, alpha, batch_size, pretrain_optimizer_params, clustering_optimizer_params,
                          pretrain_epochs, clustering_epochs, optimizer_class, loss_fn, autoencoder, embedding_size,
-                         cluster_loss_weight, custom_dataloaders,
+                         cluster_loss_weight, custom_dataloaders, augmentation_invariance,
                          initial_clustering_class, initial_clustering_params, random_state)
         self.use_reconstruction_loss = True

@@ -1,6 +1,7 @@
 from clustpy.deep import DCN
 from clustpy.deep.dcn import _compute_centroids
-from clustpy.data import create_subspace_data
+from clustpy.data import create_subspace_data, load_optdigits
+from clustpy.deep.tests._helpers_for_tests import _get_test_augmentation_dataloaders
 import torch
 import numpy as np
 
@@ -33,3 +34,19 @@ def test_compute_centroids():
                                     [4 / 5 * 2. + 1 / 5 * 1., 4 / 5 * 2. + 1 / 5 * 2., 4 / 5 * 1.75 + 1 / 5 * 2.],
                                     [0.5 * 3. + 0.5 * 3., 0.5 * 3. + 0.5 * 4., 0.5 * 3. + 0.5 * 5.]])
     assert torch.all(torch.isclose(new_centers, desired_centers))  # torch.equal is not working due to numerical issues
+
+
+def test_dcn_augmentation():
+    torch.use_deterministic_algorithms(True)
+    data, labels = load_optdigits(flatten=False)
+    data = data[:1000]
+    labels = labels[:1000]
+    data = data.reshape(-1, 1, 8, 8)
+    data = np.tile(data, (1, 3, 1, 1))
+    aug_dl, orig_dl = _get_test_augmentation_dataloaders(data)
+    clusterer = DCN(10, pretrain_epochs=3, clustering_epochs=3, random_state=1,
+                    custom_dataloaders=[aug_dl, orig_dl], augmentation_invariance=True)
+    assert not hasattr(clusterer, "labels_")
+    clusterer.fit(data)
+    assert clusterer.labels_.dtype == np.int32
+    assert clusterer.labels_.shape == labels.shape

@@ -313,8 +313,9 @@ class _AbstractAutoencoder(torch.nn.Module):
                     # Save best model
                     if model_path is not None:
                         # Check if directory exists
-                        if not os.path.isdir(os.path.dirname(model_path)):
-                            os.makedirs(os.path.dirname(model_path))
+                        parent_directory = os.path.dirname(model_path)
+                        if parent_directory != "" and not os.path.isdir(parent_directory):
+                            os.makedirs(parent_directory)
                         torch.save(self.state_dict(), model_path)
 
                 if early_stopping.early_stop:
@@ -329,8 +330,9 @@ class _AbstractAutoencoder(torch.nn.Module):
         # Save last version of model
         if evalloader is None and model_path is not None:
             # Check if directory exists
-            if not os.path.isdir(os.path.dirname(model_path)):
-                os.makedirs(os.path.dirname(model_path))
+            parent_directory = os.path.dirname(model_path)
+            if parent_directory != "" and not os.path.isdir(parent_directory):
+                os.makedirs(parent_directory)
             torch.save(self.state_dict(), model_path)
         # Autoencoder is now pretrained
         self.fitted = True
