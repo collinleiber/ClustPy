@@ -9,7 +9,7 @@ from clustpy.utils import dip_test, dip_pval
 import torch
 from clustpy.deep._utils import detect_device, encode_batchwise, squared_euclidean_distance, int_to_one_hot, \
     set_torch_seed, run_initial_clustering
-from clustpy.deep._data_utils import get_dataloader
+from clustpy.deep._data_utils import get_dataloader, augmentation_invariance_check
 from clustpy.deep._train_utils import get_trained_autoencoder
 from sklearn.cluster import KMeans
 from sklearn.base import BaseEstimator, ClusterMixin
@@ -22,7 +22,7 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
               clustering_epochs: int, optimizer_class: torch.optim.Optimizer,
               loss_fn: torch.nn.modules.loss._Loss, autoencoder: torch.nn.Module, embedding_size: int,
               max_cluster_size_diff_factor: float, pval_strategy: str, n_boots: int, custom_dataloaders: tuple,
-              initial_clustering_class: ClusterMixin, initial_clustering_params: dict,
+              augmentation_invariance: bool, initial_clustering_class: ClusterMixin, initial_clustering_params: dict,
               random_state: np.random.RandomState, debug: bool) -> (np.ndarray, int, np.ndarray, torch.nn.Module):
     """
     Start the actual DipDECK clustering procedure on the input data set.
@@ -70,6 +70,9 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         If None, the default dataloaders will be used
+    augmentation_invariance : bool
+        If True, augmented samples provided in custom_dataloaders[0] will be used to learn
+        cluster assignments that are invariant to the augmentation transformations
     initial_clustering_class : ClusterMixin
         clustering class to obtain the initial cluster labels after the pretraining
     initial_clustering_params : dict
@@ -101,6 +104,11 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
         testloader = get_dataloader(X, batch_size, False, False)
     else:
         trainloader, testloader = custom_dataloaders
+        # Get new X from dataloader (important if transformations are used within the dataloader)
+        X_new = []
+        for batch in testloader:
+            X_new.append(batch[1].detach().cpu())
+        X = torch.cat(X_new, dim=0).numpy()
     autoencoder = get_trained_autoencoder(trainloader, pretrain_optimizer_params, pretrain_epochs, device,
                                           optimizer_class, loss_fn, embedding_size, autoencoder)
     # Execute initial clustering in embedded space
@@ -130,6 +138,7 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
                                                                                           autoencoder,
                                                                                           device, trainloader,
                                                                                           testloader,
+                                                                                          augmentation_invariance,
                                                                                           max_cluster_size_diff_factor,
                                                                                           pval_strategy, n_boots,
                                                                                           random_state, debug)
@@ -139,10 +148,10 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
 
 def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_threshold: float, cluster_loss_weight: float,
                        centers_cpu: np.ndarray, cluster_labels_cpu: np.ndarray,
-                       dip_matrix_cpu: np.ndarray, max_n_clusters: int, min_n_clusters: int, clustering_epochs,
-                       optimizer: torch.optim.Optimizer,
-                       loss_fn: torch.nn.modules.loss._Loss, autoencoder: torch.nn.Module, device: torch.device,
-                       trainloader: torch.utils.data.DataLoader, testloader: torch.utils.data.DataLoader,
+                       dip_matrix_cpu: np.ndarray, max_n_clusters: int, min_n_clusters: int, clustering_epochs: int,
+                       optimizer: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss,
+                       autoencoder: torch.nn.Module, device: torch.device, trainloader: torch.utils.data.DataLoader,
+                       testloader: torch.utils.data.DataLoader, augmentation_invariance: bool,
                        max_cluster_size_diff_factor: float, pval_strategy: str, n_boots: int,
                        random_state: np.random.RandomState, debug: bool) -> (
         np.ndarray, int, np.ndarray, torch.nn.Module):
@@ -187,6 +196,9 @@ def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_thresho
         dataloader to be used for training
     testloader : torch.utils.data.DataLoader
         dataloader to be used for update of the labels, centers and the dip matrix
+    augmentation_invariance : bool
+        If True, augmented samples provided in custom_dataloaders[0] will be used to learn
+        cluster assignments that are invariant to the augmentation transformations
     max_cluster_size_diff_factor : float
         The maximum different in size when comparing two clusters regarding the number of samples.
         If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) closest samples will be used for the Dip calculation
@@ -219,7 +231,12 @@ def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_thresho
         for batch in trainloader:
             ids = batch[0]
             # Reconstruction Loss
-            ae_loss, embedded, _ = autoencoder.loss(batch, loss_fn, device)
+            if augmentation_invariance:
+                ae_loss, embedded, _ = autoencoder.loss([batch[0], batch[2]], loss_fn, device)
+                ae_loss_aug, embedded_aug, _ = autoencoder.loss([batch[0], batch[1]], loss_fn, device)
+                ae_loss = (ae_loss + ae_loss_aug) / 2
+            else:
+                ae_loss, embedded, _ = autoencoder.loss(batch, loss_fn, device)
             # Encode centers
             embedded_centers_torch = autoencoder.encode(centers_torch)
             # Get distances between points and centers. Get nearest center
@@ -244,6 +261,13 @@ def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_thresho
             # Loss function
             cluster_loss = escaped_diffs.sum(1).mean() * (
                     1 + masked_center_diffs_std) / sqrt_masked_center_diffs.mean()
+            if augmentation_invariance:
+                # Augmendet cluster loss
+                squared_diffs_aug = squared_euclidean_distance(embedded_aug, embedded_centers_torch)
+                escaped_diffs_aug = cluster_relationships * squared_diffs_aug
+                cluster_loss_aug = escaped_diffs_aug.sum(1).mean() * (
+                        1 + masked_center_diffs_std) / sqrt_masked_center_diffs.mean()
+                cluster_loss = (cluster_loss + cluster_loss_aug) / 2
             cluster_loss *= cluster_loss_weight
             loss = ae_loss + cluster_loss
             # Backward pass
@@ -580,6 +604,9 @@ class DipDECK(BaseEstimator, ClusterMixin):
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         If None, the default dataloaders will be used (default: None)
+    augmentation_invariance : bool
+        If True, augmented samples provided in custom_dataloaders[0] will be used to learn
+        cluster assignments that are invariant to the augmentation transformations (default: False)
     initial_clustering_class : ClusterMixin
         clustering class to obtain the initial cluster labels after the pretraining (default: KMeans)
     initial_clustering_params : dict
@@ -621,8 +648,9 @@ class DipDECK(BaseEstimator, ClusterMixin):
                  optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), autoencoder: torch.nn.Module = None,
                  embedding_size: int = 5, max_cluster_size_diff_factor: float = 2, pval_strategy: str = "table",
-                 n_boots: int = 1000, custom_dataloaders: tuple = None, initial_clustering_class: ClusterMixin = KMeans,
-                 initial_clustering_params: dict = {}, random_state: np.random.RandomState = None, debug: bool = False):
+                 n_boots: int = 1000, custom_dataloaders: tuple = None, augmentation_invariance: bool = False,
+                 initial_clustering_class: ClusterMixin = KMeans, initial_clustering_params: dict = {},
+                 random_state: np.random.RandomState = None, debug: bool = False):
         self.n_clusters_init = n_clusters_init
         self.dip_merge_threshold = dip_merge_threshold
         self.cluster_loss_weight = cluster_loss_weight
@@ -641,11 +669,13 @@ class DipDECK(BaseEstimator, ClusterMixin):
         self.pval_strategy = pval_strategy
         self.n_boots = n_boots
         self.custom_dataloaders = custom_dataloaders
+        self.augmentation_invariance = augmentation_invariance
         self.initial_clustering_class = initial_clustering_class
         self.initial_clustering_params = initial_clustering_params
         self.random_state = check_random_state(random_state)
         set_torch_seed(self.random_state)
         self.debug = debug
+        augmentation_invariance_check(self.augmentation_invariance, self.custom_dataloaders)
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DipDECK':
         """
@@ -673,6 +703,7 @@ class DipDECK(BaseEstimator, ClusterMixin):
                                                              self.optimizer_class, self.loss_fn, self.autoencoder,
                                                              self.embedding_size, self.max_cluster_size_diff_factor,
                                                              self.pval_strategy, self.n_boots, self.custom_dataloaders,
+                                                             self.augmentation_invariance,
                                                              self.initial_clustering_class,
                                                              self.initial_clustering_params, self.random_state,
                                                              self.debug)
