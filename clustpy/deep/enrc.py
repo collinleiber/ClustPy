@@ -1783,8 +1783,8 @@ def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers
     if trainloader.batch_size != batch_size:
         batch_size = trainloader.batch_size
 
-    # Use subsample of the data if specified
-    if init_subsample_size is not None and init_subsample_size > 0:
+    # Use subsample of the data if specified and subsample is smaller than dataset
+    if init_subsample_size is not None and init_subsample_size > 0 and init_subsample_size < X.shape[0]:
         rand_idx = random_state.choice(X.shape[0], init_subsample_size, replace=False)
         # pass preprocessing functions to the subsampleloader
         if hasattr(trainloader.dataset, "orig_transforms_list"):

@@ -46,8 +46,6 @@ def test_acedec_augmentation():
     data, labels = load_optdigits(flatten=False)
     data = data[:1000]
     labels = labels[:1000]
-    data = data.reshape(-1, 1, 8, 8)
-    data = np.tile(data, (1, 3, 1, 1))
     aug_dl, orig_dl = _get_test_augmentation_dataloaders(data)
     acedec = ACeDeC(3, pretrain_epochs=3, clustering_epochs=3, random_state=1,
                     custom_dataloaders=[aug_dl, orig_dl],

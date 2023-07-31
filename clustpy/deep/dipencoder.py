@@ -12,6 +12,7 @@ from clustpy.partition.skinnydip import _dip_mirrored_data
 from clustpy.deep._utils import detect_device, encode_batchwise, set_torch_seed, run_initial_clustering
 from clustpy.deep._data_utils import get_dataloader, augmentation_invariance_check
 from clustpy.deep._train_utils import get_trained_autoencoder
+from clustpy.deep.autoencoders._resnet_ae_modules import EncoderBlock, DecoderBlock
 import matplotlib.pyplot as plt
 from clustpy.utils import plot_scatter_matrix
 from sklearn.utils import check_random_state
@@ -448,11 +449,22 @@ def _get_rec_loss_of_first_batch(trainloader: torch.utils.data.DataLoader, autoe
     """
     autoencoder_class = type(autoencoder)
     # Create new instance of the autoencoder
-    autoencoder = autoencoder_class(layers=autoencoder.encoder.layers, decoder_layers=autoencoder.decoder.layers).to(
-        device)
+    if hasattr(autoencoder, "encoder"):
+        # In case of Feedforward-based architectures
+        tmp_autoencoder = autoencoder_class(layers=autoencoder.encoder.layers,
+                                            decoder_layers=autoencoder.decoder.layers).to(device)
+    else:
+        # In case of Conv-based architectures
+        conv_encoder_name = "resnet18" if type(autoencoder.conv_encoder.layer1[0]) is EncoderBlock else "resnet50"
+        conv_decoder_name = "resnet18" if type(autoencoder.conv_decoder.layer1[0]) is DecoderBlock else "resnet50"
+        tmp_autoencoder = autoencoder_class(input_height=autoencoder.input_height,
+                                            fc_layers=autoencoder.fc_encoder.layers,
+                                            conv_encoder_name=conv_encoder_name,
+                                            fc_decoder_layers=autoencoder.fc_decoder.layers,
+                                            conv_decoder_name=conv_decoder_name).to(device)
     # Get first batch of data and calculate reconstruction loss
     batch_init = next(iter(trainloader))
-    ae_loss, _, _ = autoencoder.loss(batch_init, loss_fn, device)
+    ae_loss, _, _ = tmp_autoencoder.loss(batch_init, loss_fn, device)
     return ae_loss.detach()
 
 
@@ -545,6 +557,8 @@ def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size:
     if reconstruction_loss_weight is None:
         reconstruction_loss_weight = _get_rec_loss_of_first_batch(trainloader, autoencoder, loss_fn, device)
         reconstruction_loss_weight = 1 / (4 * reconstruction_loss_weight)
+        if debug:
+            print("Choose reconstruction_loss_weight automatically; set to", reconstruction_loss_weight)
     # Create initial projections
     X_embed = encode_batchwise(testloader, autoencoder, device)
     if labels_gt is None:
@@ -602,6 +616,11 @@ def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size:
             points_in_all_clusters = [torch.where(labels_torch[ids] == clus)[0].to(device) for clus in
                                       range(n_clusters)]
             n_points_in_all_clusters = [points_in_cluster.shape[0] for points_in_cluster in points_in_all_clusters]
+            if augmentation_invariance:
+                # Regular embedded data will be combined with augmented data
+                points_in_all_clusters = [torch.cat((p_c, p_c + embedded.shape[0])) for p_c in points_in_all_clusters]
+                n_points_in_all_clusters = [2 * n_c for n_c in n_points_in_all_clusters]
+                embedded = torch.cat((embedded, embedded_aug), 0)
             dip_loss = torch.tensor(0)
             for m in range(n_clusters - 1):
                 if n_points_in_all_clusters[m] < MIN_NUMBER_OF_POINTS:
@@ -611,13 +630,8 @@ def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size:
                         continue
                     dip_loss_new = _get_dip_error(
                         dip_module, embedded, index_dict[(m, n)], points_in_all_clusters[m], points_in_all_clusters[n],
-                        n_points_in_all_clusters[m], n_points_in_all_clusters[n], max_cluster_size_diff_factor, device)
-                    if augmentation_invariance:
-                        dip_loss_new_aug = _get_dip_error(
-                            dip_module, embedded_aug, index_dict[(m, n)], points_in_all_clusters[m],
-                            points_in_all_clusters[n], n_points_in_all_clusters[m], n_points_in_all_clusters[n],
-                            max_cluster_size_diff_factor, device)
-                        dip_loss_new = (dip_loss_new + dip_loss_new_aug) / 2
+                        n_points_in_all_clusters[m], n_points_in_all_clusters[n], max_cluster_size_diff_factor,
+                        device)
                     dip_loss = dip_loss + dip_loss_new
             final_dip_loss = torch.true_divide(dip_loss, n_cluster_combinations)
             total_loss = final_dip_loss + ae_loss

@@ -1,7 +1,8 @@
-from clustpy.deep import DipEncoder
-from clustpy.deep.dipencoder import plot_dipencoder_embedding
+from clustpy.deep import DipEncoder, get_dataloader, detect_device
+from clustpy.deep.dipencoder import plot_dipencoder_embedding, _get_rec_loss_of_first_batch
 from clustpy.data import create_subspace_data, load_optdigits
 from clustpy.deep.tests._helpers_for_tests import _get_test_augmentation_dataloaders
+from clustpy.deep.autoencoders import FeedforwardAutoencoder, ConvolutionalAutoencoder
 import numpy as np
 import torch
 
@@ -28,8 +29,6 @@ def test_dipencoder_augmentation():
     data, labels = load_optdigits(flatten=False)
     data = data[:1000]
     labels = labels[:1000]
-    data = data.reshape(-1, 1, 8, 8)
-    data = np.tile(data, (1, 3, 1, 1))
     aug_dl, orig_dl = _get_test_augmentation_dataloaders(data)
     clusterer = DipEncoder(10, pretrain_epochs=3, clustering_epochs=3, random_state=1,
                            custom_dataloaders=[aug_dl, orig_dl], augmentation_invariance=True)
@@ -53,3 +52,20 @@ def test_plot_dipencoder_embedding():
     plot_dipencoder_embedding(embedded_data, n_clusters, cluster_labels, projection_axes, index_dict, show_plot=False)
     # Only check if error is thrown
     assert True
+
+
+def test_get_rec_loss_of_first_batch():
+    torch.use_deterministic_algorithms(True)
+    X = torch.rand((512, 3, 32, 32))
+    device = detect_device()
+    # Test with FeedforwardAutoencoder
+    X_flat = X.reshape(512, -1)
+    ff_trainloader = get_dataloader(X_flat, 32, shuffle=True)
+    ff_autoencoder = FeedforwardAutoencoder([X_flat.shape[1], 32, 10])
+    ae_loss = _get_rec_loss_of_first_batch(ff_trainloader, ff_autoencoder, torch.nn.MSELoss(), device)
+    assert ae_loss > 0
+    # Test with ConvolutionalAutoencoder
+    conv_trainloader = get_dataloader(X, 32, shuffle=True)
+    conv_autoencoder = ConvolutionalAutoencoder(X.shape[-1], [512, 10])
+    ae_loss = _get_rec_loss_of_first_batch(conv_trainloader, conv_autoencoder, torch.nn.MSELoss(), device)
+    assert ae_loss > 0

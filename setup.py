@@ -16,7 +16,7 @@ dip_extension = Extension('clustpy.utils.dipModule',
 setup(
     name='clustpy',
     version=clustpy.__version__,
-    packages=find_packages(),
+    packages=find_packages(exclude=["*tests"]),
     package_data={'clustpy': ['data/datasets/*.data']},
     url='https://clustpy.readthedocs.io/en/latest/',
     license='BSD-3-Clause License',

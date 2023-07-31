@@ -24,6 +24,7 @@ def test_ClustpyDataset():
 
 def test_ClustpyDataset_with_augmentation():
     data, _ = load_optdigits(flatten=False)
+    data /= 255.0
     data = data.reshape(-1, 1, 8, 8)
     data = np.tile(data, (1, 3, 1, 1))
     data_torch = torch.from_numpy(data)
@@ -34,7 +35,7 @@ def test_ClustpyDataset_with_augmentation():
         # transform input tensor to PIL image for augmentation
         torchvision.transforms.ToPILImage(),
         # apply transformations
-        torchvision.transforms.RandomAffine(degrees=(-16, +16), translate=(0.1, 0.1), shear=(-8, 8), fill=0),
+        torchvision.transforms.RandomAffine(degrees=(-16, +16), fill=0),
         # transform back to torch.tensor
         torchvision.transforms.ToTensor(),
         # preprocess
