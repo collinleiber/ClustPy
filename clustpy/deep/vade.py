@@ -102,7 +102,7 @@ def _vade(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_pa
     gmm = GaussianMixture(n_components=n_clusters, covariance_type='full', n_init=10, random_state=random_state)
     gmm_labels = gmm.fit_predict(embedded_data).astype(np.int32)
     # Return results
-    return gmm_labels, gmm.means_, gmm.covariances_, vade_labels, vade_centers, vade_covariances, autoencoder
+    return gmm_labels, gmm.means_, gmm.covariances_, gmm.weights_, vade_labels, vade_centers, vade_covariances, autoencoder
 
 
 class _VaDE_VAE(VariationalAutoencoder):
@@ -516,6 +516,8 @@ class VaDE(BaseEstimator, ClusterMixin):
         The cluster centers as identified by a final Gaussian Mixture Model
     covariances_ : np.ndarray
         The covariance matrices as identified by a final Gaussian Mixture Model
+    weights_ : np.ndarray
+        The weights as identified by a final Gaussian Mixture Model
     vade_labels_ : np.ndarray
         The labels as identified by VaDE after the training terminated
     vade_cluster_centers_ : np.ndarray
@@ -579,7 +581,7 @@ class VaDE(BaseEstimator, ClusterMixin):
         self : VaDE
             this instance of the VaDE algorithm
         """
-        gmm_labels, gmm_means, gmm_covariances, vade_labels, vade_centers, vade_covariances, autoencoder = _vade(X,
+        gmm_labels, gmm_means, gmm_covariances, gmm_weights, vade_labels, vade_centers, vade_covariances, autoencoder = _vade(X,
                                                                                                                  self.n_clusters,
                                                                                                                  self.batch_size,
                                                                                                                  self.pretrain_optimizer_params,
@@ -597,8 +599,34 @@ class VaDE(BaseEstimator, ClusterMixin):
         self.labels_ = gmm_labels
         self.cluster_centers_ = gmm_means
         self.covariances_ = gmm_covariances
+        self.weights_ = gmm_weights
         self.vade_labels_ = vade_labels
         self.vade_cluster_centers_ = vade_centers
         self.vade_covariances_ = vade_covariances
         self.autoencoder = autoencoder
         return self
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """
+        Predicts the labels of the input data.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            input data
+
+        Returns
+        -------
+        predicted_labels : np.ndarray
+            The predicted labels
+        """
+        device = detect_device()
+        dataloader = get_dataloader(X, self.batch_size, False, False)
+        embedded_data = _vade_encode_batchwise(dataloader, self.autoencoder, device)
+        gmm = GaussianMixture(n_components=self.n_clusters, covariance_type='full')
+        gmm.means_ = self.cluster_centers_
+        gmm.covariances_ = self.covariances_
+        gmm.weights_ = self.weights_
+        gmm.precisions_cholesky_ = np.linalg.cholesky(np.linalg.inv(self.covariances_))
+        predicted_labels = gmm.predict(embedded_data).astype(np.int32)
+        return predicted_labels

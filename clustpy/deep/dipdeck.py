@@ -8,7 +8,7 @@ import numpy as np
 from clustpy.utils import dip_test, dip_pval
 import torch
 from clustpy.deep._utils import detect_device, encode_batchwise, squared_euclidean_distance, int_to_one_hot, \
-    set_torch_seed, run_initial_clustering
+    set_torch_seed, run_initial_clustering, embedded_kmeans_prediction
 from clustpy.deep._data_utils import get_dataloader, augmentation_invariance_check
 from clustpy.deep._train_utils import get_trained_autoencoder
 from sklearn.cluster import KMeans
@@ -712,3 +712,26 @@ class DipDECK(BaseEstimator, ClusterMixin):
         self.cluster_centers_ = centers
         self.autoencoder = autoencoder
         return self
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """
+        Predicts the labels of the input data.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            input data
+
+        Returns
+        -------
+        predicted_labels : np.ndarray
+            The predicted labels
+        """
+        # Get embedded centers
+        device = detect_device()
+        centerloader = get_dataloader(self.cluster_centers_, self.batch_size, False, False)
+        embedded_centers = encode_batchwise(centerloader, self.autoencoder, device)
+        # Get labels
+        dataloader = get_dataloader(X, self.batch_size, False, False)
+        predicted_labels = embedded_kmeans_prediction(dataloader, embedded_centers, self.autoencoder)
+        return predicted_labels

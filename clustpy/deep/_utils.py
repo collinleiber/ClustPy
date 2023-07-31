@@ -4,6 +4,7 @@ import numpy as np
 import random
 from sklearn.base import ClusterMixin
 import inspect
+from sklearn.metrics.pairwise import pairwise_distances_argmin_min
 
 
 def set_torch_seed(random_state: np.random.RandomState) -> None:
@@ -244,6 +245,33 @@ def int_to_one_hot(int_tensor: torch.Tensor, n_integers: int) -> torch.Tensor:
     onehot = torch.zeros([int_tensor.shape[0], n_integers], dtype=torch.float, device=int_tensor.device)
     onehot.scatter_(1, int_tensor.unsqueeze(1).long(), 1)
     return onehot
+
+
+def embedded_kmeans_prediction(dataloader: torch.utils.data.DataLoader, cluster_centers: np.ndarray,
+                               module: torch.nn.Module) -> np.ndarray:
+    """
+    Predicts the labels of the data within the given dataloader.
+    Labels correspond to the id of the closest cluster center.
+
+    Parameters
+    ----------
+    dataloader : torch.utils.data.DataLoader
+        dataloader to be used
+    cluster_centers : np.ndarray
+        input cluster centers
+    module : torch.nn.Module
+        the module that is used for the encoding (e.g. an autoencoder)
+
+    Returns
+    -------
+    predicted_labels : np.ndarray
+        The predicted labels
+    """
+    device = detect_device()
+    embedded_data = encode_batchwise(dataloader, module, device)
+    predicted_labels, _ = pairwise_distances_argmin_min(X=embedded_data, Y=cluster_centers, metric='euclidean',
+                                                        metric_kwargs={'squared': True})
+    return predicted_labels
 
 
 def run_initial_clustering(X: np.ndarray, n_clusters: int, clustering_class: ClusterMixin, clustering_params: dict,

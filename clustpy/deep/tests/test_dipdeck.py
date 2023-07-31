@@ -19,6 +19,9 @@ def test_simple_dipdeck():
     dipdeck2.fit(X)
     assert np.array_equal(dipdeck.labels_, dipdeck2.labels_)
     assert np.array_equal(dipdeck.cluster_centers_, dipdeck2.cluster_centers_)
+    # Test predict
+    labels_predict = dipdeck.predict(X)
+    assert np.array_equal(dipdeck.labels_, labels_predict)
 
 
 def test_dipdeck_augmentation():

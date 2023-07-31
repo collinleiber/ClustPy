@@ -22,6 +22,9 @@ def test_simple_dipencoder():
     # assert np.array_equal(dipencoder.labels_, dipencoder2.labels_)
     # assert np.allclose(dipencoder.projection_axes_, dipencoder2.projection_axes_, atol=1e-1)
     # assert dipencoder.index_dict_ == dipencoder2.index_dict_
+    # Test predict
+    labels_predict = dipencoder.predict(X, X)
+    assert np.array_equal(dipencoder.labels_, labels_predict)
 
 
 def test_dipencoder_augmentation():

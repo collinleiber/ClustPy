@@ -6,7 +6,7 @@ Collin Leiber
 """
 
 from clustpy.deep._utils import detect_device, encode_batchwise, squared_euclidean_distance, predict_batchwise, \
-    set_torch_seed, run_initial_clustering
+    set_torch_seed, run_initial_clustering, embedded_kmeans_prediction
 from clustpy.deep._data_utils import get_dataloader, augmentation_invariance_check
 from clustpy.deep._train_utils import get_trained_autoencoder
 import torch
@@ -542,6 +542,24 @@ class DEC(BaseEstimator, ClusterMixin):
         self.dec_cluster_centers_ = dec_centers
         self.autoencoder = autoencoder
         return self
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """
+        Predicts the labels of the input data.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            input data
+
+        Returns
+        -------
+        predicted_labels : np.ndarray
+            The predicted labels
+        """
+        dataloader = get_dataloader(X, self.batch_size, False, False)
+        predicted_labels = embedded_kmeans_prediction(dataloader, self.cluster_centers_, self.autoencoder)
+        return predicted_labels
 
 
 class IDEC(DEC):

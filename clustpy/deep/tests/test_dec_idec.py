@@ -20,6 +20,9 @@ def test_simple_dec():
     assert np.allclose(dec.cluster_centers_, dec2.cluster_centers_, atol=1e-1)
     assert np.array_equal(dec.dec_labels_, dec2.dec_labels_)
     assert np.allclose(dec.dec_cluster_centers_, dec2.dec_cluster_centers_, atol=1e-1)
+    # Test predict
+    labels_predict = dec.predict(X)
+    assert np.array_equal(dec.labels_, labels_predict)
 
 
 def test_simple_idec():
@@ -38,6 +41,9 @@ def test_simple_idec():
     # assert np.allclose(idec.cluster_centers_, idec2.cluster_centers_, atol=5e-1)
     # assert np.array_equal(idec.dec_labels_, idec2.dec_labels_)
     # assert np.allclose(idec.dec_cluster_centers_, idec2.dec_cluster_centers_, atol=5e-1)
+    # Test predict
+    labels_predict = idec.predict(X)
+    assert np.array_equal(idec.labels_, labels_predict)
 
 
 def test_dec_augmentation():

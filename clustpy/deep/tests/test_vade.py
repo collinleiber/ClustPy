@@ -22,3 +22,6 @@ def test_simple_vade():
     assert np.array_equal(vade.cluster_centers_, vade2.cluster_centers_)
     assert np.array_equal(vade.vade_labels_, vade2.vade_labels_)
     assert np.array_equal(vade.vade_cluster_centers_, vade2.vade_cluster_centers_)
+    # Test predict
+    labels_predict = vade.predict(X)
+    assert np.array_equal(vade.labels_, labels_predict)
