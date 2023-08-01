@@ -33,7 +33,7 @@ def test_supervised_dipencoder():
     assert not hasattr(dipencoder, "labels_")
     dipencoder.fit(X, labels)
     assert dipencoder.labels_.dtype == np.int32
-    assert dipencoder.labels_.shape == labels.shape
+    assert np.array_equal(labels, dipencoder.labels_)
 
 def test_dipencoder_augmentation():
     torch.use_deterministic_algorithms(True)

@@ -5,6 +5,7 @@ import random
 from sklearn.base import ClusterMixin
 import inspect
 from sklearn.metrics.pairwise import pairwise_distances_argmin_min
+import os
 
 
 def set_torch_seed(random_state: np.random.RandomState) -> None:
@@ -62,6 +63,8 @@ def squared_euclidean_distance(tensor1: torch.Tensor, tensor2: torch.Tensor,
 def detect_device(device: torch.device = None) -> torch.device:
     """
     Automatically detects if you have a cuda enabled GPU.
+    Device can also be read from environment variable "CLUSTPY_DEVICE".
+    It can be set using, e.g., os.environ["CLUSTPY_DEVICE"] = "cuda:1"
 
     Parameters
     ----------
@@ -74,10 +77,15 @@ def detect_device(device: torch.device = None) -> torch.device:
         device on which the prediction should take place
     """
     if device is None:
-        if torch.cuda.is_available():
-            device = torch.device('cuda')
+        env_device = os.environ.get("CLUSTPY_DEVICE", None)
+        # Check if environment device is None
+        if env_device is None:
+            if torch.cuda.is_available():
+                device = torch.device('cuda')
+            else:
+                device = torch.device('cpu')
         else:
-            device = torch.device('cpu')
+            device = torch.device(env_device)
     return device
 
 
