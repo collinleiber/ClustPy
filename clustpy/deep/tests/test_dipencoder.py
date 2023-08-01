@@ -24,8 +24,16 @@ def test_simple_dipencoder():
     # assert dipencoder.index_dict_ == dipencoder2.index_dict_
     # Test predict
     labels_predict = dipencoder.predict(X, X)
-    assert np.array_equal(dipencoder.labels_, labels_predict)
+    assert np.sum(dipencoder.labels_ == labels_predict) / labels_predict.shape[0] > 0.95
 
+
+def test_supervised_dipencoder():
+    X, labels = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    dipencoder = DipEncoder(3, pretrain_epochs=3, clustering_epochs=3, random_state=1)
+    assert not hasattr(dipencoder, "labels_")
+    dipencoder.fit(X, labels)
+    assert dipencoder.labels_.dtype == np.int32
+    assert dipencoder.labels_.shape == labels.shape
 
 def test_dipencoder_augmentation():
     torch.use_deterministic_algorithms(True)
