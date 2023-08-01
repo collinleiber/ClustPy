@@ -45,6 +45,7 @@ class _TestAutoencoder(torch.nn.Module):
     A simple autoencoder only for test purposes.
     Encoder layers: [input_dim, embedding]
     Decoder layers: [embedding, input_dim]
+    All features of the embedding will be equal to the sum of the input attributes.
     All weights are initialized as 1. Fitting function only sets fitting=True (no updates of the weights).
     """
 

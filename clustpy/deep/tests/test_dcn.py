@@ -21,6 +21,9 @@ def test_simple_dcn():
     assert np.allclose(dcn.cluster_centers_, dcn2.cluster_centers_, atol=1e-1)
     assert np.array_equal(dcn.dcn_labels_, dcn2.dcn_labels_)
     assert np.allclose(dcn.dcn_cluster_centers_, dcn2.dcn_cluster_centers_, atol=1e-1)
+    # Test predict
+    labels_predict = dcn.predict(X)
+    assert np.array_equal(dcn.labels_, labels_predict)
 
 
 def test_compute_centroids():

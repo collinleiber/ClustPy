@@ -21,6 +21,7 @@ def run_around_tests():
 
 
 @pytest.mark.data
+@pytest.mark.timeseriesdata
 def test_load_motestrain():
     # Full data set
     data, labels = load_motestrain("all", downloads_path=TEST_DOWNLOAD_PATH)
@@ -34,6 +35,7 @@ def test_load_motestrain():
 
 
 @pytest.mark.data
+@pytest.mark.timeseriesdata
 def test_load_proximal_phalanx_outline():
     # Full data set
     data, labels = load_proximal_phalanx_outline("all", downloads_path=TEST_DOWNLOAD_PATH)
@@ -47,6 +49,7 @@ def test_load_proximal_phalanx_outline():
 
 
 @pytest.mark.data
+@pytest.mark.timeseriesdata
 def test_load_diatom_size_reduction():
     # Full data set
     data, labels = load_diatom_size_reduction("all", downloads_path=TEST_DOWNLOAD_PATH)
@@ -60,6 +63,7 @@ def test_load_diatom_size_reduction():
 
 
 @pytest.mark.data
+@pytest.mark.timeseriesdata
 def test_load_symbols():
     # Full data set
     data, labels = load_symbols("all", downloads_path=TEST_DOWNLOAD_PATH)
@@ -73,6 +77,7 @@ def test_load_symbols():
 
 
 @pytest.mark.data
+@pytest.mark.timeseriesdata
 def test_load_olive_oil():
     # Full data set
     data, labels = load_olive_oil("all", downloads_path=TEST_DOWNLOAD_PATH)
@@ -86,6 +91,7 @@ def test_load_olive_oil():
 
 
 @pytest.mark.data
+@pytest.mark.timeseriesdata
 def test_load_plane():
     # Full data set
     data, labels = load_plane("all", downloads_path=TEST_DOWNLOAD_PATH)
@@ -99,6 +105,7 @@ def test_load_plane():
 
 
 @pytest.mark.data
+@pytest.mark.timeseriesdata
 def test_load_sony_aibo_robot_surface():
     # Full data set
     data, labels = load_sony_aibo_robot_surface("all", downloads_path=TEST_DOWNLOAD_PATH)
@@ -112,6 +119,7 @@ def test_load_sony_aibo_robot_surface():
 
 
 @pytest.mark.data
+@pytest.mark.timeseriesdata
 def test_load_two_patterns():
     # Full data set
     data, labels = load_two_patterns("all", downloads_path=TEST_DOWNLOAD_PATH)
@@ -125,6 +133,7 @@ def test_load_two_patterns():
 
 
 @pytest.mark.data
+@pytest.mark.timeseriesdata
 def test_load_lsst():
     # Full data set
     data, labels = load_lsst("all", downloads_path=TEST_DOWNLOAD_PATH)

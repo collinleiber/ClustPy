@@ -563,10 +563,10 @@ def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size:
     X_embed = encode_batchwise(testloader, autoencoder, device)
     if labels_gt is None:
         # Execute intitial clustering to get labels and centers
-        n_clusters, labels, centers, _ = run_initial_clustering(X_embed, n_clusters,
-                                                                initial_clustering_class,
-                                                                initial_clustering_params, random_state)
-        labels_torch = torch.from_numpy(labels)
+        n_clusters, labels_new, centers, _ = run_initial_clustering(X_embed, n_clusters,
+                                                                    initial_clustering_class,
+                                                                    initial_clustering_params, random_state)
+        labels_torch = torch.from_numpy(labels_new)
     else:
         labels_torch = torch.from_numpy(labels_gt)
         centers = np.array([np.mean(X_embed[labels_gt == i], axis=0) for i in range(n_clusters)])
@@ -592,7 +592,7 @@ def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size:
         if labels_gt is None:
             X_embed = encode_batchwise(testloader, autoencoder, device)
             labels_new = _predict(X_embed, X_embed,
-                                  labels_torch.detach().cpu().numpy(),
+                                  labels_new,
                                   dip_module.projection_axes.detach().cpu().numpy(),
                                   n_clusters, index_dict)
             labels_torch = torch.from_numpy(labels_new).int().to(device)
@@ -648,7 +648,17 @@ def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size:
             mean_ae_losses = np.mean(ae_losses)
             print("total loss: {0} (dip loss: {1} / ae loss: {2})".format(mean_dip_losses + mean_ae_losses,
                                                                           mean_dip_losses, mean_ae_losses))
-    return labels_torch.detach().cpu().numpy(), dip_module.projection_axes.detach().cpu().numpy(), index_dict, autoencoder
+    # Get final labels
+    if labels_gt is None:
+        X_embed = encode_batchwise(testloader, autoencoder, device)
+        labels_final = _predict(X_embed, X_embed,
+                                labels_new,
+                                dip_module.projection_axes.detach().cpu().numpy(),
+                                n_clusters, index_dict)
+        labels_final = labels_final.astype(np.int32)
+    else:
+        labels_final = labels_gt
+    return labels_final, dip_module.projection_axes.detach().cpu().numpy(), index_dict, autoencoder
 
 
 """
@@ -806,6 +816,8 @@ class DipEncoder(BaseEstimator, ClusterMixin):
     def predict(self, X_train: np.ndarray, X_test: np.ndarray) -> np.ndarray:
         """
         Predict the labels of the X_test dataset using the information gained by the fit function and the X_train dataset.
+        Beware that the current labels influence the labels obtained by predict(). Therefore, it can occur that the outcome of
+        dipencoder.fit(X) does not match dipencoder.predict(X).
 
         Parameters
         ----------
@@ -826,7 +838,7 @@ class DipEncoder(BaseEstimator, ClusterMixin):
         X_test = encode_batchwise(testloader_supervised, self.autoencoder, device)
         labels_pred = _predict(X_train, X_test, self.labels_, self.projection_axes_, self.n_clusters,
                                self.index_dict_)
-        return labels_pred
+        return labels_pred.astype(np.int32)
 
     def plot(self, X: np.ndarray, edge_width: float = 0.2, show_legend: bool = True) -> None:
         """
