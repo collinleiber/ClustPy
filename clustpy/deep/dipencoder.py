@@ -655,7 +655,7 @@ def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size:
                                 labels_new,
                                 dip_module.projection_axes.detach().cpu().numpy(),
                                 n_clusters, index_dict)
-        labels_final = labels_final.astype(int)
+        labels_final = labels_final.astype(np.int32)
     else:
         labels_final = labels_gt
     return labels_final, dip_module.projection_axes.detach().cpu().numpy(), index_dict, autoencoder
@@ -838,7 +838,7 @@ class DipEncoder(BaseEstimator, ClusterMixin):
         X_test = encode_batchwise(testloader_supervised, self.autoencoder, device)
         labels_pred = _predict(X_train, X_test, self.labels_, self.projection_axes_, self.n_clusters,
                                self.index_dict_)
-        return labels_pred.astype(int)
+        return labels_pred.astype(np.int32)
 
     def plot(self, X: np.ndarray, edge_width: float = 0.2, show_legend: bool = True) -> None:
         """

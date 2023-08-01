@@ -99,7 +99,8 @@ def _vade(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_pa
     vade_covariances = vade_module.p_var.detach().cpu().numpy()
     # Do reclustering with GMM
     embedded_data = _vade_encode_batchwise(testloader, autoencoder, device)
-    gmm = GaussianMixture(n_components=n_clusters, covariance_type='full', n_init=10, random_state=random_state)
+    gmm = GaussianMixture(n_components=n_clusters, covariance_type='full', n_init=1, random_state=random_state,
+                          means_init=vade_centers)
     gmm_labels = gmm.fit_predict(embedded_data).astype(np.int32)
     # Return results
     return gmm_labels, gmm.means_, gmm.covariances_, gmm.weights_, vade_labels, vade_centers, vade_covariances, autoencoder
@@ -581,21 +582,22 @@ class VaDE(BaseEstimator, ClusterMixin):
         self : VaDE
             this instance of the VaDE algorithm
         """
-        gmm_labels, gmm_means, gmm_covariances, gmm_weights, vade_labels, vade_centers, vade_covariances, autoencoder = _vade(X,
-                                                                                                                 self.n_clusters,
-                                                                                                                 self.batch_size,
-                                                                                                                 self.pretrain_optimizer_params,
-                                                                                                                 self.clustering_optimizer_params,
-                                                                                                                 self.pretrain_epochs,
-                                                                                                                 self.clustering_epochs,
-                                                                                                                 self.optimizer_class,
-                                                                                                                 self.loss_fn,
-                                                                                                                 self.autoencoder,
-                                                                                                                 self.embedding_size,
-                                                                                                                 self.custom_dataloaders,
-                                                                                                                 self.initial_clustering_class,
-                                                                                                                 self.initial_clustering_params,
-                                                                                                                 self.random_state)
+        gmm_labels, gmm_means, gmm_covariances, gmm_weights, vade_labels, vade_centers, vade_covariances, autoencoder = _vade(
+            X,
+            self.n_clusters,
+            self.batch_size,
+            self.pretrain_optimizer_params,
+            self.clustering_optimizer_params,
+            self.pretrain_epochs,
+            self.clustering_epochs,
+            self.optimizer_class,
+            self.loss_fn,
+            self.autoencoder,
+            self.embedding_size,
+            self.custom_dataloaders,
+            self.initial_clustering_class,
+            self.initial_clustering_params,
+            self.random_state)
         self.labels_ = gmm_labels
         self.cluster_centers_ = gmm_means
         self.covariances_ = gmm_covariances
