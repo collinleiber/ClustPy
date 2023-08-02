@@ -473,7 +473,6 @@ class DCN(BaseEstimator, ClusterMixin):
         self.initial_clustering_params = initial_clustering_params
         self.random_state = check_random_state(random_state)
         set_torch_seed(self.random_state)
-        augmentation_invariance_check(self.augmentation_invariance, self.custom_dataloaders)
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DCN':
         """
@@ -492,6 +491,7 @@ class DCN(BaseEstimator, ClusterMixin):
         self : DCN
             this instance of the DCN algorithm
         """
+        augmentation_invariance_check(self.augmentation_invariance, self.custom_dataloaders)
         kmeans_labels, kmeans_centers, dcn_labels, dcn_centers, autoencoder = _dcn(X, self.n_clusters, self.batch_size,
                                                                                    self.pretrain_optimizer_params,
                                                                                    self.clustering_optimizer_params,

@@ -2003,9 +2003,6 @@ class ENRC(BaseEstimator, ClusterMixin):
         self.m = None
         self.P = P
 
-        augmentation_invariance_check(self.augmentation_invariance, self.custom_dataloaders)
-
-
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'ENRC':
         """
         Cluster the input dataset with the ENRC algorithm. Saves the labels, centers, V, m, Betas, and P
@@ -2024,6 +2021,7 @@ class ENRC(BaseEstimator, ClusterMixin):
         self : ENRC
             returns the ENRC object
         """
+        augmentation_invariance_check(self.augmentation_invariance, self.custom_dataloaders)
         cluster_labels, cluster_centers, V, m, betas, P, n_clusters, autoencoder, cluster_labels_before_reclustering = _enrc(X=X,
                                                                                                                             n_clusters=self.n_clusters,
                                                                                                                             V=self.V,

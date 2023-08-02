@@ -231,13 +231,18 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
                 start_time = time.time()
                 algo_obj = eval_algo.algorithm(**eval_algo.params)
                 # Check if algorithm uses an autoencoder and wether iteration_specific autoencoders are defined
-                if hasattr(algo_obj, "autoencoder") and iteration_specific_autoencoders is not None:
+                if iteration_specific_autoencoders is not None:
                     eval_autoencoder = iteration_specific_autoencoders[rep]
                     assert type(
                         eval_autoencoder) is EvaluationAutoencoder, "Each entry in iteration_specific_params must be a EvaluationAutoencoder"
-                    autoencoder = load_saved_autoencoder(eval_autoencoder.path, eval_autoencoder.autoencoder_class,
-                                                         eval_autoencoder.params)
-                    algo_obj.autoencoder = autoencoder
+                    if hasattr(algo_obj, "autoencoder"):
+                        autoencoder = load_saved_autoencoder(eval_autoencoder.path, eval_autoencoder.autoencoder_class,
+                                                             eval_autoencoder.params)
+                        algo_obj.autoencoder = autoencoder
+                    if eval_autoencoder.path_custom_dataloaders is not None and hasattr(algo_obj, "custom_dataloaders"):
+                        custom_dataloaders = (torch.load(eval_autoencoder.path_custom_dataloaders[0]),
+                                              torch.load(eval_autoencoder.path_custom_dataloaders[1]))
+                        algo_obj.custom_dataloaders = custom_dataloaders
                 try:
                     algo_obj.fit(X_processed)
                 except Exception as e:
@@ -519,7 +524,7 @@ def evaluation_df_to_latex_table(df: pd.DataFrame, output_path: str, use_std: bo
                     if color_by_value is not None:
                         color_value = int((mean_value - all_values_sorted[0]) / (
                                 all_values_sorted[-1] - all_values_sorted[0]) * 45) + 5
-                        value_write = "\cellcolor{blue!" + str(color_value) + "}" + value_write
+                        value_write = "\cellcolor{" + color_by_value + "!" + str(color_value) + "}" + value_write
                     to_write += " & " + value_write
                 to_write += "\\\\\n"
                 f.write(to_write)
@@ -693,6 +698,7 @@ class EvaluationAutoencoder():
     """
     The EvaluationAutoencoder object is a wrapper for autoencoders that can be used by deep clustering algorithms.
     It contains all the information necessary to load a pretrained autoencoder that for the evaluate_dataset or evaluate_multiple_datasets method.
+    Can also contain paths to saved dataloaders (e.g. when using augmentation).
 
     Parameters
     ----------
@@ -702,6 +708,9 @@ class EvaluationAutoencoder():
         The actual autoencoder class
     params : dict
         Parameters given to the autoencoder class (default: {})
+    path_custom_dataloaders : tuple
+        Tuple containing the path of saved dataloaders.
+        First entry is for the saved trainloader and second for the saved testloader (default: None)
 
     Examples
     ----------
@@ -709,10 +718,16 @@ class EvaluationAutoencoder():
     >>> ea = EvaluationAutoencoder(path="PATH", autoencoder_class=FeedforwardAutoencoder, params={"layers": [256, 128, 64, 10], "bias": False})
     """
 
-    def __init__(self, path: str, autoencoder_class: torch.nn.Module, params: dict = {}):
+    def __init__(self, path: str, autoencoder_class: torch.nn.Module, params: dict = {},
+                 path_custom_dataloaders: tuple = None):
         assert type(path) is str, "path must be a string"
         self.path = path
         assert issubclass(autoencoder_class, torch.nn.Module), "autoencoder_class must be a torch.nn.Module"
         self.autoencoder_class = autoencoder_class
         assert type(params) is dict, "params must be a dict"
         self.params = params
+        assert path_custom_dataloaders is None or (
+                len(path_custom_dataloaders) == 2 and type(path_custom_dataloaders[0]) is str and type(
+            path_custom_dataloaders[
+                1]) is str), "path_custom_dataloaders must be None or must contain the path to a saved trainloader at the first position and the path to a saved testloader at the second position"
+        self.path_custom_dataloaders = path_custom_dataloaders
