@@ -1056,7 +1056,7 @@ def random_nrkmeans_init(data: np.ndarray, n_clusters: list, rounds: int = 10, i
                          debug: bool = True) -> (list, list, np.ndarray, np.ndarray):
     """
     Initialization strategy based on the NrKmeans Algorithm. For documentation see nrkmeans_init function.
-    Same as nrkmeans_init, but max_iter is set to 1y, so the results will be faster and more random.
+    Same as nrkmeans_init, but max_iter is set to 1, so the results will be faster and more random.
 
     Parameters
     ----------
