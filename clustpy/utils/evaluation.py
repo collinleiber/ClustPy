@@ -435,6 +435,100 @@ def evaluate_multiple_datasets(evaluation_datasets: list, evaluation_algorithms:
     return all_dfs
 
 
+def evaluation_df_to_latex_table(df: pd.DataFrame, output_path: str, use_std: bool = True, best_in_bold: bool = True,
+                                 second_best_underlined: bool = True, color_by_value: str = None,
+                                 in_percent: int = True, decimal_places: int = 1) -> None:
+    """
+    Convert the resulting dataframe of an evaluation into a latex table.
+    This method will only consider the mean values. Therefore, note that "mean" must be included in the aggregations!
+    If "std" is also contained in the dataframe (and use_std is True) this value will also be added by using plusminus.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The pandas dataframe. Can also be a string that contains the path to the saved dataframe
+    output_path : std
+        The path were the resulting latex table text file will be stored
+    use_std : bool
+        Defines if the standard deviation (std) should also be added to the latex table (default: True)
+    best_in_bold : bool
+        Print best value for each combination of dataset and metric in bold.
+        Note, that the latex package bm is used, so usepackage{bm} must be included in the latex file (default: True)
+    second_best_underlined : bool
+        Print second-best value for each combination of dataset and metric underlined (default: True)
+    color_by_value : str
+        Define the color that should be used to indicate the difference between the values of the metrics.
+        Uses colorcell, so usepackage{colortbl} or usepackage[table]{xcolor} must be included in the latex file.
+        Can be 'blue' for example (default: None)
+    in_percent : bool
+        If true, all values, except n_clusters and runtime, will be converted to percentages -> all values will be multiplied by 100 (default: True)
+    decimal_places : int
+        Number of decimal places that should be used in the latex table (default: 1)
+    """
+    # Load dataframe
+    assert type(df) == pd.DataFrame or type(df) == str, "Type of df must be pandas DataFrame or string (path to file)"
+    if type(df) == str:
+        df = pd.read_csv(df, index_col=[0, 1], header=[0, 1])
+    # Get main information from dataframe
+    datasets = list(dict.fromkeys([s[0] for s in df.index]))
+    algorithms = list(dict.fromkeys([s[0] for s in df.keys()]))
+    metrics = list(dict.fromkeys([s[1] for s in df.keys()]))
+    std_contained = "std" in [s[1] for s in df.index]
+    # Write output
+    with open(output_path, "w") as f:
+        # Write standard table
+        f.write(
+            "\\begin{table}\n\\centering\n\\caption{TODO}\n\\resizebox{1\\textwidth}{!}{\n\\begin{tabular}{l|l|" + "c" * len(
+                algorithms) + "}\n\\toprule\n")
+        f.write("\\textbf{Dataset} & \\textbf{Metric}  & " + " & ".join(algorithms) + "\\\\\n\\midrule\n")
+        # Write values into table
+        for j, d in enumerate(datasets):
+            for i, m in enumerate(metrics):
+                # Write name of dataset and metric
+                if i == 0:
+                    to_write = d + " & " + m
+                else:
+                    to_write = "& " + m
+                # Get all values from the experiments (are stored separately to calculated min values)
+                all_values = []
+                for a in algorithms:
+                    mean_value = df[a, m][d, "mean"]
+                    if in_percent and m not in ["n_clusters", "runtime"]:
+                        mean_value *= 100
+                    mean_value = np.round(mean_value, decimals=decimal_places)
+                    all_values.append(mean_value)
+                all_values_sorted = np.unique(all_values)  # automatically sorted
+                for mean_value in all_values:
+                    # If standard deviation is contained in the dataframe, information will be added
+                    if use_std and std_contained:
+                        std_value = df[a, m][d, "std"]
+                        if in_percent and m not in ["n_clusters", "runtime"]:
+                            std_value *= 100
+                        std_value = np.round(std_value, decimals=decimal_places)
+                        value_write = "$" + str(mean_value) + " \\pm " + str(std_value) + "$"
+                    else:
+                        value_write = "$" + str(mean_value) + "$"
+                    # Optional: Write best value in bold and second best underlined
+                    if best_in_bold and ((mean_value == all_values_sorted[-1] and m != "runtime") or (
+                            mean_value == all_values_sorted[0] and m == "runtime")):
+                        value_write = "\\bm{" + value_write + "}"
+                    elif second_best_underlined and ((mean_value == all_values_sorted[-2] and m != "runtime") or (
+                            mean_value == all_values_sorted[1] and m == "runtime")):
+                        value_write = "\\underline{" + value_write + "}"
+                    # Optional: Color cells by value difference
+                    if color_by_value is not None:
+                        color_value = int((mean_value - all_values_sorted[0]) / (
+                                all_values_sorted[-1] - all_values_sorted[0]) * 45) + 5
+                        value_write = "\cellcolor{blue!" + str(color_value) + "}" + value_write
+                    to_write += " & " + value_write
+                to_write += "\\\\\n"
+                f.write(to_write)
+            if j != len(datasets) - 1:
+                f.write("\\midrule\n")
+            else:
+                f.write("\\bottomrule\n\\end{tabular}}\n\\end{table}")
+
+
 class EvaluationDataset():
     """
     The EvaluationDataset object is a wrapper for actual data sets.
