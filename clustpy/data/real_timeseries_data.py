@@ -39,7 +39,7 @@ def _load_timeseries_classification_data(dataset_name: str, subset: str, labels_
     if not os.path.isfile(filename):
         if not os.path.isdir(directory):
             os.mkdir(directory)
-        _download_file("http://www.timeseriesclassification.com/ClassificationDownloads/" + dataset_name + ".zip",
+        _download_file("http://www.timeseriesclassification.com/aeon-toolkit/" + dataset_name + ".zip",
                        filename)
         # Unpack zipfile
         with zipfile.ZipFile(filename, 'r') as zipf:
