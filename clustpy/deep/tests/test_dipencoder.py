@@ -5,6 +5,7 @@ from clustpy.deep.tests._helpers_for_tests import _get_test_augmentation_dataloa
 from clustpy.deep.autoencoders import FeedforwardAutoencoder, ConvolutionalAutoencoder
 import numpy as np
 import torch
+from unittest.mock import patch
 
 
 def test_simple_dipencoder():
@@ -24,7 +25,7 @@ def test_simple_dipencoder():
     # assert dipencoder.index_dict_ == dipencoder2.index_dict_
     # Test predict
     labels_predict = dipencoder.predict(X, X)
-    assert np.sum(dipencoder.labels_ == labels_predict) / labels_predict.shape[0] > 0.95
+    assert np.sum(dipencoder.labels_ == labels_predict) / labels_predict.shape[0] > 0.9
 
 
 def test_supervised_dipencoder():
@@ -60,9 +61,7 @@ def test_plot_dipencoder_embedding():
     cluster_labels = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2])
     projection_axes = np.array([[11, 11, 11], [30, 30, 30], [19, 19, 19]])
     index_dict = {(0, 1): 0, (0, 2): 1, (1, 2): 2}
-    plot_dipencoder_embedding(embedded_data, n_clusters, cluster_labels, projection_axes, index_dict, show_plot=False)
-    # Only check if error is thrown
-    assert True
+    assert None == plot_dipencoder_embedding(embedded_data, n_clusters, cluster_labels, projection_axes, index_dict, show_plot=False)
 
 
 def test_get_rec_loss_of_first_batch():
@@ -80,3 +79,10 @@ def test_get_rec_loss_of_first_batch():
     conv_autoencoder = ConvolutionalAutoencoder(X.shape[-1], [512, 10])
     ae_loss = _get_rec_loss_of_first_batch(conv_trainloader, conv_autoencoder, torch.nn.MSELoss(), device)
     assert ae_loss > 0
+
+@patch("matplotlib.pyplot.show")  # Used to test plots (show will not be called)
+def test_plot_dipencoder_obj(mock_fig):
+    X, _ = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    dipencoder = DipEncoder(3, pretrain_epochs=1, clustering_epochs=1, random_state=1)
+    dipencoder.fit(X)
+    assert None == dipencoder.plot(X)

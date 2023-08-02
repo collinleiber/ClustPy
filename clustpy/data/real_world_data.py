@@ -1149,6 +1149,7 @@ def load_imagenet_dog(subset: str = "all",
     -------
     http://vision.stanford.edu/aditya86/ImageNetDogs/main.html
     """
+    assert len(image_size) == 2, "image_size format must match (width, height)"
     subset = subset.lower()
     assert subset in ["all", "train",
                       "test"], "subset must match 'all', 'train' or 'test'. Your input {0}".format(subset)
@@ -1188,9 +1189,11 @@ def load_imagenet_dog(subset: str = "all",
     for i, file in enumerate(file_list):
         file = file[0][0]
         if file.split("/")[0] in breeds:
-            image_data = Image.open(directory + "/Images/" + file).convert("RGB")
+            image = Image.open(directory + "/Images/" + file).convert("RGB")
             # Convert to coherent size
-            image_data = image_data.resize(image_size)
+            image = image.resize(image_size)
+            image_data = np.asarray(image)
+            assert image_data.shape == (image_size[0], image_size[1], 3), "Size of image is not correct. Should be {0} but is {1}".format(image_size, image_data.shape)
             data_list.append(image_data)
             use_image[i] = True
         else:
