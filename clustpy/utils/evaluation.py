@@ -533,8 +533,10 @@ def evaluation_df_to_latex_table(df: pd.DataFrame, output_path: str, use_std: bo
                         value_write = "\\underline{" + value_write + "}"
                     # Optional: Color cells by value difference
                     if color_by_value is not None:
-                        color_saturation = int(round((mean_value - all_values_sorted[0]) / (
-                                all_values_sorted[-1] - all_values_sorted[0]) * 65)) + 5  # value between 5 and 70
+                        color_saturation = round((mean_value - all_values_sorted[0]) / (
+                                all_values_sorted[-1] - all_values_sorted[0]) * 65) + 5  # value between 5 and 70
+                        assert type(color_saturation) is int, "color_saturation must be an int but is {0}".format(
+                            type(color_saturation))
                         value_write = "\cellcolor{" + color_by_value + "!" + str(color_saturation) + "}" + value_write
                     to_write += " & " + value_write
                 to_write += "\\\\\n"

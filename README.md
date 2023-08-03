@@ -6,7 +6,7 @@
 [![codecov](https://codecov.io/gh/collinleiber/ClustPy/branch/main/graph/badge.svg?token=5AJYQFIYFR)](https://codecov.io/gh/collinleiber/ClustPy)
 [![Docs](https://readthedocs.org/projects/clustpy/badge/?version=latest)](https://clustpy.readthedocs.io/en/)
 
-The package provides a simple way to cluster data in Python.
+The package provides a simple way to perform clustering in Python.
 For this purpose it provides a variety of algorithms from different domains. 
 Additionally, ClustPy includes methods that are often needed for research purposes, such as plots, clustering metrics or evaluation methods.
 Further, it integrates various frequently used datasets (e.g., from the [UCI repository](https://archive.ics.uci.edu/)) through largely automated loading options. 

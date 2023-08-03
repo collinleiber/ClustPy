@@ -172,19 +172,8 @@ def test_evaluate_multiple_datasets():
 
 @pytest.fixture
 def cleanup_latex_table():
-    inputfile = "df.csv"
-    with open(inputfile, "w") as f:
-        f.write("algorithm,,Algo1,Algo1,Algo1,Algo2,Algo2,Algo2\n")
-        f.write("metric,,NMI,AMI,runtime,NMI,AMI,runtime\n")
-        f.write("Data1,0,0.11111,0.22222,12.34500,1.00000,1.00000,12.34500\n")
-        f.write("Data1,1,0.33333,0.22222,56.78900,0.80000,0.60000,43.21000\n")
-        f.write("Data1,mean,0.22222,0.22222,13.00000,0.90000,0.80000,33.12300\n")
-        f.write("Data1,std,0.11111,0.00000,1.00000,0.10000,0.20000,1.50000\n")
-        f.write("Data2,0,0.111,0.222,12.345,1.000,1.000,12.345\n")
-        f.write("Data2,1,0.333,0.222,56.789,0.800,0.600,43.210\n")
-        f.write("Data2,mean,0.222,0.222,13.000,0.900,0.800,33.123\n")
-        f.write("Data2,std,0.111,0.000,1.000,0.100,0.200,1.500\n")
     yield
+    inputfile = "df.csv"
     if os.path.isfile(inputfile):
         os.remove(inputfile)
     outputfile1 = "latex1.txt"
@@ -199,9 +188,6 @@ def cleanup_latex_table():
 def test_evaluation_df_to_latex_table():
     from sklearn.cluster import KMeans
     from sklearn.metrics import normalized_mutual_info_score as nmi, silhouette_score as silhouette
-    # Test with input file
-    assert None == evaluation_df_to_latex_table("df.csv", "latex1.txt", True, True, True, "red", True, 2)
-    assert os.path.isfile("latex1.txt")
     # Test with df
     X = np.array([[0, 0], [1, 1], [2, 2], [5, 5], [6, 6], [7, 7]])
     L = np.array([0] * 3 + [1] * 3)
@@ -215,7 +201,23 @@ def test_evaluation_df_to_latex_table():
                EvaluationMetric(name="silhouette", metric=silhouette, use_gt=False)]
     df = evaluate_multiple_datasets(evaluation_datasets=datasets, evaluation_algorithms=algorithms,
                                     evaluation_metrics=metrics, n_repetitions=n_repetitions, add_runtime=True,
-                                    add_n_clusters=True,
-                                    save_path=None, save_intermediate_results=False, random_state=1)
-    assert None == evaluation_df_to_latex_table(df, "latex2.txt", False, False, False, None, False, 0)
+                                    add_n_clusters=False,
+                                    save_path="df.csv", save_intermediate_results=False, random_state=1)
+    assert None == evaluation_df_to_latex_table(df, "latex1.txt", False, False, False, None, None, False, 0)
+    assert os.path.isfile("latex1.txt")
+    read_file1 = open("latex1.txt", "r").readlines()
+    # Test with input file
+    assert None == evaluation_df_to_latex_table("df.csv", "latex2.txt", True, True, True, "red", [True, False, False],
+                                                True, 2)
     assert os.path.isfile("latex2.txt")
+    read_file2 = open("latex2.txt", "r").readlines()
+    assert len(read_file1) == 18
+    assert len(read_file1) == len(read_file2)
+    equal_lines = list(range(8)) + [11] + list(range(15, 18))
+    non_equal_lines = [8, 9, 10, 12, 13, 14]
+    assert all([read_file1[i] == read_file2[i] for i in equal_lines])
+    assert all([read_file1[i] != read_file2[i] for i in non_equal_lines])
+    assert all(["pm" in read_file2[i] and "pm" not in read_file1[i] and
+                "bm" in read_file2[i] and "bm" not in read_file1[i] and
+                "underline" in read_file2[i] and "underline" not in read_file1[i] and
+                "cellcolor" in read_file2[i] and "cellcolor" not in read_file1[i] for i in non_equal_lines])
