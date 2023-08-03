@@ -442,7 +442,8 @@ def evaluate_multiple_datasets(evaluation_datasets: list, evaluation_algorithms:
 
 def evaluation_df_to_latex_table(df: pd.DataFrame, output_path: str, use_std: bool = True, best_in_bold: bool = True,
                                  second_best_underlined: bool = True, color_by_value: str = None,
-                                 in_percent: int = True, decimal_places: int = 1) -> None:
+                                 higher_is_better: list = None, in_percent: int = True,
+                                 decimal_places: int = 1) -> None:
     """
     Convert the resulting dataframe of an evaluation into a latex table.
     This method will only consider the mean values. Therefore, note that "mean" must be included in the aggregations!
@@ -465,6 +466,10 @@ def evaluation_df_to_latex_table(df: pd.DataFrame, output_path: str, use_std: bo
         Define the color that should be used to indicate the difference between the values of the metrics.
         Uses colorcell, so usepackage{colortbl} or usepackage[table]{xcolor} must be included in the latex file.
         Can be 'blue' for example (default: None)
+    higher_is_better : list
+        List with booleans. Each value indicates if a high value for a certain metric is better than a low value.
+        The length of the list must be equal to the number of different metrics.
+        If None, it is always assumed that a higher value is better, except for the runtime (default: None)
     in_percent : bool
         If true, all values, except n_clusters and runtime, will be converted to percentages -> all values will be multiplied by 100 (default: True)
     decimal_places : int
@@ -478,6 +483,9 @@ def evaluation_df_to_latex_table(df: pd.DataFrame, output_path: str, use_std: bo
     datasets = list(dict.fromkeys([s[0] for s in df.index]))
     algorithms = list(dict.fromkeys([s[0] for s in df.keys()]))
     metrics = list(dict.fromkeys([s[1] for s in df.keys()]))
+    assert higher_is_better is None or len(higher_is_better) == len(
+        metrics), "Length of higher_is_better and the number of metrics does not match. higher_is_better = {0} (length {1}), metrics = {2} (length {3})".format(
+        higher_is_better, len(higher_is_better), metrics, len(metrics))
     std_contained = "std" in [s[1] for s in df.index]
     # Write output
     with open(output_path, "w") as f:
@@ -489,6 +497,8 @@ def evaluation_df_to_latex_table(df: pd.DataFrame, output_path: str, use_std: bo
         # Write values into table
         for j, d in enumerate(datasets):
             for i, m in enumerate(metrics):
+                # Check if a higher value is better for this metric
+                metric_is_higher_better = (m != "runtime") if higher_is_better is None else higher_is_better[i]
                 # Write name of dataset and metric
                 if i == 0:
                     to_write = d + " & " + m
@@ -514,17 +524,18 @@ def evaluation_df_to_latex_table(df: pd.DataFrame, output_path: str, use_std: bo
                     else:
                         value_write = "$" + str(mean_value) + "$"
                     # Optional: Write best value in bold and second best underlined
-                    if best_in_bold and ((mean_value == all_values_sorted[-1] and m != "runtime") or (
-                            mean_value == all_values_sorted[0] and m == "runtime")):
+                    if best_in_bold and ((mean_value == all_values_sorted[-1] and metric_is_higher_better) or (
+                            mean_value == all_values_sorted[0] and not metric_is_higher_better)):
                         value_write = "\\bm{" + value_write + "}"
-                    elif second_best_underlined and ((mean_value == all_values_sorted[-2] and m != "runtime") or (
-                            mean_value == all_values_sorted[1] and m == "runtime")):
+                    elif second_best_underlined and (
+                            (mean_value == all_values_sorted[-2] and metric_is_higher_better) or (
+                            mean_value == all_values_sorted[1] and not metric_is_higher_better)):
                         value_write = "\\underline{" + value_write + "}"
                     # Optional: Color cells by value difference
                     if color_by_value is not None:
-                        color_value = int((mean_value - all_values_sorted[0]) / (
-                                all_values_sorted[-1] - all_values_sorted[0]) * 45) + 5
-                        value_write = "\cellcolor{" + color_by_value + "!" + str(color_value) + "}" + value_write
+                        color_saturation = int(round((mean_value - all_values_sorted[0]) / (
+                                all_values_sorted[-1] - all_values_sorted[0]) * 65)) + 5  # value between 5 and 70
+                        value_write = "\cellcolor{" + color_by_value + "!" + str(color_saturation) + "}" + value_write
                     to_write += " & " + value_write
                 to_write += "\\\\\n"
                 f.write(to_write)
