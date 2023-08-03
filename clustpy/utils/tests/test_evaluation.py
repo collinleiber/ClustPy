@@ -186,17 +186,18 @@ def cleanup_latex_table():
 
 @pytest.mark.usefixtures("cleanup_latex_table")
 def test_evaluation_df_to_latex_table():
-    from sklearn.cluster import KMeans
+    from sklearn.cluster import KMeans, SpectralClustering
     from sklearn.metrics import normalized_mutual_info_score as nmi, silhouette_score as silhouette
     # Test with df
-    X = np.array([[0, 0], [1, 1], [2, 2], [5, 5], [6, 6], [7, 7]])
-    L = np.array([0] * 3 + [1] * 3)
+    X, L = create_subspace_data(1500, subspace_features=(4, 10), random_state=1)
+    X2, L2 = create_subspace_data(1500, subspace_features=(2, 10), random_state=1)
     n_repetitions = 2
     datasets = [EvaluationDataset(name="Data1", data=X, labels_true=L),
-                EvaluationDataset(name="Data2", data=X * 2, labels_true=L)]
+                EvaluationDataset(name="Data2", data=X2, labels_true=L2)]
     algorithms = [
-        EvaluationAlgorithm(name="KMeans1", algorithm=KMeans, params={"n_clusters": 2}),
-        EvaluationAlgorithm(name="KMeans2", algorithm=KMeans, params={"n_clusters": 3})]
+        EvaluationAlgorithm(name="KMeans1", algorithm=KMeans, params={"n_clusters": 6}),
+        EvaluationAlgorithm(name="KMeans2", algorithm=KMeans, params={"n_clusters": 3}),
+        EvaluationAlgorithm(name="Spectral", algorithm=SpectralClustering, params={"n_clusters": None})]
     metrics = [EvaluationMetric(name="nmi", metric=nmi, params={"average_method": "geometric"}, use_gt=True),
                EvaluationMetric(name="silhouette", metric=silhouette, use_gt=False)]
     df = evaluate_multiple_datasets(evaluation_datasets=datasets, evaluation_algorithms=algorithms,
@@ -217,7 +218,7 @@ def test_evaluation_df_to_latex_table():
     non_equal_lines = [8, 9, 10, 12, 13, 14]
     assert all([read_file1[i] == read_file2[i] for i in equal_lines])
     assert all([read_file1[i] != read_file2[i] for i in non_equal_lines])
-    assert all(["pm" in read_file2[i] and "pm" not in read_file1[i] and
-                "bm" in read_file2[i] and "bm" not in read_file1[i] and
-                "underline" in read_file2[i] and "underline" not in read_file1[i] and
-                "cellcolor" in read_file2[i] and "cellcolor" not in read_file1[i] for i in non_equal_lines])
+    assert all(["pm" in read_file2[i] and "pm" not in read_file1[i] for i in non_equal_lines])
+    assert all(["bm" in read_file2[i] and "bm" not in read_file1[i] for i in non_equal_lines])
+    assert all(["underline" in read_file2[i] and "underline" not in read_file1[i] for i in non_equal_lines])
+    assert all(["cellcolor" in read_file2[i] and "cellcolor" not in read_file1[i] for i in non_equal_lines])
