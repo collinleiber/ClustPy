@@ -532,7 +532,7 @@ def evaluation_df_to_latex_table(df: pd.DataFrame, output_path: str, use_std: bo
                             mean_value == all_values_sorted[1] and not metric_is_higher_better)):
                         value_write = "\\underline{" + value_write + "}"
                     # Optional: Color cells by value difference
-                    if color_by_value is not None:
+                    if color_by_value is not None and all_values_sorted[-1] != all_values_sorted[0]:
                         color_saturation = round((mean_value - all_values_sorted[0]) / (
                                 all_values_sorted[-1] - all_values_sorted[0]) * 65) + 5  # value between 5 and 70
                         assert type(color_saturation) is int, "color_saturation must be an int but is {0}".format(
