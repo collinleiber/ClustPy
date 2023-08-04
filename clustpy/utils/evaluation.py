@@ -231,13 +231,18 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
                 start_time = time.time()
                 algo_obj = eval_algo.algorithm(**eval_algo.params)
                 # Check if algorithm uses an autoencoder and wether iteration_specific autoencoders are defined
-                if hasattr(algo_obj, "autoencoder") and iteration_specific_autoencoders is not None:
+                if iteration_specific_autoencoders is not None:
                     eval_autoencoder = iteration_specific_autoencoders[rep]
                     assert type(
                         eval_autoencoder) is EvaluationAutoencoder, "Each entry in iteration_specific_params must be a EvaluationAutoencoder"
-                    autoencoder = load_saved_autoencoder(eval_autoencoder.path, eval_autoencoder.autoencoder_class,
-                                                         eval_autoencoder.params)
-                    algo_obj.autoencoder = autoencoder
+                    if hasattr(algo_obj, "autoencoder"):
+                        autoencoder = load_saved_autoencoder(eval_autoencoder.path, eval_autoencoder.autoencoder_class,
+                                                             eval_autoencoder.params)
+                        algo_obj.autoencoder = autoencoder
+                    if eval_autoencoder.path_custom_dataloaders is not None and hasattr(algo_obj, "custom_dataloaders"):
+                        custom_dataloaders = (torch.load(eval_autoencoder.path_custom_dataloaders[0]),
+                                              torch.load(eval_autoencoder.path_custom_dataloaders[1]))
+                        algo_obj.custom_dataloaders = custom_dataloaders
                 try:
                     algo_obj.fit(X_processed)
                 except Exception as e:
@@ -435,6 +440,116 @@ def evaluate_multiple_datasets(evaluation_datasets: list, evaluation_algorithms:
     return all_dfs
 
 
+def evaluation_df_to_latex_table(df: pd.DataFrame, output_path: str, use_std: bool = True, best_in_bold: bool = True,
+                                 second_best_underlined: bool = True, color_by_value: str = None,
+                                 higher_is_better: list = None, in_percent: int = True,
+                                 decimal_places: int = 1) -> None:
+    """
+    Convert the resulting dataframe of an evaluation into a latex table.
+    This method will only consider the mean values. Therefore, note that "mean" must be included in the aggregations!
+    If "std" is also contained in the dataframe (and use_std is True) this value will also be added by using plusminus.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The pandas dataframe. Can also be a string that contains the path to the saved dataframe
+    output_path : std
+        The path were the resulting latex table text file will be stored
+    use_std : bool
+        Defines if the standard deviation (std) should also be added to the latex table (default: True)
+    best_in_bold : bool
+        Print best value for each combination of dataset and metric in bold.
+        Note, that the latex package bm is used, so usepackage{bm} must be included in the latex file (default: True)
+    second_best_underlined : bool
+        Print second-best value for each combination of dataset and metric underlined (default: True)
+    color_by_value : str
+        Define the color that should be used to indicate the difference between the values of the metrics.
+        Uses colorcell, so usepackage{colortbl} or usepackage[table]{xcolor} must be included in the latex file.
+        Can be 'blue' for example (default: None)
+    higher_is_better : list
+        List with booleans. Each value indicates if a high value for a certain metric is better than a low value.
+        The length of the list must be equal to the number of different metrics.
+        If None, it is always assumed that a higher value is better, except for the runtime (default: None)
+    in_percent : bool
+        If true, all values, except n_clusters and runtime, will be converted to percentages -> all values will be multiplied by 100 (default: True)
+    decimal_places : int
+        Number of decimal places that should be used in the latex table (default: 1)
+    """
+    # Load dataframe
+    assert type(df) == pd.DataFrame or type(df) == str, "Type of df must be pandas DataFrame or string (path to file)"
+    if type(df) == str:
+        df = pd.read_csv(df, index_col=[0, 1], header=[0, 1])
+    # Get main information from dataframe
+    datasets = list(dict.fromkeys([s[0] for s in df.index]))
+    algorithms = list(dict.fromkeys([s[0] for s in df.keys()]))
+    metrics = list(dict.fromkeys([s[1] for s in df.keys()]))
+    assert higher_is_better is None or len(higher_is_better) == len(
+        metrics), "Length of higher_is_better and the number of metrics does not match. higher_is_better = {0} (length {1}), metrics = {2} (length {3})".format(
+        higher_is_better, len(higher_is_better), metrics, len(metrics))
+    std_contained = "std" in [s[1] for s in df.index]
+    # Write output
+    with open(output_path, "w") as f:
+        # Write standard table
+        f.write(
+            "\\begin{table}\n\\centering\n\\caption{TODO}\n\\resizebox{1\\textwidth}{!}{\n\\begin{tabular}{l|l|" + "c" * len(
+                algorithms) + "}\n\\toprule\n")
+        f.write("\\textbf{Dataset} & \\textbf{Metric}  & " + " & ".join(algorithms) + "\\\\\n\\midrule\n")
+        # Write values into table
+        for j, d in enumerate(datasets):
+            for i, m in enumerate(metrics):
+                # Check if a higher value is better for this metric
+                metric_is_higher_better = (m != "runtime") if higher_is_better is None else higher_is_better[i]
+                # Write name of dataset and metric
+                if i == 0:
+                    to_write = d + " & " + m
+                else:
+                    to_write = "& " + m
+                # Get all values from the experiments (are stored separately to calculated min values)
+                all_values = []
+                for a in algorithms:
+                    mean_value = df[a, m][d, "mean"]
+                    if in_percent and m not in ["n_clusters", "runtime"]:
+                        mean_value *= 100
+                    mean_value = np.round(mean_value, decimals=decimal_places)
+                    all_values.append(mean_value)
+                all_values_sorted = np.unique(all_values)  # automatically sorted
+                for mean_value in all_values:
+                    # If standard deviation is contained in the dataframe, information will be added
+                    if use_std and std_contained:
+                        std_value = df[a, m][d, "std"]
+                        if in_percent and m not in ["n_clusters", "runtime"]:
+                            std_value *= 100
+                        std_value = np.round(std_value, decimals=decimal_places)
+                        value_write = "$" + str(mean_value) + " \\pm " + str(std_value) + "$"
+                    else:
+                        value_write = "$" + str(mean_value) + "$"
+                    # Optional: Write best value in bold and second best underlined
+                    if best_in_bold and ((mean_value == all_values_sorted[-1] and metric_is_higher_better) or (
+                            mean_value == all_values_sorted[0] and not metric_is_higher_better)):
+                        value_write = "\\bm{" + value_write + "}"
+                    elif second_best_underlined and (
+                            (mean_value == all_values_sorted[-2] and metric_is_higher_better) or (
+                            mean_value == all_values_sorted[1] and not metric_is_higher_better)):
+                        value_write = "\\underline{" + value_write + "}"
+                    # Optional: Color cells by value difference
+                    if color_by_value is not None:
+                        if all_values_sorted[-1] != all_values_sorted[0]:
+                            color_saturation = round((mean_value - all_values_sorted[0]) / (
+                                    all_values_sorted[-1] - all_values_sorted[0]) * 65) + 5  # value between 5 and 70
+                        else:
+                            color_saturation = 0
+                        assert type(color_saturation) is int, "color_saturation must be an int but is {0}".format(
+                            type(color_saturation))
+                        value_write = "\cellcolor{" + color_by_value + "!" + str(color_saturation) + "}" + value_write
+                    to_write += " & " + value_write
+                to_write += "\\\\\n"
+                f.write(to_write)
+            if j != len(datasets) - 1:
+                f.write("\\midrule\n")
+            else:
+                f.write("\\bottomrule\n\\end{tabular}}\n\\end{table}")
+
+
 class EvaluationDataset():
     """
     The EvaluationDataset object is a wrapper for actual data sets.
@@ -599,6 +714,7 @@ class EvaluationAutoencoder():
     """
     The EvaluationAutoencoder object is a wrapper for autoencoders that can be used by deep clustering algorithms.
     It contains all the information necessary to load a pretrained autoencoder that for the evaluate_dataset or evaluate_multiple_datasets method.
+    Can also contain paths to saved dataloaders (e.g. when using augmentation).
 
     Parameters
     ----------
@@ -608,6 +724,9 @@ class EvaluationAutoencoder():
         The actual autoencoder class
     params : dict
         Parameters given to the autoencoder class (default: {})
+    path_custom_dataloaders : tuple
+        Tuple containing the path of saved dataloaders.
+        First entry is for the saved trainloader and second for the saved testloader (default: None)
 
     Examples
     ----------
@@ -615,10 +734,16 @@ class EvaluationAutoencoder():
     >>> ea = EvaluationAutoencoder(path="PATH", autoencoder_class=FeedforwardAutoencoder, params={"layers": [256, 128, 64, 10], "bias": False})
     """
 
-    def __init__(self, path: str, autoencoder_class: torch.nn.Module, params: dict = {}):
+    def __init__(self, path: str, autoencoder_class: torch.nn.Module, params: dict = {},
+                 path_custom_dataloaders: tuple = None):
         assert type(path) is str, "path must be a string"
         self.path = path
         assert issubclass(autoencoder_class, torch.nn.Module), "autoencoder_class must be a torch.nn.Module"
         self.autoencoder_class = autoencoder_class
         assert type(params) is dict, "params must be a dict"
         self.params = params
+        assert path_custom_dataloaders is None or (
+                len(path_custom_dataloaders) == 2 and type(path_custom_dataloaders[0]) is str and type(
+            path_custom_dataloaders[
+                1]) is str), "path_custom_dataloaders must be None or must contain the path to a saved trainloader at the first position and the path to a saved testloader at the second position"
+        self.path_custom_dataloaders = path_custom_dataloaders

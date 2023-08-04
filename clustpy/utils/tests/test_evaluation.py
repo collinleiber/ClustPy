@@ -1,6 +1,6 @@
 import torch
 from clustpy.utils import evaluate_multiple_datasets, evaluate_dataset, EvaluationAlgorithm, EvaluationDataset, \
-    EvaluationMetric, EvaluationAutoencoder, load_saved_autoencoder
+    EvaluationMetric, EvaluationAutoencoder, load_saved_autoencoder, evaluation_df_to_latex_table
 from clustpy.utils.evaluation import _preprocess_dataset, _get_n_clusters_from_algo
 import numpy as np
 from clustpy.deep.autoencoders import FeedforwardAutoencoder
@@ -168,3 +168,57 @@ def test_evaluate_multiple_datasets():
                                     aggregation_functions=aggregations, add_runtime=True, add_n_clusters=True,
                                     save_path=None, save_intermediate_results=False, random_state=1)
     assert df.shape == (len(datasets) * (n_repetitions + len(aggregations)), len(algorithms) * (len(metrics) + 2))
+
+
+@pytest.fixture
+def cleanup_latex_table():
+    yield
+    inputfile = "df.csv"
+    if os.path.isfile(inputfile):
+        os.remove(inputfile)
+    outputfile1 = "latex1.txt"
+    if os.path.isfile(outputfile1):
+        os.remove(outputfile1)
+    outputfile2 = "latex2.txt"
+    if os.path.isfile(outputfile2):
+        os.remove(outputfile2)
+
+
+@pytest.mark.usefixtures("cleanup_latex_table")
+def test_evaluation_df_to_latex_table():
+    from sklearn.cluster import KMeans, SpectralClustering
+    from sklearn.metrics import normalized_mutual_info_score as nmi, silhouette_score as silhouette
+    # Test with df
+    X, L = create_subspace_data(1500, subspace_features=(4, 10), random_state=1)
+    X2, L2 = create_subspace_data(1500, subspace_features=(2, 10), random_state=1)
+    n_repetitions = 2
+    datasets = [EvaluationDataset(name="Data1", data=X, labels_true=L),
+                EvaluationDataset(name="Data2", data=X2, labels_true=L2)]
+    algorithms = [
+        EvaluationAlgorithm(name="KMeans1", algorithm=KMeans, params={"n_clusters": 6}),
+        EvaluationAlgorithm(name="KMeans2", algorithm=KMeans, params={"n_clusters": 3}),
+        EvaluationAlgorithm(name="Spectral", algorithm=SpectralClustering, params={"n_clusters": None})]
+    metrics = [EvaluationMetric(name="nmi", metric=nmi, params={"average_method": "geometric"}, use_gt=True),
+               EvaluationMetric(name="silhouette", metric=silhouette, use_gt=False)]
+    df = evaluate_multiple_datasets(evaluation_datasets=datasets, evaluation_algorithms=algorithms,
+                                    evaluation_metrics=metrics, n_repetitions=n_repetitions, add_runtime=True,
+                                    add_n_clusters=False,
+                                    save_path="df.csv", save_intermediate_results=False, random_state=1)
+    assert None == evaluation_df_to_latex_table(df, "latex1.txt", False, False, False, None, None, False, 0)
+    assert os.path.isfile("latex1.txt")
+    read_file1 = open("latex1.txt", "r").readlines()
+    # Test with input file
+    assert None == evaluation_df_to_latex_table("df.csv", "latex2.txt", True, True, True, "red", [True, False, False],
+                                                True, 2)
+    assert os.path.isfile("latex2.txt")
+    read_file2 = open("latex2.txt", "r").readlines()
+    assert len(read_file1) == 18
+    assert len(read_file1) == len(read_file2)
+    equal_lines = list(range(8)) + [11] + list(range(15, 18))
+    non_equal_lines = [8, 9, 10, 12, 13, 14]
+    assert all([read_file1[i] == read_file2[i] for i in equal_lines])
+    assert all([read_file1[i] != read_file2[i] for i in non_equal_lines])
+    assert all(["pm" in read_file2[i] and "pm" not in read_file1[i] for i in non_equal_lines])
+    assert all(["bm" in read_file2[i] and "bm" not in read_file1[i] for i in non_equal_lines])
+    assert all(["underline" in read_file2[i] and "underline" not in read_file1[i] for i in non_equal_lines])
+    assert all(["cellcolor" in read_file2[i] and "cellcolor" not in read_file1[i] for i in non_equal_lines])

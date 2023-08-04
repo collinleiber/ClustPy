@@ -773,7 +773,6 @@ class DipEncoder(BaseEstimator, ClusterMixin):
         self.random_state = check_random_state(random_state)
         set_torch_seed(self.random_state)
         self.debug = debug
-        augmentation_invariance_check(self.augmentation_invariance, self.custom_dataloaders)
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DipEncoder':
         """
@@ -792,6 +791,7 @@ class DipEncoder(BaseEstimator, ClusterMixin):
         self : DipEncoder
             This instance of the DipEncoder
         """
+        augmentation_invariance_check(self.augmentation_invariance, self.custom_dataloaders)
         if y is not None:
             assert len(np.unique(y)) == self.n_clusters, "n_clusters must match number of unique labels in y."
         labels, projection_axes, index_dict, autoencoder = _dipencoder(X, self.n_clusters, self.embedding_size,

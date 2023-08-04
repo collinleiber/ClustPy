@@ -675,7 +675,6 @@ class DipDECK(BaseEstimator, ClusterMixin):
         self.random_state = check_random_state(random_state)
         set_torch_seed(self.random_state)
         self.debug = debug
-        augmentation_invariance_check(self.augmentation_invariance, self.custom_dataloaders)
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DipDECK':
         """
@@ -694,6 +693,7 @@ class DipDECK(BaseEstimator, ClusterMixin):
         self : DipDECK
             this instance of the DipDECK algorithm
         """
+        augmentation_invariance_check(self.augmentation_invariance, self.custom_dataloaders)
         labels, n_clusters, centers, autoencoder = _dip_deck(X, self.n_clusters_init, self.dip_merge_threshold,
                                                              self.cluster_loss_weight, self.max_n_clusters,
                                                              self.min_n_clusters, self.batch_size,

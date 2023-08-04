@@ -501,7 +501,6 @@ class DEC(BaseEstimator, ClusterMixin):
         self.random_state = check_random_state(random_state)
         self.use_reconstruction_loss = False
         set_torch_seed(self.random_state)
-        augmentation_invariance_check(self.augmentation_invariance, self.custom_dataloaders)
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DEC':
         """
@@ -520,6 +519,7 @@ class DEC(BaseEstimator, ClusterMixin):
         self : DEC
             this instance of the DEC algorithm
         """
+        augmentation_invariance_check(self.augmentation_invariance, self.custom_dataloaders)
         kmeans_labels, kmeans_centers, dec_labels, dec_centers, autoencoder = _dec(X, self.n_clusters, self.alpha,
                                                                                    self.batch_size,
                                                                                    self.pretrain_optimizer_params,

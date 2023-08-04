@@ -11,7 +11,7 @@ from unittest.mock import patch
 def test_simple_dipencoder():
     torch.use_deterministic_algorithms(True)
     X, labels = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
-    dipencoder = DipEncoder(3, pretrain_epochs=3, clustering_epochs=3, random_state=1)
+    dipencoder = DipEncoder(3, pretrain_epochs=3, clustering_epochs=3, random_state=1, debug=True)
     assert not hasattr(dipencoder, "labels_")
     dipencoder.fit(X)
     assert dipencoder.labels_.dtype == np.int32
