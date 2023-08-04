@@ -510,16 +510,17 @@ def evaluation_df_to_latex_table(df: pd.DataFrame, output_path: str, use_std: bo
                     mean_value = df[a, m][d, "mean"]
                     if in_percent and m not in ["n_clusters", "runtime"]:
                         mean_value *= 100
-                    mean_value = np.round(mean_value, decimals=decimal_places)
+                    mean_value = round(mean_value, decimal_places)
                     all_values.append(mean_value)
                 all_values_sorted = np.unique(all_values)  # automatically sorted
-                for mean_value in all_values:
+                for k, a in enumerate(algorithms):
+                    mean_value = all_values[k]
                     # If standard deviation is contained in the dataframe, information will be added
                     if use_std and std_contained:
                         std_value = df[a, m][d, "std"]
                         if in_percent and m not in ["n_clusters", "runtime"]:
                             std_value *= 100
-                        std_value = np.round(std_value, decimals=decimal_places)
+                        std_value = round(std_value, decimal_places)
                         value_write = "$" + str(mean_value) + " \\pm " + str(std_value) + "$"
                     else:
                         value_write = "$" + str(mean_value) + "$"
