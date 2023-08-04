@@ -7,6 +7,7 @@ from clustpy.deep.autoencoders import FeedforwardAutoencoder
 from clustpy.data import create_subspace_data
 import os
 import pytest
+import shutil
 
 
 def _add_value(X: np.ndarray, value: int = 1):
@@ -114,7 +115,7 @@ def test_evaluate_dataset_with_autoencoders():
     aes = []
     for path in [path1, path2]:
         ae = FeedforwardAutoencoder(layers=layers)
-        ae.fit(2, optimizer_params={"lr": 1e-3}, data=X, model_path=path)
+        ae.fit(1 if path == path1 else 10, optimizer_params={"lr": 1e-3}, data=X, model_path=path)
         aes.append(ae)
     autoencoders = [EvaluationAutoencoder(path1, FeedforwardAutoencoder, {"layers": layers}),
                     EvaluationAutoencoder(path2, FeedforwardAutoencoder, {"layers": layers})]
@@ -140,12 +141,22 @@ def test_evaluate_dataset_with_autoencoders():
     assert abs(df.at[0, ("DEC1", "silhouette")] - df.at[1, ("DEC1", "silhouette")]) > 1e-2  # is not equal
 
 
+@pytest.fixture
+def cleanup_labels_directory():
+    yield
+    labels_dir = "test_evaluate_multiple_datasets_labels_dir"
+    if os.path.isdir(labels_dir):
+        # Code that will run after the test
+        shutil.rmtree(labels_dir)
+
+
+@pytest.mark.usefixtures("cleanup_labels_directory")
 def test_evaluate_multiple_datasets():
     from sklearn.cluster import KMeans, DBSCAN
     from sklearn.metrics import normalized_mutual_info_score as nmi, silhouette_score as silhouette
-    from clustpy.data import load_iris
-    X = np.array([[0, 0], [1, 1], [2, 2], [5, 5], [6, 6], [7, 7]])
-    L = np.array([0] * 3 + [1] * 3)
+    from clustpy.data import load_soybean_large
+    X = np.array([[0, 0], [1, 1], [2, 2], [5, 5], [6, 6], [7, 7], [8, 8]])
+    L = np.array([0] * 4 + [1] * 3)
     X2 = np.c_[X, L]
     n_repetitions = 2
     aggregations = [np.mean, np.std, np.max]
@@ -158,16 +169,18 @@ def test_evaluate_multiple_datasets():
                             deterministic=True)]
     metrics = [EvaluationMetric(name="nmi", metric=nmi, params={"average_method": "geometric"}, use_gt=True),
                EvaluationMetric(name="silhouette", metric=silhouette, use_gt=False)]
-    datasets = [EvaluationDataset(name="iris", data=load_iris, preprocess_methods=[_add_value],
-                                  preprocess_params=[{"value": 2}]),
-                EvaluationDataset(name="X", data=X, labels_true=L),
-                EvaluationDataset(name="X2", data=X2, labels_true=-1, ignore_algorithms=["KMeans_with_preprocess"])
+    datasets = [EvaluationDataset(name="X", data=X, labels_true=L),
+                EvaluationDataset(name="soybean", data=load_soybean_large, preprocess_methods=[_add_value],
+                                  preprocess_params=[{"value": 2}], train_test_split=True),
+                EvaluationDataset(name="X2", data=X2, labels_true=-1, ignore_algorithms=["DBSCAN"],
+                                  train_test_split=[1, 4, 5])
                 ]
     df = evaluate_multiple_datasets(evaluation_datasets=datasets, evaluation_algorithms=algorithms,
                                     evaluation_metrics=metrics, n_repetitions=n_repetitions,
                                     aggregation_functions=aggregations, add_runtime=True, add_n_clusters=True,
-                                    save_path=None, save_intermediate_results=False, random_state=1)
-    assert df.shape == (len(datasets) * (n_repetitions + len(aggregations)), len(algorithms) * (len(metrics) + 2))
+                                    save_path=None, save_intermediate_results=False, random_state=1,
+                                    save_labels_path="test_evaluate_multiple_datasets_labels_dir/labels.csv")
+    assert df.shape == (len(datasets) * (n_repetitions + len(aggregations)), len(algorithms) * (len(metrics) * 2 + 2))
 
 
 @pytest.fixture

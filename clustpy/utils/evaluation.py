@@ -6,6 +6,7 @@ from sklearn.utils import check_random_state
 from sklearn.base import ClusterMixin
 from collections.abc import Callable
 import os
+import inspect
 
 
 def load_saved_autoencoder(path: str, autoencoder_class: torch.nn.Module, params: dict = {}) -> torch.nn.Module:
@@ -102,6 +103,7 @@ def _get_n_clusters_from_algo(algo_obj: ClusterMixin) -> int:
 
 def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metrics: list = None,
                      labels_true: np.ndarray = None, n_repetitions: int = 10,
+                     X_test: np.ndarray = None, labels_true_test: np.ndarray = None,
                      iteration_specific_autoencoders: list = None, aggregation_functions: list = [np.mean, np.std],
                      add_runtime: bool = True, add_n_clusters: bool = False, save_path: str = None,
                      save_labels_path: str = None, ignore_algorithms: list = [],
@@ -123,6 +125,10 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
         The ground truth labels of the data set (default: None)
     n_repetitions : int
         Number of times that the clustering procedure should be executed on the same data set (default: 10)
+    X_test : np.ndarray
+        An optional test data set that will be evaluated using the predict method of the clustering algorithms (default: None)
+    labels_true_test : np.ndarray
+        The ground truth labels of the test data set (default: None)
     iteration_specific_autoencoders : list
         List containing EvaluationAutoencoder objects for each iteration of deep clustering algorithm.
         Length of the list must be equal to 'n_repetitions'.
@@ -190,14 +196,16 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
     seeds = random_state.choice(10000, n_repetitions, replace=False)
     algo_names = [a.name for a in evaluation_algorithms]
     metric_names = [] if evaluation_metrics is None else [m.name for m in evaluation_metrics]
+    if X_test is not None:
+        metric_names += [mn + "_TEST" for mn in metric_names]
     # Add additional columns
     if add_runtime:
         metric_names += ["runtime"]
     if add_n_clusters:
         metric_names += ["n_clusters"]
     header = pd.MultiIndex.from_product([algo_names, metric_names], names=["algorithm", "metric"])
-    data = np.zeros((n_repetitions, len(algo_names) * len(metric_names)))
-    df = pd.DataFrame(data, columns=header, index=range(n_repetitions))
+    value_placeholder = np.zeros((n_repetitions, len(algo_names) * len(metric_names)))
+    df = pd.DataFrame(value_placeholder, columns=header, index=range(n_repetitions))
     for eval_algo in evaluation_algorithms:
         automatically_set_n_clusters = False
         try:
@@ -220,8 +228,13 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
             # Algorithms can preprocess datasets (e.g. PCA + K-means)
             if eval_algo.preprocess_methods is not None:
                 X_processed = _preprocess_dataset(X, eval_algo.preprocess_methods, eval_algo.preprocess_params)
+                if X_test is not None:
+                    X_test_processed = _preprocess_dataset(X_test, eval_algo.preprocess_methods,
+                                                           eval_algo.preprocess_params)
             else:
                 X_processed = X
+                if X_test is not None:
+                    X_test_processed = X_test
             # Execute the algorithm multiple times
             for rep in range(n_repetitions):
                 print("- Iteration {0}".format(rep))
@@ -249,6 +262,20 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
                     print("Execution of {0} raised an exception in iteration {1}".format(eval_algo.name, rep))
                     print(e)
                     continue
+                # Optional: Obtain labels from the predict method
+                if X_test is not None:
+                    try:
+                        predict_params = inspect.getfullargspec(algo_obj.predict).args
+                        # Normally, there should not be X_train and X_test as input
+                        if "X_train" in predict_params and "X_test" in predict_params:
+                            labels_predicted_test = algo_obj.predict(X_train=X_processed,
+                                                                     X_test=X_test_processed)  # TODO Remove special case for DipEncoder
+                        else:
+                            labels_predicted_test = algo_obj.predict(X_test_processed)
+                    except Exception as e:
+                        print("Problem when running the predict method of {0} in iteration {1}".format(eval_algo.name, rep))
+                        print(e)
+                        labels_predicted_test = None
                 runtime = time.time() - start_time
                 if add_runtime:
                     df.at[rep, (eval_algo.name, "runtime")] = runtime
@@ -266,6 +293,11 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
                     if parent_directory != "" and not os.path.isdir(parent_directory):
                         os.makedirs(parent_directory)
                     np.savetxt(save_labels_path_algo, algo_obj.labels_)
+                    # Also save predict labels
+                    if X_test is not None and labels_predicted_test is not None:
+                        save_labels_path_algo_test = "{0}_TEST.{1}".format(save_labels_path_algo.split(".")[0],
+                                                                           save_labels_path_algo.split(".")[1])
+                        np.savetxt(save_labels_path_algo_test, labels_predicted_test)
                 # Get result of all metrics
                 if evaluation_metrics is not None:
                     for eval_metric in evaluation_metrics:
@@ -275,24 +307,36 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
                             if eval_metric.use_gt:
                                 assert labels_true is not None, "Ground truth can not be None if it is used for the chosen metric"
                                 result = eval_metric.method(labels_true, algo_obj.labels_, **eval_metric.params)
+                                if X_test is not None and labels_predicted_test is not None:
+                                    result_test = eval_metric.method(labels_true_test, labels_predicted_test,
+                                                                     **eval_metric.params)
                             else:
                                 # Metric does not use ground truth (e.g. Silhouette, ...)
                                 result = eval_metric.method(X, algo_obj.labels_, **eval_metric.params)
+                                if X_test is not None and labels_predicted_test is not None:
+                                    result_test = eval_metric.method(X_test, labels_predicted_test, **eval_metric.params)
                             df.at[rep, (eval_algo.name, eval_metric.name)] = result
                             print("-- {0}: {1}".format(eval_metric.name, result))
+                            if X_test is not None and labels_predicted_test is not None:
+                                df.at[rep, (eval_algo.name, eval_metric.name + "_TEST")] = result_test
+                                print("-- {0} (TEST): {1}".format(eval_metric.name, result_test))
                         except Exception as e:
                             print("Metric {0} raised an exception and will be skipped".format(eval_metric.name))
                             print(e)
                 if eval_algo.deterministic:
-                    if add_runtime:
-                        df.at[np.arange(1, n_repetitions), (eval_algo.name, "runtime")] = df.at[
-                            0, (eval_algo.name, "runtime")]
-                    if add_n_clusters:
-                        df.at[np.arange(1, n_repetitions), (eval_algo.name, "n_clusters")] = df.at[
-                            0, (eval_algo.name, "n_clusters")]
-                    for eval_metric in evaluation_metrics:
-                        df.at[np.arange(1, n_repetitions), (eval_algo.name, eval_metric.name)] = df.at[
-                            0, (eval_algo.name, eval_metric.name)]
+                    for element in range(1, n_repetitions):
+                        if add_runtime:
+                            df.at[element, (eval_algo.name, "runtime")] = df.at[
+                                0, (eval_algo.name, "runtime")]
+                        if add_n_clusters:
+                            df.at[element, (eval_algo.name, "n_clusters")] = df.at[
+                                0, (eval_algo.name, "n_clusters")]
+                        for eval_metric in evaluation_metrics:
+                            df.at[element, (eval_algo.name, eval_metric.name)] = df.at[
+                                0, (eval_algo.name, eval_metric.name)]
+                            if X_test is not None:
+                                df.at[element, (eval_algo.name, eval_metric.name + "_TEST")] = df.at[
+                                    0, (eval_algo.name, eval_metric.name + "_TEST")]
                     break
         except Exception as e:
             print("Algorithm {0} raised an exception and will be skipped".format(eval_algo.name))
@@ -395,24 +439,16 @@ def evaluate_multiple_datasets(evaluation_datasets: list, evaluation_algorithms:
         try:
             assert type(eval_data) is EvaluationDataset, "All datasets must be of type EvaluationDataset"
             print("=== Start evaluation of {0} ===".format(eval_data.name))
-            # If data is a path read file. If it is a callable load data
-            labels_true = None
-            if type(eval_data.data) is str:
-                X = np.genfromtxt(eval_data.data, **eval_data.data_loader_params)
-            elif type(eval_data.data) is np.ndarray:
-                X = eval_data.data
-            else:
-                X, labels_true = eval_data.data(**eval_data.data_loader_params)
-            # Check if ground truth columns are defined
-            if type(eval_data.labels_true) is int or type(eval_data.labels_true) is list:
-                labels_true = X[:, eval_data.labels_true]
-                X = np.delete(X, eval_data.labels_true, axis=1)
-            elif type(eval_data.labels_true) is np.ndarray:
-                labels_true = eval_data.labels_true
+            X, labels_true, X_test, labels_true_test = _get_data_and_labels_from_evaluation_dataset(eval_data.data,
+                                                                                                    eval_data.data_loader_params,
+                                                                                                    eval_data.labels_true,
+                                                                                                    eval_data.train_test_split)
             print("=== (Data shape: {0} / Ground truth shape: {1}) ===".format(X.shape,
                                                                                labels_true if labels_true is None else labels_true.shape))
             if eval_data.preprocess_methods is not None:
                 X = _preprocess_dataset(X, eval_data.preprocess_methods, eval_data.preprocess_params)
+                if X_test is not None:
+                    X_test = _preprocess_dataset(X_test, eval_data.preprocess_methods, eval_data.preprocess_params)
             inner_save_path = None if not save_intermediate_results else "{0}_{1}.{2}".format(save_path.split(".")[0],
                                                                                               eval_data.name,
                                                                                               save_path.split(".")[1])
@@ -420,7 +456,7 @@ def evaluate_multiple_datasets(evaluation_datasets: list, evaluation_algorithms:
                 save_labels_path.split(".")[0], eval_data.name, save_labels_path.split(".")[1])
             df = evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=evaluation_metrics,
                                   labels_true=labels_true,
-                                  n_repetitions=n_repetitions,
+                                  n_repetitions=n_repetitions, X_test=X_test, labels_true_test=labels_true_test,
                                   iteration_specific_autoencoders=eval_data.iteration_specific_autoencoders,
                                   aggregation_functions=aggregation_functions,
                                   add_runtime=add_runtime, add_n_clusters=add_n_clusters, save_path=inner_save_path,
@@ -438,6 +474,69 @@ def evaluate_multiple_datasets(evaluation_datasets: list, evaluation_algorithms:
             os.makedirs(parent_directory)
         all_dfs.to_csv(save_path)
     return all_dfs
+
+
+def _get_data_and_labels_from_evaluation_dataset(data_input: np.ndarray, data_loader_params_input: dict,
+                                                 labels_input: np.ndarray, train_test_split: np.ndarray) -> (
+        np.ndarray, np.ndarray, np.ndarray, np.ndarray):
+    """
+    Use the parameters stored in the EvaluationDataset to load the data and the labels.
+    If specifies it will also load a distinct test dataset.
+
+    Parameters
+    ----------
+    data_input : np.ndarray
+        The actual data set. Can be a np.ndarray, a path to a data file (of type str) or a callable (e.g. a method from clustpy.data)
+    data_loader_params_input : dict
+        Dictionary containing the information necessary to load data from a function or file. Only relevant if data is of type callable or str
+    labels_input : np.ndarray
+        The ground truth labels. Can be a np.ndarray, an int or list specifying which columns of the data contain the labels or None if no ground truth labels are present.
+        If data is a callable, the ground truth labels can also be obtained by that function and labels_true can be None
+    train_test_split : bool
+        Specifies if the laoded dataset should be split into a train and test set. Can be of type bool, list or np.ndarray.
+        If train_test_split is a boolean and true, the data loader will use the parameter "subset" to load a train and test set. In that case data must be a callable.
+        If train_test_split is a list/np.ndarray, the entries specify the indices of the data array that should be used for the train set
+
+    Returns
+    -------
+    tuple : (np.ndarray, np.ndarray, np.ndarray, np.ndarray)
+        The dataset,
+        The labels (can be None),
+        The test dataset (can be None),
+        The test labels (can be None)
+    """
+    # If data is a path read file. If it is a callable load data
+    labels_true = None
+    X_test = None
+    labels_true_test = None
+    if type(data_input) is str:
+        X = np.genfromtxt(data_input, **data_loader_params_input)
+    elif type(data_input) is np.ndarray:
+        X = data_input
+    else:
+        data_loader_params = inspect.getfullargspec(data_input).args
+        # Check if dataset should be split in train and test set
+        if type(train_test_split) is bool and train_test_split and "subset" in data_loader_params:
+            X, labels_true = data_input(subset="train", **data_loader_params_input)
+            X_test, labels_true_test = data_input(subset="test", **data_loader_params_input)
+        else:
+            X, labels_true = data_input(**data_loader_params_input)
+    # Check if ground truth columns are defined
+    if type(labels_input) is int or type(labels_input) is list:
+        labels_true = X[:, labels_input]
+        X = np.delete(X, labels_input, axis=1)
+    elif type(labels_input) is np.ndarray:
+        labels_true = labels_input
+    # Check if dataset should be split in train and test set
+    if type(train_test_split) is list or type(train_test_split) is np.ndarray:
+        test_subset = np.zeros(X.shape[0], dtype=bool)
+        test_subset[train_test_split] = True
+        X_test = X[test_subset]
+        X = X[~test_subset]
+        if labels_true is not None:
+            labels_true_test = labels_true[test_subset]
+            labels_true = labels_true[~test_subset]
+    return X, labels_true, X_test, labels_true_test
 
 
 def evaluation_df_to_latex_table(df: pd.DataFrame, output_path: str, use_std: bool = True, best_in_bold: bool = True,
@@ -567,9 +666,14 @@ class EvaluationDataset():
         If data is a callable, the ground truth labels can also be obtained by that function and labels_true can be None (default: None)
     data_loader_params : dict
         Dictionary containing the information necessary to load data from a function or file. Only relevant if data is of type callable or str (default: {})
+    train_test_split : bool
+        Specifies if the laoded dataset should be split into a train and test set. Can be of type bool, list or np.ndarray.
+        If train_test_split is a boolean and true, the data loader will use the parameter "subset" to load a train and test set. In that case data must be a callable.
+        If train_test_split is a list/np.ndarray, the entries specify the indices of the data array that should be used for the train set (default: None)
     preprocess_methods : list
         Specify preprocessing steps before evaluating the data set.
-        Can be either a list of callable functions or a single callable function (default: None)
+        Can be either a list of callable functions or a single callable function.
+        Will also be applied to an optional test data set (default: None)
     preprocess_params : list
         List of dictionaries containing the parameters for the preprocessing methods.
         Needs one entry for each method in preprocess_methods.
@@ -594,7 +698,7 @@ class EvaluationDataset():
     """
 
     def __init__(self, name: str, data: np.ndarray, labels_true: np.ndarray = None, data_loader_params: dict = {},
-                 preprocess_methods: list = None, preprocess_params: list = {},
+                 train_test_split: bool = None, preprocess_methods: list = None, preprocess_params: list = {},
                  iteration_specific_autoencoders: list = None, ignore_algorithms: list = []):
         assert type(name) is str, "name must be a string"
         self.name = name
@@ -607,6 +711,11 @@ class EvaluationDataset():
         self.labels_true = labels_true
         assert type(data_loader_params) is dict, "data_loader_params must be a dict"
         self.data_loader_params = data_loader_params
+        assert train_test_split is None or type(train_test_split) is bool or type(train_test_split) is list or type(
+            train_test_split) is np.ndarray, "train_test_split must be None, a bool, list or numpy array"
+        assert type(train_test_split) is not bool or callable(
+            data), "If train_test_split is a bool, data must be callable"
+        self.train_test_split = train_test_split
         assert callable(preprocess_methods) or type(
             preprocess_methods) is list or preprocess_methods is None, "preprocess_methods must be a method, a list of methods or None"
         self.preprocess_methods = preprocess_methods
@@ -678,7 +787,8 @@ class EvaluationAlgorithm():
         In this case the algorithm will only be executed once even though a higher number of repetitions is specified when evaluating a data set (default: False)
     preprocess_methods : list
         Specify preprocessing steps performed on each data set before executing the clustering algorithm.
-        Can be either a list of callable functions or a single callable function (default: None)
+        Can be either a list of callable functions or a single callable function.
+        Will also be applied to an optional test data set (default: None)
     preprocess_params : list
         List of dictionaries containing the parameters for the preprocessing methods.
         Needs one entry for each method in preprocess_methods.
