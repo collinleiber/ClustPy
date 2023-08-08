@@ -198,7 +198,7 @@ def cleanup_latex_table():
 
 
 @pytest.mark.usefixtures("cleanup_latex_table")
-def test_evaluation_df_to_latex_table():
+def test_evaluation_df_to_latex_table_multiple_datasets():
     from sklearn.cluster import KMeans, SpectralClustering
     from sklearn.metrics import normalized_mutual_info_score as nmi, silhouette_score as silhouette
     # Test with df
@@ -231,6 +231,62 @@ def test_evaluation_df_to_latex_table():
     non_equal_lines = [8, 9, 10, 12, 13, 14]
     assert all([read_file1[i] == read_file2[i] for i in equal_lines])
     assert all([read_file1[i] != read_file2[i] for i in non_equal_lines])
+    assert len(read_file1[6].split("&")) == 5 and len(read_file2[6].split("&")) == 5
+    assert all([len(read_file1[i].split("&")) == 5 and len(read_file2[i].split("&")) == 5 for i in non_equal_lines])
+    for rf in [read_file1, read_file2]:
+        assert rf[5] == "\\toprule\n" and rf[7] == "\\midrule\n" and rf[11] == "\\midrule\n" and rf[
+            15] == "\\bottomrule\n"
+        assert rf[6] == "\\textbf{Dataset} & \\textbf{Metric} & KMeans1 & KMeans2 & Spectral\\\\\n"
+        assert rf[non_equal_lines[0]].startswith("Data1 & nmi &")
+        assert rf[non_equal_lines[1]].startswith("& silhouette &")
+        assert rf[non_equal_lines[2]].startswith("& runtime &")
+        assert rf[non_equal_lines[3]].startswith("Data2 & nmi &")
+        assert rf[non_equal_lines[4]].startswith("& silhouette &")
+        assert rf[non_equal_lines[5]].startswith("& runtime &")
+    assert all(["pm" in read_file2[i] and "pm" not in read_file1[i] for i in non_equal_lines])
+    assert all(["bm" in read_file2[i] and "bm" not in read_file1[i] for i in non_equal_lines])
+    assert all(["underline" in read_file2[i] and "underline" not in read_file1[i] for i in non_equal_lines])
+    assert all(["cellcolor" in read_file2[i] and "cellcolor" not in read_file1[i] for i in non_equal_lines])
+
+
+@pytest.mark.usefixtures("cleanup_latex_table")
+def test_evaluation_df_to_latex_table_single_dataset():
+    from sklearn.cluster import KMeans, SpectralClustering
+    from sklearn.metrics import normalized_mutual_info_score as nmi, silhouette_score as silhouette
+    # Test with df
+    X, L = create_subspace_data(1500, subspace_features=(4, 10), random_state=1)
+    n_repetitions = 2
+    algorithms = [
+        EvaluationAlgorithm(name="KMeans1", algorithm=KMeans, params={"n_clusters": 6}),
+        EvaluationAlgorithm(name="KMeans2", algorithm=KMeans, params={"n_clusters": 3}),
+        EvaluationAlgorithm(name="Spectral", algorithm=SpectralClustering, params={"n_clusters": None})]
+    metrics = [EvaluationMetric(name="nmi", metric=nmi, params={"average_method": "geometric"}, use_gt=True),
+               EvaluationMetric(name="silhouette", metric=silhouette, use_gt=False)]
+    df = evaluate_dataset(X=X, evaluation_algorithms=algorithms, evaluation_metrics=metrics, labels_true=L,
+                          n_repetitions=n_repetitions, add_runtime=True,
+                          add_n_clusters=False, save_path="df.csv", random_state=1)
+    assert None == evaluation_df_to_latex_table(df, "latex1.txt", False, False, False, None, None, False, 0)
+    assert os.path.isfile("latex1.txt")
+    read_file1 = open("latex1.txt", "r").readlines()
+    # Test with input file
+    assert None == evaluation_df_to_latex_table("df.csv", "latex2.txt", True, True, True, "red", [True, False, False],
+                                                True, 2)
+    assert os.path.isfile("latex2.txt")
+    read_file2 = open("latex2.txt", "r").readlines()
+    assert len(read_file1) == 14
+    assert len(read_file1) == len(read_file2)
+    equal_lines = list(range(8)) + list(range(11, 14))
+    non_equal_lines = [8, 9, 10]
+    assert all([read_file1[i] == read_file2[i] for i in equal_lines])
+    assert all([read_file1[i] != read_file2[i] for i in non_equal_lines])
+    assert len(read_file1[6].split("&")) == 4 and len(read_file2[6].split("&")) == 4
+    assert all([len(read_file1[i].split("&")) == 4 and len(read_file2[i].split("&")) == 4 for i in non_equal_lines])
+    for rf in [read_file1, read_file2]:
+        assert rf[5] == "\\toprule\n" and rf[7] == "\\midrule\n" and rf[11] == "\\bottomrule\n"
+        assert rf[6] == "\\textbf{Metric} & KMeans1 & KMeans2 & Spectral\\\\\n"
+        assert rf[non_equal_lines[0]].startswith("nmi &")
+        assert rf[non_equal_lines[1]].startswith("silhouette &")
+        assert rf[non_equal_lines[2]].startswith("runtime &")
     assert all(["pm" in read_file2[i] and "pm" not in read_file1[i] for i in non_equal_lines])
     assert all(["bm" in read_file2[i] and "bm" not in read_file1[i] for i in non_equal_lines])
     assert all(["underline" in read_file2[i] and "underline" not in read_file1[i] for i in non_equal_lines])

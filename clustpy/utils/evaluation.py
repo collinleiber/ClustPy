@@ -273,7 +273,8 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
                         else:
                             labels_predicted_test = algo_obj.predict(X_test_processed)
                     except Exception as e:
-                        print("Problem when running the predict method of {0} in iteration {1}".format(eval_algo.name, rep))
+                        print("Problem when running the predict method of {0} in iteration {1}".format(eval_algo.name,
+                                                                                                       rep))
                         print(e)
                         labels_predicted_test = None
                 runtime = time.time() - start_time
@@ -314,7 +315,8 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
                                 # Metric does not use ground truth (e.g. Silhouette, ...)
                                 result = eval_metric.method(X, algo_obj.labels_, **eval_metric.params)
                                 if X_test is not None and labels_predicted_test is not None:
-                                    result_test = eval_metric.method(X_test, labels_predicted_test, **eval_metric.params)
+                                    result_test = eval_metric.method(X_test, labels_predicted_test,
+                                                                     **eval_metric.params)
                             df.at[rep, (eval_algo.name, eval_metric.name)] = result
                             print("-- {0}: {1}".format(eval_metric.name, result))
                             if X_test is not None and labels_predicted_test is not None:
@@ -577,36 +579,53 @@ def evaluation_df_to_latex_table(df: pd.DataFrame, output_path: str, use_std: bo
     # Load dataframe
     assert type(df) == pd.DataFrame or type(df) == str, "Type of df must be pandas DataFrame or string (path to file)"
     if type(df) == str:
-        df = pd.read_csv(df, index_col=[0, 1], header=[0, 1])
+        df_file = open(df, "r").readlines()
+        multiple_datasets = df_file[2].split(",")[0] != "0"
+        df = pd.read_csv(df, index_col=[0, 1] if multiple_datasets else [0], header=[0, 1])
+    else:
+        multiple_datasets = isinstance(df.index, pd.MultiIndex)
     # Get main information from dataframe
-    datasets = list(dict.fromkeys([s[0] for s in df.index]))
+    if multiple_datasets:
+        datasets = list(dict.fromkeys([s[0] for s in df.index]))
+        std_contained = "std" in [s[1] for s in df.index]
+    else:
+        datasets = [None]
+        std_contained = "std" in [s for s in df.index]
     algorithms = list(dict.fromkeys([s[0] for s in df.keys()]))
     metrics = list(dict.fromkeys([s[1] for s in df.keys()]))
     assert higher_is_better is None or len(higher_is_better) == len(
         metrics), "Length of higher_is_better and the number of metrics does not match. higher_is_better = {0} (length {1}), metrics = {2} (length {3})".format(
         higher_is_better, len(higher_is_better), metrics, len(metrics))
-    std_contained = "std" in [s[1] for s in df.index]
     # Write output
     with open(output_path, "w") as f:
         # Write standard table
         f.write(
-            "\\begin{table}\n\\centering\n\\caption{TODO}\n\\resizebox{1\\textwidth}{!}{\n\\begin{tabular}{l|l|" + "c" * len(
-                algorithms) + "}\n\\toprule\n")
-        f.write("\\textbf{Dataset} & \\textbf{Metric}  & " + " & ".join(algorithms) + "\\\\\n\\midrule\n")
+            "\\begin{table}\n\\centering\n\\caption{TODO}\n\\resizebox{1\\textwidth}{!}{\n\\begin{tabular}{l|")
+        if multiple_datasets:
+            f.write("l|" + "c" * len(algorithms) + "}\n\\toprule\n\\textbf{Dataset} & ")
+        else:
+            f.write("c" * len(algorithms) + "}\n\\toprule\n")
+        f.write("\\textbf{Metric} & " + " & ".join(algorithms) + "\\\\\n\\midrule\n")
         # Write values into table
         for j, d in enumerate(datasets):
             for i, m in enumerate(metrics):
                 # Check if a higher value is better for this metric
                 metric_is_higher_better = (m != "runtime") if higher_is_better is None else higher_is_better[i]
                 # Write name of dataset and metric
-                if i == 0:
-                    to_write = d + " & " + m
+                if multiple_datasets:
+                    if i == 0:
+                        to_write = d + " & " + m
+                    else:
+                        to_write = "& " + m
                 else:
-                    to_write = "& " + m
+                    to_write = m
                 # Get all values from the experiments (are stored separately to calculated min values)
                 all_values = []
                 for a in algorithms:
-                    mean_value = df[a, m][d, "mean"]
+                    if multiple_datasets:
+                        mean_value = df[a, m][d, "mean"]
+                    else:
+                        mean_value = df[a, m]["mean"]
                     if in_percent and m not in ["n_clusters", "runtime"]:
                         mean_value *= 100
                     mean_value = round(mean_value, decimal_places)
@@ -616,7 +635,10 @@ def evaluation_df_to_latex_table(df: pd.DataFrame, output_path: str, use_std: bo
                     mean_value = all_values[k]
                     # If standard deviation is contained in the dataframe, information will be added
                     if use_std and std_contained:
-                        std_value = df[a, m][d, "std"]
+                        if multiple_datasets:
+                            std_value = df[a, m][d, "std"]
+                        else:
+                            std_value = df[a, m]["std"]
                         if in_percent and m not in ["n_clusters", "runtime"]:
                             std_value *= 100
                         std_value = round(std_value, decimal_places)
