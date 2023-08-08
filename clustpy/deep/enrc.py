@@ -1793,20 +1793,19 @@ def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers
         testloader = get_dataloader(X, batch_size, False, False)
     else:
         trainloader, testloader = custom_dataloaders
+        if debug: print("Custom dataloaders are used, X will be overwritten with testloader return values.")
+        _preprocessed = []
+        for batch in testloader: _preprocessed.append(batch[1])
+        X = torch.cat(_preprocessed)
 
     if trainloader.batch_size != batch_size:
+        if debug: print("WARNING: Specified batch_size differs from trainloader.batch_size. Will use trainloader.batch_size.")
         batch_size = trainloader.batch_size
 
     # Use subsample of the data if specified and subsample is smaller than dataset
     if init_subsample_size is not None and init_subsample_size > 0 and init_subsample_size < X.shape[0]:
         rand_idx = random_state.choice(X.shape[0], init_subsample_size, replace=False)
-        # pass preprocessing functions to the subsampleloader
-        if hasattr(trainloader.dataset, "orig_transforms_list"):
-            ds_kwargs = {"orig_transforms_list":deepcopy(trainloader.dataset.orig_transforms_list)}
-        else:
-            ds_kwargs = None
-        subsampleloader = get_dataloader(X[rand_idx], batch_size=batch_size, shuffle=False, drop_last=False, ds_kwargs=ds_kwargs)
-
+        subsampleloader = get_dataloader(X[rand_idx], batch_size=batch_size, shuffle=False, drop_last=False)
     else:
         subsampleloader = testloader
     if debug: print("Setup autoencoder")
