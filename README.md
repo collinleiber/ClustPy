@@ -111,6 +111,7 @@ Remove clustpy via pip to avoid ambiguities during development, e.g., when chang
 
 - Metrics
     - Confusion Matrix
+    - Fair Normalized Mutual Information (FNMI) [[Paper](https://dl.acm.org/doi/abs/10.1145/2808797.2809344)]
     - Information-Theoretic External Cluster-Validity Measure (DOM) [[Paper](https://dl.acm.org/doi/10.5555/2073876.2073893)]
     - Pair Counting Scores (f1, rand, jaccard, recall, precision) [[Paper](https://link.springer.com/article/10.1007/s10115-008-0150-6)]
     - Scores for multiple labelings (see alternative clustering algorithms)

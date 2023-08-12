@@ -2,6 +2,7 @@ import numpy as np
 from scipy.optimize import linear_sum_assignment
 from clustpy.metrics.confusion_matrix import ConfusionMatrix
 from scipy.special import comb
+from sklearn.metrics import normalized_mutual_info_score as nmi
 
 
 def _check_number_of_points(labels_true: np.ndarray, labels_pred: np.ndarray) -> bool:
@@ -140,8 +141,11 @@ def information_theoretic_external_cluster_validity_measure(labels_true: np.ndar
     # Get number of objects per predicted label
     hks = np.sum(cm.confusion_matrix, axis=0)
     # Calculate Q_0
-    empirical_conditional_entropy = cm.confusion_matrix / n_points * np.log(cm.confusion_matrix / hks)
-    empirical_conditional_entropy = - np.sum(empirical_conditional_entropy[~np.isnan(empirical_conditional_entropy)])
+    cm_tmp = cm.confusion_matrix.copy()  # Needed if some cells are 0 so log can be calculated
+    cm_tmp[cm_tmp == 0] = 1  # will later be multiplied by 0, so this does not change the final result
+    empirical_conditional_entropy = cm.confusion_matrix / n_points * np.log(cm_tmp / hks)
+    empirical_conditional_entropy = - np.sum(
+        empirical_conditional_entropy)  # [~np.isnan(empirical_conditional_entropy)])
     sum_binom_coefficient = np.sum([np.log(comb(hk + n_classes - 1, n_classes - 1)) for hk in hks])
     Q_0 = empirical_conditional_entropy + sum_binom_coefficient / n_points
     if scale:
@@ -156,3 +160,39 @@ def information_theoretic_external_cluster_validity_measure(labels_true: np.ndar
         # Scale Q_0 to receive final value
         Q_0 = (max_Q_0 - Q_0) / (max_Q_0 - min_Q_0)
     return Q_0
+
+
+def fair_normalized_mutual_information(labels_true: np.ndarray, labels_pred: np.ndarray):
+    """
+    Evaluate the quality of predicted labels by comparing it to the ground truth labels using the
+    fair normalized mutual information score. Often simply called FNMI.
+    A value of 1 indicates a perfect clustering result, a value of 0 indicates totally random result.
+    The FNMI punishes if the number of predicted clusters diverges from the ground truth number of clusters.
+    Therefore, it uses the normalized mutual information from sklearn and scales the value by using the predicted and ground truth number of clusters.
+
+    Parameters
+    ----------
+    labels_true : np.ndarray
+        The ground truth labels of the data set
+    labels_pred : np.ndarray
+        The labels as predicted by a clustering algorithm
+
+    Returns
+    -------
+    fnmi : float
+        The score between the two input label sets.
+
+    References
+    -------
+    Amelio, Alessia, and Clara Pizzuti. "Is normalized mutual information a fair measure for comparing community detection methods?."
+    Proceedings of the 2015 IEEE/ACM international conference on advances in social networks analysis and mining 2015. 2015.
+    """
+    # Get the normalized mutual information
+    my_nmi = nmi(labels_true, labels_pred)
+    # Get number of clusters
+    n_clusters_true = len(np.unique(labels_true))
+    n_clusters_pred = len(np.unique(labels_pred))
+    # Calculate FNMI
+    factor = np.exp(-abs(n_clusters_true - n_clusters_pred) / n_clusters_true)
+    fnmi = factor * my_nmi
+    return fnmi

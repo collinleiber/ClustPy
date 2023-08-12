@@ -1,8 +1,9 @@
 import numpy as np
 from clustpy.metrics import unsupervised_clustering_accuracy, variation_of_information, \
-    information_theoretic_external_cluster_validity_measure
+    information_theoretic_external_cluster_validity_measure, fair_normalized_mutual_information
 from clustpy.metrics.clustering_metrics import _check_number_of_points
 import pytest
+from sklearn.metrics import normalized_mutual_info_score as nmi
 
 
 def test_check_number_of_points():
@@ -56,3 +57,22 @@ def test_information_theoretic_external_cluster_validity_measure():
     assert scaled_result_3 >= 0 and scaled_result_3 <= 1
     assert non_scaled_result_1 < non_scaled_result_2 and non_scaled_result_2 < non_scaled_result_3
     assert scaled_result_1 > scaled_result_2 and scaled_result_2 > scaled_result_3
+
+
+def test_fair_normalized_mutual_information():
+    l1 = np.array([0, 0, 1, 1, 2, 2, 3, 3, 4, 4])
+    l2 = np.array([1, 1, 2, 2, 3, 3, 4, 4, 0, 0])
+    fnmi1 = fair_normalized_mutual_information(l1, l2)
+    assert fnmi1 == 1.0
+    l2 = np.array([0, 0, 1, 1, 1, 2, 3, 3, 4, 4])
+    fnmi2 = fair_normalized_mutual_information(l1, l2)
+    assert fnmi2 < fnmi1
+    assert fnmi2 == nmi(l1, l2)
+    l2 = np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+    fnmi3 = fair_normalized_mutual_information(l1, l2)
+    assert fnmi3 < fnmi2
+    assert fnmi3 < nmi(l1, l2)
+    l2 = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    fnmi4 = fair_normalized_mutual_information(l1, l2)
+    assert fnmi4 < fnmi3
+    assert fnmi4 == nmi(l1, l2)
