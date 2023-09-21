@@ -34,9 +34,9 @@ def _pgmeans(X, significance, n_projections, n_samples, n_new_centers, amount_ra
     amount_random_centers : float
         Amount of random centers tested. Must be a value in the range [0, 1].
         In total (n_new_centers * amount_random_centers) random centers will be tested.
-        The other possible centers will be chosen based on the probability densities of the current GMM modal
+        The other possible centers will be chosen based on the probability densities of the current GMM model
     n_clusters_init : int
-        The initial number of clusters. Can also by of type np.ndarray if initial cluster centers are specified
+        The initial number of clusters. Can also be of type np.ndarray if initial cluster centers are specified
     max_n_clusters : int
         Maximum number of clusters. Must be larger than n_clusters_init
     random_state : np.random.RandomState
