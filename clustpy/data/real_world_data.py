@@ -1,5 +1,5 @@
 from clustpy.data._utils import _download_file, _get_download_dir, _decompress_z_file, _load_data_file, \
-    _download_file_from_google_drive
+    _download_file_from_google_drive, _load_color_image_data
 import os
 import numpy as np
 import zipfile
@@ -10,7 +10,7 @@ from sklearn.datasets import fetch_20newsgroups, fetch_rcv1, load_iris as sk_loa
     load_breast_cancer as sk_load_breast_cancer
 import pandas as pd
 from scipy.io import loadmat
-from PIL import Image
+
 import torch
 from clustpy.data.real_torchvision_data import _torch_normalize_and_flatten
 
@@ -1189,11 +1189,7 @@ def load_imagenet_dog(subset: str = "all",
     for i, file in enumerate(file_list):
         file = file[0][0]
         if file.split("/")[0] in breeds:
-            image = Image.open(directory + "/Images/" + file).convert("RGB")
-            # Convert to coherent size
-            image = image.resize(image_size)
-            image_data = np.asarray(image)
-            assert image_data.shape == (image_size[0], image_size[1], 3), "Size of image is not correct. Should be {0} but is {1}".format(image_size, image_data.shape)
+            image_data = _load_color_image_data(directory + "/Images/" + file, image_size)
             data_list.append(image_data)
             use_image[i] = True
         else:

@@ -1,5 +1,6 @@
 from clustpy.data.tests._helpers_for_tests import _helper_test_data_loader, _check_normalized_channels
-from clustpy.data import load_usps, load_mnist, load_fmnist, load_kmnist, load_cifar10, load_svhn, load_stl10
+from clustpy.data import load_usps, load_mnist, load_fmnist, load_kmnist, load_cifar10, load_svhn, load_stl10, \
+    load_gtsrb
 import torchvision.datasets
 from pathlib import Path
 import os
@@ -30,6 +31,7 @@ def test_torchvision_data_methods():
     assert "CIFAR10" in dir(torchvision.datasets)
     assert "SVHN" in dir(torchvision.datasets)
     assert "STL10" in dir(torchvision.datasets)
+    assert "GTSRB" in dir(torchvision.datasets)
 
 
 # Do not skip USPS as it is the smallest dataset and can check the torchvision data loading mechanism
@@ -170,3 +172,23 @@ def test_load_stl10():
     # Test non-flatten
     data, _ = load_stl10("all", downloads_path=TEST_DOWNLOAD_PATH, flatten=False)
     assert data.shape == (13000, 3, 96, 96)
+
+
+@pytest.mark.largedata
+@pytest.mark.data
+def test_load_gtsrb():
+    # Full data set
+    data, labels = load_gtsrb("all", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)
+    _helper_test_data_loader(data, labels, 39270, 3072, 43)
+    _check_normalized_channels(data, 3, True)
+    # Train data set
+    data, labels = load_gtsrb("train", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=False)
+    _helper_test_data_loader(data, labels, 26640, 3072, 43)
+    _check_normalized_channels(data, 3, False)
+    # Test data set
+    data, labels = load_gtsrb("test", downloads_path=TEST_DOWNLOAD_PATH)
+    _helper_test_data_loader(data, labels, 12630, 3072, 43)
+    _check_normalized_channels(data, 3, False)
+    # Test non-flatten and different image size
+    data, _ = load_gtsrb("all", downloads_path=TEST_DOWNLOAD_PATH, flatten=False, image_size=(30, 30))
+    assert data.shape == (39270, 3, 30, 30)

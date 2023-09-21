@@ -164,10 +164,10 @@ def information_theoretic_external_cluster_validity_measure(labels_true: np.ndar
 
 def fair_normalized_mutual_information(labels_true: np.ndarray, labels_pred: np.ndarray):
     """
-    Evaluate the quality of predicted labels by comparing it to the ground truth labels using the
+    Evaluate the quality of predicted labels by comparing to the ground truth labels using the
     fair normalized mutual information score. Often simply called FNMI.
-    A value of 1 indicates a perfect clustering result, a value of 0 indicates totally random result.
-    The FNMI punishes if the number of predicted clusters diverges from the ground truth number of clusters.
+    A value of 1 indicates a perfect clustering result, a value of 0 indicates a totally random result.
+    The FNMI punishes results where the number of predicted clusters diverges from the ground truth number of clusters.
     Therefore, it uses the normalized mutual information from sklearn and scales the value by using the predicted and ground truth number of clusters.
 
     Parameters
@@ -187,6 +187,7 @@ def fair_normalized_mutual_information(labels_true: np.ndarray, labels_pred: np.
     Amelio, Alessia, and Clara Pizzuti. "Is normalized mutual information a fair measure for comparing community detection methods?."
     Proceedings of the 2015 IEEE/ACM international conference on advances in social networks analysis and mining 2015. 2015.
     """
+    _check_number_of_points(labels_true, labels_pred)
     # Get the normalized mutual information
     my_nmi = nmi(labels_true, labels_pred)
     # Get number of clusters

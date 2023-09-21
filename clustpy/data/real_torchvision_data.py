@@ -2,16 +2,61 @@ import torchvision
 import torch
 import numpy as np
 import ssl
-from clustpy.data._utils import _get_download_dir
+from clustpy.data._utils import _get_download_dir, _load_color_image_data
 
 """
 Load torchvision datasets
 """
 
 
+def _get_data_and_labels(dataset: torchvision.datasets.VisionDataset, image_size: tuple) -> (
+        torch.Tensor, torch.Tensor):
+    """
+    Extract data and labels from a torchvision dataset object.
+
+    Parameters
+    ----------
+    dataset : torchvision.datasets.VisionDataset
+        The torchvision dataset object
+    image_size : tuple
+        for some datasets (e.g., GTSRB) the images of various sizes must be converted into a coherent size.
+        The tuple equals (width, height) of the images
+
+    Returns
+    -------
+    data, labels : (torch.Tensor, torch.Tensor)
+        the data torch tensor, the labels torch tensor
+    """
+    if hasattr(dataset, "data"):
+        # USPS, MNIST, ... use data parameter
+        data = dataset.data
+        if hasattr(dataset, "targets"):
+            # USPS, MNIST, ... use targets
+            labels = dataset.targets
+        else:
+            # SVHN, STL10, ... use labels
+            labels = dataset.labels
+    else:
+        # GTSRB only gives path to images
+        labels = []
+        data_list = []
+        for path, label in dataset._samples:
+            labels.append(label)
+            image_data = _load_color_image_data(path, image_size)
+            data_list.append(image_data)
+        # Convert data form list to numpy array
+        data = np.array(data_list)
+        labels = np.array(labels)
+    if type(data) is np.ndarray:
+        # Transform numpy arrays to torch tensors. Needs to be done for eg USPS
+        data = torch.from_numpy(data)
+        labels = torch.from_numpy(np.array(labels))
+    return data, labels
+
+
 def _load_torch_image_data(data_source: torchvision.datasets.VisionDataset, subset: str, flatten: bool,
                            normalize_channels: bool, uses_train_param: bool, downloads_path: str,
-                           is_color_channel_last: bool) -> (np.ndarray, np.ndarray):
+                           is_color_channel_last: bool, image_size: tuple = None) -> (np.ndarray, np.ndarray):
     """
     Helper function to load a data set from the torchvision package.
     All data sets will be returned as a two-dimensional tensor, created out of the HWC (height, width, color channels) image representation.
@@ -34,6 +79,9 @@ def _load_torch_image_data(data_source: torchvision.datasets.VisionDataset, subs
     is_color_channel_last : bool
         if true, the color channels should be in the last dimension, known as HWC representation. Alternatively the color channel can be at the first position, known as CHW representation.
         Only relevant for color images -> Should be None for grayscale images
+    image_size : tuple
+        for some datasets (e.g., GTSRB) the images of various sizes must be converted into a coherent size.
+        The tuple equals (width, height) of the images (default: None)
 
     Returns
     -------
@@ -52,34 +100,14 @@ def _load_torch_image_data(data_source: torchvision.datasets.VisionDataset, subs
             trainset = data_source(root=_get_download_dir(downloads_path), train=True, download=True)
         else:
             trainset = data_source(root=_get_download_dir(downloads_path), split="train", download=True)
-        data = trainset.data
-        if hasattr(trainset, "targets"):
-            # USPS, MNIST, ... use targets
-            labels = trainset.targets
-        else:
-            # SVHN, STL10, ... use labels
-            labels = trainset.labels
-        if type(data) is np.ndarray:
-            # Transform numpy arrays to torch tensors. Needs to be done for eg USPS
-            data = torch.from_numpy(data)
-            labels = torch.from_numpy(np.array(labels))
+        data, labels = _get_data_and_labels(trainset, image_size)
     if subset == "all" or subset == "test":
         # Load test data
         if uses_train_param:
             testset = data_source(root=_get_download_dir(downloads_path), train=False, download=True)
         else:
             testset = data_source(root=_get_download_dir(downloads_path), split="test", download=True)
-        data_test = testset.data
-        if hasattr(testset, "targets"):
-            # USPS, MNIST, ... use targets
-            labels_test = testset.targets
-        else:
-            # SVHN, STL10, ... use labels
-            labels_test = testset.labels
-        if type(data_test) is np.ndarray:
-            # Transform numpy arrays to torch tensors. Needs to be done for eg USPS
-            data_test = torch.from_numpy(data_test)
-            labels_test = torch.from_numpy(np.array(labels_test))
+        data_test, labels_test = _get_data_and_labels(testset, image_size)
         if subset == "all":
             # Add to train data
             data = torch.cat([data, data_test], dim=0)
@@ -454,4 +482,46 @@ def load_stl10(subset: str = "all", flatten: bool = True, normalize_channels: bo
     """
     data, labels = _load_torch_image_data(torchvision.datasets.STL10, subset, flatten, normalize_channels, False,
                                           downloads_path, False)
+    return data, labels
+
+
+def load_gtsrb(subset: str = "all", image_size: tuple = (32, 32), flatten: bool = True,
+               normalize_channels: bool = False, downloads_path: str = None) -> (np.ndarray, np.ndarray):
+    """
+    Load the GTSRB (German Traffic Sign Recognition Benchmark) data set. It consists of 39270 color images showing 43 different traffic signs.
+    Example classes are: stop sign, speed limit 50 sign, speed limit 70 sign, construction site sign and many others.
+    The data set is composed of 26640 training and 12630 test images.
+    N=39270, d=image_size[0]*image_size[1]*3, k=43.
+
+    Parameters
+    ----------
+    subset : str
+        can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
+    image_size : tuple
+        the images of various sizes must be converted into a coherent size.
+        The tuple equals (width, height) of the images (default: (32, 32))
+    flatten : bool
+        should the image data be flatten, i.e. should the format be changed to a (N x d) array.
+        If false, the image will be returned in the CHW format (default: True)
+    normalize_channels : bool
+        normalize each color-channel of the images (default: False)
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
+
+
+    Returns
+    -------
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (39270 x image_size[0]*image_size[1]*3), the labels numpy array (20580)
+
+    References
+    -------
+    https://pytorch.org/vision/stable/generated/torchvision.datasets.GTSRB.html#torchvision.datasets.GTSRB
+
+    and
+
+    https://benchmark.ini.rub.de/
+    """
+    data, labels = _load_torch_image_data(torchvision.datasets.GTSRB, subset, flatten, normalize_channels, False,
+                                          downloads_path, True, image_size)
     return data, labels

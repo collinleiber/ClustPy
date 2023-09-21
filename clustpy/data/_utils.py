@@ -4,6 +4,7 @@ import requests
 import os
 from pathlib import Path
 import ssl
+from PIL import Image
 
 DEFAULT_DOWNLOAD_PATH = str(Path.home() / "Downloads/clustpy_datafiles")
 
@@ -139,3 +140,31 @@ def _decompress_z_file(filename: str, directory: str) -> bool:
         successful = False
         print("[WARNING] 7Zip is needed to uncompress *.Z files!")
     return successful
+
+
+def _load_color_image_data(path: str, image_size: tuple) -> np.ndarray:
+    """
+    Load image and convert it into a coherent size. Returns a numpy array containing the image data.
+
+    Parameters
+    ----------
+    path : str
+        Path to the image
+    image_size : tuple
+        images of various sizes can be converted into a coherent size.
+        The tuple equals (width, height) of the images
+
+    Returns
+    -------
+    image_data : np.ndarray
+        The numpy array containing the image data
+    """
+    image = Image.open(path).convert("RGB")
+    # Convert to coherent size
+    if image_size is not None:
+        image = image.resize(image_size)
+    image_data = np.asarray(image)
+    assert image_size is None or image_data.shape == (
+        image_size[0], image_size[1], 3), "Size of image is not correct. Should be {0} but is {1}".format(image_size,
+                                                                                                          image_data.shape)
+    return image_data
