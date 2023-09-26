@@ -22,7 +22,7 @@ def _dec(X: np.ndarray, n_clusters: int, alpha: float, batch_size: int, pretrain
          autoencoder: torch.nn.Module, embedding_size: int, use_reconstruction_loss: bool,
          cluster_loss_weight: float, custom_dataloaders: tuple, augmentation_invariance: bool,
          initial_clustering_class: ClusterMixin,
-         initial_clustering_params: dict, random_state: np.random.RandomState) -> (
+         initial_clustering_params: dict, random_state: np.random.RandomState, init_clusters: str | np.ndarray) -> (
         np.ndarray, np.ndarray, np.ndarray, np.ndarray, torch.nn.Module):
     """
     Start the actual DEC clustering procedure on the input data set.
@@ -69,6 +69,8 @@ def _dec(X: np.ndarray, n_clusters: int, alpha: float, batch_size: int, pretrain
         parameters for the initial clustering class
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution
+    init_clusters : np.ndarray
+        initial cluster centers. has to be of shape (n_clusters, n_features) or a string like 'k-means++'
 
     Returns
     -------
@@ -105,7 +107,7 @@ def _dec(X: np.ndarray, n_clusters: int, alpha: float, batch_size: int, pretrain
     dec_centers = dec_module.centers.detach().cpu().numpy()
     # Do reclustering with Kmeans
     embedded_data = encode_batchwise(testloader, autoencoder, device)
-    kmeans = KMeans(n_clusters=n_clusters, random_state=random_state)
+    kmeans = KMeans(n_clusters=n_clusters, random_state=random_state, init=init_clusters)
     kmeans.fit(embedded_data)
     return kmeans.labels_, kmeans.cluster_centers_, dec_labels, dec_centers, autoencoder
 
@@ -445,6 +447,8 @@ class DEC(BaseEstimator, ClusterMixin):
         parameters for the initial clustering class (default: {})
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
+    init_clusters : np.ndarray
+        initial cluster centers similar to the init parameter of KMeans (default: 'k-means++'). if np.ndarray, has to be of shape (n_clusters, n_features)
 
     Attributes
     ----------
@@ -481,7 +485,7 @@ class DEC(BaseEstimator, ClusterMixin):
                  embedding_size: int = 10, cluster_loss_weight: float = 1, custom_dataloaders: tuple = None,
                  augmentation_invariance: bool = False, initial_clustering_class: ClusterMixin = KMeans,
                  initial_clustering_params: dict = {},
-                 random_state: np.random.RandomState = None):
+                 random_state: np.random.RandomState = None, init_clusters: str | np.ndarray = 'k-means++'):
         self.n_clusters = n_clusters
         self.alpha = alpha
         self.batch_size = batch_size
@@ -500,6 +504,7 @@ class DEC(BaseEstimator, ClusterMixin):
         self.initial_clustering_params = initial_clustering_params
         self.random_state = check_random_state(random_state)
         self.use_reconstruction_loss = False
+        self.init_clusters = init_clusters
         set_torch_seed(self.random_state)
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DEC':
@@ -535,7 +540,8 @@ class DEC(BaseEstimator, ClusterMixin):
                                                                                    self.augmentation_invariance,
                                                                                    self.initial_clustering_class,
                                                                                    self.initial_clustering_params,
-                                                                                   self.random_state)
+                                                                                   self.random_state,
+                                                                                   self.init_clusters)
         self.labels_ = kmeans_labels
         self.cluster_centers_ = kmeans_centers
         self.dec_labels_ = dec_labels
