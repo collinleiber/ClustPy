@@ -24,7 +24,7 @@ def _rearrange(confusion_matrix: np.ndarray) -> np.ndarray:
     """
     # Change order using the Hungarian Method
     max_number_labels = max(confusion_matrix.shape)
-    rearranged_confusion_matrix = np.zeros((max_number_labels, max_number_labels), dtype=int)
+    rearranged_confusion_matrix = np.zeros((max_number_labels, max_number_labels), dtype=confusion_matrix.dtype)
     # Linear sum assignment tries to minimize the diagonal sum -> use negative confusion_matrix
     rearranged_confusion_matrix[:confusion_matrix.shape[0], :confusion_matrix.shape[1]] = -confusion_matrix
     indices = linear_sum_assignment(rearranged_confusion_matrix)

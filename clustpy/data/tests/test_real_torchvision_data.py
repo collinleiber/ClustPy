@@ -174,8 +174,8 @@ def test_load_stl10():
     assert data.shape == (13000, 3, 96, 96)
 
 
-@pytest.mark.largedata
 @pytest.mark.data
+# Do not skip GTSRB as the loading mechanism is different to the other torchvision dataloaders
 def test_load_gtsrb():
     # Full data set
     data, labels = load_gtsrb("all", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)

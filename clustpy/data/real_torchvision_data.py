@@ -2,7 +2,7 @@ import torchvision
 import torch
 import numpy as np
 import ssl
-from clustpy.data._utils import _get_download_dir, _load_color_image_data
+from clustpy.data._utils import _get_download_dir, _load_image_data
 
 """
 Load torchvision datasets
@@ -42,7 +42,7 @@ def _get_data_and_labels(dataset: torchvision.datasets.VisionDataset, image_size
         data_list = []
         for path, label in dataset._samples:
             labels.append(label)
-            image_data = _load_color_image_data(path, image_size)
+            image_data = _load_image_data(path, image_size, True)
             data_list.append(image_data)
         # Convert data form list to numpy array
         data = np.array(data_list)
