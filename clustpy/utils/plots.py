@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-import matplotlib.cm as cm
+import matplotlib
 from matplotlib.colors import Colormap
 from matplotlib.colors import Normalize
 from sklearn.decomposition import PCA
@@ -499,6 +499,6 @@ def _get_cmap_and_norm(labels: np.ndarray, min_max: tuple = None) -> (np.ndarray
         min_max = (unique_labels[0], unique_labels[-1])
     assert min_max[0] <= min_max[1], "First value in min_max must be smaller or equal to second value"
     # Manage colormap
-    cmap = cm.get_cmap('viridis', 12)
+    cmap = matplotlib.colormaps['viridis']
     norm = Normalize(vmin=min_max[0], vmax=min_max[1])
     return unique_labels, cmap, norm
