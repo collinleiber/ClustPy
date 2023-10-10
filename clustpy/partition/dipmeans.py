@@ -93,7 +93,7 @@ class DipMeans(BaseEstimator, ClusterMixin):
     """
     Execute the DipMeans clustering procedure.
     In contrast to other algorithms (e.g. KMeans) DipMeans is able to identify the number of clusters by itself.
-    Therefore it uses the dip-dist criterion.
+    Therefore, it uses the dip-dist criterion.
     It calculates the dip-value of the distances of each point within a cluster to all other points in that cluster and checks how many points are assigned a dip-value below the threshold.
     If that amount of so called split viewers is above the split_viewers_threshold, the cluster will be split using 2-Means.
     The algorithm terminates if all clusters show a unimdoal behaviour.

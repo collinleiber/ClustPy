@@ -82,6 +82,7 @@ Remove clustpy via pip to avoid ambiguities during development, e.g., when chang
     - PG-Means [[Paper](https://proceedings.neurips.cc/paper/2006/hash/a9986cb066812f440bc2bb6e3c13696c-Abstract.html)]
     - Projected Dip-Means [[Paper](https://dl.acm.org/doi/abs/10.1145/3200947.3201008)]
     - SkinnyDip + UniDip [[Paper](https://dl.acm.org/doi/abs/10.1145/2939672.2939740)] & TailoredDip [[Paper](https://epubs.siam.org/doi/abs/10.1137/1.9781611977653.ch13)]
+    - SpecialK [[Paper](https://link.springer.com/chapter/10.1007/978-3-030-46150-8_16)]
     - SubKmeans [[Paper](https://dl.acm.org/doi/abs/10.1145/3097983.3097989)]
     - X-Means [[Paper](https://web.cs.dal.ca/~shepherd/courses/csci6403/clustering/xmeans.pdf)]
 - Density-based clustering
