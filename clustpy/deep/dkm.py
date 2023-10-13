@@ -42,7 +42,8 @@ def _dkm(X: np.ndarray, n_clusters: int, alphas: list, batch_size: int, pretrain
     pretrain_epochs : int
         number of epochs for the pretraining of the autoencoder
     clustering_epochs : int
-        number of epochs for each alpha value for the actual clustering procedure
+        number of epochs for each alpha value for the actual clustering procedure.
+        The total number of clustering epochs therefore corresponds to: len(alphas)*clustering_epochs
     optimizer_class : torch.optim.Optimizer
         the optimizer
     loss_fn : torch.nn.modules.loss._Loss
@@ -166,7 +167,7 @@ class _DKM_Module(torch.nn.Module):
     alphas : list
         list of different alpha values used for the prediction
     augmentation_invariance : bool
-        If True, augmented samples provided in will be used to learn 
+        If True, augmented samples provided in custom_dataloaders[0] will be used to learn
         cluster assignments that are invariant to the augmentation transformations (default: False)
 
     Attributes
@@ -348,7 +349,8 @@ class _DKM_Module(torch.nn.Module):
         trainloader : torch.utils.data.DataLoader
             dataloader to be used for training
         n_epochs : int
-            number of epochs for the clustering procedure
+            number of epochs for the clustering procedure.
+            The total number of epochs therefore corresponds to: len(alphas)*n_epochs
         device : torch.device
             device to be trained on
         optimizer : torch.optim.Optimizer
@@ -398,7 +400,8 @@ class DKM(BaseEstimator, ClusterMixin):
     pretrain_epochs : int
         number of epochs for the pretraining of the autoencoder (default: 100)
     clustering_epochs : int
-        number of epochs for each alpha value for the actual clustering procedure (default: 5)
+        number of epochs for each alpha value for the actual clustering procedure.
+        The total number of clustering epochs therefore corresponds to: len(alphas)*clustering_epochs (default: 5)
     optimizer_class : torch.optim.Optimizer
         the optimizer class (default: torch.optim.Adam)
     loss_fn : torch.nn.modules.loss._Loss

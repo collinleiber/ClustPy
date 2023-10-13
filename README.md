@@ -108,7 +108,7 @@ Remove clustpy via pip to avoid ambiguities during development, e.g., when chang
     - ENRC [[Paper](https://ojs.aaai.org/index.php/AAAI/article/view/5961)]
     - IDEC [[Paper](https://dl.acm.org/doi/abs/10.5555/3172077.3172131)]
     - VaDE [[Paper](https://dl.acm.org/doi/abs/10.5555/3172077.3172161)]
-    
+
 ## Other implementations
 
 - Metrics
@@ -141,6 +141,14 @@ Remove clustpy via pip to avoid ambiguities during development, e.g., when chang
         - Fruit [[Paper](https://link.springer.com/article/10.1007/s10115-016-0998-9)]
         - NRLetters [[Paper](https://epubs.siam.org/doi/abs/10.1137/1.9781611977172.26)]
         - WebKB [[Website](http://www.cs.cmu.edu/~webkb/)]
+
+## Python environments
+
+ClustPy utilizes global [Python environment variables](https://docs.python.org/3/library/os.html#os.environ) in some places. These can be defined using `os.environ['VARIABLE_NAME'] = VARIABLE_VALUE`.
+The following variable names are used
+
+- 'CLUSTPY_DATA': Defines the path where downloaded datasets should be saved
+- 'CLUSTPY_DEVICE': Define the device to be used for Pytorch applications. Example: `os.environ['CLUSTPY_DEVICE'] = 'cuda:1'`
 
 # Compatible packages
 

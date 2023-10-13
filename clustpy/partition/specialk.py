@@ -15,7 +15,7 @@ from sklearn.utils import check_random_state
 import scipy
 
 
-def _specialk(X: np.ndarray, significance: float, n_dimensions: int, use_neighborhood_adj_mat: bool, n_neighbors: int,
+def _specialk(X: np.ndarray, significance: float, n_dimensions: int, similarity_matrix: str, n_neighbors: int,
               percentage: float, n_cluster_pairs_to_consider: int, max_n_clusters: int,
               random_state: np.random.RandomState, debug: bool) -> (int, np.ndarray):
     """
@@ -29,12 +29,14 @@ def _specialk(X: np.ndarray, significance: float, n_dimensions: int, use_neighbo
         Threshold to decide if the samples originate from a single distribution or two distributions
     n_dimensions : int
         Dimensionality of the embedding
-    use_neighborhood_adj_mat : bool
-        Defines if a neighborhood adjacency matrix or a symmetrically normalized adjacency matrix is used
+    similarity_matrix : str
+        Defines the similarity matrix to use. Can be one of the following strings or a numpy array / scipy sparse csr matrix.
+        If 'NAM', a neighborhood adjacency matrix is used.
+        If 'SAM' a symmetrically normalized adjacency matrix is used
     n_neighbors : int
         Number of neighbors for the construction of the similarity matrix. Does not include the object itself
     percentage : float
-        The amount of data points that should have at least n_neihgbors neighbors.
+        The amount of data points that should have at least n_neighbors neighbors.
         Only relevant if use_neighborhood_adj_mat is set to True
     n_cluster_pairs_to_consider : int
         The number of cluster pairs to consider when calculating the probability boundary.
@@ -55,12 +57,17 @@ def _specialk(X: np.ndarray, significance: float, n_dimensions: int, use_neighbo
     """
     assert significance >= 0 and significance <= 1, "significance must be a value in the range [0, 1]"
     assert percentage >= 0 and percentage <= 1, "percentage must be a value in the range [0, 1]"
-    if use_neighborhood_adj_mat:
-        similarity_matrix = _get_neighborhood_adjacency_matrix(X, percentage, n_neighbors)
+    if type(similarity_matrix) is str and similarity_matrix == 'NAM':
+        final_similarity_matrix = _get_neighborhood_adjacency_matrix(X, percentage, n_neighbors)
+    elif type(similarity_matrix) is str and similarity_matrix == 'SAM':
+        final_similarity_matrix = _get_symmetrically_normalized_adjacency_matrix(X, n_neighbors)
+    elif type(similarity_matrix) is np.ndarray or type(similarity_matrix) is scipy.sparse.csr_matrix:
+        final_similarity_matrix = similarity_matrix
     else:
-        similarity_matrix = _get_symmetrically_normalized_adjacency_matrix(X, n_neighbors)
+        raise ValueError(
+            "similarity_matrix must be 'NAM' (Neighborhood Adjacency Matrix), 'SAM' (Symmetrically Normalized Adjacency Matrix) or a numpy array.")
     # Get eigenvalues and eigenvectors
-    my_lambda, V = scipy.sparse.linalg.eigsh(similarity_matrix, k=n_dimensions, which="LM")
+    my_lambda, V = scipy.sparse.linalg.eigsh(final_similarity_matrix, k=n_dimensions, which="LM")
     my_lambda, D = np.absolute(my_lambda), np.absolute(V)
     D = D * np.sqrt(my_lambda)
     # Initial values
@@ -83,7 +90,7 @@ def _specialk(X: np.ndarray, significance: float, n_dimensions: int, use_neighbo
             one_hot = np.zeros((D.shape[0], n_clusters), dtype=int)
             for c in range(n_clusters):
                 one_hot[ids_in_each_cluster[c], c] = 1
-            cuts = one_hot.T @ similarity_matrix @ one_hot
+            cuts = one_hot.T @ final_similarity_matrix @ one_hot
             # Fill upper triangle matrix with 0s and ignore diagonal
             cuts = np.tril(cuts)
             np.fill_diagonal(cuts, -np.inf)  # operation is inplace
@@ -162,7 +169,7 @@ def _get_neighborhood_adjacency_matrix(X: np.ndarray, percentage: float = 0.99,
     X : np.ndarray
         the given data set
     percentage : float
-        The amount of data points that should have at least n_neihgbors neighbors (default: 0.99)
+        The amount of data points that should have at least n_neighbors neighbors (default: 0.99)
     n_neighbors : int
         The number of neighbors, not including the object itself (default: 10)
 
@@ -225,12 +232,14 @@ class SpecialK(BaseEstimator, ClusterMixin):
         Threshold to decide if the samples originate from a single distribution or two distributions (default: 0.01)
     n_dimensions : int
         Dimensionality of the embedding (default: 200)
-    use_neighborhood_adj_mat : bool
-        Defines if a neighborhood adjacency matrix or a symmetrically normalized adjacency matrix is used (default: True)
+    similarity_matrix : str
+        Defines the similarity matrix to use. Can be one of the following strings or a numpy array / scipy sparse csr matrix.
+        If 'NAM', a neighborhood adjacency matrix is used.
+        If 'SAM' a symmetrically normalized adjacency matrix is used (default: 'NAM')
     n_neighbors : int
         Number of neighbors for the construction of the similarity matrix. Does not include the object itself (default: 10)
     percentage : float
-        The amount of data points that should have at least n_neihgbors neighbors.
+        The amount of data points that should have at least n_neighbors neighbors.
         Only relevant if use_neighborhood_adj_mat is set to True (default: 0.99)
     n_cluster_pairs_to_consider : int
         The number of cluster pairs to consider when calculating the probability boundary.
@@ -256,12 +265,12 @@ class SpecialK(BaseEstimator, ClusterMixin):
     Machine Learning and Knowledge Discovery in Databases: European Conference, ECML PKDD 2019, Würzburg, Germany, September 16–20, 2019, Proceedings, Part I. Springer International Publishing, 2020.
     """
 
-    def __init__(self, significance: float = 0.01, n_dimensions: int = 200, use_neighborhood_adj_mat: bool = True,
+    def __init__(self, significance: float = 0.01, n_dimensions: int = 200, similarity_matrix: str = 'NAM',
                  n_neighbors: int = 10, percentage: float = 0.99, n_cluster_pairs_to_consider: int = 10,
                  max_n_clusters: int = np.inf, random_state: np.random.RandomState = None, debug: bool = False):
         self.significance = significance
         self.n_dimensions = n_dimensions
-        self.use_neighborhood_adj_mat = use_neighborhood_adj_mat
+        self.similarity_matrix = similarity_matrix
         self.n_neighbors = n_neighbors
         self.percentage = percentage
         self.n_cluster_pairs_to_consider = n_cluster_pairs_to_consider
@@ -286,7 +295,7 @@ class SpecialK(BaseEstimator, ClusterMixin):
         self : SpecialK
             this instance of the SpecialK algorithm
         """
-        n_clusters, labels = _specialk(X, self.significance, self.n_dimensions, self.use_neighborhood_adj_mat,
+        n_clusters, labels = _specialk(X, self.significance, self.n_dimensions, self.similarity_matrix,
                                        self.n_neighbors, self.percentage, self.n_cluster_pairs_to_consider,
                                        self.max_n_clusters, self.random_state, self.debug)
         self.n_clusters_ = n_clusters

@@ -193,7 +193,7 @@ class _DEC_Module(torch.nn.Module):
     alpha : double
         alpha value for the prediction method
     augmentation_invariance : bool
-        If True, augmented samples provided in will be used to learn 
+        If True, augmented samples provided in custom_dataloaders[0] will be used to learn
         cluster assignments that are invariant to the augmentation transformations (default: False)
 
     Attributes
