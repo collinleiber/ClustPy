@@ -487,7 +487,7 @@ def _get_nearest_points(points_in_larger_cluster: np.ndarray, center: np.ndarray
     # Check if more points should be taken because the other cluster is too small
     sample_size = size_smaller_cluster * max_cluster_size_diff_factor
     if size_smaller_cluster + sample_size < min_sample_size:
-        sample_size = min(min_sample_size - size_smaller_cluster, len(points_in_larger_cluster))
+        sample_size = min(int(min_sample_size - size_smaller_cluster), len(points_in_larger_cluster))
     subset_all_points = points_in_larger_cluster[nearest_points[:sample_size, 0]]
     return subset_all_points
 

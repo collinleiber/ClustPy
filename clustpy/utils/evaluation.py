@@ -662,7 +662,7 @@ def evaluation_df_to_latex_table(df: pd.DataFrame, output_path: str, use_std: bo
                             color_saturation = 0
                         assert type(color_saturation) is int, "color_saturation must be an int but is {0}".format(
                             type(color_saturation))
-                        value_write = "\cellcolor{" + color_by_value + "!" + str(color_saturation) + "}" + value_write
+                        value_write = "\\cellcolor{" + color_by_value + "!" + str(color_saturation) + "}" + value_write
                     to_write += " & " + value_write
                 to_write += "\\\\\n"
                 f.write(to_write)

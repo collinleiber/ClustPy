@@ -161,6 +161,26 @@ def test_multiple_labelings_confusion_matrix_aggregate():
     assert mlcm.aggregate("mean") == 3.5 / 9
 
 
+def test_multiple_labelings_confusion_matrix_rearrange():
+    from clustpy.metrics import unsupervised_clustering_accuracy as acc
+    labels_true = np.array([[1, 1, 0, 0, 1, 1, 0, 0],
+                            [0, 0, 0, 0, 0, 0, 0, 0],
+                            [1, 1, 1, 1, 0, 0, 0, 0]]).T
+    labels_pred = np.array([[0, 0, 0, 0, 1, 1, 1, 1],
+                            [1, 2, 3, 4, 5, 6, 7, 8],
+                            [0, 0, 0, 0, 0, 0, 0, 0]]).T
+    mlcm = MultipleLabelingsConfusionMatrix(labels_true, labels_pred, metric=acc, remove_noise_spaces=False)
+    expected_cm = np.array([[0.5, 0.25, 0.5],
+                            [0.5, 0.125, 1],
+                            [1, 0.25, 0.5]])
+    assert np.allclose(mlcm.confusion_matrix, expected_cm)
+    mlcm.rearrange(inplace=True)
+    expected_cm = np.array([[0.25, 0.5, 0.5],
+                            [0.125, 1, 0.5],
+                            [0.25, 0.5, 1]])
+    assert np.allclose(mlcm.confusion_matrix, expected_cm)
+
+
 def test_multiple_labelings_confusion_matrix_average_redundancy():
     from clustpy.metrics import variation_of_information as vi
     labels = np.array([[1, 1, 1, 1, 0, 0, 0, 0],

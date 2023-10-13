@@ -4,7 +4,7 @@ from clustpy.data import load_iris, load_wine, load_breast_cancer, load_newsgrou
     load_ecoli, load_htru2, load_letterrecognition, load_har, load_statlog_shuttle, load_mice_protein, \
     load_user_knowledge, load_breast_tissue, load_forest_types, load_dermatology, load_multiple_features, \
     load_statlog_australian_credit_approval, load_breast_cancer_wisconsin_original, load_semeion, load_imagenet_dog, \
-    load_imagenet10
+    load_imagenet10, load_coil20, load_coil100
 from pathlib import Path
 import os
 import shutil
@@ -310,3 +310,26 @@ def test_load_imagenet10():
     # Test non-flatten
     data, _ = load_imagenet10(downloads_path=TEST_DOWNLOAD_PATH, flatten=False)
     assert data.shape == (13000, 3, 224, 224)
+
+
+@pytest.mark.data
+def test_load_coil20():
+    data, labels = load_coil20(downloads_path=TEST_DOWNLOAD_PATH)
+    _helper_test_data_loader(data, labels, 1440, 16384, 20)
+    # Test non-flatten
+    data, _ = load_coil20(flatten=False, downloads_path=TEST_DOWNLOAD_PATH)
+    assert data.shape == (1440, 128, 128)
+
+
+@pytest.mark.data
+def test_load_coil100():
+    data, labels = load_coil100(downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)
+    _helper_test_data_loader(data, labels, 7200, 49152, 100)
+    _check_normalized_channels(data, 3, True)
+    # Without normalize
+    data, labels = load_coil100(downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=False)
+    _helper_test_data_loader(data, labels, 7200, 49152, 100)
+    _check_normalized_channels(data, 3, False)
+    # Test non-flatten
+    data, _ = load_coil100(flatten=False, downloads_path=TEST_DOWNLOAD_PATH)
+    assert data.shape == (7200, 3, 128, 128)

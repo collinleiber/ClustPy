@@ -26,13 +26,18 @@ def _get_download_dir(downloads_path: str) -> str:
         '[USER]/Downloads/clustpy_datafiles'
     """
     if downloads_path is None:
-        downloads_path = DEFAULT_DOWNLOAD_PATH
+        env_data_path = os.environ.get("CLUSTPY_DATA", None)
+        if env_data_path is None:
+            downloads_path = DEFAULT_DOWNLOAD_PATH
+        else:
+            downloads_path = env_data_path
     if not os.path.isdir(downloads_path):
         os.makedirs(downloads_path)
         with open(downloads_path + "/info.txt", "w") as f:
             f.write("This directory was created by the ClustPy python package to store real world data sets.\n"
                     "The default directory is '[USER]/Downloads/clustpy_datafiles' and can be changed with the "
-                    "'downloads_path' parameter when loading a data set.")
+                    "'downloads_path' parameter when loading a data set.\n"
+                    "Alternatively, a global python environment variable for the path can be defined with os.environ['CLUSTPY_DATA'] = 'PATH'.")
     return downloads_path
 
 
@@ -142,7 +147,7 @@ def _decompress_z_file(filename: str, directory: str) -> bool:
     return successful
 
 
-def _load_color_image_data(path: str, image_size: tuple) -> np.ndarray:
+def _load_image_data(path: str, image_size: tuple, color_image: bool) -> np.ndarray:
     """
     Load image and convert it into a coherent size. Returns a numpy array containing the image data.
 
@@ -152,14 +157,19 @@ def _load_color_image_data(path: str, image_size: tuple) -> np.ndarray:
         Path to the image
     image_size : tuple
         images of various sizes can be converted into a coherent size.
-        The tuple equals (width, height) of the images
+        The tuple equals (width, height) of the images.
+        Can also be None if the image size should not be changed
+    color_image : bool
+        Specifies if the loaded image is a color image
 
     Returns
     -------
     image_data : np.ndarray
         The numpy array containing the image data
     """
-    image = Image.open(path).convert("RGB")
+    image = Image.open(path)
+    if color_image:
+        image = image.convert("RGB")
     # Convert to coherent size
     if image_size is not None:
         image = image.resize(image_size)

@@ -82,6 +82,7 @@ Remove clustpy via pip to avoid ambiguities during development, e.g., when chang
     - PG-Means [[Paper](https://proceedings.neurips.cc/paper/2006/hash/a9986cb066812f440bc2bb6e3c13696c-Abstract.html)]
     - Projected Dip-Means [[Paper](https://dl.acm.org/doi/abs/10.1145/3200947.3201008)]
     - SkinnyDip + UniDip [[Paper](https://dl.acm.org/doi/abs/10.1145/2939672.2939740)] & TailoredDip [[Paper](https://epubs.siam.org/doi/abs/10.1137/1.9781611977653.ch13)]
+    - SpecialK [[Paper](https://link.springer.com/chapter/10.1007/978-3-030-46150-8_16)]
     - SubKmeans [[Paper](https://dl.acm.org/doi/abs/10.1145/3097983.3097989)]
     - X-Means [[Paper](https://web.cs.dal.ca/~shepherd/courses/csci6403/clustering/xmeans.pdf)]
 - Density-based clustering
@@ -103,6 +104,7 @@ Remove clustpy via pip to avoid ambiguities during development, e.g., when chang
     - DEC [[Paper](https://dl.acm.org/doi/abs/10.5555/3045390.3045442)]
     - DipDECK [[Paper](https://dl.acm.org/doi/10.1145/3447548.3467316)]
     - DipEncoder [[Paper](https://dl.acm.org/doi/10.1145/3534678.3539407)]
+    - DKM [[Paper](https://www.sciencedirect.com/science/article/abs/pii/S0167865520302749)]
     - ENRC [[Paper](https://ojs.aaai.org/index.php/AAAI/article/view/5961)]
     - IDEC [[Paper](https://dl.acm.org/doi/abs/10.5555/3172077.3172131)]
     - VaDE [[Paper](https://dl.acm.org/doi/abs/10.5555/3172077.3172161)]
@@ -139,7 +141,7 @@ Remove clustpy via pip to avoid ambiguities during development, e.g., when chang
         - Fruit [[Paper](https://link.springer.com/article/10.1007/s10115-016-0998-9)]
         - NRLetters [[Paper](https://epubs.siam.org/doi/abs/10.1137/1.9781611977172.26)]
         - WebKB [[Website](http://www.cs.cmu.edu/~webkb/)]
-    
+
 # Compatible packages
 
 We stick as close as possible to the implementation details of sklean clustering. Therefore, our methods are compatible with many other packages. Examples are:
@@ -171,7 +173,7 @@ We stick as close as possible to the implementation details of sklean clustering
 ## 1)
 
 In this first example, the subspace algorithm SubKmeans is run on a synthetic subspace dataset.
-Afterwards, the clustering accuracy is calculated to evaluate the result.
+Afterward, the clustering accuracy is calculated to evaluate the result.
 
 ```python
 from clustpy.partition import SubKmeans

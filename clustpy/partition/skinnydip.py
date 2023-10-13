@@ -335,9 +335,9 @@ def _merge_clusters(X_1d_sorted: np.ndarray, argsorted: np.ndarray, labels: np.n
         # Dip of i combined with left (i - 1)
         cluster_size_left = cluster_boundaries[i - 1][1] - cluster_boundaries[i - 1][0]
         start_left = max(cluster_boundaries[i - 1][0],
-                         cluster_boundaries[i - 1][1] - max_cluster_size_diff_factor * cluster_size_center)
+                         int(cluster_boundaries[i - 1][1] - max_cluster_size_diff_factor * cluster_size_center))
         end_left = min(cluster_boundaries[i][1],
-                       cluster_boundaries[i][0] + max_cluster_size_diff_factor * cluster_size_left)
+                       int(cluster_boundaries[i][0] + max_cluster_size_diff_factor * cluster_size_left))
         tmp_X_1d = X_1d_sorted[start_left:end_left]
         # Run dip-test
         dip_value = dip_test(tmp_X_1d, just_dip=True, is_data_sorted=True)
@@ -346,9 +346,9 @@ def _merge_clusters(X_1d_sorted: np.ndarray, argsorted: np.ndarray, labels: np.n
         # Dip of i combined with right (i + 1)
         cluster_size_right = cluster_boundaries[i + 1][1] - cluster_boundaries[i + 1][0]
         start_right = max(cluster_boundaries[i][0],
-                          cluster_boundaries[i][1] - max_cluster_size_diff_factor * cluster_size_right)
+                          int(cluster_boundaries[i][1] - max_cluster_size_diff_factor * cluster_size_right))
         end_right = min(cluster_boundaries[i + 1][1],
-                        cluster_boundaries[i + 1][0] + max_cluster_size_diff_factor * cluster_size_center)
+                        int(cluster_boundaries[i + 1][0] + max_cluster_size_diff_factor * cluster_size_center))
         tmp_X_1d = X_1d_sorted[start_right:end_right]
         # Run dip-test
         dip_value = dip_test(tmp_X_1d, just_dip=True, is_data_sorted=True)
@@ -519,7 +519,7 @@ def _add_tails(X_1d: np.ndarray, labels: np.ndarray, sorted_X_1d: np.ndarray, ar
                     cluster_range = cluster_boundaries_new[0][1] - cluster_boundaries_new[0][0]
                     # Use a maximum of cluster_range points of left cluster to see if transition is unimodal
                     start_left = max(cluster_boundaries_orig[i - 1][0],
-                                     cluster_boundaries_orig[i - 1][1] - max_cluster_size_diff_factor * cluster_range)
+                                     int(cluster_boundaries_orig[i - 1][1] - max_cluster_size_diff_factor * cluster_range))
                     end_left = start + cluster_boundaries_new[0][1]
                     dip_value_left = dip_test(sorted_X_1d[start_left:end_left], just_dip=True, is_data_sorted=True)
                     dip_pvalue_left = dip_pval(dip_value_left, n_points=end_left - start_left,
@@ -535,7 +535,7 @@ def _add_tails(X_1d: np.ndarray, labels: np.ndarray, sorted_X_1d: np.ndarray, ar
                     start_right = start + cluster_boundaries_new[-1][0]
                     # Use a maximum of cluster_range points of right cluster to see if transition is unimodal
                     end_right = min(cluster_boundaries_orig[i][1],
-                                    cluster_boundaries_orig[i][0] + max_cluster_size_diff_factor * cluster_range)
+                                    int(cluster_boundaries_orig[i][0] + max_cluster_size_diff_factor * cluster_range))
                     dip_value_right = dip_test(sorted_X_1d[start_right:end_right], just_dip=True,
                                                is_data_sorted=True)
                     dip_pvalue_right = dip_pval(dip_value_right, n_points=end_right - start_right,
