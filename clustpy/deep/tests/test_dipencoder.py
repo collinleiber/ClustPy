@@ -11,7 +11,8 @@ from unittest.mock import patch
 def test_simple_dipencoder():
     torch.use_deterministic_algorithms(True)
     X, labels = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
-    dipencoder = DipEncoder(3, pretrain_epochs=3, clustering_epochs=3, random_state=1, debug=True)
+    dipencoder = DipEncoder(3, pretrain_epochs=3, clustering_epochs=3, max_cluster_size_diff_factor=2.2, random_state=1,
+                            debug=True)
     assert not hasattr(dipencoder, "labels_")
     dipencoder.fit(X)
     assert dipencoder.labels_.dtype == np.int32
@@ -35,6 +36,7 @@ def test_supervised_dipencoder():
     dipencoder.fit(X, labels)
     assert dipencoder.labels_.dtype == np.int32
     assert np.array_equal(labels, dipencoder.labels_)
+
 
 def test_dipencoder_augmentation():
     torch.use_deterministic_algorithms(True)
@@ -61,7 +63,8 @@ def test_plot_dipencoder_embedding():
     cluster_labels = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2])
     projection_axes = np.array([[11, 11, 11], [30, 30, 30], [19, 19, 19]])
     index_dict = {(0, 1): 0, (0, 2): 1, (1, 2): 2}
-    assert None == plot_dipencoder_embedding(embedded_data, n_clusters, cluster_labels, projection_axes, index_dict, show_plot=False)
+    assert None == plot_dipencoder_embedding(embedded_data, n_clusters, cluster_labels, projection_axes, index_dict,
+                                             show_plot=False)
 
 
 def test_get_rec_loss_of_first_batch():
@@ -79,6 +82,7 @@ def test_get_rec_loss_of_first_batch():
     conv_autoencoder = ConvolutionalAutoencoder(X.shape[-1], [512, 10])
     ae_loss = _get_rec_loss_of_first_batch(conv_trainloader, conv_autoencoder, torch.nn.MSELoss(), device)
     assert ae_loss > 0
+
 
 @patch("matplotlib.pyplot.show")  # Used to test plots (show will not be called)
 def test_plot_dipencoder_obj(mock_fig):

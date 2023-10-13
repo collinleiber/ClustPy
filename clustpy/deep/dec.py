@@ -193,7 +193,7 @@ class _DEC_Module(torch.nn.Module):
     alpha : double
         alpha value for the prediction method
     augmentation_invariance : bool
-        If True, augmented samples provided in will be used to learn 
+        If True, augmented samples provided in custom_dataloaders[0] will be used to learn
         cluster assignments that are invariant to the augmentation transformations (default: False)
 
     Attributes
@@ -306,7 +306,9 @@ class _DEC_Module(torch.nn.Module):
         loss = (clean_loss + aug_loss) / 2
         return loss
 
-    def _loss(self, batch, autoencoder, cluster_loss_weight, use_reconstruction_loss, loss_fn, device) -> torch.Tensor:
+    def _loss(self, batch: list, autoencoder: torch.nn.Module, cluster_loss_weight: float,
+              use_reconstruction_loss: bool, loss_fn: torch.nn.modules.loss._Loss,
+              device: torch.device) -> torch.Tensor:
         """
         Calculate the complete DEC + optional Autoencoder loss.
 

@@ -9,6 +9,7 @@ from .subkmeans import SubKmeans
 from .ldakmeans import LDAKmeans
 from .dipnsub import DipNSub
 from .gapstatistic import GapStatistic
+from .specialk import SpecialK
 
 __all__ = ['GMeans',
            'PGMeans',
@@ -22,4 +23,5 @@ __all__ = ['GMeans',
            'SubKmeans',
            'LDAKmeans',
            'DipNSub',
-           'GapStatistic']
+           'GapStatistic',
+           'SpecialK']

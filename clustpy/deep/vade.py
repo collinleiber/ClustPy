@@ -582,6 +582,8 @@ class VaDE(BaseEstimator, ClusterMixin):
         self : VaDE
             this instance of the VaDE algorithm
         """
+        assert type(self.loss_fn) != torch.nn.modules.loss.BCELoss or (np.min(X) >= 0 and np.max(
+            X) <= 1), "Your dataset contains values that are not in the value range [0, 1]. Therefore, BCE is not a valid loss function, an alternative might be a MSE loss function."
         gmm_labels, gmm_means, gmm_covariances, gmm_weights, vade_labels, vade_centers, vade_covariances, autoencoder = _vade(
             X,
             self.n_clusters,

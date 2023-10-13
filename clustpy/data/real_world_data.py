@@ -1,5 +1,5 @@
 from clustpy.data._utils import _download_file, _get_download_dir, _decompress_z_file, _load_data_file, \
-    _download_file_from_google_drive, _load_color_image_data
+    _download_file_from_google_drive, _load_image_data
 import os
 import numpy as np
 import zipfile
@@ -1189,7 +1189,7 @@ def load_imagenet_dog(subset: str = "all",
     for i, file in enumerate(file_list):
         file = file[0][0]
         if file.split("/")[0] in breeds:
-            image_data = _load_color_image_data(directory + "/Images/" + file, image_size)
+            image_data = _load_image_data(directory + "/Images/" + file, image_size, True)
             data_list.append(image_data)
             use_image[i] = True
         else:
@@ -1267,4 +1267,114 @@ def load_imagenet10(use_224_size: bool = True, flatten: bool = True, normalize_c
     data = data_torch.detach().cpu().numpy()
     # Convert labels to int32 format
     labels = labels.astype(np.int32)
+    return data, labels
+
+
+def load_coil20(flatten: bool = True, downloads_path: str = None) -> (np.ndarray, np.ndarray):
+    """
+    Load the COIL-20 data set.
+    It consists of 1440 128x128 gray-scale images of 20 objects photographed from 72 different angles.
+    N=1440, d=16384, k=20.
+
+    Parameters
+    ----------
+    flatten : bool
+        should the image data be flatten, i.e. should the format be changed to a (N x d) array (default: True)
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
+
+    Returns
+    -------
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (1440 x 16384), the labels numpy array (1440)
+
+    References
+    -------
+    https://www.cs.columbia.edu/CAVE/software/softlib/coil-20.php
+    """
+    directory = _get_download_dir(downloads_path) + "/COIL20/"
+    filename = directory + "coil-20-proc.zip"
+    if not os.path.isfile(filename):
+        if not os.path.isdir(directory):
+            os.mkdir(directory)
+        _download_file("http://www.cs.columbia.edu/CAVE/databases/SLAM_coil-20_coil-100/coil-20/coil-20-proc.zip",
+                       filename)
+        # Unpack zipfile
+        with zipfile.ZipFile(filename, 'r') as zipf:
+            zipf.extractall(directory)
+    # get image data
+    data_list = []
+    labels = np.zeros(1440, dtype=np.int32)
+    for i in range(20):
+        for j in range(72):
+            image_data = _load_image_data(directory + "coil-20-proc/obj{0}__{1}.png".format(i + 1, j), None, False)
+            assert image_data.shape == (
+                128, 128), "Shape of image obj{0}__{1}.png is not correct. Mest be (128, 128) but is {2}".format(i + 1,
+                                                                                                                 j,
+                                                                                                                 image_data.shape)
+            data_list.append(image_data)
+            labels[i * 72:(i + 1) * 72] = i
+    # Convert data to numpy
+    data = np.array(data_list)
+    # Optional: flatten data
+    if flatten:
+        data = data.reshape((1440, -1))
+    return data, labels
+
+
+def load_coil100(flatten: bool = True, normalize_channels: bool = False, downloads_path: str = None) -> (
+        np.ndarray, np.ndarray):
+    """
+    Load the COIL-100 data set.
+    It consists of 7200 128x128 color images of 100 objects photographed from 72 different angles.
+    N=7200, d=49152, k=100.
+
+    Parameters
+    ----------
+    flatten : bool
+        should the image data be flatten, i.e. should the format be changed to a (N x d) array.
+        If false, the image will be returned in the CHW format (default: True)
+    normalize_channels : bool
+        normalize each color-channel of the images (default: False)
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
+
+    Returns
+    -------
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (7200 x 49152), the labels numpy array (7200)
+
+    References
+    -------
+    https://www.cs.columbia.edu/CAVE/software/softlib/coil-100.php
+    """
+    directory = _get_download_dir(downloads_path) + "/COIL100/"
+    filename = directory + "coil-100.zip"
+    if not os.path.isfile(filename):
+        if not os.path.isdir(directory):
+            os.mkdir(directory)
+        _download_file("http://www.cs.columbia.edu/CAVE/databases/SLAM_coil-20_coil-100/coil-100/coil-100.zip",
+                       filename)
+        # Unpack zipfile
+        with zipfile.ZipFile(filename, 'r') as zipf:
+            zipf.extractall(directory)
+    # get image data
+    data_list = []
+    labels = np.zeros(7200, dtype=np.int32)
+    for i in range(100):
+        for j in range(72):
+            image_data = _load_image_data(directory + "coil-100/obj{0}__{1}.png".format(i + 1, j * 5), None, True)
+            assert image_data.shape == (
+                128, 128, 3), "Shape of image obj{0}__{1}.png is not correct. Mest be (128, 128, 3) but is {2}".format(
+                i + 1, j, image_data.shape)
+            data_list.append(image_data)
+            labels[i * 72:(i + 1) * 72] = i
+    # Convert data to numpy
+    data = np.array(data_list)
+    # If desired, normalize channels
+    data_torch = torch.Tensor(data)
+    is_color_channel_last = True
+    data_torch = _torch_normalize_and_flatten(data_torch, flatten, normalize_channels, is_color_channel_last)
+    # Move data to CPU
+    data = data_torch.detach().cpu().numpy()
     return data, labels

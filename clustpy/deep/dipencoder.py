@@ -328,12 +328,12 @@ def _get_dip_error(dip_module: _Dip_Module, X_embed: torch.Tensor, projection_ax
     # Calculate dip combined clusters m and n
     if n_points_in_m > max_cluster_size_diff_factor * n_points_in_n:
         perm = torch.randperm(n_points_in_m).to(device)
-        sampled_m = points_in_m[perm[:n_points_in_n * max_cluster_size_diff_factor]]
+        sampled_m = points_in_m[perm[:int(n_points_in_n * max_cluster_size_diff_factor)]]
         dip_value_mn = dip_module(torch.cat([X_embed[sampled_m], X_embed[points_in_n]]),
                                   projection_axis_index)
     elif n_points_in_n > max_cluster_size_diff_factor * n_points_in_m:
         perm = torch.randperm(n_points_in_n).to(device)
-        sampled_n = points_in_n[perm[:n_points_in_m * max_cluster_size_diff_factor]]
+        sampled_n = points_in_n[perm[:int(n_points_in_m * max_cluster_size_diff_factor)]]
         dip_value_mn = dip_module(torch.cat([X_embed[points_in_m], X_embed[sampled_n]]),
                                   projection_axis_index)
     else:
