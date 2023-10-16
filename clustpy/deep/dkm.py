@@ -32,6 +32,7 @@ def _dkm(X: np.ndarray, n_clusters: int, alphas: list, batch_size: int, pretrain
     n_clusters : int
         number of clusters. Can be None if a corresponding initial_clustering_class is given, e.g. DBSCAN
     alphas : list
+        Small values close to 0 are equivalent to homogeneous assignments to all clusters. Large values simulate a clear assignment as with kMeans.
         list of different alpha values used for the prediction
     batch_size : int
         size of the data batches
@@ -389,7 +390,9 @@ class DKM(BaseEstimator, ClusterMixin):
     n_clusters : int
         number of clusters. Can be None if a corresponding initial_clustering_class is given, e.g. DBSCAN
     alphas : list
-        list of different alpha values used for the prediction. If None, the default calculation of the paper will be used.
+        list of different alpha values used for the prediction.
+        Small values close to 0 are equivalent to homogeneous assignments to all clusters. Large values simulate a clear assignment as with kMeans.
+        If None, the default calculation of the paper will be used.
         This is equal to \alpha_{i+1}=2^{1/log(i)^2}*\alpha_i with \alpha_1=0.1 and maximum i=40.
         Alpha can also be a tuple with (\alpha_1, maximum i) (default: [1000])
     batch_size : int
