@@ -184,7 +184,8 @@ class _DKM_Module(torch.nn.Module):
         super().__init__()
         self.alphas = alphas
         self.augmentation_invariance = augmentation_invariance
-        self.centers = torch.tensor(init_centers)
+        # Centers are learnable parameters
+        self.centers = torch.nn.Parameter(torch.tensor(init_centers), requires_grad=True)
 
     def to_device(self, device: torch.device) -> '_DKM_Module':
         """
@@ -390,7 +391,7 @@ class DKM(BaseEstimator, ClusterMixin):
     alphas : list
         list of different alpha values used for the prediction. If None, the default calculation of the paper will be used.
         This is equal to \alpha_{i+1}=2^{1/log(i)^2}*\alpha_i with \alpha_1=0.1 and maximum i=40.
-        Alpha can also be a tuple with (\alpha_1, maximum i) (default: None)
+        Alpha can also be a tuple with (\alpha_1, maximum i) (default: [1000])
     batch_size : int
         size of the data batches (default: 256)
     pretrain_optimizer_params : dict
@@ -398,10 +399,10 @@ class DKM(BaseEstimator, ClusterMixin):
     clustering_optimizer_params : dict
         parameters of the optimizer for the actual clustering procedure, includes the learning rate (default: {"lr": 1e-4})
     pretrain_epochs : int
-        number of epochs for the pretraining of the autoencoder (default: 100)
+        number of epochs for the pretraining of the autoencoder (default: 50)
     clustering_epochs : int
         number of epochs for each alpha value for the actual clustering procedure.
-        The total number of clustering epochs therefore corresponds to: len(alphas)*clustering_epochs (default: 5)
+        The total number of clustering epochs therefore corresponds to: len(alphas)*clustering_epochs (default: 100)
     optimizer_class : torch.optim.Optimizer
         the optimizer class (default: torch.optim.Adam)
     loss_fn : torch.nn.modules.loss._Loss
@@ -452,9 +453,9 @@ class DKM(BaseEstimator, ClusterMixin):
     Pattern Recognition Letters 138 (2020): 185-192.
     """
 
-    def __init__(self, n_clusters: int, alphas: list = None, batch_size: int = 256,
+    def __init__(self, n_clusters: int, alphas: list = [1000], batch_size: int = 256,
                  pretrain_optimizer_params: dict = {"lr": 1e-3}, clustering_optimizer_params: dict = {"lr": 1e-4},
-                 pretrain_epochs: int = 100, clustering_epochs: int = 5,
+                 pretrain_epochs: int = 50, clustering_epochs: int = 100,
                  optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), autoencoder: torch.nn.Module = None,
                  embedding_size: int = 10, cluster_loss_weight: float = 1, custom_dataloaders: tuple = None,
@@ -466,7 +467,7 @@ class DKM(BaseEstimator, ClusterMixin):
             alphas = _get_default_alphas()
         elif type(alphas) is tuple and len(alphas) == 2:
             alphas = _get_default_alphas(init_alpha=alphas[0], n_alphas=alphas[1])
-        elif type(alphas) is int:
+        elif type(alphas) is int or type(alphas) is float:
             alphas = [alphas]
         assert type(alphas) is list, "alphas must be a list, int or tuple"
         self.alphas = alphas
