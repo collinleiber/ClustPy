@@ -16,12 +16,10 @@ from sklearn.utils import check_random_state
 
 def _dkm(X: np.ndarray, n_clusters: int, alphas: list, batch_size: int, pretrain_optimizer_params: dict,
          clustering_optimizer_params: dict, pretrain_epochs: int, clustering_epochs: int,
-         optimizer_class: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss,
-         autoencoder: torch.nn.Module, embedding_size: int, cluster_loss_weight: float, custom_dataloaders: tuple,
-         augmentation_invariance: bool,
-         initial_clustering_class: ClusterMixin,
-         initial_clustering_params: dict, random_state: np.random.RandomState) -> (
-        np.ndarray, np.ndarray, np.ndarray, np.ndarray, torch.nn.Module):
+         optimizer_class: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss, autoencoder: torch.nn.Module,
+         embedding_size: int, cluster_loss_weight: float, custom_dataloaders: tuple, augmentation_invariance: bool,
+         initial_clustering_class: ClusterMixin, initial_clustering_params: dict,
+         random_state: np.random.RandomState) -> (np.ndarray, np.ndarray, np.ndarray, np.ndarray, torch.nn.Module):
     """
     Start the actual DKM clustering procedure on the input data set.
 
@@ -91,7 +89,7 @@ def _dkm(X: np.ndarray, n_clusters: int, alphas: list, batch_size: int, pretrain
                                                             initial_clustering_class,
                                                             initial_clustering_params, random_state)
     # Setup DKM Module
-    dkm_module = _DKM_Module(init_centers, alphas, augmentation_invariance).to_device(device)
+    dkm_module = _DKM_Module(init_centers, alphas, augmentation_invariance).to(device)
     # Use DKM optimizer parameters (usually learning rate is reduced by a magnitude of 10)
     optimizer = optimizer_class(list(autoencoder.parameters()) + list(dkm_module.parameters()),
                                 **clustering_optimizer_params)
@@ -187,24 +185,6 @@ class _DKM_Module(torch.nn.Module):
         self.augmentation_invariance = augmentation_invariance
         # Centers are learnable parameters
         self.centers = torch.nn.Parameter(torch.tensor(init_centers), requires_grad=True)
-
-    def to_device(self, device: torch.device) -> '_DKM_Module':
-        """
-        Move the _DKM_Module and the cluster centers to the specified device (cpu or cuda).
-
-        Parameters
-        ----------
-        device : torch.device
-            device to be trained on
-
-        Returns
-        -------
-        self : _DKM_Module
-            this instance of the _DKM_Module
-        """
-        self.centers = self.centers.to(device)
-        self.to(device)
-        return self
 
     def predict(self, embedded: torch.Tensor, alpha: float = 1000) -> torch.Tensor:
         """
