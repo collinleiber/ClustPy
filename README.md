@@ -145,9 +145,9 @@ Remove clustpy via pip to avoid ambiguities during development, e.g., when chang
 ## Python environments
 
 ClustPy utilizes global [Python environment variables](https://docs.python.org/3/library/os.html#os.environ) in some places. These can be defined using `os.environ['VARIABLE_NAME'] = VARIABLE_VALUE`.
-The following variable names are used
+The following variable names are used:
 
-- 'CLUSTPY_DATA': Defines the path where downloaded datasets should be saved
+- 'CLUSTPY_DATA': Defines the path where downloaded datasets should be saved.
 - 'CLUSTPY_DEVICE': Define the device to be used for Pytorch applications. Example: `os.environ['CLUSTPY_DEVICE'] = 'cuda:1'`
 
 # Compatible packages
