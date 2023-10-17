@@ -9,13 +9,13 @@ import numpy as np
 def test_simple_dkm():
     torch.use_deterministic_algorithms(True)
     X, labels = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
-    dkm = DKM(3, pretrain_epochs=3, alphas=(0.1, 2), clustering_epochs=3, random_state=1)
+    dkm = DKM(3, pretrain_epochs=3, alphas=(0.1, 1), clustering_epochs=3, random_state=1)
     assert not hasattr(dkm, "labels_")
     dkm.fit(X)
     assert dkm.labels_.dtype == np.int32
     assert dkm.labels_.shape == labels.shape
     # Test if random state is working
-    dkm = DKM(3, pretrain_epochs=3, alphas=(0.1, 2), clustering_epochs=3, random_state=1)
+    dkm = DKM(3, pretrain_epochs=3, alphas=0.1, clustering_epochs=3, random_state=1)
     dkm.fit(X)
     assert np.array_equal(dkm.labels_, dkm.labels_)
     assert np.allclose(dkm.cluster_centers_, dkm.cluster_centers_, atol=1e-1)
