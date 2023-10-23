@@ -1,0 +1,35 @@
+cff-version: 1.2.0
+message: "If you use the ClustPy package in the context of a scientific publication, please cite it as follows"
+authors:
+- family-names: "Leiber"
+  given-names: "Collin"
+  orcid: https://orcid.org/0000-0001-5368-5697
+- family-names: "Miklautz"
+  given-names: "Lukas"
+  orcid: "https://orcid.org/0000-0002-2585-5895"
+title: "ClustPy"
+version: 0.0.2
+date-released: 2023-09-25
+url: "https://github.com/collinleiber/ClustPy"
+preferred-citation:
+  type: conference-paper
+  authors:
+    - family-names: "Leiber"
+      given-names: "Collin"
+      orcid: https://orcid.org/0000-0001-5368-5697
+    - family-names: "Miklautz"
+      given-names: "Lukas"
+      orcid: "https://orcid.org/0000-0002-2585-5895"
+    - family-names: "Plant"
+      given-names: "Claudia"
+      orcid: "https://orcid.org/0000-0001-5274-8123"
+    - family-names: "Böhm"
+      given-names: "Christian"
+      orcid: "https://orcid.org/0000-0002-2237-9969"
+  doi: "10.1145/3583780.3615290"
+  journal: "Proceedings of the 32nd ACM International Conference on Information and Knowledge Management"
+  month: 10
+  start: 5208 # First page number
+  end: 5211 # Last page number
+  title: "Application of Deep Clustering Algorithms"
+  year: 2023
