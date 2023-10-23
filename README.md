@@ -150,27 +150,6 @@ The following variable names are used:
 - 'CLUSTPY_DATA': Defines the path where downloaded datasets should be saved.
 - 'CLUSTPY_DEVICE': Define the device to be used for Pytorch applications. Example: `os.environ['CLUSTPY_DEVICE'] = 'cuda:1'`
 
-# Citation
-
-If you use the ClustPy package in the context of a scientific publication, please cite it as follows:
-
-*Leiber, C., Miklautz, L., Plant, C., Böhm, C. (2023, October).
-Application of Deep Clustering Algorithms.
-Proceedings of the 32nd ACM International Conference on Information and Knowledge Management.*
-
-**BibTeX:**
-```latex
-@inproceedings{leiber2023application,
-  title = {Application of Deep Clustering Algorithms},
-  author = {Leiber, Collin and Miklautz, Lukas and Plant, Claudia and Böhm, Christian},
-  booktitle = {Proceedings of the 32nd ACM International Conference on Information and Knowledge Management},
-  year = {2023},
-  pages = {5208–5211},
-  organization = {Association for Computing Machinery},
-  url = {https://doi.org/10.1145/3583780.3615290}
-}
-```
-
 # Compatible packages
 
 We stick as close as possible to the implementation details of sklean clustering. Therefore, our methods are compatible with many other packages. Examples are:
@@ -309,4 +288,25 @@ df = evaluate_multiple_datasets(datasets, algorithms, metrics, n_repetitions=5,
                                 add_runtime=True, add_n_clusters=True, save_path=None,
                                 save_intermediate_results=False)
 print(df)
+```
+
+# Citation
+
+If you use the ClustPy package in the context of a scientific publication, please cite it as follows:
+
+*Leiber, C., Miklautz, L., Plant, C., Böhm, C. (2023, October).
+Application of Deep Clustering Algorithms.
+Proceedings of the 32nd ACM International Conference on Information and Knowledge Management.*
+
+**BibTeX:**
+```latex
+@inproceedings{leiber2023application,
+  title = {Application of Deep Clustering Algorithms},
+  author = {Leiber, Collin and Miklautz, Lukas and Plant, Claudia and Böhm, Christian},
+  booktitle = {Proceedings of the 32nd ACM International Conference on Information and Knowledge Management},
+  year = {2023},
+  pages = {5208–5211},
+  publisher = {Association for Computing Machinery},
+  url = {https://doi.org/10.1145/3583780.3615290}
+}
 ```

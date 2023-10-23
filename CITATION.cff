@@ -27,9 +27,9 @@ preferred-citation:
       given-names: "Christian"
       orcid: "https://orcid.org/0000-0002-2237-9969"
   doi: "10.1145/3583780.3615290"
-  journal: "Proceedings of the 32nd ACM International Conference on Information and Knowledge Management"
-  month: 10
+  booktitle: "Proceedings of the 32nd ACM International Conference on Information and Knowledge Management"
   start: 5208 # First page number
   end: 5211 # Last page number
   title: "Application of Deep Clustering Algorithms"
   year: 2023
+  publisher: "Association for Computing Machinery"
