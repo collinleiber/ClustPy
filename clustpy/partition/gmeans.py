@@ -46,6 +46,8 @@ def _gmeans(X: np.ndarray, significance: float, n_clusters_init: int, max_n_clus
         n_clusters_old = n_clusters
         for c in range(n_clusters_old):
             ids_in_cluster = np.where(labels == c)[0]
+            if ids_in_cluster.shape[0] < 2:
+                continue
             # Split cluster into two
             labels_split, centers_split, _ = _execute_two_means(X[ids_in_cluster], [np.arange(ids_in_cluster.shape[0])], 0,
                                                              np.array([centers[c]]), n_split_trials, random_state)
