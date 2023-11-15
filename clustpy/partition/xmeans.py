@@ -89,6 +89,7 @@ def _execute_two_means(X: np.ndarray, ids_in_each_cluster: list, cluster_id_to_s
         The resuling cluster centers,
         The Kmeans error of the clustering result
     """
+    assert X.shape[0] >= 2, "X must contain at least 2 elements"
     # Prepare cluster for splitting
     old_center = centers[cluster_id_to_split, :]
     reduced_centers = np.delete(centers, cluster_id_to_split, axis=0)
