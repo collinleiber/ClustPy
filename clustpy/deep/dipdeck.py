@@ -593,7 +593,7 @@ class DipDECK(BaseEstimator, ClusterMixin):
     autoencoder : torch.nn.Module
         the input autoencoder. If None a new FeedforwardAutoencoder will be created (default: None)
     embedding_size : int
-        size of the embedding within the autoencoder (default: 10)
+        size of the embedding within the autoencoder (default: 5)
     max_cluster_size_diff_factor : float
         The maximum different in size when comparing two clusters regarding the number of samples.
         If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) closest samples will be used for the Dip calculation (default: 2)

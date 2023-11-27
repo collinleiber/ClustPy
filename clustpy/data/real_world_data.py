@@ -10,7 +10,6 @@ from sklearn.datasets import fetch_20newsgroups, fetch_rcv1, load_iris as sk_loa
     load_breast_cancer as sk_load_breast_cancer
 import pandas as pd
 from scipy.io import loadmat
-
 import torch
 from clustpy.data.real_torchvision_data import _torch_normalize_and_flatten
 

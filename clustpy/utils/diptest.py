@@ -551,10 +551,10 @@ Plot
 
 
 def plot_dip(X: np.ndarray, is_data_sorted: bool = False, dip_value: float = None, modal_interval: tuple = None,
-             modal_triangle: tuple = None, gcm: np.ndarray = None, lcm: np.ndarray = None, show_legend: bool = True,
-             add_histogram: bool = True, histogram_labels: np.ndarray = None, histogram_show_legend: bool = True,
-             histogram_density: bool = True, histogram_n_bins: int = 100, height_ratio: tuple = (1, 2),
-             show_plot: bool = True) -> None:
+             modal_triangle: tuple = None, gcm: np.ndarray = None, lcm: np.ndarray = None, linewidth_ecdf: float = 1,
+             linewidth_extra: float = 2, show_legend: bool = True, add_histogram: bool = True,
+             histogram_labels: np.ndarray = None, histogram_show_legend: bool = True, histogram_density: bool = True,
+             histogram_n_bins: int = 100, height_ratio: tuple = (1, 2), show_plot: bool = True) -> None:
     """
     Plot a visual representation of the computational process of the Dip.
     Upper part shows an optional histogram of the data and the lower part shows the corresponding ECDF.
@@ -575,6 +575,10 @@ def plot_dip(X: np.ndarray, is_data_sorted: bool = False, dip_value: float = Non
         The indices of points that are part of the Greatest Convex Minorant (gcm) (default: None)
     lcm : np.ndarray
         The indices of points that are part of the Least Concave Majorant (lcm) (default None)
+    linewidth_ecdf : flaot
+        The linewidth for the eCDF (default: 1)
+    linewidth_extra : float
+        The linewidth for the visualization of the dip, modal interval, modal triangle, gcm and lcm (default: 2)
     show_legend : bool
         Defines whether the legend of the ECDF plot should be added (default: True)
     add_histogram : bool
@@ -607,33 +611,33 @@ def plot_dip(X: np.ndarray, is_data_sorted: bool = False, dip_value: float = Non
                        show_legend=histogram_show_legend,
                        container=ax1, show_plot=False)
         if modal_interval is not None:
-            ax1.plot([X[modal_interval[0]], X[modal_interval[0]]], ax1.get_ylim(), "g--")
-            ax1.plot([X[modal_interval[1]], X[modal_interval[1]]], ax1.get_ylim(), "g--")
+            ax1.plot([X[modal_interval[0]], X[modal_interval[0]]], ax1.get_ylim(), "g--", linewidth=linewidth_extra)
+            ax1.plot([X[modal_interval[1]], X[modal_interval[1]]], ax1.get_ylim(), "g--", linewidth=linewidth_extra)
         dip_container = ax2
         # Remove spacing between the two plots
         fig.subplots_adjust(hspace=0)
     else:
         dip_container = plt
     # Plot ECDF
-    dip_container.plot(X, np.arange(N) / N, "b", label="eCDF")
+    dip_container.plot(X, np.arange(N) / N, "b", label="eCDF", linewidth=linewidth_ecdf)
     if dip_value is not None:
         # Add Dip range around ECDF
-        dip_container.plot(X, np.arange(N) / N - dip_value * 2, "k:", alpha=0.7, label="2x dip")
-        dip_container.plot(X, np.arange(N) / N + dip_value * 2, "k:", alpha=0.7)
+        dip_container.plot(X, np.arange(N) / N - dip_value * 2, "k:", alpha=0.7, label="2x dip", linewidth=linewidth_extra)
+        dip_container.plot(X, np.arange(N) / N + dip_value * 2, "k:", alpha=0.7, linewidth=linewidth_extra)
     if modal_interval is not None:
         # Add modal interval in green
         dip_container.plot([X[modal_interval[0]], X[modal_interval[1]]], [modal_interval[0] / N, modal_interval[1] / N],
-                           linewidth=1.5, c="g", label="modal interval")
+                           linewidth=linewidth_extra, c="g", label="modal interval")
     if modal_triangle is not None:
         # Add modal triangle in red
         dip_container.plot([X[modal_triangle[0]], X[modal_triangle[1]], X[modal_triangle[2]], X[modal_triangle[0]]],
                            [modal_triangle[0] / N, modal_triangle[1] / N, modal_triangle[2] / N, modal_triangle[0] / N],
-                           linewidth=1.5, c="r", label="modal triangle")
+                           linewidth=linewidth_extra, c="r", label="modal triangle")
     # Add process of gcm and lcm curves
     if gcm is not None:
-        dip_container.plot(X[gcm], gcm / N, "y--", linewidth=1.5, label="gcm")
+        dip_container.plot(X[gcm], gcm / N, "y--", linewidth=linewidth_extra, label="gcm")
     if lcm is not None:
-        dip_container.plot(X[lcm], lcm / N, "c--", linewidth=1.5, label="lcm")
+        dip_container.plot(X[lcm], lcm / N, "c--", linewidth=linewidth_extra, label="lcm")
     if show_legend:
         dip_container.legend(loc="lower right")
     if show_plot:

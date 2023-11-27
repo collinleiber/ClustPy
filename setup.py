@@ -35,6 +35,7 @@ setup(
                       'torchvision',
                       'xlrd',
                       'Pillow',
-                      'nltk'],
+                      'nltk',
+                      'opencv-python'],
     ext_modules=[dip_extension]
 )

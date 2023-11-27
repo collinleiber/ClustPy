@@ -14,6 +14,7 @@ from .real_medical_mnist_data import load_path_mnist, load_chest_mnist, load_der
     load_pneumonia_mnist, load_retina_mnist, load_breast_mnist, load_blood_mnist, load_tissue_mnist, load_organ_a_mnist, \
     load_organ_c_mnist, load_organ_s_mnist, load_organ_mnist_3d, load_nodule_mnist_3d, load_adrenal_mnist_3d, \
     load_fracture_mnist_3d, load_vessel_mnist_3d, load_synapse_mnist_3d
+from clustpy.data.real_video_data import load_video_weizmann
 
 __all__ = ['create_subspace_data',
            'create_nr_data',
@@ -88,4 +89,5 @@ __all__ = ['create_subspace_data',
            'load_imagenet10',
            'load_gtsrb',
            'load_coil20',
-           'load_coil100']
+           'load_coil100',
+           'load_video_weizmann']
