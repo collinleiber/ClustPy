@@ -7,7 +7,7 @@ import tarfile
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import LabelEncoder
 from sklearn.datasets import fetch_20newsgroups, fetch_rcv1, load_iris as sk_load_iris, load_wine as sk_load_wine, \
-    load_breast_cancer as sk_load_breast_cancer
+    load_breast_cancer as sk_load_breast_cancer, fetch_olivetti_faces
 import pandas as pd
 from scipy.io import loadmat
 import torch
@@ -78,6 +78,30 @@ def load_breast_cancer() -> (np.ndarray, np.ndarray):
     """
     data, labels = sk_load_breast_cancer(return_X_y=True)
     return data, labels
+
+
+def load_olivetti_faces(flatten: bool = True) -> (np.ndarray, np.ndarray):
+    """
+    Load the olivetti faces data set. It consists of 400 64x64 grayscale images showing faces of 40 different persons.
+    N=400, d=4096, k=40.
+
+    Returns
+    -------
+    data, labels : (np.ndarray, np.ndarray)
+        the data numpy array (400 x 4096), the labels numpy array (400)
+    flatten : bool
+        should the image data be flatten, i.e. should the format be changed to a (N x d) array (default: True)
+
+    References
+    -------
+    https://scikit-learn.org/stable/modules/generated/sklearn.datasets.fetch_olivetti_faces.html
+    """
+    dataset = fetch_olivetti_faces()
+    if flatten:
+        data = dataset.data
+    else:
+        data = dataset.images
+    return data, dataset.target
 
 
 def load_newsgroups(subset: str = "all", n_features: int = 2000) -> (np.ndarray, np.ndarray):

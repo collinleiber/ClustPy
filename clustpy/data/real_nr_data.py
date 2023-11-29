@@ -139,7 +139,7 @@ UCI
 def load_cmu_faces(flatten: bool = True, downloads_path: str = None) -> (np.ndarray, np.ndarray):
     """
     Load the CMU Face Images data set. It consists of 640 30x32 grayscale images showing 20 persons in different poses
-    (up, straight, left, right) und with different expressions (neutral, happy, sad, angry). Additionally, the persons
+    (up, straight, left, right) and with different expressions (neutral, happy, sad, angry). Additionally, the persons
     can wear sunglasses or not.
     16 images show glitches which is why the final data set only contains 624 images.
     N=624, d=400, k=[20,4,4,2].

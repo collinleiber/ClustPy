@@ -147,14 +147,14 @@ def _decompress_z_file(filename: str, directory: str) -> bool:
     return successful
 
 
-def _load_image_data(path: str, image_size: tuple, color_image: bool) -> np.ndarray:
+def _load_image_data(image: str, image_size: tuple, color_image: bool) -> np.ndarray:
     """
     Load image and convert it into a coherent size. Returns a numpy array containing the image data.
 
     Parameters
     ----------
-    path : str
-        Path to the image
+    image : str
+        Path to the image. Can also be a numpy array containing the specific pixels
     image_size : tuple
         images of various sizes can be converted into a coherent size.
         The tuple equals (width, height) of the images.
@@ -167,13 +167,16 @@ def _load_image_data(path: str, image_size: tuple, color_image: bool) -> np.ndar
     image_data : np.ndarray
         The numpy array containing the image data
     """
-    image = Image.open(path)
+    if type(image) is str:
+        pil_image = Image.open(image)
+    else:
+        pil_image = Image.fromarray(np.uint8(image))
     if color_image:
-        image = image.convert("RGB")
+        pil_image = pil_image.convert("RGB")
     # Convert to coherent size
     if image_size is not None:
-        image = image.resize(image_size)
-    image_data = np.asarray(image)
+        pil_image = pil_image.resize(image_size)
+    image_data = np.asarray(pil_image)
     assert image_size is None or image_data.shape == (
         image_size[0], image_size[1], 3), "Size of image is not correct. Should be {0} but is {1}".format(image_size,
                                                                                                           image_data.shape)

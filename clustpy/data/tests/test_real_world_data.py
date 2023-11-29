@@ -4,7 +4,7 @@ from clustpy.data import load_iris, load_wine, load_breast_cancer, load_newsgrou
     load_ecoli, load_htru2, load_letterrecognition, load_har, load_statlog_shuttle, load_mice_protein, \
     load_user_knowledge, load_breast_tissue, load_forest_types, load_dermatology, load_multiple_features, \
     load_statlog_australian_credit_approval, load_breast_cancer_wisconsin_original, load_semeion, load_imagenet_dog, \
-    load_imagenet10, load_coil20, load_coil100
+    load_imagenet10, load_coil20, load_coil100, load_olivetti_faces
 from pathlib import Path
 import os
 import shutil
@@ -40,6 +40,15 @@ def test_load_wine():
 def test_load_breast_cancer():
     data, labels = load_breast_cancer()
     _helper_test_data_loader(data, labels, 569, 30, 2)
+
+
+@pytest.mark.data
+def test_load_olivetti_faces():
+    data, labels = load_olivetti_faces(flatten=True)
+    _helper_test_data_loader(data, labels, 400, 4096, 40)
+    # Do not flatten
+    data, _ = load_olivetti_faces(flatten=False)
+    assert data.shape == (400, 64, 64)
 
 
 @pytest.mark.data
