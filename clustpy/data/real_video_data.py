@@ -11,7 +11,7 @@ Helpers
 """
 
 
-def _load_video(path: str, image_size: tuple) -> list:
+def _load_video(path: str, image_size: tuple) -> np.ndarray:
     """
     Load a video by saving each frame within a numpy array.
 
@@ -26,8 +26,8 @@ def _load_video(path: str, image_size: tuple) -> list:
 
     Returns
     -------
-    video_array : list
-        The list containing the frames
+    video_array : np.ndarray
+        The array containing the frames
     """
     # Load video
     vid = cv2.VideoCapture(path)
@@ -44,18 +44,21 @@ def _load_video(path: str, image_size: tuple) -> list:
                 frame_array = _load_image_data(frame_array, image_size, is_color_image)
             video_array.append(frame_array)
     vid.release()
+    # Transform list to numpy array
+    video_array = np.array(video_array, dtype="uint8")
     return video_array
 
 
-def _downsample_frames(data: list, labels: list, frame_sampling_ratio: float = 1) -> (np.ndarray, np.ndarray):
+def _downsample_frames(data: np.ndarray, labels: np.ndarray, frame_sampling_ratio: float = 1) -> (
+        np.ndarray, np.ndarray):
     """
     Downsample the number of frames within a video.
 
     Parameters
     ----------
-    data : list
+    data : np.ndarray
         The data array containing the frames
-    labels : list
+    labels : np.ndarray
         The labels array
     frame_sampling_ratio : float
         Ratio to downsample the number of frames. If it is set to 1 all frames will be returned.
@@ -69,18 +72,14 @@ def _downsample_frames(data: list, labels: list, frame_sampling_ratio: float = 1
     assert frame_sampling_ratio > 0 and frame_sampling_ratio <= 1, "frame_sampling_ratio must be within (0, 1]"
     # Downsample array
     if frame_sampling_ratio != 1:
-        n_samples_orig = len(data)
-        n_to_delete = n_samples_orig - frame_sampling_ratio * n_samples_orig
-        nth_element = int(n_samples_orig / n_to_delete)
-        nth_element = nth_element + 1 if n_samples_orig % n_to_delete > 0 else nth_element
-        del data[nth_element - 1::nth_element]
-        del labels[nth_element - 1::nth_element]
-        assert frame_sampling_ratio <= len(
-            data) / n_samples_orig, "Difference between frame_sampling_ratio ({0}) and actual sampling ratio ({1}) is too large".format(
-            frame_sampling_ratio, len(data) / n_samples_orig)
-    # Transform lists to numpy arrays
-    data = np.array(data, dtype="uint8")
-    labels = np.array(labels, dtype="int32")
+        n_samples_orig = data.shape[0]
+        n_to_delete = int(n_samples_orig - frame_sampling_ratio * n_samples_orig)
+        indices_to_delete = np.round(np.linspace(0, n_samples_orig - 1, n_to_delete)).astype(int)
+        data = np.delete(data, indices_to_delete, axis=0)
+        labels = np.delete(labels, indices_to_delete, axis=0)
+        assert frame_sampling_ratio <= data.shape[
+            0] / n_samples_orig, "Difference between frame_sampling_ratio ({0}) and actual sampling ratio ({1}) is too large".format(
+            frame_sampling_ratio, data.shape[0] / n_samples_orig)
     return data, labels
 
 
@@ -161,7 +160,7 @@ def load_video_weizmann(image_size: tuple = None, frame_sampling_ratio: float = 
             # Transform string to label
             label_person = all_persons.index(person)
             label_action = all_actions.index(action)
-            labels_local = [[label_action, label_person]] * len(data_local)
+            labels_local = np.array([[label_action, label_person]] * data_local.shape[0], dtype="int32")
             # Downsample frames
             data_local, labels_local = _downsample_frames(data_local, labels_local, frame_sampling_ratio)
             # Update data and labels
@@ -296,15 +295,14 @@ def load_video_keck_gesture(subset: str = "all", image_size: tuple = (200, 200),
             # Transform string to label
             label_gesture = int(v_file.split("_")[1].replace("gesture", ""))
             label_person = int(v_file.split("_")[0].replace("person", "")) - 1
-            labels_local_0 = [0] * len(data_local)
+            labels_local = np.array([[0, label_person]] * data_local.shape[0], dtype="int32")
             # Use frames_dicts to set gestures correctly
             if train_data:
                 for start, end in frames_train_dict[(label_gesture, label_person)]:
-                    labels_local_0[start:end] = [label_gesture] * (end - start)
+                    labels_local[start:end, 0] = label_gesture
             else:
                 for start, end in frames_test_dict[(label_gesture, label_person)]:
-                    labels_local_0[start:end] = [label_gesture] * (end - start)
-            labels_local = [[labels_local_0[i], label_person] for i in range(len(data_local))]
+                    labels_local[start:end, 0] = label_gesture
             # Downsample frames
             data_local, labels_local = _downsample_frames(data_local, labels_local, frame_sampling_ratio)
             # Update data and labels

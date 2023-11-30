@@ -1,5 +1,7 @@
+import numpy as np
 from clustpy.data.tests._helpers_for_tests import _helper_test_data_loader, _check_normalized_channels
 from clustpy.data import load_video_weizmann, load_video_keck_gesture
+from clustpy.data.real_video_data import _downsample_frames
 from pathlib import Path
 import os
 import shutil
@@ -17,6 +19,25 @@ def run_around_tests():
     yield
     # Code that will run after the tests
     shutil.rmtree(TEST_DOWNLOAD_PATH)
+
+
+def test_downsample_frames():
+    data_in = np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
+    labels_in = np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
+    data_out, labels_out = _downsample_frames(data_in, labels_in, 1)
+    assert np.array_equal(data_out, np.array(data_in)) and np.array_equal(labels_out, np.array(labels_in))
+    data_out, labels_out = _downsample_frames(data_in, labels_in, 0.75)
+    assert data_out.shape[0] == 9
+    assert np.array_equal(data_out, np.array([1, 2, 3, 4, 5, 7, 8, 9, 10])) and np.array_equal(labels_out, data_out)
+    data_out, labels_out = _downsample_frames(data_in, labels_in, 0.5)
+    assert data_out.shape[0] == 6
+    assert np.array_equal(data_out, np.array([1, 3, 5, 6, 8, 10])) and np.array_equal(labels_out, data_out)
+    data_out, labels_out = _downsample_frames(data_in, labels_in, 0.25)
+    assert data_out.shape[0] == 3
+    assert np.array_equal(data_out, np.array([2, 5, 9])) and np.array_equal(labels_out, data_out)
+    data_out, labels_out = _downsample_frames(data_in, labels_in, 0.0001)
+    assert data_out.shape[0] == 1
+    assert np.array_equal(data_out, np.array([5])) and np.array_equal(labels_out, data_out)
 
 
 @pytest.mark.data
