@@ -1,3 +1,5 @@
+from sklearn.base import ClusterMixin
+import inspect
 import torch
 from itertools import islice
 import numpy as np
@@ -111,7 +113,7 @@ def encode_batchwise(dataloader: torch.utils.data.DataLoader, module: torch.nn.M
         batch_data = batch[1].to(device)
         embedded_data = module.encode(batch_data)
         # In case encode() returns more than one value (e.g., for a variational autoencoder), we will pick the first
-        if type(embedded_data) is list:
+        if type(embedded_data) is tuple:
             embedded_data = embedded_data[0]
         embeddings.append(embedded_data.detach().cpu())
     embeddings_numpy = torch.cat(embeddings, dim=0).numpy()
@@ -143,7 +145,7 @@ def decode_batchwise(dataloader: torch.utils.data.DataLoader, module: torch.nn.M
         batch_data = batch[1].to(device)
         embedded_data = module.encode(batch_data)
         # In case encode() returns more than one value (e.g., for a variational autoencoder), we all of them will be used for decoding
-        if type(embedded_data) is list:
+        if type(embedded_data) is tuple:
             decoded_data = module.decode(*embedded_data)
         else:
             decoded_data = module.decode(embedded_data)
@@ -287,3 +289,65 @@ def embedded_kmeans_prediction(dataloader: torch.utils.data.DataLoader, cluster_
     predicted_labels, _ = pairwise_distances_argmin_min(X=embedded_data, Y=cluster_centers, metric='euclidean',
                                                         metric_kwargs={'squared': True})
     return predicted_labels
+
+
+def run_initial_clustering(X: np.ndarray, n_clusters: int, clustering_class: ClusterMixin, clustering_params: dict,
+                           random_state: np.random.RandomState) -> (int, np.ndarray, np.ndarray, ClusterMixin):
+    """
+    Get an initial clustering result for a deep clustering algorithm.
+    This result can then be refined by the optimization of the autoencoder.
+
+    Parameters
+    ----------
+    X : np.ndarray
+        the given data set
+    n_clusters : int
+        number of clusters. Can be None if a corresponding initial_clustering_class is given, e.g. DBSCAN
+    clustering_class : ClusterMixin
+        the class of the initial clustering algorithm
+    clustering_params : dict
+        the parameters for the initial clustering algorithm
+    random_state : np.random.RandomState
+        use a fixed random state to get a repeatable solution
+
+    Returns
+    -------
+    tuple : (int, np.ndarray, np.ndarray, ClusterMixin)
+        The number of clusters (can change if e.g. DBSCAN is used),
+        The initial cluster labels,
+        The initial cluster centers,
+        The clustering object
+    """
+    # Get possible input parameters of the clustering algorithm
+    clustering_class_parameters = inspect.getfullargspec(clustering_class).args + inspect.getfullargspec(
+        clustering_class).kwonlyargs
+    # Check if n_clusters or n_components is contained in the possible parameters
+    if "n_clusters" in clustering_class_parameters:
+        if "random_state" in clustering_class_parameters:
+            clustering_algo = clustering_class(n_clusters=n_clusters, random_state=random_state, **clustering_params)
+        else:
+            clustering_algo = clustering_class(n_clusters=n_clusters, **clustering_params)
+    elif "n_components" in clustering_class_parameters:  # in case of GMM
+        if "random_state" in clustering_class_parameters:
+            clustering_algo = clustering_class(n_components=n_clusters, random_state=random_state, **clustering_params)
+        else:
+            clustering_algo = clustering_class(n_components=n_clusters, **clustering_params)
+    else:  # in case of e.g., DBSCAN
+        if "random_state" in clustering_class_parameters:
+            clustering_algo = clustering_class(random_state=random_state, **clustering_params)
+        else:
+            clustering_algo = clustering_class(**clustering_params)
+    # Run algorithm
+    clustering_algo.fit(X)
+    # Check if clustering algorithm return cluster centers
+    if hasattr(clustering_algo, "cluster_centers_"):
+        labels = clustering_algo.labels_
+        centers = clustering_algo.cluster_centers_
+    elif hasattr(clustering_algo, "means_"):  # in case of GMM
+        labels = clustering_algo.predict(X)
+        centers = clustering_algo.means_
+    else:  # in case of e.g., DBSCAN
+        labels = clustering_algo.labels_
+        centers = np.array([np.mean(X[labels == i], axis=0) for i in np.unique(labels) if i >= 0])
+    n_clusters = np.sum(np.unique(labels) >= 0)  # Needed for DBSCAN, XMeans, GMeans, ...
+    return n_clusters, labels, centers, clustering_algo

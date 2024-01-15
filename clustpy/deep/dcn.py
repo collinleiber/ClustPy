@@ -6,8 +6,8 @@ Dominik Mautz
 
 from clustpy.deep._utils import encode_batchwise, squared_euclidean_distance, predict_batchwise, \
     set_torch_seed, int_to_one_hot, embedded_kmeans_prediction
+from clustpy.deep.dec import get_standard_initial_deep_clustering_setting
 from clustpy.deep._data_utils import get_dataloader, augmentation_invariance_check
-from clustpy.deep._train_utils import get_standard_initial_deep_clustering_setting
 import torch
 import numpy as np
 from sklearn.cluster import KMeans

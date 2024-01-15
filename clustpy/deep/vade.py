@@ -7,8 +7,8 @@ Collin Leiber
 
 import torch
 from clustpy.deep._utils import detect_device, set_torch_seed, encode_batchwise
+from clustpy.deep.dec import get_standard_initial_deep_clustering_setting
 from clustpy.deep._data_utils import get_dataloader
-from clustpy.deep._train_utils import get_standard_initial_deep_clustering_setting
 from clustpy.deep.autoencoders.variational_autoencoder import VariationalAutoencoder, _vae_sampling
 import numpy as np
 from sklearn.mixture import GaussianMixture

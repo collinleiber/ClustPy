@@ -9,9 +9,9 @@ from clustpy.utils import dip_test
 import torch
 import numpy as np
 from clustpy.partition.skinnydip import _dip_mirrored_data
-from clustpy.deep._utils import detect_device, encode_batchwise, set_torch_seed
+from clustpy.deep._utils import detect_device, encode_batchwise, set_torch_seed, run_initial_clustering
 from clustpy.deep._data_utils import get_dataloader, augmentation_invariance_check
-from clustpy.deep._train_utils import get_trained_autoencoder, run_initial_clustering
+from clustpy.deep._train_utils import get_trained_autoencoder
 from clustpy.deep.autoencoders._resnet_ae_modules import EncoderBlock, DecoderBlock
 import matplotlib.pyplot as plt
 from clustpy.utils import plot_scatter_matrix
