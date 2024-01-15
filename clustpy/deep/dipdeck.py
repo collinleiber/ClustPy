@@ -8,9 +8,9 @@ import numpy as np
 from clustpy.utils import dip_test, dip_pval
 import torch
 from clustpy.deep._utils import detect_device, encode_batchwise, squared_euclidean_distance, int_to_one_hot, \
-    set_torch_seed, run_initial_clustering, embedded_kmeans_prediction
+    set_torch_seed, embedded_kmeans_prediction
 from clustpy.deep._data_utils import get_dataloader, augmentation_invariance_check
-from clustpy.deep._train_utils import get_trained_autoencoder
+from clustpy.deep._train_utils import get_standard_initial_deep_clustering_setting
 from sklearn.cluster import KMeans
 from sklearn.base import BaseEstimator, ClusterMixin
 from sklearn.utils import check_random_state
@@ -98,25 +98,17 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
         raise Exception("n_clusters can not be smaller than min_n_clusters")
     if dip_merge_threshold < 0 or dip_merge_threshold > 1:
         raise Exception("dip_merge_threshold must be between 0 and 1")
-    device = detect_device()
-    if custom_dataloaders is None:
-        trainloader = get_dataloader(X, batch_size, True, False)
-        testloader = get_dataloader(X, batch_size, False, False)
-    else:
-        trainloader, testloader = custom_dataloaders
-        # Get new X from dataloader (important if transformations are used within the dataloader)
+    # Get initial setting (device, dataloaders, pretrained AE and initial clustering result)
+    device, trainloader, testloader, autoencoder, embedded_data, n_clusters_init, cluster_labels_cpu, init_centers, _ = get_standard_initial_deep_clustering_setting(
+        X, n_clusters_init, batch_size, pretrain_optimizer_params, pretrain_epochs, optimizer_class, loss_fn,
+        autoencoder, embedding_size, custom_dataloaders, initial_clustering_class, initial_clustering_params,
+        random_state)
+    if custom_dataloaders is not None:
+        # Get new X from testloader (important if transformations are used within the dataloader)
         X_new = []
         for batch in testloader:
             X_new.append(batch[1].detach().cpu())
         X = torch.cat(X_new, dim=0).numpy()
-    autoencoder = get_trained_autoencoder(trainloader, pretrain_optimizer_params, pretrain_epochs, device,
-                                          optimizer_class, loss_fn, embedding_size, autoencoder)
-    # Execute initial clustering in embedded space
-    embedded_data = encode_batchwise(testloader, autoencoder, device)
-    n_clusters_init, cluster_labels_cpu, init_centers, _ = run_initial_clustering(embedded_data, n_clusters_init,
-                                                                                  initial_clustering_class,
-                                                                                  initial_clustering_params,
-                                                                                  random_state)
     # Get nearest points to optimal centers
     centers_cpu, embedded_centers_cpu = _get_nearest_points_to_optimal_centers(X, init_centers, embedded_data)
     # Initial dip values
@@ -729,8 +721,7 @@ class DipDECK(BaseEstimator, ClusterMixin):
         """
         # Get embedded centers
         device = detect_device()
-        centerloader = get_dataloader(self.cluster_centers_, self.batch_size, False, False)
-        embedded_centers = encode_batchwise(centerloader, self.autoencoder, device)
+        embedded_centers = self.autoencoder.encode(torch.from_numpy(self.cluster_centers_).float().to(device))
         # Get labels
         dataloader = get_dataloader(X, self.batch_size, False, False)
         predicted_labels = embedded_kmeans_prediction(dataloader, embedded_centers, self.autoencoder)

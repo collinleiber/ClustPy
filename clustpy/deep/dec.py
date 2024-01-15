@@ -5,10 +5,10 @@ Dominik Mautz,
 Collin Leiber
 """
 
-from clustpy.deep._utils import detect_device, encode_batchwise, squared_euclidean_distance, predict_batchwise, \
-    set_torch_seed, run_initial_clustering, embedded_kmeans_prediction
+from clustpy.deep._utils import encode_batchwise, squared_euclidean_distance, predict_batchwise, \
+    set_torch_seed, embedded_kmeans_prediction
 from clustpy.deep._data_utils import get_dataloader, augmentation_invariance_check
-from clustpy.deep._train_utils import get_trained_autoencoder
+from clustpy.deep._train_utils import get_standard_initial_deep_clustering_setting
 import torch
 import numpy as np
 from sklearn.cluster import KMeans
@@ -79,19 +79,10 @@ def _dec(X: np.ndarray, n_clusters: int, alpha: float, batch_size: int, pretrain
         The cluster centers as identified by DEC after the training terminated,
         The final autoencoder
     """
-    device = detect_device()
-    if custom_dataloaders is None:
-        trainloader = get_dataloader(X, batch_size, True, False)
-        testloader = get_dataloader(X, batch_size, False, False)
-    else:
-        trainloader, testloader = custom_dataloaders
-    autoencoder = get_trained_autoencoder(trainloader, pretrain_optimizer_params, pretrain_epochs, device,
-                                          optimizer_class, loss_fn, embedding_size, autoencoder)
-    # Execute initial clustering in embedded space
-    embedded_data = encode_batchwise(testloader, autoencoder, device)
-    n_clusters, _, init_centers, _ = run_initial_clustering(embedded_data, n_clusters,
-                                                            initial_clustering_class,
-                                                            initial_clustering_params, random_state)
+    # Get initial setting (device, dataloaders, pretrained AE and initial clustering result)
+    device, trainloader, testloader, autoencoder, _, n_clusters, _, init_centers, _ = get_standard_initial_deep_clustering_setting(
+        X, n_clusters, batch_size, pretrain_optimizer_params, pretrain_epochs, optimizer_class, loss_fn, autoencoder,
+        embedding_size, custom_dataloaders, initial_clustering_class, initial_clustering_params, random_state)
     # Setup DEC Module
     dec_module = _DEC_Module(init_centers, alpha, augmentation_invariance).to(device)
     # Use DEC optimizer parameters (usually learning rate is reduced by a magnitude of 10)

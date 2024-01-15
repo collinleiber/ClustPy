@@ -1,6 +1,9 @@
 from clustpy.data._utils import _download_file, _get_download_dir, _load_image_data
 from clustpy.data.real_torchvision_data import _torch_normalize_and_flatten
-import cv2
+try:
+    import cv2
+except:
+    print("[WARNING] Could not import cv2 in clustpy.data.real_video_data")
 import numpy as np
 import os
 import zipfile

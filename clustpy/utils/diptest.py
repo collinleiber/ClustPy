@@ -1,4 +1,7 @@
-from clustpy.utils.dipModule import c_diptest  # noqa - Import from C file (could be marked as unresolved)
+try:
+    from clustpy.utils.dipModule import c_diptest  # noqa - Import from C file (could be marked as unresolved)
+except:
+    print("[WARNING] Could not import c_diptest in clustpy.utils.dipModule")
 import numpy as np
 import matplotlib.pyplot as plt
 from clustpy.utils.plots import plot_histogram

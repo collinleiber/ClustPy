@@ -133,7 +133,7 @@ class ConfusionMatrix():
         Parameters
         ----------
         inplace : bool
-            Should the new confusion matrix overwrite the original one
+            Should the new confusion matrix overwrite the original one (default: True)
 
         Returns
         -------
