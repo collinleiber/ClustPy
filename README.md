@@ -101,6 +101,7 @@ Remove clustpy via pip to avoid ambiguities during development, e.g., when chang
         - Variational Autoencoder [[Paper](https://arxiv.org/abs/1312.6114)]
     - ACe/DeC [[Paper](https://www.ijcai.org/proceedings/2021/389)]
     - DCN [[Paper](https://dl.acm.org/doi/abs/10.5555/3305890.3306080)]
+    - DDC [[Paper](https://www.sciencedirect.com/science/article/pii/S0950705120302112)]
     - DEC [[Paper](https://dl.acm.org/doi/abs/10.5555/3045390.3045442)]
     - DipDECK [[Paper](https://dl.acm.org/doi/10.1145/3447548.3467316)]
     - DipEncoder [[Paper](https://dl.acm.org/doi/10.1145/3534678.3539407)]
