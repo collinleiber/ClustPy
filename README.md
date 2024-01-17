@@ -72,43 +72,66 @@ Remove clustpy via pip to avoid ambiguities during development, e.g., when chang
 
 ## Clustering Algorithms
 
-- Partition-based clustering
-    - DipExt + DipInit [[Paper](https://link.springer.com/chapter/10.1007/978-3-030-67658-2_6)]
-    - Dip-Means [[Paper](https://proceedings.neurips.cc/paper/2012/hash/a8240cb8235e9c493a0c30607586166c-Abstract.html)]
-    - Dip'n'sub [[Paper](https://epubs.siam.org/doi/abs/10.1137/1.9781611977653.ch13)]
-    - GapStatistic [[Paper](https://rss.onlinelibrary.wiley.com/doi/abs/10.1111/1467-9868.00293)]
-    - G-Means [[Paper](https://proceedings.neurips.cc/paper/2003/hash/234833147b97bb6aed53a8f4f1c7a7d8-Abstract.html)]
-    - LDA-K-Means [[Paper](https://dl.acm.org/doi/abs/10.1145/1273496.1273562)]
-    - PG-Means [[Paper](https://proceedings.neurips.cc/paper/2006/hash/a9986cb066812f440bc2bb6e3c13696c-Abstract.html)]
-    - Projected Dip-Means [[Paper](https://dl.acm.org/doi/abs/10.1145/3200947.3201008)]
-    - SkinnyDip + UniDip [[Paper](https://dl.acm.org/doi/abs/10.1145/2939672.2939740)] & TailoredDip [[Paper](https://epubs.siam.org/doi/abs/10.1137/1.9781611977653.ch13)]
-    - SpecialK [[Paper](https://link.springer.com/chapter/10.1007/978-3-030-46150-8_16)]
-    - SubKmeans [[Paper](https://dl.acm.org/doi/abs/10.1145/3097983.3097989)]
-    - X-Means [[Paper](https://web.cs.dal.ca/~shepherd/courses/csci6403/clustering/xmeans.pdf)]
-- Density-based clustering
-    - Multi Density DBSCAN [[Paper](https://link.springer.com/chapter/10.1007/978-3-642-23878-9_53)]
-- Hierarchical clustering
-    - Diana [[Paper](https://www.jstor.org/stable/2290430?origin=crossref)]
-- Alternative clustering / Non-redundant clustering
-    - AutoNR [[Paper](https://epubs.siam.org/doi/abs/10.1137/1.9781611977172.26)]
-    - NR-Kmeans [[Paper](https://dl.acm.org/doi/abs/10.1145/3219819.3219945)]
-- Deep clustering
-    - Autoencoder
-        - Convolutional Autoencoder [[Paper](https://openaccess.thecvf.com/content_cvpr_2016/html/He_Deep_Residual_Learning_CVPR_2016_paper.html)]
-        - Feedforward Autoencoder [[Paper](https://www.aaai.org/Library/AAAI/1987/aaai87-050.php)]
-        - Neighbor Encoder [[Paper](https://arxiv.org/abs/1811.01557)]
-        - Stacked Autoencoder [[Paper](https://www.jmlr.org/papers/volume11/vincent10a/vincent10a.pdf?)]
-        - Variational Autoencoder [[Paper](https://arxiv.org/abs/1312.6114)]
-    - ACe/DeC [[Paper](https://www.ijcai.org/proceedings/2021/389)]
-    - DCN [[Paper](https://dl.acm.org/doi/abs/10.5555/3305890.3306080)]
-    - DDC [[Paper](https://www.sciencedirect.com/science/article/pii/S0950705120302112)]
-    - DEC [[Paper](https://dl.acm.org/doi/abs/10.5555/3045390.3045442)]
-    - DipDECK [[Paper](https://dl.acm.org/doi/10.1145/3447548.3467316)]
-    - DipEncoder [[Paper](https://dl.acm.org/doi/10.1145/3534678.3539407)]
-    - DKM [[Paper](https://www.sciencedirect.com/science/article/abs/pii/S0167865520302749)]
-    - ENRC [[Paper](https://ojs.aaai.org/index.php/AAAI/article/view/5961)]
-    - IDEC [[Paper](https://dl.acm.org/doi/abs/10.5555/3172077.3172131)]
-    - VaDE [[Paper](https://dl.acm.org/doi/abs/10.5555/3172077.3172161)]
+### Partition-based Clustering
+
+| Algorithm                     | Publication                                                              | Published at       | Original Code                                                                                                                                                                                                                  | Docs                                                                                                                           |
+|-------------------------------|--------------------------------------------------------------------------|--------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------|
+| DipInit (incl. DipExt)        | [Utilizing Structure-Rich Features to Improve Clustering](https://link.springer.com/chapter/10.1007/978-3-030-67658-2_6) | ECML PKDD 2020     | [Link](https://figshare.com/articles/code/Utilizing_Structure-rich_Features_to_improve_Clustering/12063252/1) (R)                                                                                                              | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.partition.html#clustpy.partition.dipext.DipInit)                       |
+| DipMeans                      | [Dip-means: an incremental clustering method for estimating the number of clusters](https://proceedings.neurips.cc/paper/2012/hash/a8240cb8235e9c493a0c30607586166c-Abstract.html) | NIPS 2012          | [Link](https://kalogeratos.com/psite/material/dip-means/) (Matlab)                                                                                                                                                             | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.partition.html#clustpy.partition.dipmeans.DipMeans)                    |
+| Dip'n'sub (incl. TailoredDip) | [Extension of the Dip-test Repertoire - Efficient and Differentiable p-value Calculation for Clustering](https://epubs.siam.org/doi/abs/10.1137/1.9781611977653.ch13) | SIAM SDM 2023      | [Link](https://figshare.com/articles/conference_contribution/Supplement_codes_and_data_for_the_paper_Extension_of_the_Dip-test_Repertoire_-_Efficient_and_Differentiable_p-value_Calculation_for_Clustering_/21916752) (Python) | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.partition.html#clustpy.partition.dipnsub.DipNSub)                      |
+| GapStatistic                  | [Estimating the number of clusters in a data set via the gap statistic](https://rss.onlinelibrary.wiley.com/doi/abs/10.1111/1467-9868.00293) | RSS: Series B 2002 | Unknown                                                                                                                                                                                                                        | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.partition.html#clustpy.partition.gapstatistic.GapStatistic)            | 
+| G-Means                       | [Learning the k in k-means](https://proceedings.neurips.cc/paper/2003/hash/234833147b97bb6aed53a8f4f1c7a7d8-Abstract.html) | NIPS 2003          | Unknown                                                                                                                                                                                                                        | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.partition.html#clustpy.partition.gmeans.GMeans)                        |
+| LDA-K-Means                   | [Adaptive dimension reduction using discriminant analysis and K-means clustering](https://dl.acm.org/doi/abs/10.1145/1273496.1273562) | ICML 2007          | Unknown                                                                                                                                                                                                                        | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.partition.html#clustpy.partition.ldakmeans.LDAKmeans)                  |
+| PG-Means                      | [PG-means: learning the number of clusters in data](https://proceedings.neurips.cc/paper/2006/hash/a9986cb066812f440bc2bb6e3c13696c-Abstract.html) | NIPS 2006          | Unknown                                                                                                                                                                                                                        | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.partition.html#clustpy.partition.pgmeans.PGMeans)                      |
+| Projected Dip-Means           | [The Projected Dip-means Clustering Algorithm](https://dl.acm.org/doi/abs/10.1145/3200947.3201008) | SETN 2018          | Unknown                                                                                                                                                                                                                        | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.partition.html#clustpy.partition.projected_dipmeans.ProjectedDipMeans) |                             
+| SkinnyDip (incl. UniDip)      | [Skinny-dip: Clustering in a Sea of Noise](https://dl.acm.org/doi/abs/10.1145/2939672.2939740) | KDD 2016           | [Link](https://github.com/samhelmholtz/skinny-dip) (R)                                                                                                                                                                                 | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.partition.html#clustpy.partition.skinnydip.SkinnyDip)                  |
+| SpecialK | [k Is the Magic Number—Inferring the Number of Clusters Through Nonparametric Concentration Inequalities](https://link.springer.com/chapter/10.1007/978-3-030-46150-8_16) | ECML PKDD 2019     | [Link](https://github.com/Sibylse/SpecialK) (Python)                                                                                                                                                                           | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.partition.html#clustpy.partition.specialk.SpecialK)                    |
+| SubKmeans | [Towards an Optimal Subspace for K-Means](https://dl.acm.org/doi/abs/10.1145/3097983.3097989) | KDD 2017           | [Link](http://dmm.dbs.ifi.lmu.de/downloads/) (Scala) | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.partition.html#clustpy.partition.subkmeans.SubKmeans) |
+| X-Means | [X-means: Extending k-means with efficient estimation of the number of clusters](https://web.cs.dal.ca/~shepherd/courses/csci6403/clustering/xmeans.pdf) | ICML 2000          | Unknown | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.partition.html#clustpy.partition.xmeans.XMeans) |
+
+### Density-based Clustering
+
+| Algorithm                     | Publication                                                              | Published at                             | Original Code                                                                                                                                                                                                                  | Docs                                                                                                                           |
+|-------------------------------|--------------------------------------------------------------------------|------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------|
+| Multi Density DBSCAN | [Multi Density DBSCAN](https://link.springer.com/chapter/10.1007/978-3-642-23878-9_53) | IDEAL 2011 | Unknown | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.density.html#clustpy.density.multi_density_dbscan.MultiDensityDBSCAN) |
+
+### Hierarchical Clustering
+
+| Algorithm | Publication                                                              | Published at | Original Code                                                                                                                                                                                                                  | Docs                                                                                                        |
+|-----------|--------------------------------------------------------------------------|--------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------|
+| DIANA     | [Finding Groups in Data: An Introduction to Cluster Analysis](https://www.jstor.org/stable/2290430?origin=crossref) | JASA 1991    | Unknown | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.hierarchical.html#clustpy.hierarchical.diana.Diana) |
+
+### Alternative Clustering / Non-redundant Clustering
+
+| Algorithm | Publication                                                              | Published at                             | Original Code                                         | Docs                                                                                                             |
+|-----------|--------------------------------------------------------------------------|------------------------------------------|-------------------------------------------------------|------------------------------------------------------------------------------------------------------------------|
+| AutoNR | [Automatic Parameter Selection for Non-Redundant Clustering](https://epubs.siam.org/doi/abs/10.1137/1.9781611977172.26) | SIAM SDM 2022 | [Link](https://dmm.dbs.ifi.lmu.de/downloads) (Python) | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.alternative.html#clustpy.alternative.autonr.AutoNR)      |
+| NR-Kmeans | [Discovering Non-Redundant K-means Clusterings in Optimal Subspaces](https://dl.acm.org/doi/abs/10.1145/3219819.3219945) | KDD 2018 | [Link](https://dmm.dbs.ifi.lmu.de/downloads) (Scala)  |  [Link](https://clustpy.readthedocs.io/en/latest/clustpy.alternative.html#clustpy.alternative.nrkmeans.NrKmeans) | 
+
+### Deep Clustering
+
+| Algorithm | Publication                                                                                                                    | Published at                 | Original Code                                                                 | Docs                                                                                        |
+|-----------|--------------------------------------------------------------------------------------------------------------------------------|------------------------------|-------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------|
+| ACe/DeC   | [Details (Don't) Matter: Isolating Cluster Information in Deep Embedded Spaces](https://www.ijcai.org/proceedings/2021/389)    | IJCAI 2021                   | [Link](https://gitlab.cs.univie.ac.at/lukas/acedec_public) (Python + PyTorch) | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.deep.html#clustpy.deep.enrc.ACeDeC) |
+| DCN       | [Towards K-means-friendly spaces: simultaneous deep learning and clustering](https://dl.acm.org/doi/abs/10.5555/3305890.3306080) | ICML 2017                    | [Link](https://github.com/boyangumn/DCN) (Python + Theano)                    | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.deep.html#clustpy.deep.dcn.DCN)     |
+| DDC       | [Deep density-based image clustering](https://www.sciencedirect.com/science/article/pii/S0950705120302112) | Knowledge-Based Systems 2020 | [Link](https://github.com/Yazhou-Ren/DDC/tree/master) (Python + Keras)        | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.deep.html#clustpy.deep.ddc.DDC)     | 
+| DEC | [Unsupervised deep embedding for clustering analysis](https://dl.acm.org/doi/abs/10.5555/3045390.3045442) | ICML 2016 | [Link](https://github.com/piiswrong/dec) (Python + Caffe)                     | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.deep.html#clustpy.deep.dec.DEC) |
+| DipDECK | [Dip-based Deep Embedded Clustering with k-Estimation](https://dl.acm.org/doi/10.1145/3447548.3467316) | KDD 2021 | [Link](https://dmm.dbs.ifi.lmu.de/downloads) (Python + PyTorch)               | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.deep.html#clustpy.deep.dipdeck.DipDECK) |
+| DipEncoder | [The DipEncoder: Enforcing Multimodality in Autoencoders](https://dl.acm.org/doi/10.1145/3534678.3539407) | KDD 2022 | [Link](https://dmm.dbs.ifi.lmu.de/downloads) (Python + PyTorch)               | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.deep.html#clustpy.deep.dipencoder.DipEncoder) |
+| DKM | [Deep k-Means: Jointly clustering with k-Means and learning representations](https://www.sciencedirect.com/science/article/abs/pii/S0167865520302749) | Pattern Recognition Letters 2020 | [Link](https://github.com/MaziarMF/deep-k-means) (Python + Tensorflow)        | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.deep.html#clustpy.deep.dkm.DKM) |
+| ENRC | [Deep Embedded Non-Redundant Clustering](https://ojs.aaai.org/index.php/AAAI/article/view/5961) | AAAI 2020 | [Link](https://gitlab.cs.univie.ac.at/lukas/enrcpublic) (Python + PyTorch)    | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.deep.html#clustpy.deep.enrc.ENRC) |
+| IDEC | [Improved Deep Embedded Clustering with Local Structure Preservation](https://www.ijcai.org/proceedings/2017/243) | IJCAI 2017 | [Link](https://github.com/XifengGuo/IDEC) (Python + Keras)                    | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.deep.html#clustpy.deep.dec.IDEC) |
+| VaDE | [Variational Deep Embedding: An Unsupervised and Generative Approach to Clustering](https://www.ijcai.org/proceedings/2017/0273) | IJCAI 2017 | [Link](https://github.com/slim1017/VaDE) (Python + Keras)                     | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.deep.html#clustpy.deep.vade.VaDE) |
+
+#### Autoencoder
+
+| Algorithm                          | Publication                                                                                                                    | Published at | Original Code                                                                 | Docs                                                                                                                                                         |
+|------------------------------------|--------------------------------------------------------------------------------------------------------------------------------|--------------|-------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| ResNet (Convolutional Autoencoder) | [Deep Residual Learning for Image Recognition](https://openaccess.thecvf.com/content_cvpr_2016/html/He_Deep_Residual_Learning_CVPR_2016_paper.html) | CVPR 2016    | Unknown | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.deep.autoencoders.html#clustpy.deep.autoencoders.convolutional_autoencoder.ConvolutionalAutoencoder) |
+| Feedforward Autoencoder | [Nonlinear principal component analysis using autoassociative neural networks](https://aiche.onlinelibrary.wiley.com/doi/abs/10.1002/aic.690370209?casa_token=imvq6unuYuYAAAAA:dqzzzJpIG4UMj5I1XHKBVuhVy_gwLTIgJ55zGbvp25zbQagLAIl3GSljQ9cdpo9fGH7aeyE4nQwT7w) | AIChE 1991   | Unknown | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.deep.autoencoders.html#clustpy.deep.autoencoders.feedforward_autoencoder.FeedforwardAutoencoder)     |
+| Neighbor Encoder | [Representation Learning by Reconstructing Neighborhoods](https://arxiv.org/abs/1811.01557) | arXiv 2018   | Unknown | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.deep.autoencoders.html#clustpy.deep.autoencoders.neighbor_encoder.NeighborEncoder)                   |
+| Greedy Layer-Wise Autoencoder | [Greedy Layer-Wise Training of Deep Networks](https://proceedings.neurips.cc/paper/2006/hash/5da713a690c067105aeb2fae32403405-Abstract.html) | NIPS 2006    | Unknown | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.deep.autoencoders.html#clustpy.deep.autoencoders.stacked_autoencoder.StackedAutoencoder)             |
+| Variational Autoencoder | [Auto-Encoding Variational Bayes](https://arxiv.org/abs/1312.6114) | ICLR 2014    | Unknown | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.deep.autoencoders.html#clustpy.deep.autoencoders.variational_autoencoder.VariationalAutoencoder) |
 
 ## Other implementations
 
