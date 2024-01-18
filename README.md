@@ -136,21 +136,23 @@ Remove clustpy via pip to avoid ambiguities during development, e.g., when chang
 ## Other implementations
 
 - Metrics
-    - Confusion Matrix
-    - Fair Normalized Mutual Information (FNMI) [[Paper](https://dl.acm.org/doi/abs/10.1145/2808797.2809344)]
-    - Information-Theoretic External Cluster-Validity Measure (DOM) [[Paper](https://dl.acm.org/doi/10.5555/2073876.2073893)]
-    - Pair Counting Scores (f1, rand, jaccard, recall, precision) [[Paper](https://link.springer.com/article/10.1007/s10115-008-0150-6)]
+    - Confusion Matrix [[Docs](https://clustpy.readthedocs.io/en/latest/clustpy.metrics.html#clustpy.metrics.confusion_matrix.ConfusionMatrix)]
+    - Fair Normalized Mutual Information (FNMI) [[Publication](https://dl.acm.org/doi/abs/10.1145/2808797.2809344)] [[Docs](https://clustpy.readthedocs.io/en/latest/clustpy.metrics.html#clustpy.metrics.clustering_metrics.fair_normalized_mutual_information)]
+    - Information-Theoretic External Cluster-Validity Measure (DOM) [[Publication](https://dl.acm.org/doi/10.5555/2073876.2073893)] [[Docs](https://clustpy.readthedocs.io/en/latest/clustpy.metrics.html#clustpy.metrics.clustering_metrics.information_theoretic_external_cluster_validity_measure)]
+    - Pair Counting Scores (f1, rand, jaccard, recall, precision) [[Publication](https://link.springer.com/article/10.1007/s10115-008-0150-6)] [[Docs](https://clustpy.readthedocs.io/en/latest/clustpy.metrics.html#clustpy.metrics.pair_counting_scores.PairCountingScores)]
     - Scores for multiple labelings (see alternative clustering algorithms)
-        - Multiple Labelings Confusion Matrix
-        - Multiple Labelings Pair Counting Scores [[Paper](https://ieeexplore.ieee.org/abstract/document/6228189)]
-    - Unsupervised Clustering Accuracy [[Paper](https://ieeexplore.ieee.org/abstract/document/5454426)]
-    - Variation of information [[Paper](https://link.springer.com/chapter/10.1007/978-3-540-45167-9_14)]
+        - Multiple Labelings Confusion Matrix [[Docs](https://clustpy.readthedocs.io/en/latest/clustpy.metrics.html#clustpy.metrics.multipe_labelings_scoring.MultipleLabelingsConfusionMatrix)]
+        - Multiple Labelings Pair Counting Scores [[Publication](https://ieeexplore.ieee.org/abstract/document/6228189)] [[Docs](https://clustpy.readthedocs.io/en/latest/clustpy.metrics.html#clustpy.metrics.multipe_labelings_scoring.MultipleLabelingsPairCountingScores)]
+    - Unsupervised Clustering Accuracy [[Publication](https://ieeexplore.ieee.org/abstract/document/5454426)] [[Docs](https://clustpy.readthedocs.io/en/latest/clustpy.metrics.html#clustpy.metrics.clustering_metrics.unsupervised_clustering_accuracy)]
+    - Variation of information [[Publication](https://link.springer.com/chapter/10.1007/978-3-540-45167-9_14)] [[Docs](https://clustpy.readthedocs.io/en/latest/clustpy.metrics.html#clustpy.metrics.clustering_metrics.variation_of_information)]
 - Utils
-    - Automatic evaluation methods
-    - Hartigans Dip-test [[Paper](https://www.jstor.org/stable/2241144)]
-    - Various plots
+    - Automatic evaluation methods [[Docs](https://clustpy.readthedocs.io/en/latest/clustpy.utils.html#module-clustpy.utils.evaluation)]
+    - Hartigans Dip-test [[Publication](https://www.jstor.org/stable/2241144)] [[Docs](https://clustpy.readthedocs.io/en/latest/clustpy.utils.html#module-clustpy.utils.diptest)]
+    - Various plots [[Docs](https://clustpy.readthedocs.io/en/latest/clustpy.utils.html#module-clustpy.utils.plots)]
 - Datasets
-    - Synthetic dataset creators for subspace and alternative clustering 
+    - Synthetic dataset creators
+        - For common subspace clustering [[Docs](https://clustpy.readthedocs.io/en/latest/clustpy.data.html#clustpy.data.synthetic_data_creator.create_subspace_data)]
+        - For Alternative clustering [[Docs](https://clustpy.readthedocs.io/en/latest/clustpy.data.html#clustpy.data.synthetic_data_creator.create_nr_data)]
     - Real-world dataset loaders (e.g., Iris, Wine, Mice protein, Optdigits, MNIST, ...)
         - UCI Repository [[Website](https://archive.ics.uci.edu/)]
         - UEA & UCR Time Series Classification Repository [[Website](http://www.timeseriesclassification.com/)]
@@ -161,9 +163,9 @@ Remove clustpy via pip to avoid ambiguities during development, e.g., when chang
     - Dataset loaders for datasets with multiple labelings
         - ALOI (subset) [[Website](https://aloi.science.uva.nl/)]
         - CMU Face [[Website](http://archive.ics.uci.edu/ml/datasets/cmu+face+images)]
-        - Dancing Stickfigures [[Paper](https://dl.acm.org/doi/abs/10.1145/2623330.2623734)]
-        - Fruit [[Paper](https://link.springer.com/article/10.1007/s10115-016-0998-9)]
-        - NRLetters [[Paper](https://epubs.siam.org/doi/abs/10.1137/1.9781611977172.26)]
+        - Dancing Stickfigures [[Publication](https://dl.acm.org/doi/abs/10.1145/2623330.2623734)]
+        - Fruit [[Publication](https://link.springer.com/article/10.1007/s10115-016-0998-9)]
+        - NRLetters [[Publication](https://epubs.siam.org/doi/abs/10.1137/1.9781611977172.26)]
         - WebKB [[Website](http://www.cs.cmu.edu/~webkb/)]
 
 ## Python environments

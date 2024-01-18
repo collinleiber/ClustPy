@@ -7,7 +7,7 @@ from sklearn.base import BaseEstimator, ClusterMixin
 import torch
 import numpy as np
 from clustpy.deep._utils import detect_device, encode_batchwise, set_torch_seed
-from clustpy.deep._data_utils import get_dataloader, augmentation_invariance_check
+from clustpy.deep._data_utils import get_dataloader
 from clustpy.deep._train_utils import get_trained_autoencoder
 from sklearn.utils import check_random_state
 from sklearn.manifold import TSNE
@@ -16,7 +16,7 @@ from scipy.spatial.distance import pdist, squareform
 
 def _ddc(X: np.ndarray, ratio: float, batch_size: int, pretrain_optimizer_params: dict, pretrain_epochs: int,
          optimizer_class: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss, autoencoder: torch.nn.Module,
-         embedding_size: int, custom_dataloaders: tuple, random_state: np.random.RandomState) -> (
+         embedding_size: int, custom_dataloaders: tuple, tsne_params: dict, random_state: np.random.RandomState) -> (
         int, np.ndarray, torch.nn.Module):
     """
     Start the actual DDC clustering procedure on the input data set.
@@ -44,6 +44,8 @@ def _ddc(X: np.ndarray, ratio: float, batch_size: int, pretrain_optimizer_params
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         If None, the default dataloaders will be used
+    tsne_params : dict
+        Parameters for the t-SNE execution. Check out sklearn.manifold.TSNE for more information
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution
 
@@ -68,7 +70,9 @@ def _ddc(X: np.ndarray, ratio: float, batch_size: int, pretrain_optimizer_params
     # Encode data
     X_embed = encode_batchwise(testloader, autoencoder, device)
     # Execute T-SNE
-    X_tsne = TSNE(n_components=2, random_state=random_state).fit_transform(X_embed)
+    if not "random_state" in tsne_params:
+        tsne_params["random_state"] = random_state
+    X_tsne = TSNE(**tsne_params).fit_transform(X_embed)
     # Execute Density Peark Algorithm
     n_clusters, labels = _density_peak_clustering(X_tsne, ratio)
     return n_clusters, labels, autoencoder
@@ -174,9 +178,8 @@ class DDC(BaseEstimator, ClusterMixin):
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         If None, the default dataloaders will be used (default: None)
-    augmentation_invariance : bool
-        If True, augmented samples provided in custom_dataloaders[0] will be used to learn
-        cluster assignments that are invariant to the augmentation transformations (default: False)
+    tsne_params : dict
+        Parameters for the t-SNE execution. Check out sklearn.manifold.TSNE for more information (default: {"n_components": 2})
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
@@ -206,7 +209,7 @@ class DDC(BaseEstimator, ClusterMixin):
     def __init__(self, ratio: float = 0.1, batch_size: int = 256, pretrain_optimizer_params: dict = {"lr": 1e-3},
                  pretrain_epochs: int = 100, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), autoencoder: torch.nn.Module = None,
-                 embedding_size: int = 10, custom_dataloaders: tuple = None, augmentation_invariance: bool = False,
+                 embedding_size: int = 10, custom_dataloaders: tuple = None, tsne_params: dict = {"n_components": 2},
                  random_state: np.random.RandomState = None):
         self.ratio = ratio
         self.batch_size = batch_size
@@ -217,7 +220,7 @@ class DDC(BaseEstimator, ClusterMixin):
         self.autoencoder = autoencoder
         self.embedding_size = embedding_size
         self.custom_dataloaders = custom_dataloaders
-        self.augmentation_invariance = augmentation_invariance
+        self.tsne_params = tsne_params
         self.random_state = check_random_state(random_state)
         set_torch_seed(self.random_state)
 
@@ -238,7 +241,6 @@ class DDC(BaseEstimator, ClusterMixin):
         self : DDC
             this instance of the DDC algorithm
         """
-        augmentation_invariance_check(self.augmentation_invariance, self.custom_dataloaders)
         n_clusters, labels, autoencoder = _ddc(X, self.ratio, self.batch_size,
                                                self.pretrain_optimizer_params,
                                                self.pretrain_epochs,
@@ -246,6 +248,7 @@ class DDC(BaseEstimator, ClusterMixin):
                                                self.autoencoder,
                                                self.embedding_size,
                                                self.custom_dataloaders,
+                                               self.tsne_params,
                                                self.random_state)
         self.labels_ = labels
         self.n_clusters_ = n_clusters
