@@ -181,7 +181,7 @@ def test_plot_dip(mock_fig):
     L = np.array([-1] + [0] * 49 + [1] * 49 + [-1])
     dip, modal_interval, modal_triangle, gcm, lcm, mn, mj = dip_test(X, is_data_sorted=True, just_dip=False,
                                                                      return_gcm_lcm_mn_mj=True)
-    assert None == plot_dip(X, False, dip, modal_interval, modal_triangle, gcm, lcm, True, True, L, True, True, 20,
+    assert None == plot_dip(X, False, dip, modal_interval, modal_triangle, gcm, lcm, 1, 2, True, True, L, True, True, 20,
                             (1, 1), True)
 
 
