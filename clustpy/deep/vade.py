@@ -506,18 +506,20 @@ class VaDE(BaseEstimator, ClusterMixin):
     Jiang, Zhuxi, et al. "Variational Deep Embedding: An Unsupervised and Generative Approach to Clustering." IJCAI. 2017.
     """
 
-    def __init__(self, n_clusters: int, batch_size: int = 256, pretrain_optimizer_params: dict = {"lr": 1e-3},
-                 clustering_optimizer_params: dict = {"lr": 1e-4}, pretrain_epochs: int = 100,
+    def __init__(self, n_clusters: int, batch_size: int = 256, pretrain_optimizer_params: dict = None,
+                 clustering_optimizer_params: dict = None, pretrain_epochs: int = 100,
                  clustering_epochs: int = 150, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  loss_fn: torch.nn.modules.loss._Loss = torch.nn.BCELoss(), autoencoder: torch.nn.Module = None,
                  embedding_size: int = 10, custom_dataloaders: tuple = None,
                  initial_clustering_class: ClusterMixin = GaussianMixture,
-                 initial_clustering_params: dict = {"n_init": 10, "covariance_type": "diag"},
+                 initial_clustering_params: dict = None,
                  random_state: np.random.RandomState = None):
         self.n_clusters = n_clusters
         self.batch_size = batch_size
-        self.pretrain_optimizer_params = pretrain_optimizer_params
-        self.clustering_optimizer_params = clustering_optimizer_params
+        self.pretrain_optimizer_params = {
+            "lr": 1e-3} if pretrain_optimizer_params is None else pretrain_optimizer_params
+        self.clustering_optimizer_params = {
+            "lr": 1e-4} if clustering_optimizer_params is None else clustering_optimizer_params
         self.pretrain_epochs = pretrain_epochs
         self.clustering_epochs = clustering_epochs
         self.optimizer_class = optimizer_class
@@ -526,7 +528,8 @@ class VaDE(BaseEstimator, ClusterMixin):
         self.embedding_size = embedding_size
         self.custom_dataloaders = custom_dataloaders
         self.initial_clustering_class = initial_clustering_class
-        self.initial_clustering_params = initial_clustering_params
+        self.initial_clustering_params = {"n_init": 10,
+                                          "covariance_type": "diag"} if initial_clustering_params is None else initial_clustering_params
         self.random_state = check_random_state(random_state)
         set_torch_seed(self.random_state)
 

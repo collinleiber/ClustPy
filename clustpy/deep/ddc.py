@@ -70,7 +70,7 @@ def _ddc(X: np.ndarray, ratio: float, batch_size: int, pretrain_optimizer_params
     # Encode data
     X_embed = encode_batchwise(testloader, autoencoder, device)
     # Execute T-SNE
-    if not "random_state" in tsne_params:
+    if "random_state" not in tsne_params.keys():
         tsne_params["random_state"] = random_state
     X_tsne = TSNE(**tsne_params).fit_transform(X_embed)
     # Execute Density Peark Algorithm
@@ -206,21 +206,22 @@ class DDC(BaseEstimator, ClusterMixin):
     Knowledge-Based Systems 197 (2020): 105841.
     """
 
-    def __init__(self, ratio: float = 0.1, batch_size: int = 256, pretrain_optimizer_params: dict = {"lr": 1e-3},
+    def __init__(self, ratio: float = 0.1, batch_size: int = 256, pretrain_optimizer_params: dict = None,
                  pretrain_epochs: int = 100, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), autoencoder: torch.nn.Module = None,
-                 embedding_size: int = 10, custom_dataloaders: tuple = None, tsne_params: dict = {"n_components": 2},
+                 embedding_size: int = 10, custom_dataloaders: tuple = None, tsne_params: dict = None,
                  random_state: np.random.RandomState = None):
         self.ratio = ratio
         self.batch_size = batch_size
-        self.pretrain_optimizer_params = pretrain_optimizer_params
+        self.pretrain_optimizer_params = {
+            "lr": 1e-3} if pretrain_optimizer_params is None else pretrain_optimizer_params
         self.pretrain_epochs = pretrain_epochs
         self.optimizer_class = optimizer_class
         self.loss_fn = loss_fn
         self.autoencoder = autoencoder
         self.embedding_size = embedding_size
         self.custom_dataloaders = custom_dataloaders
-        self.tsne_params = tsne_params
+        self.tsne_params = {"n_components": 2} if tsne_params is None else tsne_params
         self.random_state = check_random_state(random_state)
         set_torch_seed(self.random_state)
 

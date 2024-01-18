@@ -323,17 +323,17 @@ def run_initial_clustering(X: np.ndarray, n_clusters: int, clustering_class: Clu
         clustering_class).kwonlyargs
     # Check if n_clusters or n_components is contained in the possible parameters
     if "n_clusters" in clustering_class_parameters:
-        if "random_state" in clustering_class_parameters and "random_state" not in clustering_params:
+        if "random_state" in clustering_class_parameters and "random_state" not in clustering_params.keys():
             clustering_algo = clustering_class(n_clusters=n_clusters, random_state=random_state, **clustering_params)
         else:
             clustering_algo = clustering_class(n_clusters=n_clusters, **clustering_params)
     elif "n_components" in clustering_class_parameters:  # in case of GMM
-        if "random_state" in clustering_class_parameters and "random_state" not in clustering_params:
+        if "random_state" in clustering_class_parameters and "random_state" not in clustering_params.keys():
             clustering_algo = clustering_class(n_components=n_clusters, random_state=random_state, **clustering_params)
         else:
             clustering_algo = clustering_class(n_components=n_clusters, **clustering_params)
     else:  # in case of e.g., DBSCAN
-        if "random_state" in clustering_class_parameters and "random_state" not in clustering_params:
+        if "random_state" in clustering_class_parameters and "random_state" not in clustering_params.keys():
             clustering_algo = clustering_class(random_state=random_state, **clustering_params)
         else:
             clustering_algo = clustering_class(**clustering_params)

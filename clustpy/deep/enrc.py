@@ -1969,8 +1969,8 @@ class ENRC(BaseEstimator, ClusterMixin):
     """
 
     def __init__(self, n_clusters: list, V: np.ndarray = None, P: list = None, input_centers: list = None,
-                 batch_size: int = 128, pretrain_optimizer_params: dict = {"lr":1e-3},
-                 clustering_optimizer_params: dict = {"lr":1e-4}, pretrain_epochs: int = 100, clustering_epochs: int = 150,
+                 batch_size: int = 128, pretrain_optimizer_params: dict = None,
+                 clustering_optimizer_params: dict = None, pretrain_epochs: int = 100, clustering_epochs: int = 150,
                  tolerance_threshold: float = None, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(),
                  degree_of_space_distortion: float = 1.0, degree_of_space_preservation: float = 1.0,
@@ -1983,8 +1983,8 @@ class ENRC(BaseEstimator, ClusterMixin):
         if self.device is None:
             self.device = detect_device()
         self.batch_size = batch_size
-        self.pretrain_optimizer_params = pretrain_optimizer_params
-        self.clustering_optimizer_params = clustering_optimizer_params
+        self.pretrain_optimizer_params = {"lr":1e-3} if pretrain_optimizer_params is None else pretrain_optimizer_params
+        self.clustering_optimizer_params = {"lr":1e-4} if clustering_optimizer_params is None else clustering_optimizer_params
         self.pretrain_epochs = pretrain_epochs
         self.clustering_epochs = clustering_epochs
         self.tolerance_threshold = tolerance_threshold
@@ -2299,8 +2299,8 @@ class ACeDeC(ENRC):
     """
 
     def __init__(self, n_clusters: int, V: np.ndarray = None, P: list = None, input_centers: list = None,
-                 batch_size: int = 128, pretrain_optimizer_params: dict = {"lr":1e-3},
-                 clustering_optimizer_params: dict = {"lr":1e-4}, pretrain_epochs: int = 100, clustering_epochs: int = 150,
+                 batch_size: int = 128, pretrain_optimizer_params: dict = None,
+                 clustering_optimizer_params: dict = None, pretrain_epochs: int = 100, clustering_epochs: int = 150,
                  tolerance_threshold: float = None, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(),
                  degree_of_space_distortion: float = 1.0, degree_of_space_preservation: float = 1.0,

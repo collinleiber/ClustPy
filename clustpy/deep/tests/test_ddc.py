@@ -26,7 +26,7 @@ def test_ddc_augmentation():
     labels = labels[:1000]
     aug_dl, orig_dl = _get_test_augmentation_dataloaders(data)
     clusterer = DDC(pretrain_epochs=3, random_state=1,
-                    custom_dataloaders=[aug_dl, orig_dl], augmentation_invariance=True)
+                    custom_dataloaders=[aug_dl, orig_dl])
     assert not hasattr(clusterer, "labels_")
     clusterer.fit(data)
     assert clusterer.labels_.dtype == np.int32
