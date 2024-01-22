@@ -20,16 +20,19 @@ def _helper_test_data_loader(data, labels, N, d, k, outliers=False):
     outliers : bool
         Defines if outliers are contained in the dataset. Should be a list for datasets with multiple labelings (default: False)
     """
-    assert data.shape == (N, d), "data shape should be {0} but is {1}".format(data.shape, (N, d))
+    assert (N is None and data.shape[1] == d) or (
+            N is not None and data.shape == (N, d)), "data shape should be {0} but is {1}".format((N, d),
+                                                                                                  data.shape)
     assert np.issubdtype(labels.dtype, np.integer)
     if type(k) is int:
-        assert labels.shape == (N,), "labels shape should be {0} but is {1}".format(labels.shape, (N,))
+        assert labels.shape == (data.shape[0],), "labels shape should be {0} but is {1}".format((data.shape[0],),
+                                                                                                labels.shape)
         assert np.array_equal(np.unique(labels), range(k) if not outliers else range(-1, k))
     else:
         if type(outliers) is bool:
             outliers = [outliers] * len(k)
         # In case of datasets for alternative clusterings
-        assert labels.shape == (N, len(k))
+        assert labels.shape == (data.shape[0], len(k))
         unique_labels = [np.unique(labels[:, i]) for i in range(labels.shape[1])]
         assert [len(l) for l in unique_labels] == [k[i] if not outliers[i] else k[i] + 1 for i in
                                                    range(labels.shape[1])]  # Checks that number of labels is correct

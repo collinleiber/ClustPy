@@ -97,6 +97,7 @@ def load_video_weizmann(image_size: tuple = None, frame_sampling_ratio: float = 
     Load the Weizmann video data set.
     It consists of 93 videos showing 9 different persons performing 10 different activities.
     We transform the data set by extracting the 5687 144x180 colored frames.
+    Note that the number of frames can differ depending on the used machine and version of opencv.
     The two label sets are the activities and the persons.
     N=5687, d=77760, k=[10, 9].
 
@@ -188,6 +189,7 @@ def load_video_keck_gesture(subset: str = "all", image_size: tuple = (200, 200),
     This results in 15 different gestures.
     Note, that the person with label '3' is only contained in the testing data.
     We transform the data set by extracting the 25457 480x640 colored frames.
+    Note that the number of frames can differ depending on the used machine and version of opencv.
     Further, we recommend to downsize the frames due to possible memory issues.
     The final data set is divided into 13546 training and 11911 test images.
     The two label sets are the gestures and the persons.
