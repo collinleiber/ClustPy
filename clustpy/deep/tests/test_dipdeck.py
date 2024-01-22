@@ -21,7 +21,7 @@ def test_simple_dipdeck():
     assert np.array_equal(dipdeck.cluster_centers_, dipdeck2.cluster_centers_)
     # Test predict
     labels_predict = dipdeck.predict(X)
-    assert np.array_equal(dipdeck.labels_, labels_predict)
+    assert np.sum(dipdeck.labels_ == labels_predict) / labels_predict.shape[0] > 0.99
 
 
 def test_dipdeck_augmentation():

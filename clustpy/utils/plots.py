@@ -186,7 +186,7 @@ def plot_2d_data(X: np.ndarray, labels: np.ndarray = None, centers: np.ndarray =
     show_plot : bool
         Defines whether the plot should directly be plotted (default: True)
     """
-    assert X.ndim == 2 or X.shape[1] == 2, "Data must be 2-dimensional"
+    assert X.ndim == 2 and X.shape[1] == 2, "Data must be 2-dimensional"
     if true_labels is None:
         container.scatter(X[:, 0], X[:, 1], c=labels, s=scattersize)
     else:

@@ -20,10 +20,10 @@ def _helper_test_data_loader(data, labels, N, d, k, outliers=False):
     outliers : bool
         Defines if outliers are contained in the dataset. Should be a list for datasets with multiple labelings (default: False)
     """
-    assert data.shape == (N, d)
+    assert data.shape == (N, d), "data shape should be {0} but is {1}".format(data.shape, (N, d))
     assert np.issubdtype(labels.dtype, np.integer)
     if type(k) is int:
-        assert labels.shape == (N,)
+        assert labels.shape == (N,), "labels shape should be {0} but is {1}".format(labels.shape, (N,))
         assert np.array_equal(np.unique(labels), range(k) if not outliers else range(-1, k))
     else:
         if type(outliers) is bool:
@@ -43,10 +43,10 @@ def _check_normalized_channels(data, channels, should_be_normalized=True):
     # Check is simple if we only have a single channel, i.e. a grayscale image
     if channels == 1:
         if should_be_normalized:
-            assert np.mean(data) < imprecision
+            assert abs(np.mean(data) - 0) < imprecision
             assert abs(np.std(data) - 1) < imprecision
         else:
-            assert np.mean(data) > imprecision
+            assert abs(np.mean(data) - 0) > imprecision
             assert abs(np.std(data) - 1) > imprecision
     else:
         # Else we have to check each channel separately

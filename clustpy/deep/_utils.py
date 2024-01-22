@@ -288,6 +288,7 @@ def embedded_kmeans_prediction(dataloader: torch.utils.data.DataLoader, cluster_
     embedded_data = encode_batchwise(dataloader, module, device)
     predicted_labels, _ = pairwise_distances_argmin_min(X=embedded_data, Y=cluster_centers, metric='euclidean',
                                                         metric_kwargs={'squared': True})
+    predicted_labels = predicted_labels.astype(np.int32)
     return predicted_labels
 
 
