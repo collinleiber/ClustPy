@@ -1,8 +1,8 @@
-from sklearn.base import OneToOneFeatureMixin, TransformerMixin, BaseEstimator
+from sklearn.base import TransformerMixin, BaseEstimator
 import numpy as np
 
 
-class ZNormalizer(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
+class ZNormalizer(TransformerMixin, BaseEstimator):
     """
     Normalize a data set by calculating (data - mean) / std.
     In general, two strategies are sensible to normalize a data set.
