@@ -29,13 +29,11 @@ setup(
     install_requires=['numpy',
                       'scipy',
                       'scikit-learn',
-                      'pandas',
                       'matplotlib',
                       'torch',
-                      'torchvision',
-                      'xlrd',
-                      'Pillow',
-                      'nltk',
-                      'opencv-python'],
+                      'pandas'],
+    extras_require={
+        'full': ['torchvision', 'Pillow', 'nltk', 'xlrd', 'opencv-python']
+    },
     ext_modules=[dip_extension]
 )

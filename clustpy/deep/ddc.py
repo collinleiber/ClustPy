@@ -17,7 +17,7 @@ from scipy.spatial.distance import pdist, squareform
 def _ddc(X: np.ndarray, ratio: float, batch_size: int, pretrain_optimizer_params: dict, pretrain_epochs: int,
          optimizer_class: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss, autoencoder: torch.nn.Module,
          embedding_size: int, custom_dataloaders: tuple, tsne_params: dict, random_state: np.random.RandomState) -> (
-        int, np.ndarray, torch.nn.Module):
+        int, np.ndarray, torch.nn.Module, TSNE):
     """
     Start the actual DDC clustering procedure on the input data set.
 
@@ -51,10 +51,11 @@ def _ddc(X: np.ndarray, ratio: float, batch_size: int, pretrain_optimizer_params
 
     Returns
     -------
-    tuple : (int, np.ndarray, torch.nn.Module)
+    tuple : (int, np.ndarray, torch.nn.Module, TSNE)
         The number of clusters,
-        The cluster labels
-        The final autoencoder
+        The cluster labels,
+        The final autoencoder,
+        The t-SNE object
     """
     # Get the device to train on
     device = detect_device()
@@ -72,10 +73,11 @@ def _ddc(X: np.ndarray, ratio: float, batch_size: int, pretrain_optimizer_params
     # Execute T-SNE
     if "random_state" not in tsne_params.keys():
         tsne_params["random_state"] = random_state
-    X_tsne = TSNE(**tsne_params).fit_transform(X_embed)
-    # Execute Density Peark Algorithm
+    tsne = TSNE(**tsne_params)
+    X_tsne = tsne.fit_transform(X_embed)
+    # Execute Density Peak Algorithm
     n_clusters, labels = _density_peak_clustering(X_tsne, ratio)
-    return n_clusters, labels, autoencoder
+    return n_clusters, labels, autoencoder, tsne
 
 
 def _density_peak_clustering(X: np.ndarray, ratio: float) -> (int, np.ndarray):
@@ -98,6 +100,11 @@ def _density_peak_clustering(X: np.ndarray, ratio: float) -> (int, np.ndarray):
     distances = pdist(X)
     max_dist = np.max(distances)
     d_c = np.mean(distances) * ratio
+    if d_c >= max_dist:
+        print(
+            "[WARNING] ratio parameter was chosen too large (ratio={0}). It is recommended to set ratio smaller than 1. d_c will be set to the maximum possible value".format(
+                ratio))
+        d_c = max_dist - 1e-8  # d_c can not be larger than the max distance
     # Calculate rho_i
     adj_distancse = np.exp(-((distances / d_c) ** 2))  # Equation 7
     rhos = np.sum(squareform(adj_distancse), axis=1)
@@ -179,7 +186,8 @@ class DDC(BaseEstimator, ClusterMixin):
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         If None, the default dataloaders will be used (default: None)
     tsne_params : dict
-        Parameters for the t-SNE execution. Check out sklearn.manifold.TSNE for more information (default: {"n_components": 2})
+        Parameters for the t-SNE execution. For example, perplexity can be changed by setting tsne_params to {"n_components": 2, "perplexity": 25}.
+        Check out sklearn.manifold.TSNE for more information (default: {"n_components": 2})
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
@@ -191,6 +199,8 @@ class DDC(BaseEstimator, ClusterMixin):
         The final labels (obtained by a variant of Density Peak Clustering)
     autoencoder : torch.nn.Module
         The final autoencoder
+    tsne_ : TSNE
+        The t-SNE object
 
     Examples
     ----------
@@ -212,6 +222,8 @@ class DDC(BaseEstimator, ClusterMixin):
                  embedding_size: int = 10, custom_dataloaders: tuple = None, tsne_params: dict = None,
                  random_state: np.random.RandomState = None):
         self.ratio = ratio
+        if ratio > 1:
+            print("[WARNING] ratio for DDC algorithm has been set to a value > 1 which can cause poor results")
         self.batch_size = batch_size
         self.pretrain_optimizer_params = {
             "lr": 1e-3} if pretrain_optimizer_params is None else pretrain_optimizer_params
@@ -242,16 +254,17 @@ class DDC(BaseEstimator, ClusterMixin):
         self : DDC
             this instance of the DDC algorithm
         """
-        n_clusters, labels, autoencoder = _ddc(X, self.ratio, self.batch_size,
-                                               self.pretrain_optimizer_params,
-                                               self.pretrain_epochs,
-                                               self.optimizer_class, self.loss_fn,
-                                               self.autoencoder,
-                                               self.embedding_size,
-                                               self.custom_dataloaders,
-                                               self.tsne_params,
-                                               self.random_state)
+        n_clusters, labels, autoencoder, tsne = _ddc(X, self.ratio, self.batch_size,
+                                                     self.pretrain_optimizer_params,
+                                                     self.pretrain_epochs,
+                                                     self.optimizer_class, self.loss_fn,
+                                                     self.autoencoder,
+                                                     self.embedding_size,
+                                                     self.custom_dataloaders,
+                                                     self.tsne_params,
+                                                     self.random_state)
         self.labels_ = labels
         self.n_clusters_ = n_clusters
         self.autoencoder = autoencoder
+        self.tsne_ = tsne
         return self

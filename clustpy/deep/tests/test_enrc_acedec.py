@@ -50,9 +50,9 @@ def test_simple_acedec():
 
 def test_acedec_augmentation():
     torch.use_deterministic_algorithms(True)
-    data, labels = load_optdigits(flatten=False)
-    data = data[:1000]
-    labels = labels[:1000]
+    dataset = load_optdigits()
+    data = dataset.images[:1000]
+    labels = dataset.target[:1000]
     aug_dl, orig_dl = _get_test_augmentation_dataloaders(data)
     acedec = ACeDeC(3, pretrain_epochs=3, clustering_epochs=3, random_state=1,
                     custom_dataloaders=[aug_dl, orig_dl],

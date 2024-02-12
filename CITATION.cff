@@ -26,10 +26,10 @@ preferred-citation:
     - family-names: "Böhm"
       given-names: "Christian"
       orcid: "https://orcid.org/0000-0002-2237-9969"
-  doi: "10.1145/3583780.3615290"
-  booktitle: "Proceedings of the 32nd ACM International Conference on Information and Knowledge Management"
-  start: 5208 # First page number
-  end: 5211 # Last page number
-  title: "Application of Deep Clustering Algorithms"
+  doi: "10.1109/ICDMW60847.2023.00087"
+  booktitle: "2023 IEEE International Conference on Data Mining Workshops (ICDMW)"
+  start: 625 # First page number
+  end: 632 # Last page number
+  title: "Benchmarking Deep Clustering Algorithms With ClustPy"
   year: 2023
-  publisher: "Association for Computing Machinery"
+  publisher: "IEEE"

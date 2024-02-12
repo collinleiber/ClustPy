@@ -17,7 +17,7 @@ def test_example_2():
     from sklearn.metrics import normalized_mutual_info_score as nmi
     import numpy as np
 
-    data, labels = load_fruit()
+    data, labels = load_fruit(return_X_y=True)
     nk = NrKmeans([3, 3])
     nk.fit(data)
     mlcm = MultipleLabelingsConfusionMatrix(labels, nk.labels_, nmi)
@@ -28,11 +28,11 @@ def test_example_2():
 
 def test_example_3():
     from clustpy.deep import DEC
-    from clustpy.data import load_newsgroups
+    from clustpy.data import load_optdigits
     from sklearn.metrics import adjusted_rand_score as ari
 
-    data, labels = load_newsgroups()
-    dec = DEC(20, pretrain_epochs=3, clustering_epochs=3)
+    data, labels = load_optdigits(return_X_y=True)
+    dec = DEC(10, pretrain_epochs=3, clustering_epochs=3)
     dec.fit(data)
     my_ari = ari(labels, dec.labels_)
     print(my_ari)

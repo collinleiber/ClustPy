@@ -312,12 +312,7 @@ class _AbstractAutoencoder(torch.nn.Module):
                     best_epoch = epoch_i
                     # Save best model
                     if model_path is not None:
-                        # Check if directory exists
-                        parent_directory = os.path.dirname(model_path)
-                        if parent_directory != "" and not os.path.isdir(parent_directory):
-                            os.makedirs(parent_directory)
-                        torch.save(self.state_dict(), model_path)
-
+                        self.save_parameters(model_path)
                 if early_stopping.early_stop:
                     if print_step > 0:
                         print(f"Stop training at epoch {best_epoch}")
@@ -329,11 +324,40 @@ class _AbstractAutoencoder(torch.nn.Module):
         self.eval()
         # Save last version of model
         if evalloader is None and model_path is not None:
-            # Check if directory exists
-            parent_directory = os.path.dirname(model_path)
-            if parent_directory != "" and not os.path.isdir(parent_directory):
-                os.makedirs(parent_directory)
-            torch.save(self.state_dict(), model_path)
+            self.save_parameters(model_path)
         # Autoencoder is now pretrained
+        self.fitted = True
+        return self
+
+    def save_parameters(self, path: str) -> None:
+        """
+        Save the current state_dict of the model.
+
+        Parameters
+        ----------
+        path : str
+            Path where the state_dict should be stored
+        """
+        # Check if directory exists
+        parent_directory = os.path.dirname(path)
+        if parent_directory != "" and not os.path.isdir(parent_directory):
+            os.makedirs(parent_directory)
+        torch.save(self.state_dict(), path)
+
+    def load_parameters(self, path: str) -> '_AbstractAutoencoder':
+        """
+        Load a state_dict into the current model to set its parameters.
+
+        Parameters
+        ----------
+        path : str
+            Path from where the state_dict should be loaded
+
+        Returns
+        -------
+        self : _AbstractAutoencoder
+            this instance of the autoencoder
+        """
+        self.load_state_dict(torch.load(path))
         self.fitted = True
         return self

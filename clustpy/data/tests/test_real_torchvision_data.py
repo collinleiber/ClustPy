@@ -1,6 +1,6 @@
-from clustpy.data.tests._helpers_for_tests import _helper_test_data_loader, _check_normalized_channels
+from clustpy.data.tests._helpers_for_tests import _helper_test_data_loader
 from clustpy.data import load_usps, load_mnist, load_fmnist, load_kmnist, load_cifar10, load_svhn, load_stl10, \
-    load_gtsrb
+    load_gtsrb, load_cifar100
 import torchvision.datasets
 from pathlib import Path
 import os
@@ -32,163 +32,213 @@ def test_torchvision_data_methods():
     assert "SVHN" in dir(torchvision.datasets)
     assert "STL10" in dir(torchvision.datasets)
     assert "GTSRB" in dir(torchvision.datasets)
+    assert "CIFAR100" in dir(torchvision.datasets)
 
 
 # Do not skip USPS as it is the smallest dataset and can check the torchvision data loading mechanism
 @pytest.mark.data
 def test_load_usps():
     # Full data set
-    data, labels = load_usps("all", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)
-    _helper_test_data_loader(data, labels, 9298, 256, 10)
-    _check_normalized_channels(data, 1, True)
+    dataset = _helper_test_data_loader(load_usps, 9298, 256, 10,
+                                       dataloader_params={"subset": "all", "downloads_path": TEST_DOWNLOAD_PATH})
+    # Non-flatten
+    assert dataset.images.shape == (9298, 16, 16)
+    assert dataset.image_format == "HW"
     # Train data set
-    data, labels = load_usps("train", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=False)
-    _helper_test_data_loader(data, labels, 7291, 256, 10)
-    _check_normalized_channels(data, 1, False)
+    dataset = _helper_test_data_loader(load_usps, 7291, 256, 10,
+                                       dataloader_params={"subset": "train", "downloads_path": TEST_DOWNLOAD_PATH})
+    # Non-flatten
+    assert dataset.images.shape == (7291, 16, 16)
+    assert dataset.image_format == "HW"
     # Test data set
-    data, labels = load_usps("test", downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 2007, 256, 10)
-    _check_normalized_channels(data, 1, False)
-    # Test non-flatten
-    data, _ = load_usps("all", downloads_path=TEST_DOWNLOAD_PATH, flatten=False)
-    assert data.shape == (9298, 16, 16)
+    dataset = _helper_test_data_loader(load_usps, 2007, 256, 10,
+                                       dataloader_params={"subset": "test", "downloads_path": TEST_DOWNLOAD_PATH})
+    # Non-flatten
+    assert dataset.images.shape == (2007, 16, 16)
+    assert dataset.image_format == "HW"
 
 
 @pytest.mark.largedata
 @pytest.mark.data
 def test_load_mnist():
     # Full data set
-    data, labels = load_mnist("all", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)
-    _helper_test_data_loader(data, labels, 70000, 784, 10)
-    _check_normalized_channels(data, 1, True)
+    dataset = _helper_test_data_loader(load_mnist, 70000, 784, 10,
+                                       dataloader_params={"subset": "all", "downloads_path": TEST_DOWNLOAD_PATH})
+    # Non-flatten
+    assert dataset.images.shape == (70000, 28, 28)
+    assert dataset.image_format == "HW"
     # Train data set
-    data, labels = load_mnist("train", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=False)
-    _helper_test_data_loader(data, labels, 60000, 784, 10)
-    _check_normalized_channels(data, 1, False)
+    dataset = _helper_test_data_loader(load_mnist, 60000, 784, 10,
+                                       dataloader_params={"subset": "train", "downloads_path": TEST_DOWNLOAD_PATH})
+    # Non-flatten
+    assert dataset.images.shape == (60000, 28, 28)
+    assert dataset.image_format == "HW"
     # Test data set
-    data, labels = load_mnist("test", downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 10000, 784, 10)
-    _check_normalized_channels(data, 1, False)
-    # Test non-flatten
-    data, _ = load_mnist("all", downloads_path=TEST_DOWNLOAD_PATH, flatten=False)
-    assert data.shape == (70000, 28, 28)
+    dataset = _helper_test_data_loader(load_mnist, 10000, 784, 10,
+                                       dataloader_params={"subset": "test", "downloads_path": TEST_DOWNLOAD_PATH})
+    # Non-flatten
+    assert dataset.images.shape == (10000, 28, 28)
+    assert dataset.image_format == "HW"
 
 
 @pytest.mark.largedata
 @pytest.mark.data
 def test_load_kmnist():
     # Full data set
-    data, labels = load_kmnist("all", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)
-    _helper_test_data_loader(data, labels, 70000, 784, 10)
-    _check_normalized_channels(data, 1, True)
+    dataset = _helper_test_data_loader(load_kmnist, 70000, 784, 10,
+                                       dataloader_params={"subset": "all", "downloads_path": TEST_DOWNLOAD_PATH})
+    # Non-flatten
+    assert dataset.images.shape == (70000, 28, 28)
+    assert dataset.image_format == "HW"
     # Train data set
-    data, labels = load_kmnist("train", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=False)
-    _helper_test_data_loader(data, labels, 60000, 784, 10)
-    _check_normalized_channels(data, 1, False)
+    dataset = _helper_test_data_loader(load_kmnist, 60000, 784, 10,
+                                       dataloader_params={"subset": "train", "downloads_path": TEST_DOWNLOAD_PATH})
+    # Non-flatten
+    assert dataset.images.shape == (60000, 28, 28)
+    assert dataset.image_format == "HW"
     # Test data set
-    data, labels = load_kmnist("test", downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 10000, 784, 10)
-    _check_normalized_channels(data, 1, False)
-    # Test non-flatten
-    data, _ = load_kmnist("all", downloads_path=TEST_DOWNLOAD_PATH, flatten=False)
-    assert data.shape == (70000, 28, 28)
+    dataset = _helper_test_data_loader(load_kmnist, 10000, 784, 10,
+                                       dataloader_params={"subset": "test", "downloads_path": TEST_DOWNLOAD_PATH})
+    # Non-flatten
+    assert dataset.images.shape == (10000, 28, 28)
+    assert dataset.image_format == "HW"
 
 
 @pytest.mark.largedata
 @pytest.mark.data
 def test_load_fmnist():
     # Full data set
-    data, labels = load_fmnist("all", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)
-    _helper_test_data_loader(data, labels, 70000, 784, 10)
-    _check_normalized_channels(data, 1, True)
+    dataset = _helper_test_data_loader(load_fmnist, 70000, 784, 10,
+                                       dataloader_params={"subset": "all", "downloads_path": TEST_DOWNLOAD_PATH})
+    # Non-flatten
+    assert dataset.images.shape == (70000, 28, 28)
+    assert dataset.image_format == "HW"
     # Train data set
-    data, labels = load_fmnist("train", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=False)
-    _helper_test_data_loader(data, labels, 60000, 784, 10)
-    _check_normalized_channels(data, 1, False)
+    dataset = _helper_test_data_loader(load_fmnist, 60000, 784, 10,
+                                       dataloader_params={"subset": "train", "downloads_path": TEST_DOWNLOAD_PATH})
+    # Non-flatten
+    assert dataset.images.shape == (60000, 28, 28)
+    assert dataset.image_format == "HW"
     # Test data set
-    data, labels = load_fmnist("test", downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 10000, 784, 10)
-    _check_normalized_channels(data, 1, False)
-    # Test non-flatten
-    data, _ = load_fmnist("all", downloads_path=TEST_DOWNLOAD_PATH, flatten=False)
-    assert data.shape == (70000, 28, 28)
+    dataset = _helper_test_data_loader(load_fmnist, 10000, 784, 10,
+                                       dataloader_params={"subset": "test", "downloads_path": TEST_DOWNLOAD_PATH})
+    # Non-flatten
+    assert dataset.images.shape == (10000, 28, 28)
+    assert dataset.image_format == "HW"
 
 
 # Do not skip cifar10 as it is the smallest 3-channel dataset and can check channel normalization
 @pytest.mark.data
 def test_load_cifar10():
     # Full data set
-    data, labels = load_cifar10("all", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)
-    _helper_test_data_loader(data, labels, 60000, 3072, 10)
-    _check_normalized_channels(data, 3, True)
+    dataset = _helper_test_data_loader(load_cifar10, 60000, 3072, 10,
+                                       dataloader_params={"subset": "all", "downloads_path": TEST_DOWNLOAD_PATH})
+    # Non-flatten
+    assert dataset.images.shape == (60000, 3, 32, 32)
+    assert dataset.image_format == "CHW"
     # Train data set
-    data, labels = load_cifar10("train", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=False)
-    _helper_test_data_loader(data, labels, 50000, 3072, 10)
-    _check_normalized_channels(data, 3, False)
+    dataset = _helper_test_data_loader(load_cifar10, 50000, 3072, 10,
+                                       dataloader_params={"subset": "train", "downloads_path": TEST_DOWNLOAD_PATH})
+    # Non-flatten
+    assert dataset.images.shape == (50000, 3, 32, 32)
+    assert dataset.image_format == "CHW"
     # Test data set
-    data, labels = load_cifar10("test", downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 10000, 3072, 10)
-    _check_normalized_channels(data, 3, False)
-    # Test non-flatten
-    data, _ = load_cifar10("all", downloads_path=TEST_DOWNLOAD_PATH, flatten=False)
-    assert data.shape == (60000, 3, 32, 32)
+    dataset = _helper_test_data_loader(load_cifar10, 10000, 3072, 10,
+                                       dataloader_params={"subset": "test", "downloads_path": TEST_DOWNLOAD_PATH})
+    # Non-flatten
+    assert dataset.images.shape == (10000, 3, 32, 32)
+    assert dataset.image_format == "CHW"
+
+
+@pytest.mark.largedata
+@pytest.mark.data
+def test_load_cifar100():
+    # Full data set
+    dataset = _helper_test_data_loader(load_cifar100, 60000, 3072, 100,
+                                       dataloader_params={"subset": "all", "downloads_path": TEST_DOWNLOAD_PATH})
+    # Non-flatten
+    assert dataset.images.shape == (60000, 3, 32, 32)
+    assert dataset.image_format == "CHW"
+    # Train data set
+    dataset = _helper_test_data_loader(load_cifar100, 50000, 3072, 100,
+                                       dataloader_params={"subset": "train", "downloads_path": TEST_DOWNLOAD_PATH})
+    # Non-flatten
+    assert dataset.images.shape == (50000, 3, 32, 32)
+    assert dataset.image_format == "CHW"
+    # Test data set
+    dataset = _helper_test_data_loader(load_cifar100, 10000, 3072, 20,
+                                       dataloader_params={"subset": "test", "downloads_path": TEST_DOWNLOAD_PATH,
+                                                          "use_superclasses": True})
+    # Non-flatten
+    assert dataset.images.shape == (10000, 3, 32, 32)
+    assert dataset.image_format == "CHW"
 
 
 @pytest.mark.largedata
 @pytest.mark.data
 def test_load_svhn():
     # Full data set
-    data, labels = load_svhn("all", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)
-    _helper_test_data_loader(data, labels, 99289, 3072, 10)
-    _check_normalized_channels(data, 3, True)
+    dataset = _helper_test_data_loader(load_svhn, 99289, 3072, 10,
+                                       dataloader_params={"subset": "all", "downloads_path": TEST_DOWNLOAD_PATH})
+    # Non-flatten
+    assert dataset.images.shape == (99289, 3, 32, 32)
+    assert dataset.image_format == "CHW"
     # Train data set
-    data, labels = load_svhn("train", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=False)
-    _helper_test_data_loader(data, labels, 73257, 3072, 10)
-    _check_normalized_channels(data, 3, False)
+    dataset = _helper_test_data_loader(load_svhn, 73257, 3072, 10,
+                                       dataloader_params={"subset": "train", "downloads_path": TEST_DOWNLOAD_PATH})
+    # Non-flatten
+    assert dataset.images.shape == (73257, 3, 32, 32)
+    assert dataset.image_format == "CHW"
     # Test data set
-    data, labels = load_svhn("test", downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 26032, 3072, 10)
-    _check_normalized_channels(data, 3, False)
-    # Test non-flatten
-    data, _ = load_svhn("all", downloads_path=TEST_DOWNLOAD_PATH, flatten=False)
-    assert data.shape == (99289, 3, 32, 32)
+    dataset = _helper_test_data_loader(load_svhn, 26032, 3072, 10,
+                                       dataloader_params={"subset": "test", "downloads_path": TEST_DOWNLOAD_PATH})
+    # Non-flatten
+    assert dataset.images.shape == (26032, 3, 32, 32)
+    assert dataset.image_format == "CHW"
 
 
 @pytest.mark.largedata
 @pytest.mark.data
 def test_load_stl10():
     # Full data set
-    data, labels = load_stl10("all", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)
-    _helper_test_data_loader(data, labels, 13000, 27648, 10)
-    _check_normalized_channels(data, 3, True)
+    dataset = _helper_test_data_loader(load_stl10, 13000, 27648, 10,
+                                       dataloader_params={"subset": "all", "downloads_path": TEST_DOWNLOAD_PATH})
+    # Non-flatten
+    assert dataset.images.shape == (13000, 3, 96, 96)
+    assert dataset.image_format == "CHW"
     # Train data set
-    data, labels = load_stl10("train", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=False)
-    _helper_test_data_loader(data, labels, 5000, 27648, 10)
-    _check_normalized_channels(data, 3, False)
+    dataset = _helper_test_data_loader(load_stl10, 5000, 27648, 10,
+                                       dataloader_params={"subset": "train", "downloads_path": TEST_DOWNLOAD_PATH})
+    # Non-flatten
+    assert dataset.images.shape == (5000, 3, 96, 96)
+    assert dataset.image_format == "CHW"
     # Test data set
-    data, labels = load_stl10("test", downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 8000, 27648, 10)
-    _check_normalized_channels(data, 3, False)
-    # Test non-flatten
-    data, _ = load_stl10("all", downloads_path=TEST_DOWNLOAD_PATH, flatten=False)
-    assert data.shape == (13000, 3, 96, 96)
+    dataset = _helper_test_data_loader(load_stl10, 8000, 27648, 10,
+                                       dataloader_params={"subset": "test", "downloads_path": TEST_DOWNLOAD_PATH})
+    # Non-flatten
+    assert dataset.images.shape == (8000, 3, 96, 96)
+    assert dataset.image_format == "CHW"
 
 
 @pytest.mark.data
 # Do not skip GTSRB as the loading mechanism is different to the other torchvision dataloaders
 def test_load_gtsrb():
     # Full data set
-    data, labels = load_gtsrb("all", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)
-    _helper_test_data_loader(data, labels, 39270, 3072, 43)
-    _check_normalized_channels(data, 3, True)
+    dataset = _helper_test_data_loader(load_gtsrb, 39270, 3072, 43,
+                                       dataloader_params={"subset": "all", "downloads_path": TEST_DOWNLOAD_PATH})
+    # Non-flatten
+    assert dataset.images.shape == (39270, 3, 32, 32)
+    assert dataset.image_format == "CHW"
     # Train data set
-    data, labels = load_gtsrb("train", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=False)
-    _helper_test_data_loader(data, labels, 26640, 3072, 43)
-    _check_normalized_channels(data, 3, False)
-    # Test data set
-    data, labels = load_gtsrb("test", downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 12630, 3072, 43)
-    _check_normalized_channels(data, 3, False)
-    # Test non-flatten and different image size
-    data, _ = load_gtsrb("all", downloads_path=TEST_DOWNLOAD_PATH, flatten=False, image_size=(30, 30))
-    assert data.shape == (39270, 3, 30, 30)
+    dataset = _helper_test_data_loader(load_gtsrb, 26640, 3072, 43,
+                                       dataloader_params={"subset": "train", "downloads_path": TEST_DOWNLOAD_PATH})
+    # Non-flatten
+    assert dataset.images.shape == (26640, 3, 32, 32)
+    assert dataset.image_format == "CHW"
+    # Test data set (with image size 30x30)
+    dataset = _helper_test_data_loader(load_gtsrb, 12630, 2700, 43,
+                                       dataloader_params={"subset": "test", "downloads_path": TEST_DOWNLOAD_PATH,
+                                                          "image_size": (30, 30)})
+    # Non-flatten
+    assert dataset.images.shape == (12630, 3, 30, 30)
+    assert dataset.image_format == "CHW"

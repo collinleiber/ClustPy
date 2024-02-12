@@ -1,13 +1,12 @@
-from clustpy.data._utils import _download_file, _get_download_dir, _load_image_data
-from clustpy.data.real_torchvision_data import _torch_normalize_and_flatten
 try:
     import cv2
 except:
-    print("[WARNING] Could not import cv2 in clustpy.data.real_video_data")
+    print("[WARNING] Could not import cv2 in clustpy.data.real_video_data. Please install cv2 by 'pip install opencv-python' if necessary")
+from clustpy.data._utils import _download_file, _get_download_dir, _load_image_data, flatten_images
 import numpy as np
 import os
 import zipfile
-import torch
+from sklearn.datasets._base import Bunch
 
 """
 Helpers
@@ -91,8 +90,8 @@ Actual datasets
 """
 
 
-def load_video_weizmann(image_size: tuple = None, frame_sampling_ratio: float = 1, flatten: bool = True,
-                        normalize_channels: bool = False, downloads_path: str = None) -> (np.ndarray, np.ndarray):
+def load_video_weizmann(image_size: tuple = None, frame_sampling_ratio: float = 1, return_X_y: bool = False,
+                        downloads_path: str = None) -> Bunch:
     """
     Load the Weizmann video data set.
     It consists of 93 videos showing 9 different persons performing 10 different activities.
@@ -110,17 +109,18 @@ def load_video_weizmann(image_size: tuple = None, frame_sampling_ratio: float = 
     frame_sampling_ratio : float
         Ratio to downsample the number of frames of each video. If it is set to 1 all frames will be returned.
         Can take values within (0, 1] (default: 1)
-    flatten : bool
-        should the image data be flatten, i.e. should the format be changed to a (N x d) array.
-        If false, the image will be returned in the CHW format (default: True)
-    normalize_channels : bool
-        normalize each color-channel of the images (default: False)
+    return_X_y : bool
+        If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
     downloads_path : str
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    data, labels : (np.ndarray, np.ndarray)
+    bunch : Bunch
+        A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
+        Furthermore, the original images are contained in the 'images' attribute.
+        Note that the data within 'data' is in HWC format and within 'images' in the CHW format.
+        Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (5687 x 77760), the labels numpy array (5687 x 2)
 
     References
@@ -170,18 +170,21 @@ def load_video_weizmann(image_size: tuple = None, frame_sampling_ratio: float = 
             # Update data and labels
             all_data = np.append(all_data, data_local, axis=0)
             labels = np.append(labels, labels_local, axis=0)
-    # If desired, normalize channels
-    data_torch = torch.Tensor(all_data)
-    is_color_channel_last = True
-    data_torch = _torch_normalize_and_flatten(data_torch, flatten, normalize_channels, is_color_channel_last)
-    # Move data to CPU
-    data = data_torch.detach().cpu().numpy()
-    return data, labels
+    # Flatten data
+    data_flatten = flatten_images(all_data, "HWC")
+    # Return values
+    if return_X_y:
+        return data_flatten, labels
+    else:
+        # Get images in correct format
+        data_image = np.transpose(all_data, [0, 3, 1, 2])
+        image_format = "CHW"
+        return Bunch(dataset_name="VideoWeizmann", data=data_flatten, target=labels, images=data_image,
+                     image_format=image_format)
 
 
 def load_video_keck_gesture(subset: str = "all", image_size: tuple = (200, 200), frame_sampling_ratio: float = 1,
-                            flatten: bool = True, normalize_channels: bool = False, downloads_path: str = None) -> (
-        np.ndarray, np.ndarray):
+                            return_X_y: bool = False, downloads_path: str = None) -> Bunch:
     """
     Load the Keck Gesture video data set.
     It consists of 42 training and 56 testing videos showing 4 different persons performing 14 different gestures.
@@ -206,17 +209,18 @@ def load_video_keck_gesture(subset: str = "all", image_size: tuple = (200, 200),
     frame_sampling_ratio : float
         Ratio to downsample the number of frames of each video. If it is set to 1 all frames will be returned.
         Can take values within (0, 1] (default: 1)
-    flatten : bool
-        should the image data be flatten, i.e. should the format be changed to a (N x d) array.
-        If false, the image will be returned in the CHW format (default: True)
-    normalize_channels : bool
-        normalize each color-channel of the images (default: False)
+    return_X_y : bool
+        If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
     downloads_path : str
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    data, labels : (np.ndarray, np.ndarray)
+    bunch : Bunch
+        A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
+        Furthermore, the original images are contained in the 'images' attribute.
+        Note that the data within 'data' is in HWC format and within 'images' in the CHW format.
+        Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (25457 x 120000 (for image_size (200, 200))), the labels numpy array (25457 x 2)
 
     References
@@ -313,10 +317,14 @@ def load_video_keck_gesture(subset: str = "all", image_size: tuple = (200, 200),
             # Update data and labels
             all_data = np.append(all_data, data_local, axis=0)
             labels = np.append(labels, labels_local, axis=0)
-    # If desired, normalize channels
-    data_torch = torch.Tensor(all_data)
-    is_color_channel_last = True
-    data_torch = _torch_normalize_and_flatten(data_torch, flatten, normalize_channels, is_color_channel_last)
-    # Move data to CPU
-    data = data_torch.detach().cpu().numpy()
-    return data, labels
+    # Flatten data
+    data_flatten = flatten_images(all_data, "HWC")
+    # Return values
+    if return_X_y:
+        return data_flatten, labels
+    else:
+        # Get images in correct format
+        data_image = np.transpose(all_data, [0, 3, 1, 2])
+        image_format = "CHW"
+        return Bunch(dataset_name="VideoKeckGesture", data=data_flatten, target=labels, images=data_image,
+                     image_format=image_format)

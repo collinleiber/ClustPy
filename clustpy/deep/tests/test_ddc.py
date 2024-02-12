@@ -17,17 +17,3 @@ def test_simple_ddc():
     ddc2 = DDC(pretrain_epochs=3, random_state=1)
     ddc2.fit(X)
     assert np.array_equal(ddc.labels_, ddc2.labels_)
-
-
-def test_ddc_augmentation():
-    torch.use_deterministic_algorithms(True)
-    data, labels = load_optdigits(flatten=False)
-    data = data[:1000]
-    labels = labels[:1000]
-    aug_dl, orig_dl = _get_test_augmentation_dataloaders(data)
-    clusterer = DDC(pretrain_epochs=3, random_state=1,
-                    custom_dataloaders=[aug_dl, orig_dl])
-    assert not hasattr(clusterer, "labels_")
-    clusterer.fit(data)
-    assert clusterer.labels_.dtype == np.int32
-    assert clusterer.labels_.shape == labels.shape

@@ -242,7 +242,7 @@ def plot_3d_data(X: np.ndarray, labels: np.ndarray = None, centers: np.ndarray =
     """
     assert X.ndim == 2 or X.shape[1] == 3, "Data must be 3-dimensional"
     fig = plt.figure()
-    ax = Axes3D(fig)  # fig.add_subplot(111, projection='3d')
+    ax = fig.add_subplot(111, projection='3d')  # Axes3D(fig)
     if true_labels is None:
         ax.scatter(X[:, 0], X[:, 1], zs=X[:, 2], zdir='z', s=scattersize, c=labels, alpha=0.8)
     else:
@@ -294,9 +294,9 @@ def plot_image(img_data: np.ndarray, black_and_white: bool = False, image_shape:
     Examples
     ----------
     >>> from clustpy.data import load_nrletters, load_optdigits
-    >>> X, _ = load_nrletters()
+    >>> X = load_nrletters().data
     >>> plot_image(X[0], False, (9, 7, 3), True, 255, 0, show_plot=True)
-    >>> X, _ = load_optdigits()
+    >>> X = load_optdigits().data
     >>> plot_image(X[0], True, (8, 8), None, 255, 0, show_plot=True)
     """
     assert img_data.ndim <= 3, "Image data can not have more than 3 dimensions."

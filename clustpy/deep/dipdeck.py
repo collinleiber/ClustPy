@@ -9,7 +9,7 @@ from clustpy.utils import dip_test, dip_pval
 import torch
 from clustpy.deep._utils import detect_device, encode_batchwise, squared_euclidean_distance, int_to_one_hot, \
     set_torch_seed, embedded_kmeans_prediction
-from clustpy.deep.dec import get_standard_initial_deep_clustering_setting
+from clustpy.deep._train_utils import get_standard_initial_deep_clustering_setting
 from clustpy.deep._data_utils import get_dataloader, augmentation_invariance_check
 from sklearn.cluster import KMeans
 from sklearn.base import BaseEstimator, ClusterMixin

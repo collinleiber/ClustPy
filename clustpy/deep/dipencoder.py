@@ -25,7 +25,7 @@ Dip module - holds backward functions
 class _Dip_Module(torch.nn.Module):
     """
     The _Dip_Module class is a wrapper for the _Dip_Gradient class.
-    It saves the the projection axes needed to calculate the Dip-values.
+    It saves the projection axes needed to calculate the Dip-values.
 
     Parameters
     ----------
@@ -125,7 +125,7 @@ class _Dip_Gradient(torch.autograd.Function):
         device = detect_device()
         # Load parameters from forward
         X, X_proj, sorted_indices, projection_vector, modal_triangle, dip_value = ctx.saved_tensors
-        if modal_triangle[0] == -1:
+        if -1 in modal_triangle:
             return torch.zeros((X_proj.shape[0], projection_vector.shape[0])).to(device), torch.zeros(
                 projection_vector.shape).to(device)
         # Grad_output equals gradient of outer operations. Update grad_output to consider dip

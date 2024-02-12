@@ -1,5 +1,5 @@
 import numpy as np
-from clustpy.data.tests._helpers_for_tests import _helper_test_data_loader, _check_normalized_channels
+from clustpy.data.tests._helpers_for_tests import _helper_test_data_loader
 from clustpy.data import load_video_weizmann, load_video_keck_gesture
 from clustpy.data.real_video_data import _downsample_frames
 from pathlib import Path
@@ -42,39 +42,47 @@ def test_downsample_frames():
 
 @pytest.mark.data
 def test_load_video_weizmann():
-    data, labels = load_video_weizmann(downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)
-    _helper_test_data_loader(data, labels, None, 77760, [10, 9]) # N not always 5687
-    _check_normalized_channels(data, 3, True)
-    # Without normalize
-    data, labels = load_video_weizmann(downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=False,
-                                       image_size=(100, 100))
-    _helper_test_data_loader(data, labels, None, 30000, [10, 9]) # N not always 5687
-    _check_normalized_channels(data, 3, False)
-    # Test non-flatten
-    data, _ = load_video_weizmann(flatten=False, downloads_path=TEST_DOWNLOAD_PATH,
-                                  frame_sampling_ratio=0.5)
+    dataset = _helper_test_data_loader(load_video_weizmann, None, 77760, [10, 9],
+                                       dataloader_params={"downloads_path": TEST_DOWNLOAD_PATH})  # N not always 5687
+    # Non-flatten
+    assert dataset.images.shape[1:] == (3, 144, 180)
+    assert dataset.image_format == "CHW"
+    # Change image size and downsample
+    dataset = _helper_test_data_loader(load_video_weizmann, None, 30000, [10, 9],
+                                       dataloader_params={"image_size": (100, 100), "frame_sampling_ratio": 0.5,
+                                                          "downloads_path": TEST_DOWNLOAD_PATH})  # N not always 5687
+    # Non-flatten
+    assert dataset.images.shape[1:] == (3, 100, 100)
+    assert dataset.image_format == "CHW"
+    # Check downsampling
+    data = dataset.data
     assert data.shape[0] / 5687 < 0.55 and data.shape[0] / 5687 > 0.49
-    assert data.shape == (data.shape[0], 3, 144, 180)
 
 
 @pytest.mark.largedata
 @pytest.mark.data
 def test_load_video_keck_gesture():
-    data, labels = load_video_keck_gesture(subset="all", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)
-    _helper_test_data_loader(data, labels, None, 120000, [15, 4]) # N not always 25457
-    _check_normalized_channels(data, 3, True)
+    dataset = _helper_test_data_loader(load_video_keck_gesture, None, 120000, [15, 4],
+                                       dataloader_params={"subset": "all",
+                                                          "downloads_path": TEST_DOWNLOAD_PATH})  # N not always 25457
+    # Non-flatten
+    assert dataset.images.shape[1:] == (3, 200, 200)
+    assert dataset.image_format == "CHW"
     # Test data
-    data, labels = load_video_keck_gesture(subset="test", image_size=(150, 150),
-                                           downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=False)
-    _helper_test_data_loader(data, labels, None, 67500, [15, 4]) # N not always 11911
-    _check_normalized_channels(data, 3, False)
-    # Train data
-    data, labels = load_video_keck_gesture(subset="train", image_size=(150, 150),
-                                           downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=False)
-    _helper_test_data_loader(data, labels, None, 67500, [15, 3]) # N not always 13546
-    _check_normalized_channels(data, 3, False)
-    # Test non-flatten
-    data, _ = load_video_keck_gesture(subset="test", flatten=False, downloads_path=TEST_DOWNLOAD_PATH,
-                                      frame_sampling_ratio=0.5)
+    dataset = _helper_test_data_loader(load_video_keck_gesture, None, 120000, [15, 3],
+                                       dataloader_params={"subset": "train",
+                                                          "downloads_path": TEST_DOWNLOAD_PATH})  # N not always 11911
+    # Non-flatten
+    assert dataset.images.shape[1:] == (3, 200, 200)
+    assert dataset.image_format == "CHW"
+    # Train data and Change image size and downsample
+    dataset = _helper_test_data_loader(load_video_keck_gesture, None, 30000, [15, 4],
+                                       dataloader_params={"image_size": (100, 100), "frame_sampling_ratio": 0.5,
+                                                          "subset": "test",
+                                                          "downloads_path": TEST_DOWNLOAD_PATH})  # N not always 13546
+    # Non-flatten
+    assert dataset.images.shape[1:] == (3, 100, 100)
+    assert dataset.image_format == "CHW"
+    # Check downsampling
+    data = dataset.data
     assert data.shape[0] / 11911 < 0.55 and data.shape[0] / 11911 > 0.49
-    assert data.shape == (data.shape[0], 3, 200, 200)
