@@ -156,7 +156,7 @@ Remove clustpy via pip to avoid ambiguities during development, e.g., when chang
 - Datasets
     - Synthetic dataset creators
         - For common subspace clustering [[Docs](https://clustpy.readthedocs.io/en/latest/clustpy.data.html#clustpy.data.synthetic_data_creator.create_subspace_data)]
-        - For Alternative clustering [[Docs](https://clustpy.readthedocs.io/en/latest/clustpy.data.html#clustpy.data.synthetic_data_creator.create_nr_data)]
+        - For alternative clustering [[Docs](https://clustpy.readthedocs.io/en/latest/clustpy.data.html#clustpy.data.synthetic_data_creator.create_nr_data)]
     - Real-world dataset loaders (e.g., Iris, Wine, Mice protein, Optdigits, MNIST, ...)
         - UCI Repository [[Website](https://archive.ics.uci.edu/)]
         - UEA & UCR Time Series Classification Repository [[Website](http://www.timeseriesclassification.com/)]

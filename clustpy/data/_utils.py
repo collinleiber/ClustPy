@@ -202,7 +202,7 @@ def flatten_images(data: np.ndarray, format: str) -> np.ndarray:
     data : np.ndarray
         The given data set
     format : str
-        Format of the data array. Can be: "HW", "HWD", "CHW", "CHWD", "HWC", "HWDC".
+        Format of the images with the data array. Can be: "HW", "HWD", "CHW", "CHWD", "HWC", "HWDC".
         Abbreviations stand for: H: Height, W: Width, D: Depth, C: Color-channels
 
     Returns
