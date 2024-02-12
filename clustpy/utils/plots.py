@@ -20,7 +20,7 @@ _MIN_OBJECTS_FOR_DENS_PLOT = 3
 def plot_with_transformation(X: np.ndarray, labels: np.ndarray = None, centers: np.ndarray = None,
                              true_labels: np.ndarray = None, plot_dimensionality: int = 2,
                              transformation_class: TransformerMixin = PCA, show_legend: bool = True,
-                             scattersize: int = 10, equal_axis: bool = False, show_plot: bool = True) -> None:
+                             scattersize: float = 10, equal_axis: bool = False, show_plot: bool = True) -> None:
     """
     In Data Science, it is common to work with high-dimensional data.
     These cannot be visualized without further ado.
@@ -148,8 +148,9 @@ def plot_1d_data(X: np.ndarray, labels: np.ndarray = None, centers: np.ndarray =
 
 
 def plot_2d_data(X: np.ndarray, labels: np.ndarray = None, centers: np.ndarray = None, true_labels: np.ndarray = None,
-                 add_text: bool = False, show_legend: bool = True, title: str = None, scattersize: int = 10,
-                 equal_axis: bool = False, container: plt.Axes = plt, show_plot: bool = True) -> None:
+                 cluster_ids_font_size: float = None, centers_ids_font_size: float = 10, show_legend: bool = True,
+                 title: str = None, scattersize: float = 10, centers_scattersize: float = 15, equal_axis: bool = False,
+                 container: plt.Axes = plt, show_plot: bool = True) -> None:
     """
     Plot a two-dimensional data set.
 
@@ -163,14 +164,20 @@ def plot_2d_data(X: np.ndarray, labels: np.ndarray = None, centers: np.ndarray =
         The cluster centers. Will be plotted as red dots labeled by the corresponding cluster id. Can be None (default: None)
     true_labels : np.ndarray
         The ground truth labels. Specifies the symbol of the plotted objects. Can be None (default: None)
-    add_text : bool
-        Add the id of a predicted cluster as text into the center of that cluster (default: False)
+    cluster_ids_font_size : float
+        The font size of the id of a predicted cluster, which is shown as text in the center of that cluster.
+        Can be None if no id should be shown (default: None)
+    centers_ids_font_size: float
+        The font size of the id that is shown next to the red marker of a cluster center. Only relevant if centers is not None.
+        Can be None if no id should be shown (default: 10)
     show_legend : bool
         Defines whether a legend should be shown (default: True)
     title : str
         Title of the plot (default: None)
     scattersize : float
         The size of the scatters (default: 10)
+    centers_scattersize : float
+        The size of the red scatters of the cluster centers (default: 15)
     equal_axis : bool
         Defines whether the axes are to be scaled to the same value range (default: False)
     container : plt.Axes
@@ -179,7 +186,7 @@ def plot_2d_data(X: np.ndarray, labels: np.ndarray = None, centers: np.ndarray =
     show_plot : bool
         Defines whether the plot should directly be plotted (default: True)
     """
-    assert X.ndim == 2 or X.shape[1] == 2, "Data must be 2-dimensional"
+    assert X.ndim == 2 and X.shape[1] == 2, "Data must be 2-dimensional"
     if true_labels is None:
         container.scatter(X[:, 0], X[:, 1], c=labels, s=scattersize)
     else:
@@ -190,15 +197,16 @@ def plot_2d_data(X: np.ndarray, labels: np.ndarray = None, centers: np.ndarray =
             container.scatter(X[true_labels == true_lab, 0], X[true_labels == true_lab, 1], s=scattersize,
                               c=labels if labels is None else labels[true_labels == true_lab], marker=marker,
                               vmin=np.min(labels), vmax=np.max(labels))
-    if add_text:
+    if cluster_ids_font_size is not None:
         unique_labels = np.unique(labels)
         mean_positions = [np.mean(X[labels == pred_lab], axis=0) for pred_lab in unique_labels]
         for i, mp in enumerate(mean_positions):
-            plt.text(mp[0], mp[1], unique_labels[i])
+            plt.text(mp[0], mp[1], unique_labels[i], fontsize=cluster_ids_font_size)
     if centers is not None:
-        container.scatter(centers[:, 0], centers[:, 1], s=scattersize * 1.5, color="red", marker="s")
-        for j in range(len(centers)):
-            container.text(centers[j, 0], centers[j, 1], str(j), weight="bold")
+        container.scatter(centers[:, 0], centers[:, 1], s=centers_scattersize, color="red", marker="s")
+        if centers_ids_font_size is not None:
+            for j in range(len(centers)):
+                container.text(centers[j, 0], centers[j, 1], str(j), weight="bold", fontsize=centers_ids_font_size)
     if equal_axis:
         container.axis("equal")
     if show_legend and labels is not None:
@@ -211,7 +219,7 @@ def plot_2d_data(X: np.ndarray, labels: np.ndarray = None, centers: np.ndarray =
 
 
 def plot_3d_data(X: np.ndarray, labels: np.ndarray = None, centers: np.ndarray = None, true_labels: np.ndarray = None,
-                 show_legend: bool = True, scattersize: int = 10, show_plot: bool = True) -> None:
+                 show_legend: bool = True, scattersize: float = 10, show_plot: bool = True) -> None:
     """
     Plot a three-dimensional data set.
 
@@ -234,7 +242,7 @@ def plot_3d_data(X: np.ndarray, labels: np.ndarray = None, centers: np.ndarray =
     """
     assert X.ndim == 2 or X.shape[1] == 3, "Data must be 3-dimensional"
     fig = plt.figure()
-    ax = Axes3D(fig)  # fig.add_subplot(111, projection='3d')
+    ax = fig.add_subplot(111, projection='3d')  # Axes3D(fig)
     if true_labels is None:
         ax.scatter(X[:, 0], X[:, 1], zs=X[:, 2], zdir='z', s=scattersize, c=labels, alpha=0.8)
     else:
@@ -286,10 +294,10 @@ def plot_image(img_data: np.ndarray, black_and_white: bool = False, image_shape:
     Examples
     ----------
     >>> from clustpy.data import load_nrletters, load_optdigits
-    >>> X, _ = load_nrletters()
-    >>> plot_image(X[0], False, (9, 7, 3), 255, 0, show_plot=True)
-    >>> X, _ = load_optdigits()
-    >>> plot_image(X[0], True, (8, 8), 255, 0, show_plot=True)
+    >>> X = load_nrletters().data
+    >>> plot_image(X[0], False, (9, 7, 3), True, 255, 0, show_plot=True)
+    >>> X = load_optdigits().data
+    >>> plot_image(X[0], True, (8, 8), None, 255, 0, show_plot=True)
     """
     assert img_data.ndim <= 3, "Image data can not have more than 3 dimensions."
     # Data range must match float between [0..1] or int between [0..255] -> use min-max transform
@@ -373,7 +381,7 @@ def plot_histogram(X: np.ndarray, labels: np.ndarray = None, density: bool = Tru
 
 def plot_scatter_matrix(X: np.ndarray, labels: np.ndarray = None, centers: np.ndarray = None,
                         true_labels: np.ndarray = None, density: bool = True, n_bins: int = 100,
-                        show_legend: bool = True, scattersize: int = 10, equal_axis: bool = False,
+                        show_legend: bool = True, scattersize: float = 10, equal_axis: bool = False,
                         max_dimensions: int = 10, show_plot: bool = True) -> plt.Axes:
     """
     Create a scatter matrix plot.

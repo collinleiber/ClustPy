@@ -75,13 +75,22 @@ def _download_file_from_google_drive(file_id: str, filename_local: str, chunk_si
         chink size when downloading the file (default: 32768)
     """
     print("Downloading data set {0} from Google Drive to {1}".format(file_id, filename_local))
-    URL = "https://docs.google.com/uc?export=download&confirm=1"
+    URL = "https://drive.google.com/uc"
     session = requests.Session()
-    response = session.get(URL, params={"id": file_id, "confirm": 1}, stream=True)
+    response = session.get(URL, params={"id": file_id, "confirm": "t"}, stream=True)
+    if response.text.startswith("<!DOCTYPE"):
+        # Large files can not be obtained automatically but need a second request
+        try:
+            URL_extracted = response.text.split("download-form\" action=\"")[1].split("\" method=\"get\"")[0]
+            uuid = response.text.split("name=\"uuid\" value=\"")[1].split("\">")[0]
+        except:
+            raise Exception("[ERROR] New URL and UUID could not be extracted from first request in _download_file_from_google_drive")
+        response = session.get(URL_extracted, params={"id": file_id, "confirm": "t", "uuid": uuid}, stream=True)
     with open(filename_local, "wb") as f:
         for chunk in response.iter_content(chunk_size):
             if chunk:  # filter out keep-alive new chunks
                 f.write(chunk)
+    session.close()
 
 
 def _load_data_file(filename_local: str, file_url: str, delimiter: str = ",", last_column_are_labels: bool = True) -> (
@@ -147,14 +156,14 @@ def _decompress_z_file(filename: str, directory: str) -> bool:
     return successful
 
 
-def _load_image_data(path: str, image_size: tuple, color_image: bool) -> np.ndarray:
+def _load_image_data(image: str, image_size: tuple, color_image: bool) -> np.ndarray:
     """
     Load image and convert it into a coherent size. Returns a numpy array containing the image data.
 
     Parameters
     ----------
-    path : str
-        Path to the image
+    image : str
+        Path to the image. Can also be a numpy array containing the specific pixels
     image_size : tuple
         images of various sizes can be converted into a coherent size.
         The tuple equals (width, height) of the images.
@@ -167,14 +176,85 @@ def _load_image_data(path: str, image_size: tuple, color_image: bool) -> np.ndar
     image_data : np.ndarray
         The numpy array containing the image data
     """
-    image = Image.open(path)
+    if type(image) is str:
+        pil_image = Image.open(image)
+    else:
+        pil_image = Image.fromarray(np.uint8(image))
     if color_image:
-        image = image.convert("RGB")
+        pil_image = pil_image.convert("RGB")
     # Convert to coherent size
     if image_size is not None:
-        image = image.resize(image_size)
-    image_data = np.asarray(image)
+        pil_image = pil_image.resize(image_size)
+    image_data = np.asarray(pil_image)
     assert image_size is None or image_data.shape == (
         image_size[0], image_size[1], 3), "Size of image is not correct. Should be {0} but is {1}".format(image_size,
                                                                                                           image_data.shape)
     return image_data
+
+
+def flatten_images(data: np.ndarray, format: str) -> np.ndarray:
+    """
+    Convert data array from image to numerical vector.
+    Before flattening, color images will be converted to the HWC/HWDC (height, width, color channels) format.
+
+    Parameters
+    ----------
+    data : np.ndarray
+        The given data set
+    format : str
+        Format of the data array. Can be: "HW", "HWD", "CHW", "CHWD", "HWC", "HWDC".
+        Abbreviations stand for: H: Height, W: Width, D: Depth, C: Color-channels
+
+    Returns
+    -------
+    data : np.ndarray
+        The flatten data array
+    """
+    format_possibilities = ["HW", "HWD", "CHW", "CHWD", "HWC", "HWDC"]
+    assert format in format_possibilities, "Format must be within {0}".format(format_possibilities)
+    if format == "HW":
+        assert data.ndim == 3
+    elif format in ["HWD", "CHW", "HWC"]:
+        assert data.ndim == 4
+    elif format in ["CHWD", "HWDC"]:
+        assert data.ndim == 5
+    # Flatten shape
+    if format != "HW" and format != "HWD":
+        if format == "CHW":
+            # Change representation to HWC
+            data = np.transpose(data, [0, 2, 3, 1])
+        elif format == "CHWD":
+            # Change representation to HWDC
+            data = np.transpose(data, [0, 2, 3, 4, 1])
+        assert data.shape[
+                   -1] == 3, "Color-channels must be in the last position and contain three channels not {0} ({1})".format(
+            data.shape[-1], data.shape)
+    data = data.reshape(data.shape[0], -1)
+    return data
+
+
+def unflatten_images(data_flatten: np.ndarray, image_size: tuple) -> np.ndarray:
+    """
+    Convert data array from numerical vector to image.
+    After unflattening, color images will be converted to the CHW/CHWD (color channels, height, width) format.
+
+    Parameters
+    ----------
+    data_flatten : np.ndarray
+        The given flatten data set
+    image_size : str
+        The size of a single image, e.g., (28,28,3) for a colored image of size 28 x 28
+
+    Returns
+    -------
+    data_image : np.ndarray
+        The unflatten data array corresponding to an image
+    """
+    new_shape = tuple([-1] + [i for i in image_size])
+    data_image = data_flatten.reshape(new_shape)
+    # Change image from HWC/HWDC to CHW/CHWD
+    if data_image.ndim == 4 and image_size[-1] == 3:
+        data_image = np.transpose(data_image, (0, 3, 1, 2))
+    elif data_image.ndim == 5 and image_size[-1] == 3:
+        data_image = np.transpose(data_image, (0, 4, 1, 2, 3))
+    return data_image

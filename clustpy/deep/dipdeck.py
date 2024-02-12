@@ -8,9 +8,9 @@ import numpy as np
 from clustpy.utils import dip_test, dip_pval
 import torch
 from clustpy.deep._utils import detect_device, encode_batchwise, squared_euclidean_distance, int_to_one_hot, \
-    set_torch_seed, run_initial_clustering, embedded_kmeans_prediction
+    set_torch_seed, embedded_kmeans_prediction
+from clustpy.deep._train_utils import get_standard_initial_deep_clustering_setting
 from clustpy.deep._data_utils import get_dataloader, augmentation_invariance_check
-from clustpy.deep._train_utils import get_trained_autoencoder
 from sklearn.cluster import KMeans
 from sklearn.base import BaseEstimator, ClusterMixin
 from sklearn.utils import check_random_state
@@ -98,25 +98,17 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
         raise Exception("n_clusters can not be smaller than min_n_clusters")
     if dip_merge_threshold < 0 or dip_merge_threshold > 1:
         raise Exception("dip_merge_threshold must be between 0 and 1")
-    device = detect_device()
-    if custom_dataloaders is None:
-        trainloader = get_dataloader(X, batch_size, True, False)
-        testloader = get_dataloader(X, batch_size, False, False)
-    else:
-        trainloader, testloader = custom_dataloaders
-        # Get new X from dataloader (important if transformations are used within the dataloader)
+    # Get initial setting (device, dataloaders, pretrained AE and initial clustering result)
+    device, trainloader, testloader, autoencoder, embedded_data, n_clusters_init, cluster_labels_cpu, init_centers, _ = get_standard_initial_deep_clustering_setting(
+        X, n_clusters_init, batch_size, pretrain_optimizer_params, pretrain_epochs, optimizer_class, loss_fn,
+        autoencoder, embedding_size, custom_dataloaders, initial_clustering_class, initial_clustering_params,
+        random_state)
+    if custom_dataloaders is not None:
+        # Get new X from testloader (important if transformations are used within the dataloader)
         X_new = []
         for batch in testloader:
             X_new.append(batch[1].detach().cpu())
         X = torch.cat(X_new, dim=0).numpy()
-    autoencoder = get_trained_autoencoder(trainloader, pretrain_optimizer_params, pretrain_epochs, device,
-                                          optimizer_class, loss_fn, embedding_size, autoencoder)
-    # Execute initial clustering in embedded space
-    embedded_data = encode_batchwise(testloader, autoencoder, device)
-    n_clusters_init, cluster_labels_cpu, init_centers, _ = run_initial_clustering(embedded_data, n_clusters_init,
-                                                                                  initial_clustering_class,
-                                                                                  initial_clustering_params,
-                                                                                  random_state)
     # Get nearest points to optimal centers
     centers_cpu, embedded_centers_cpu = _get_nearest_points_to_optimal_centers(X, init_centers, embedded_data)
     # Initial dip values
@@ -593,7 +585,7 @@ class DipDECK(BaseEstimator, ClusterMixin):
     autoencoder : torch.nn.Module
         the input autoencoder. If None a new FeedforwardAutoencoder will be created (default: None)
     embedding_size : int
-        size of the embedding within the autoencoder (default: 10)
+        size of the embedding within the autoencoder (default: 5)
     max_cluster_size_diff_factor : float
         The maximum different in size when comparing two clusters regarding the number of samples.
         If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) closest samples will be used for the Dip calculation (default: 2)
@@ -643,13 +635,13 @@ class DipDECK(BaseEstimator, ClusterMixin):
 
     def __init__(self, n_clusters_init: int = 35, dip_merge_threshold: float = 0.9, cluster_loss_weight: float = 1,
                  max_n_clusters: int = np.inf, min_n_clusters: int = 1, batch_size: int = 256,
-                 pretrain_optimizer_params: dict = {"lr": 1e-3}, clustering_optimizer_params: dict = {"lr": 1e-4},
+                 pretrain_optimizer_params: dict = None, clustering_optimizer_params: dict = None,
                  pretrain_epochs: int = 100, clustering_epochs: int = 50,
                  optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), autoencoder: torch.nn.Module = None,
                  embedding_size: int = 5, max_cluster_size_diff_factor: float = 2, pval_strategy: str = "table",
                  n_boots: int = 1000, custom_dataloaders: tuple = None, augmentation_invariance: bool = False,
-                 initial_clustering_class: ClusterMixin = KMeans, initial_clustering_params: dict = {},
+                 initial_clustering_class: ClusterMixin = KMeans, initial_clustering_params: dict = None,
                  random_state: np.random.RandomState = None, debug: bool = False):
         self.n_clusters_init = n_clusters_init
         self.dip_merge_threshold = dip_merge_threshold
@@ -657,8 +649,8 @@ class DipDECK(BaseEstimator, ClusterMixin):
         self.max_n_clusters = max_n_clusters
         self.min_n_clusters = min_n_clusters
         self.batch_size = batch_size
-        self.pretrain_optimizer_params = pretrain_optimizer_params
-        self.clustering_optimizer_params = clustering_optimizer_params
+        self.pretrain_optimizer_params = {"lr": 1e-3} if pretrain_optimizer_params is None else pretrain_optimizer_params
+        self.clustering_optimizer_params = {"lr": 1e-4} if clustering_optimizer_params is None else clustering_optimizer_params
         self.pretrain_epochs = pretrain_epochs
         self.clustering_epochs = clustering_epochs
         self.optimizer_class = optimizer_class
@@ -671,7 +663,7 @@ class DipDECK(BaseEstimator, ClusterMixin):
         self.custom_dataloaders = custom_dataloaders
         self.augmentation_invariance = augmentation_invariance
         self.initial_clustering_class = initial_clustering_class
-        self.initial_clustering_params = initial_clustering_params
+        self.initial_clustering_params = {} if initial_clustering_params is None else initial_clustering_params
         self.random_state = check_random_state(random_state)
         set_torch_seed(self.random_state)
         self.debug = debug
@@ -729,8 +721,8 @@ class DipDECK(BaseEstimator, ClusterMixin):
         """
         # Get embedded centers
         device = detect_device()
-        centerloader = get_dataloader(self.cluster_centers_, self.batch_size, False, False)
-        embedded_centers = encode_batchwise(centerloader, self.autoencoder, device)
+        centers_torch = torch.from_numpy(self.cluster_centers_).float().to(device)
+        embedded_centers = self.autoencoder.encode(centers_torch).detach().cpu().numpy()
         # Get labels
         dataloader = get_dataloader(X, self.batch_size, False, False)
         predicted_labels = embedded_kmeans_prediction(dataloader, embedded_centers, self.autoencoder)

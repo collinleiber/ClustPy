@@ -5,15 +5,15 @@ import numpy as np
 
 def test_create_subspace_data():
     data, labels = create_subspace_data(1500, 5, [4, 3])
-    _helper_test_data_loader(data, labels, 1500, 7, 5)
+    _helper_test_data_loader((data, labels), 1500, 7, 5)
     # Test with different cluster sizes and outliers
     data, labels = create_subspace_data([200, 200, 300, 300, 500], 5, [4, 3], [10, 10])
-    _helper_test_data_loader(data, labels, 1510, 7, 5, outliers=True)
+    _helper_test_data_loader((data, labels), 1510, 7, 5, outliers=True)
 
 
 def test_create_nr_data():
     data, labels = create_nr_data(1000, [3, 3, 5], [4, 3, 2], [100, 0, 0], rotate_space=False, random_state=0)
-    _helper_test_data_loader(data, labels, 1100, 9, [3, 3, 5], outliers=[True, False, False])
+    _helper_test_data_loader((data, labels), 1100, 9, [3, 3, 5], outliers=[True, False, False])
     _, cluster_sizes = np.unique(labels[:, 0], return_counts=True)
     assert cluster_sizes[0] == 100  # Checks number of outliers
     # Check if random state is working
@@ -28,7 +28,7 @@ def test_create_nr_data():
     # Check different cluster sizes
     data3, labels3 = create_nr_data([[300, 400, 500], [400, 400, 450], [400, 400, 300, 100, 100]], [3, 3, 5], [4, 3, 2],
                                     [100, 50, 0], rotate_space=True, random_state=0)
-    _helper_test_data_loader(data3, labels3, 1300, 9, [3, 3, 5], outliers=[True, True, False])
+    _helper_test_data_loader((data3, labels3), 1300, 9, [3, 3, 5], outliers=[True, True, False])
     for i in range(3):
         _, cluster_sizes = np.unique(labels3[:, i], return_counts=True)
         if i == 0:

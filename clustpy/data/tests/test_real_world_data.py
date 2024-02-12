@@ -1,10 +1,6 @@
-from clustpy.data.tests._helpers_for_tests import _helper_test_data_loader, _check_normalized_channels
-from clustpy.data import load_iris, load_wine, load_breast_cancer, load_newsgroups, load_reuters, load_banknotes, \
-    load_spambase, load_seeds, load_skin, load_soybean_small, load_soybean_large, load_optdigits, load_pendigits, \
-    load_ecoli, load_htru2, load_letterrecognition, load_har, load_statlog_shuttle, load_mice_protein, \
-    load_user_knowledge, load_breast_tissue, load_forest_types, load_dermatology, load_multiple_features, \
-    load_statlog_australian_credit_approval, load_breast_cancer_wisconsin_original, load_semeion, load_imagenet_dog, \
-    load_imagenet10, load_coil20, load_coil100
+from clustpy.data.tests._helpers_for_tests import _helper_test_data_loader
+from clustpy.data import load_iris, load_wine, load_breast_cancer, load_olivetti_faces, load_newsgroups, load_reuters, \
+    load_imagenet_dog, load_imagenet10, load_coil20, load_coil100, load_webkb
 from pathlib import Path
 import os
 import shutil
@@ -26,310 +22,116 @@ def run_around_tests():
 
 @pytest.mark.data
 def test_load_iris():
-    data, labels = load_iris()
-    _helper_test_data_loader(data, labels, 150, 4, 3)
+    _helper_test_data_loader(load_iris, 150, 4, 3)
 
 
 @pytest.mark.data
 def test_load_wine():
-    data, labels = load_wine()
-    _helper_test_data_loader(data, labels, 178, 13, 3)
+    _helper_test_data_loader(load_wine, 178, 13, 3)
 
 
 @pytest.mark.data
 def test_load_breast_cancer():
-    data, labels = load_breast_cancer()
-    _helper_test_data_loader(data, labels, 569, 30, 2)
+    _helper_test_data_loader(load_breast_cancer, 569, 30, 2)
+
+
+@pytest.mark.data
+def test_load_olivetti_faces():
+    dataset = _helper_test_data_loader(load_olivetti_faces, 400, 4096, 40)
+    # Non-flatten
+    assert dataset.images.shape == (400, 64, 64)
+    assert dataset.image_format == "HW"
 
 
 @pytest.mark.data
 def test_load_newsgroups():
     # Full data set
-    data, labels = load_newsgroups("all")
-    _helper_test_data_loader(data, labels, 18846, 2000, 20)
+    _helper_test_data_loader(load_newsgroups, 18846, 2000, 20, dataloader_params={"subset": "all"})
     # Train data set
-    data, labels = load_newsgroups("train")
-    _helper_test_data_loader(data, labels, 11314, 2000, 20)
+    _helper_test_data_loader(load_newsgroups, 11314, 2000, 20, dataloader_params={"subset": "train"})
     # Test data set and different number of features
-    data, labels = load_newsgroups("test", 500)
-    _helper_test_data_loader(data, labels, 7532, 500, 20)
+    _helper_test_data_loader(load_newsgroups, 7532, 500, 20, dataloader_params={"subset": "test", "n_features": 500})
 
 
 @pytest.mark.data
 @pytest.mark.largedata
 def test_load_reuters():
     # Full data set
-    data, labels = load_reuters("all")
-    _helper_test_data_loader(data, labels, 685071, 2000, 4)
+    _helper_test_data_loader(load_reuters, 685071, 2000, 4, dataloader_params={"subset": "all"})
     # Train data set
-    data, labels = load_reuters("train")
-    _helper_test_data_loader(data, labels, 19806, 2000, 4)
+    _helper_test_data_loader(load_reuters, 19806, 2000, 4, dataloader_params={"subset": "train"})
     # Test data set and different number of features
-    data, labels = load_reuters("test", 500)
-    _helper_test_data_loader(data, labels, 665265, 500, 4)
-
-
-@pytest.mark.data
-def test_load_banknotes():
-    data, labels = load_banknotes(downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 1372, 4, 2)
-
-
-@pytest.mark.data
-def test_load_spambase():
-    data, labels = load_spambase(downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 4601, 57, 2)
-
-
-@pytest.mark.data
-def test_load_seeds():
-    data, labels = load_seeds(downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 210, 7, 3)
-
-
-@pytest.mark.data
-def test_load_skin():
-    data, labels = load_skin(downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 245057, 3, 2)
-
-
-@pytest.mark.data
-def test_load_soybean_small():
-    data, labels = load_soybean_small(downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 47, 35, 4)
-
-
-@pytest.mark.data
-def test_load_soybean_large():
-    # Full data set
-    data, labels = load_soybean_large("all", downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 562, 35, 15)
-    # Train data set
-    data, labels = load_soybean_large("train", downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 266, 35, 15)
-    # Test data set
-    data, labels = load_soybean_large("test", downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 296, 35, 15)
-
-
-@pytest.mark.data
-def test_load_optdigits():
-    # Full data set
-    data, labels = load_optdigits("all", downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 5620, 64, 10)
-    # Train data set
-    data, labels = load_optdigits("train", downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 3823, 64, 10)
-    # Test data set
-    data, labels = load_optdigits("test", downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 1797, 64, 10)
-    # Test non-flatten
-    data, _ = load_optdigits("all", flatten=False, downloads_path=TEST_DOWNLOAD_PATH)
-    assert data.shape == (5620, 8, 8)
-
-
-@pytest.mark.data
-def test_load_pendigits():
-    # Full data set
-    data, labels = load_pendigits("all", downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 10992, 16, 10)
-    # Train data set
-    data, labels = load_pendigits("train", downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 7494, 16, 10)
-    # Test data set
-    data, labels = load_pendigits("test", downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 3498, 16, 10)
-
-
-@pytest.mark.data
-def test_load_ecoli():
-    data, labels = load_ecoli(downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 336, 7, 8)
-    # Check if ignoring small clusters works
-    data, labels = load_ecoli(ignore_small_clusters=True, downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 327, 7, 5)
-
-
-@pytest.mark.data
-def test_load_hrtu2():
-    data, labels = load_htru2(downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 17898, 8, 2)
-
-
-@pytest.mark.data
-def test_load_letterrecognition():
-    data, labels = load_letterrecognition(downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 20000, 16, 26)
-
-
-@pytest.mark.data
-def test_load_har():
-    # Full data set
-    data, labels = load_har("all", downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 10299, 561, 6)
-    # Train data set
-    data, labels = load_har("train", downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 7352, 561, 6)
-    # Test data set
-    data, labels = load_har("test", downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 2947, 561, 6)
-
-
-@pytest.mark.data
-def test_load_statlog_shuttle():
-    # 7z probably not installed! -> data and labels can be None
-    # Full data set
-    data, labels = load_statlog_shuttle("all", downloads_path=TEST_DOWNLOAD_PATH)
-    if data is None:
-        assert labels is None
-    else:
-        _helper_test_data_loader(data, labels, 58000, 9, 7)
-    # Train data set
-    data, labels = load_statlog_shuttle("train", downloads_path=TEST_DOWNLOAD_PATH)
-    if data is None:
-        assert labels is None
-    else:
-        _helper_test_data_loader(data, labels, 43500, 9, 7)
-    # Test data set
-    data, labels = load_statlog_shuttle("test", downloads_path=TEST_DOWNLOAD_PATH)
-    if data is None:
-        assert labels is None
-    else:
-        _helper_test_data_loader(data, labels, 14500, 9, 7)
-
-
-@pytest.mark.data
-def test_load_mice_protein():
-    data, labels = load_mice_protein(downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 1077, 68, 8)
-    # Check if additional labels work
-    data, labels = load_mice_protein(return_additional_labels=True, downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 1077, 68, [8, 72, 2, 2, 2])
-
-
-@pytest.mark.data
-def test_load_user_knowledge():
-    # Full data set
-    data, labels = load_user_knowledge("all", downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 403, 5, 4)
-    # Train data set
-    data, labels = load_user_knowledge("train", downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 258, 5, 4)
-    # Test data set
-    data, labels = load_user_knowledge("test", downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 145, 5, 4)
-
-
-@pytest.mark.data
-def test_load_breast_tissue():
-    data, labels = load_breast_tissue(downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 106, 9, 6)
-
-
-@pytest.mark.data
-def test_load_forest_types():
-    # Full data set
-    data, labels = load_forest_types("all", downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 523, 27, 4)
-    # Train data set
-    data, labels = load_forest_types("train", downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 198, 27, 4)
-    # Test data set
-    data, labels = load_forest_types("test", downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 325, 27, 4)
-
-
-@pytest.mark.data
-def test_load_dermatology():
-    data, labels = load_dermatology(downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 358, 34, 6)
-
-
-@pytest.mark.data
-def test_load_multiple_features():
-    data, labels = load_multiple_features(downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 2000, 649, 10)
-
-
-@pytest.mark.data
-def test_load_statlog_australian_credit_approval():
-    data, labels = load_statlog_australian_credit_approval(downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 690, 14, 2)
-
-
-@pytest.mark.data
-def test_load_breast_cancer_wisconsin_original():
-    data, labels = load_breast_cancer_wisconsin_original(downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 683, 9, 2)
-
-
-@pytest.mark.data
-def test_load_semeion():
-    data, labels = load_semeion(downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 1593, 256, 10)
-    # Test non-flatten
-    data, _ = load_semeion(flatten=False, downloads_path=TEST_DOWNLOAD_PATH)
-    assert data.shape == (1593, 16, 16)
+    _helper_test_data_loader(load_reuters, 665265, 500, 4, dataloader_params={"subset": "test", "n_features": 500})
 
 
 @pytest.mark.data
 @pytest.mark.largedata
 def test_load_imagenet_dog():
     # Full data set
-    data, labels = load_imagenet_dog("all", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True, breeds=None)
-    _helper_test_data_loader(data, labels, 20580, 150528, 120)
-    _check_normalized_channels(data, 3, True)
+    dataset = _helper_test_data_loader(load_imagenet_dog, 20580, 150528, 120,
+                                       dataloader_params={"subset": "all", "downloads_path": TEST_DOWNLOAD_PATH,
+                                                          "breeds": None})
+    # Non-flatten
+    assert dataset.images.shape == (20580, 3, 224, 224)
+    assert dataset.image_format == "CHW"
     # Train data set
-    data, labels = load_imagenet_dog("train", downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=False, breeds=None)
-    _helper_test_data_loader(data, labels, 12000, 150528, 120)
-    _check_normalized_channels(data, 3, False)
+    dataset = _helper_test_data_loader(load_imagenet_dog, 12000, 150528, 120,
+                                       dataloader_params={"subset": "train", "downloads_path": TEST_DOWNLOAD_PATH,
+                                                          "breeds": None})
+    # Non-flatten
+    assert dataset.images.shape == (12000, 3, 224, 224)
+    assert dataset.image_format == "CHW"
     # Test data set
-    data, labels = load_imagenet_dog("test", downloads_path=TEST_DOWNLOAD_PATH, breeds=None)
-    _helper_test_data_loader(data, labels, 8580, 150528, 120)
-    _check_normalized_channels(data, 3, False)
+    dataset = _helper_test_data_loader(load_imagenet_dog, 8580, 150528, 120,
+                                       dataloader_params={"subset": "test", "downloads_path": TEST_DOWNLOAD_PATH,
+                                                          "breeds": None})
+    # Non-flatten
+    assert dataset.images.shape == (8580, 3, 224, 224)
+    assert dataset.image_format == "CHW"
     # Test default breeds and different image size
-    data, labels = load_imagenet_dog("all", downloads_path=TEST_DOWNLOAD_PATH, image_size=(32, 32))
-    _helper_test_data_loader(data, labels, 2574, 3072, 15)
-    _check_normalized_channels(data, 3, False)
-    # Test non-flatten
-    data, _ = load_imagenet_dog("all", downloads_path=TEST_DOWNLOAD_PATH, flatten=False)
-    assert data.shape == (2574, 3, 224, 224)
+    dataset = _helper_test_data_loader(load_imagenet_dog, 2574, 3072, 15,
+                                       dataloader_params={"subset": "all", "downloads_path": TEST_DOWNLOAD_PATH,
+                                                          "image_size": (32, 32)})
+    # Non-flatten
+    assert dataset.images.shape == (2574, 3, 32, 32)
+    assert dataset.image_format == "CHW"
 
 
 @pytest.mark.data
 @pytest.mark.largedata
 def test_load_imagenet10():
     # Full data set
-    data, labels = load_imagenet10(downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)
-    _helper_test_data_loader(data, labels, 13000, 150528, 10)
-    _check_normalized_channels(data, 3, True)
+    dataset = _helper_test_data_loader(load_imagenet10, 13000, 150528, 10,
+                                       dataloader_params={"downloads_path": TEST_DOWNLOAD_PATH})
+    # Non-flatten
+    assert dataset.images.shape == (13000, 3, 224, 224)
+    assert dataset.image_format == "CHW"
     # Test different image size
-    data, labels = load_imagenet10(downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=False, use_224_size=False)
-    _helper_test_data_loader(data, labels, 13000, 27648, 10)
-    _check_normalized_channels(data, 3, False)
-    # Test non-flatten
-    data, _ = load_imagenet10(downloads_path=TEST_DOWNLOAD_PATH, flatten=False)
-    assert data.shape == (13000, 3, 224, 224)
+    dataset = _helper_test_data_loader(load_imagenet10, 13000, 27648, 10,
+                                       dataloader_params={"downloads_path": TEST_DOWNLOAD_PATH,
+                                                          "use_224_size": False})
+    # Non-flatten
+    assert dataset.images.shape == (13000, 3, 96, 96)
+    assert dataset.image_format == "CHW"
 
 
 @pytest.mark.data
 def test_load_coil20():
-    data, labels = load_coil20(downloads_path=TEST_DOWNLOAD_PATH)
-    _helper_test_data_loader(data, labels, 1440, 16384, 20)
-    # Test non-flatten
-    data, _ = load_coil20(flatten=False, downloads_path=TEST_DOWNLOAD_PATH)
-    assert data.shape == (1440, 128, 128)
+    dataset = _helper_test_data_loader(load_coil20, 1440, 16384, 20,
+                                       dataloader_params={"downloads_path": TEST_DOWNLOAD_PATH})
+    # Non-flatten
+    assert dataset.images.shape == (1440, 128, 128)
+    assert dataset.image_format == "HW"
 
 
 @pytest.mark.data
 def test_load_coil100():
-    data, labels = load_coil100(downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=True)
-    _helper_test_data_loader(data, labels, 7200, 49152, 100)
-    _check_normalized_channels(data, 3, True)
-    # Without normalize
-    data, labels = load_coil100(downloads_path=TEST_DOWNLOAD_PATH, normalize_channels=False)
-    _helper_test_data_loader(data, labels, 7200, 49152, 100)
-    _check_normalized_channels(data, 3, False)
-    # Test non-flatten
-    data, _ = load_coil100(flatten=False, downloads_path=TEST_DOWNLOAD_PATH)
-    assert data.shape == (7200, 3, 128, 128)
+    dataset = _helper_test_data_loader(load_coil100, 7200, 49152, 100, dataloader_params={"downloads_path": TEST_DOWNLOAD_PATH})
+    # Non-flatten
+    assert dataset.images.shape == (7200, 3, 128, 128)
+    assert dataset.image_format == "CHW"
+
+
+@pytest.mark.data
+def test_load_webkb():
+    _helper_test_data_loader(load_webkb, 1041, 323, [4, 4], dataloader_params={"downloads_path": TEST_DOWNLOAD_PATH})

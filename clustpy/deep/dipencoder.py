@@ -25,7 +25,7 @@ Dip module - holds backward functions
 class _Dip_Module(torch.nn.Module):
     """
     The _Dip_Module class is a wrapper for the _Dip_Gradient class.
-    It saves the the projection axes needed to calculate the Dip-values.
+    It saves the projection axes needed to calculate the Dip-values.
 
     Parameters
     ----------
@@ -125,7 +125,7 @@ class _Dip_Gradient(torch.autograd.Function):
         device = detect_device()
         # Load parameters from forward
         X, X_proj, sorted_indices, projection_vector, modal_triangle, dip_value = ctx.saved_tensors
-        if modal_triangle[0] == -1:
+        if -1 in modal_triangle:
             return torch.zeros((X_proj.shape[0], projection_vector.shape[0])).to(device), torch.zeros(
                 projection_vector.shape).to(device)
         # Grad_output equals gradient of outer operations. Update grad_output to consider dip
@@ -546,7 +546,6 @@ def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size:
     # Get initial AE
     autoencoder = get_trained_autoencoder(trainloader, pretrain_optimizer_params, pretrain_epochs, device,
                                           optimizer_class, loss_fn, embedding_size, autoencoder)
-
     # Get factor for AE loss
     # rand_samples = torch.rand((batch_size, X.shape[1]))
     # data_min = np.min(X)
@@ -744,20 +743,20 @@ class DipEncoder(BaseEstimator, ClusterMixin):
     Proceedings of the 28th ACM SIGKDD Conference on Knowledge Discovery & Data Mining. 2022.
     """
 
-    def __init__(self, n_clusters: int, batch_size: int = None, pretrain_optimizer_params: dict = {"lr": 1e-3},
-                 clustering_optimizer_params: dict = {"lr": 1e-4}, pretrain_epochs: int = 100,
+    def __init__(self, n_clusters: int, batch_size: int = None, pretrain_optimizer_params: dict = None,
+                 clustering_optimizer_params: dict = None, pretrain_epochs: int = 100,
                  clustering_epochs: int = 100, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), autoencoder: torch.nn.Module = None,
                  embedding_size: int = 10, max_cluster_size_diff_factor: float = 3,
                  reconstruction_loss_weight: float = None, custom_dataloaders: tuple = None,
                  augmentation_invariance: bool = False, initial_clustering_class: ClusterMixin = KMeans,
-                 initial_clustering_params: dict = {}, random_state: np.random.RandomState = None, debug: bool = False):
+                 initial_clustering_params: dict = None, random_state: np.random.RandomState = None, debug: bool = False):
         self.n_clusters = n_clusters
         if batch_size is None:
             batch_size = 25 * n_clusters
         self.batch_size = batch_size
-        self.pretrain_optimizer_params = pretrain_optimizer_params
-        self.clustering_optimizer_params = clustering_optimizer_params
+        self.pretrain_optimizer_params = {"lr": 1e-3} if pretrain_optimizer_params is None else pretrain_optimizer_params
+        self.clustering_optimizer_params = {"lr": 1e-4} if clustering_optimizer_params is None else clustering_optimizer_params
         self.pretrain_epochs = pretrain_epochs
         self.clustering_epochs = clustering_epochs
         self.optimizer_class = optimizer_class
@@ -769,7 +768,7 @@ class DipEncoder(BaseEstimator, ClusterMixin):
         self.custom_dataloaders = custom_dataloaders
         self.augmentation_invariance = augmentation_invariance
         self.initial_clustering_class = initial_clustering_class
-        self.initial_clustering_params = initial_clustering_params
+        self.initial_clustering_params = {} if initial_clustering_params is None else initial_clustering_params
         self.random_state = check_random_state(random_state)
         set_torch_seed(self.random_state)
         self.debug = debug

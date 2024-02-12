@@ -23,7 +23,7 @@ def test_ClustpyDataset():
 
 
 def test_ClustpyDataset_with_augmentation():
-    data, _ = load_optdigits(flatten=False)
+    data = load_optdigits().images
     data /= 255.0
     data = data.reshape(-1, 1, 8, 8)
     data = np.tile(data, (1, 3, 1, 1))

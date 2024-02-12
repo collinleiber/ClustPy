@@ -47,7 +47,13 @@ class FeedforwardAutoencoder(_AbstractAutoencoder):
 
     References
     ----------
-    E.g. Ballard, Dana H. "Modular learning in neural networks." Aaai. Vol. 647. 1987.
+    E.g.:
+    Ballard, Dana H. "Modular learning in neural networks." Aaai. Vol. 647. 1987.
+
+    or
+
+    Kramer, Mark A. "Nonlinear principal component analysis using autoassociative neural networks."
+    AIChE journal 37.2 (1991): 233-243.
     """
 
     def __init__(self, layers: list, batch_norm: bool = False, dropout: float = None,

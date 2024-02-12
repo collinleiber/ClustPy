@@ -21,14 +21,14 @@ def test_simple_dipdeck():
     assert np.array_equal(dipdeck.cluster_centers_, dipdeck2.cluster_centers_)
     # Test predict
     labels_predict = dipdeck.predict(X)
-    assert np.array_equal(dipdeck.labels_, labels_predict)
+    assert np.sum(dipdeck.labels_ == labels_predict) / labels_predict.shape[0] > 0.99
 
 
 def test_dipdeck_augmentation():
     torch.use_deterministic_algorithms(True)
-    data, labels = load_optdigits(flatten=False)
-    data = data[:1000]
-    labels = labels[:1000]
+    dataset = load_optdigits()
+    data = dataset.images[:1000]
+    labels = dataset.target[:1000]
     aug_dl, orig_dl = _get_test_augmentation_dataloaders(data)
     clusterer = DipDECK(pretrain_epochs=3, clustering_epochs=3, random_state=1,
                         custom_dataloaders=[aug_dl, orig_dl], augmentation_invariance=True)

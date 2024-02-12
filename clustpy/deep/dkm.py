@@ -3,10 +3,10 @@
 Collin Leiber
 """
 
-from clustpy.deep._utils import detect_device, encode_batchwise, squared_euclidean_distance, predict_batchwise, \
-    set_torch_seed, run_initial_clustering, embedded_kmeans_prediction
+from clustpy.deep._utils import encode_batchwise, squared_euclidean_distance, predict_batchwise, \
+    set_torch_seed, embedded_kmeans_prediction
 from clustpy.deep._data_utils import get_dataloader, augmentation_invariance_check
-from clustpy.deep._train_utils import get_trained_autoencoder
+from clustpy.deep._train_utils import get_standard_initial_deep_clustering_setting
 import torch
 import numpy as np
 from sklearn.cluster import KMeans
@@ -75,19 +75,10 @@ def _dkm(X: np.ndarray, n_clusters: int, alphas: list, batch_size: int, pretrain
         The cluster centers as identified by DKM after the training terminated,
         The final autoencoder
     """
-    device = detect_device()
-    if custom_dataloaders is None:
-        trainloader = get_dataloader(X, batch_size, True, False)
-        testloader = get_dataloader(X, batch_size, False, False)
-    else:
-        trainloader, testloader = custom_dataloaders
-    autoencoder = get_trained_autoencoder(trainloader, pretrain_optimizer_params, pretrain_epochs, device,
-                                          optimizer_class, loss_fn, embedding_size, autoencoder)
-    # Execute initial clustering in embedded space
-    embedded_data = encode_batchwise(testloader, autoencoder, device)
-    n_clusters, _, init_centers, _ = run_initial_clustering(embedded_data, n_clusters,
-                                                            initial_clustering_class,
-                                                            initial_clustering_params, random_state)
+    # Get initial setting (device, dataloaders, pretrained AE and initial clustering result)
+    device, trainloader, testloader, autoencoder, _, n_clusters, _, init_centers, _ = get_standard_initial_deep_clustering_setting(
+        X, n_clusters, batch_size, pretrain_optimizer_params, pretrain_epochs, optimizer_class, loss_fn, autoencoder,
+        embedding_size, custom_dataloaders, initial_clustering_class, initial_clustering_params, random_state)
     # Setup DKM Module
     dkm_module = _DKM_Module(init_centers, alphas, augmentation_invariance).to(device)
     # Use DKM optimizer parameters (usually learning rate is reduced by a magnitude of 10)
@@ -369,12 +360,12 @@ class DKM(BaseEstimator, ClusterMixin):
     ----------
     n_clusters : int
         number of clusters. Can be None if a corresponding initial_clustering_class is given, e.g. DBSCAN
-    alphas : list
-        list of different alpha values used for the prediction.
+    alphas : tuple
+        tuple of different alpha values used for the prediction.
         Small values close to 0 are equivalent to homogeneous assignments to all clusters. Large values simulate a clear assignment as with kMeans.
         If None, the default calculation of the paper will be used.
         This is equal to \alpha_{i+1}=2^{1/log(i)^2}*\alpha_i with \alpha_1=0.1 and maximum i=40.
-        Alpha can also be a tuple with (\alpha_1, maximum i) (default: [1000])
+        Alpha can also be a tuple with (None, \alpha_1, maximum i) (default: (1000))
     batch_size : int
         size of the data batches (default: 256)
     pretrain_optimizer_params : dict
@@ -436,27 +427,26 @@ class DKM(BaseEstimator, ClusterMixin):
     Pattern Recognition Letters 138 (2020): 185-192.
     """
 
-    def __init__(self, n_clusters: int, alphas: list = [1000], batch_size: int = 256,
-                 pretrain_optimizer_params: dict = {"lr": 1e-3}, clustering_optimizer_params: dict = {"lr": 1e-4},
+    def __init__(self, n_clusters: int, alphas: tuple = (1000), batch_size: int = 256,
+                 pretrain_optimizer_params: dict = None, clustering_optimizer_params: dict = None,
                  pretrain_epochs: int = 50, clustering_epochs: int = 100,
                  optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), autoencoder: torch.nn.Module = None,
                  embedding_size: int = 10, cluster_loss_weight: float = 1, custom_dataloaders: tuple = None,
                  augmentation_invariance: bool = False, initial_clustering_class: ClusterMixin = KMeans,
-                 initial_clustering_params: dict = {},
-                 random_state: np.random.RandomState = None):
+                 initial_clustering_params: dict = None, random_state: np.random.RandomState = None):
         self.n_clusters = n_clusters
         if alphas is None:
             alphas = _get_default_alphas()
-        elif type(alphas) is tuple and len(alphas) == 2:
-            alphas = _get_default_alphas(init_alpha=alphas[0], n_alphas=alphas[1])
+        elif (type(alphas) is tuple or type(alphas) is list) and len(alphas) == 3 and alphas[0] is None:
+            alphas = _get_default_alphas(init_alpha=alphas[1], n_alphas=alphas[2])
         elif type(alphas) is int or type(alphas) is float:
             alphas = [alphas]
-        assert type(alphas) is list, "alphas must be a list, int or tuple"
+        assert type(alphas) is tuple or type(alphas) is list, "alphas must be a list, int or tuple"
         self.alphas = alphas
         self.batch_size = batch_size
-        self.pretrain_optimizer_params = pretrain_optimizer_params
-        self.clustering_optimizer_params = clustering_optimizer_params
+        self.pretrain_optimizer_params = {"lr": 1e-3} if pretrain_optimizer_params is None else pretrain_optimizer_params
+        self.clustering_optimizer_params = {"lr": 1e-4} if clustering_optimizer_params is None else clustering_optimizer_params
         self.pretrain_epochs = pretrain_epochs
         self.clustering_epochs = clustering_epochs
         self.optimizer_class = optimizer_class
@@ -467,7 +457,7 @@ class DKM(BaseEstimator, ClusterMixin):
         self.custom_dataloaders = custom_dataloaders
         self.augmentation_invariance = augmentation_invariance
         self.initial_clustering_class = initial_clustering_class
-        self.initial_clustering_params = initial_clustering_params
+        self.initial_clustering_params = {} if initial_clustering_params is None else initial_clustering_params
         self.random_state = check_random_state(random_state)
         set_torch_seed(self.random_state)
 

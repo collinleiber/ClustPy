@@ -57,10 +57,10 @@ def test_plot_histogram(mock_fig):
 
 @patch("matplotlib.pyplot.show")  # Used to test plots (show will not be called)
 def test_plot_image_using_optdigits_and_nrletters(mock_fig):
-    X, _ = load_optdigits()
-    assert None == plot_image(X, True, (8, 8), show_plot=True)
-    X, _ = load_nrletters()
-    assert None == plot_image(X, False, (9, 7, 3), 255, 0, show_plot=True)
+    X = load_optdigits().data
+    assert None == plot_image(X[0], True, (8, 8), show_plot=True)
+    X = load_nrletters().data
+    assert None == plot_image(X[0], False, (9, 7, 3), 255, 0, show_plot=True)
 
 
 @patch("matplotlib.pyplot.show")  # Used to test plots (show will not be called)
