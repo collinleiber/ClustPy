@@ -614,8 +614,9 @@ def plot_dip(X: np.ndarray, is_data_sorted: bool = False, dip_value: float = Non
                        show_legend=histogram_show_legend,
                        container=ax1, show_plot=False)
         if modal_interval is not None:
-            ax1.plot([X[modal_interval[0]], X[modal_interval[0]]], ax1.get_ylim(), "g--", linewidth=linewidth_extra)
-            ax1.plot([X[modal_interval[1]], X[modal_interval[1]]], ax1.get_ylim(), "g--", linewidth=linewidth_extra)
+            y_axis_limit = ax1.get_ylim()
+            ax1.plot([X[modal_interval[0]], X[modal_interval[0]]], y_axis_limit, "g--", linewidth=linewidth_extra)
+            ax1.plot([X[modal_interval[1]], X[modal_interval[1]]], y_axis_limit, "g--", linewidth=linewidth_extra)
         dip_container = ax2
         # Remove spacing between the two plots
         fig.subplots_adjust(hspace=0)
@@ -625,7 +626,8 @@ def plot_dip(X: np.ndarray, is_data_sorted: bool = False, dip_value: float = Non
     dip_container.plot(X, np.arange(N) / N, "b", label="eCDF", linewidth=linewidth_ecdf)
     if dip_value is not None:
         # Add Dip range around ECDF
-        dip_container.plot(X, np.arange(N) / N - dip_value * 2, "k:", alpha=0.7, label="2x dip", linewidth=linewidth_extra)
+        dip_container.plot(X, np.arange(N) / N - dip_value * 2, "k:", alpha=0.7, label="2x dip",
+                           linewidth=linewidth_extra)
         dip_container.plot(X, np.arange(N) / N + dip_value * 2, "k:", alpha=0.7, linewidth=linewidth_extra)
     if modal_interval is not None:
         # Add modal interval in green

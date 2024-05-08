@@ -107,10 +107,11 @@ Remove clustpy via pip to avoid ambiguities during development, e.g., when chang
 
 ### Alternative Clustering / Non-redundant Clustering
 
-| Algorithm | Publication                                                              | Published at                             | Original Code                                         | Docs                                                                                                             |
-|-----------|--------------------------------------------------------------------------|------------------------------------------|-------------------------------------------------------|------------------------------------------------------------------------------------------------------------------|
-| AutoNR | [Automatic Parameter Selection for Non-Redundant Clustering](https://epubs.siam.org/doi/abs/10.1137/1.9781611977172.26) | SIAM SDM 2022 | [Link](https://dmm.dbs.ifi.lmu.de/downloads) (Python) | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.alternative.html#clustpy.alternative.autonr.AutoNR)      |
-| NR-Kmeans | [Discovering Non-Redundant K-means Clusterings in Optimal Subspaces](https://dl.acm.org/doi/abs/10.1145/3219819.3219945) | KDD 2018 | [Link](https://dmm.dbs.ifi.lmu.de/downloads) (Scala)  |  [Link](https://clustpy.readthedocs.io/en/latest/clustpy.alternative.html#clustpy.alternative.nrkmeans.NrKmeans) | 
+| Algorithm     | Publication                                                              | Published at  | Original Code                                         | Docs                                                                                                            |
+|---------------|--------------------------------------------------------------------------|---------------|-------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|
+| AutoNR        | [Automatic Parameter Selection for Non-Redundant Clustering](https://epubs.siam.org/doi/abs/10.1137/1.9781611977172.26) | SIAM SDM 2022 | [Link](https://dmm.dbs.ifi.lmu.de/downloads) (Python) | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.alternative.html#clustpy.alternative.autonr.AutoNR)     |
+| NR-Kmeans     | [Discovering Non-Redundant K-means Clusterings in Optimal Subspaces](https://dl.acm.org/doi/abs/10.1145/3219819.3219945) | KDD 2018      | [Link](https://dmm.dbs.ifi.lmu.de/downloads) (Scala)  | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.alternative.html#clustpy.alternative.nrkmeans.NrKmeans) | 
+| Orth1 + Orth2 | [Non-redundant multi-view clustering via orthogonalization](https://ieeexplore.ieee.org/document/4470237) | ICDM 2007     | -                                                     | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.alternative.html#clustpy.alternative.orth.OrthogonalClustering)     |
 
 ### Deep Clustering
 
