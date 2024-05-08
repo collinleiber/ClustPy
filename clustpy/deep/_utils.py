@@ -8,16 +8,21 @@ from sklearn.metrics.pairwise import pairwise_distances_argmin_min
 import os
 
 
-def set_torch_seed(random_state: np.random.RandomState) -> None:
+def set_torch_seed(random_state: np.random.RandomState | int) -> None:
     """
     Set the random state for torch applications.
 
     Parameters
     ----------
-    random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution
+    random_state : np.random.RandomState | int
+        use a fixed random state or an integer to get a repeatable solution
     """
-    seed = (random_state.get_state()[1][0]).item()
+    if type(random_state) is int:
+        seed = random_state
+    elif type(random_state) is np.random.RandomState:
+        seed = (random_state.get_state()[1][0]).item()
+    else:
+        raise ValueError("random_state must be of type int or np.random.RandomState")
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
