@@ -15,12 +15,17 @@ def test_simple_dkm():
     assert dkm.labels_.dtype == np.int32
     assert dkm.labels_.shape == labels.shape
     # Test if random state is working
+    dkm2 = DKM(3, pretrain_epochs=3, alphas=(None, 0.1, 1), clustering_epochs=3, random_state=1)
+    dkm2.fit(X)
+    assert np.array_equal(dkm.labels_, dkm2.labels_)
+    assert np.allclose(dkm.cluster_centers_, dkm2.cluster_centers_, atol=1e-1)
+    assert np.array_equal(dkm.dkm_labels_, dkm2.dkm_labels_)
+    assert np.allclose(dkm.dkm_cluster_centers_, dkm2.dkm_cluster_centers_, atol=1e-1)
+    # Test different alpha
     dkm = DKM(3, pretrain_epochs=3, alphas=0.1, clustering_epochs=3, random_state=1)
     dkm.fit(X)
-    assert np.array_equal(dkm.labels_, dkm.labels_)
-    assert np.allclose(dkm.cluster_centers_, dkm.cluster_centers_, atol=1e-1)
-    assert np.array_equal(dkm.dkm_labels_, dkm.dkm_labels_)
-    assert np.allclose(dkm.dkm_cluster_centers_, dkm.dkm_cluster_centers_, atol=1e-1)
+    assert dkm.labels_.dtype == np.int32
+    assert dkm.labels_.shape == labels.shape
     # Test predict
     labels_predict = dkm.predict(X)
     assert np.array_equal(dkm.labels_, labels_predict)

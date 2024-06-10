@@ -73,8 +73,7 @@ def test_get_trained_autoencoder_with_custom_pretrained_ae():
     device = torch.device('cpu')
     ae = FeedforwardAutoencoder(layers=[data.shape[1], 256, 128, 64, 10], reusable=True)
     assert ae.fitted == False
-    ae.fit(dataloader=dataloader, optimizer_params={"lr":1e-3}, n_epochs=5, device=device,
-           optimizer_class=torch.optim.Adam,
+    ae.fit(dataloader=dataloader, optimizer_params={"lr":1e-3}, n_epochs=5, optimizer_class=torch.optim.Adam,
            loss_fn=torch.nn.MSELoss())
     encoder_0_params = ae.encoder.block[0].weight.data.detach().clone()
     decoder_0_params = ae.decoder.block[0].weight.data.detach().clone()

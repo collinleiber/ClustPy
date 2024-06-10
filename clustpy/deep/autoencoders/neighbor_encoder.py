@@ -118,11 +118,9 @@ class NeighborEncoder(FeedforwardAutoencoder):
     --------
     >>> from clustpy.data import create_subspace_data
     >>> from clustpy.deep import get_dataloader
-    >>> from clustpy.deep._utils import detect_device
     >>> from scipy.spatial.distance import pdist, squareform
 
     >>> X, L = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
-    >>> device = detect_device()
     >>> n_neighbors = 3
 
     >>> dist_matrix = squareform(pdist(X))
@@ -132,7 +130,7 @@ class NeighborEncoder(FeedforwardAutoencoder):
 
     >>> dataloader = get_dataloader(X, 256, True, additional_inputs=neighbors)
     >>> neighbor_encoder = NeighborEncoder(layers=[X.shape[1], 512, 256, 10], n_neighbors=n_neighbors, decode_self=False)
-    >>> neighbor_encoder.fit(dataloader=dataloader, device=device, n_epochs=5, lr=1e-3)
+    >>> neighbor_encoder.fit(dataloader=dataloader, n_epochs=5, lr=1e-3)
 
     References
     ----------
@@ -218,8 +216,7 @@ class NeighborEncoder(FeedforwardAutoencoder):
             dataloader: torch.utils.data.DataLoader = None, evalloader: torch.utils.data.DataLoader = None,
             optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
             loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), patience: int = 5,
-            scheduler: torch.optim.lr_scheduler = None, scheduler_params: dict = None,
-            device: torch.device = torch.device("cpu"), model_path: str = None,
+            scheduler: torch.optim.lr_scheduler = None, scheduler_params: dict = None, model_path: str = None,
             print_step: int = 0) -> 'NeighborEncoder':
         """
         Trains the NeighborEncoder in place.
@@ -249,8 +246,6 @@ class NeighborEncoder(FeedforwardAutoencoder):
             If torch.optim.lr_scheduler.ReduceLROnPlateau is used then the behaviour is matched by providing the validation_loss calculated based on samples from evalloader (default: None)
         scheduler_params : dict
             dictionary of the parameters of the scheduler object (default: None)
-        device : torch.device
-            device to be trained on (default: torch.device('cpu'))
         model_path : str
             if specified will save the trained model to the location. If evalloader is used, then only the best model w.r.t. evaluation loss is saved (default: None)
         print_step : int
@@ -262,6 +257,5 @@ class NeighborEncoder(FeedforwardAutoencoder):
             this instance of the NeighborEncoder
         """
         super().fit(n_epochs, optimizer_params, batch_size, None, None, dataloader, evalloader, optimizer_class,
-                    loss_fn, patience,
-                    scheduler, scheduler_params, device, model_path, print_step)
+                    loss_fn, patience, scheduler, scheduler_params, model_path, print_step)
         return self

@@ -98,9 +98,10 @@ class _ClustpyDataset(torch.utils.data.Dataset):
         return dataset_size
 
 
-def get_dataloader(X: np.ndarray, batch_size: int, shuffle: bool = True, drop_last: bool = False,
-                   additional_inputs: list = None, dataset_class: torch.utils.data.Dataset = _ClustpyDataset,
-                   ds_kwargs: dict = {}, dl_kwargs: dict = {}) -> torch.utils.data.DataLoader:
+def get_dataloader(X: np.ndarray | torch.Tensor, batch_size: int, shuffle: bool = True, drop_last: bool = False,
+                   additional_inputs: list | np.ndarray | torch.Tensor = None,
+                   dataset_class: torch.utils.data.Dataset = _ClustpyDataset, ds_kwargs: dict = None,
+                   dl_kwargs: dict = None) -> torch.utils.data.DataLoader:
     """
     Create a dataloader for Deep Clustering algorithms.
     First entry always contains the indices of the data samples.
@@ -111,7 +112,7 @@ def get_dataloader(X: np.ndarray, batch_size: int, shuffle: bool = True, drop_la
 
     Parameters
     ----------
-    X : np.ndarray / torch.Tensor
+    X : np.ndarray | torch.Tensor
         the actual data set (can be np.ndarray or torch.Tensor)
     batch_size : int
         the batch size
@@ -119,11 +120,11 @@ def get_dataloader(X: np.ndarray, batch_size: int, shuffle: bool = True, drop_la
         boolean that defines if the data set should be shuffled (default: True)
     drop_last : bool
         boolean that defines if the last batch should be ignored (default: False)
-    additional_inputs : list / np.ndarray / torch.Tensor
+    additional_inputs : list | np.ndarray | torch.Tensor
         additional inputs for the dataloader, e.g. labels. Can be None, np.ndarray, torch.Tensor or a list containing np.ndarrays/torch.Tensors (default: None)
     dataset_class : torch.utils.data.Dataset
         defines the class of the tensor dataset that is contained in the dataloader (default: _ClustpyDataset)
-    ds_kwargs : any
+    ds_kwargs : dict
         other arguments for dataset_class. 
         An example usage would be to include augmentation or preprocessing transforms to the _ClustpyDataset by
         passing ds_kwargs={"aug_transforms_list":[aug_transforms], "orig_transforms_list":[orig_transforms]}, where aug_transforms and orig_transforms
@@ -134,7 +135,7 @@ def get_dataloader(X: np.ndarray, batch_size: int, shuffle: bool = True, drop_la
                    If orig_transforms_list is passed as well then the third entry will be transformed accordingly, this might be needed for preprocessing the data.
                    An example for MNIST is shown below.
 
-    dl_kwargs : any
+    dl_kwargs : dict
         other arguments for torch.utils.data.DataLoader
 
     Examples
@@ -191,6 +192,8 @@ def get_dataloader(X: np.ndarray, batch_size: int, shuffle: bool = True, drop_la
     assert type(X) in [np.ndarray, torch.Tensor], "X must be of type np.ndarray or torch.Tensor."
     assert additional_inputs is None or type(additional_inputs) in [np.ndarray, torch.Tensor,
                                                                     list], "additional_input must be None or of type np.ndarray, torch.Tensor or list."
+    ds_kwargs = {} if ds_kwargs is None else ds_kwargs
+    dl_kwargs = {} if dl_kwargs is None else dl_kwargs
     if type(X) is np.ndarray:
         # Convert np.ndarray to torch.Tensor
         X = torch.from_numpy(X).float()

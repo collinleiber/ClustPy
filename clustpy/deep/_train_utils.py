@@ -28,9 +28,11 @@ def _get_default_layers(input_dim: int, embedding_size: int) -> list:
     return layers
 
 
-def get_trained_autoencoder(trainloader: torch.utils.data.DataLoader, optimizer_params: dict, n_epochs: int, device,
-                            optimizer_class: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss,
-                            embedding_size: int, autoencoder: torch.nn.Module = None,
+def get_trained_autoencoder(trainloader: torch.utils.data.DataLoader = None, data: np.ndarray = None,
+                            n_epochs: int = 100, batch_size: int = 128, optimizer_params: dict = None,
+                            optimizer_class: torch.optim.Optimizer = torch.optim.Adam, device=None,
+                            loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), embedding_size: int = 10,
+                            autoencoder: torch.nn.Module = None,
                             autoencoder_class: torch.nn.Module = FeedforwardAutoencoder) -> torch.nn.Module:
     """This function returns a trained autoencoder. The following cases are considered
        - If the autoencoder is initialized and trained (autoencoder.fitted==True), then return input autoencoder without training it again.
@@ -41,19 +43,23 @@ def get_trained_autoencoder(trainloader: torch.utils.data.DataLoader, optimizer_
     Parameters
     ----------
     trainloader : torch.utils.data.DataLoader
-        dataloader used to train autoencoder
-    optimizer_params : dict
-        parameters of the optimizer for the autoencoder training, includes the learning rate
+        dataloader used to train autoencoder (default: None)
+    data : np.ndarray
+        train data set. If data is passed then trainloader can remain empty (default: None)
     n_epochs : int
-        number of training epochs
-    device : torch.device
-        device to be trained on
+        number of training epochs (default: 100)
+    batch_size : int
+        size of the data batches (default: 128)
+    optimizer_params : dict
+        parameters of the optimizer for the autoencoder training, includes the learning rate (default: {"lr": 1e-3})
     optimizer_class : torch.optim.Optimizer
-        optimizer for training.
+        optimizer for training (default: torch.optim.Adam)
+    device : torch.device
+        device to be trained on. If None, Cuda will be used if available (default: None)
     loss_fn : torch.nn.modules.loss._Loss
-        loss function for the reconstruction.
+        loss function for the reconstruction (default: torch.nn.MSELoss())
     embedding_size : int
-        dimension of the innermost layer of the autoencoder
+        dimension of the innermost layer of the autoencoder (default: 10)
     autoencoder : torch.nn.Module
         autoencoder object to be trained (optional) (default: None)
     autoencoder_class : torch.nn.Module
@@ -64,6 +70,12 @@ def get_trained_autoencoder(trainloader: torch.utils.data.DataLoader, optimizer_
     autoencoder : torch.nn.Module
         The fitted autoencoder
     """
+    device = detect_device(device)
+    optimizer_params = {"lr": 1e-3} if optimizer_params is None else optimizer_params
+    if trainloader is None:
+        if data is None:
+            raise ValueError("data must be specified if trainloader is None")
+        trainloader = get_dataloader(data, batch_size, True)
     if autoencoder is None:
         input_dim = torch.numel(next(iter(trainloader))[1][0])  # Get input dimensions from first batch
         if embedding_size > input_dim:
@@ -81,15 +93,14 @@ def get_trained_autoencoder(trainloader: torch.utils.data.DataLoader, optimizer_
         print("Autoencoder is not fitted yet, will be pretrained.")
         # Pretrain Autoencoder
         autoencoder.fit(n_epochs=n_epochs, optimizer_params=optimizer_params, dataloader=trainloader,
-                        device=device, optimizer_class=optimizer_class, loss_fn=loss_fn)
+                        optimizer_class=optimizer_class, loss_fn=loss_fn)
     if autoencoder.reusable:
         # If autoencoder is used by multiple deep clustering algorithms, create a deep copy of the object
         autoencoder = copy.deepcopy(autoencoder)
-
     return autoencoder
 
 
-def get_standard_initial_deep_clustering_setting(X: np.ndarray, n_clusters: int, batch_size: int,
+def get_standard_initial_deep_clustering_setting(X: np.ndarray | torch.Tensor, n_clusters: int, batch_size: int,
                                                  pretrain_optimizer_params: dict, pretrain_epochs: int,
                                                  optimizer_class: torch.optim.Optimizer,
                                                  loss_fn: torch.nn.modules.loss._Loss,
@@ -106,7 +117,7 @@ def get_standard_initial_deep_clustering_setting(X: np.ndarray, n_clusters: int,
 
     Parameters
     ----------
-    X : np.ndarray / torch.Tensor
+    X : np.ndarray | torch.Tensor
         the given data set. Can be a np.ndarray or a torch.Tensor
     n_clusters : int
         number of clusters. Can be None if a corresponding initial_clustering_class is given, e.g. DBSCAN
@@ -128,7 +139,8 @@ def get_standard_initial_deep_clustering_setting(X: np.ndarray, n_clusters: int,
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         If None, the default dataloaders will be used
     initial_clustering_class : ClusterMixin
-        clustering class to obtain the initial cluster labels after the pretraining
+        clustering class to obtain the initial cluster labels after the pretraining.
+        If it is None, random labels will be chosen
     initial_clustering_params : dict
         parameters for the initial clustering class
     random_state : np.random.RandomState
@@ -155,10 +167,12 @@ def get_standard_initial_deep_clustering_setting(X: np.ndarray, n_clusters: int,
         testloader = get_dataloader(X, batch_size, False, False)
     else:
         trainloader, testloader = custom_dataloaders
-    autoencoder = get_trained_autoencoder(trainloader, pretrain_optimizer_params, pretrain_epochs, device,
-                                          optimizer_class, loss_fn, embedding_size, autoencoder, autoencoder_class)
+    autoencoder = get_trained_autoencoder(trainloader, n_epochs=pretrain_epochs,
+                                          optimizer_params=pretrain_optimizer_params, optimizer_class=optimizer_class,
+                                          device=device, loss_fn=loss_fn, embedding_size=embedding_size,
+                                          autoencoder=autoencoder, autoencoder_class=autoencoder_class)
     # Execute initial clustering in embedded space
-    embedded_data = encode_batchwise(testloader, autoencoder, device)
+    embedded_data = encode_batchwise(testloader, autoencoder)
     n_clusters, init_labels, init_centers, init_cluster_obj = run_initial_clustering(embedded_data, n_clusters,
                                                                                      initial_clustering_class,
                                                                                      initial_clustering_params,

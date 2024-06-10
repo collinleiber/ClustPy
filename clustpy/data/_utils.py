@@ -1,6 +1,9 @@
+try:
+    import requests
+except:
+    print("[WARNING] Could not import requests in clustpy.data._utils. Please install requests by 'pip install requests' if necessary")
 import numpy as np
 import urllib.request
-import requests
 import os
 from pathlib import Path
 import ssl

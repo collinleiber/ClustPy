@@ -371,7 +371,7 @@ class _ENRC_Module(torch.nn.Module):
         n_clusters = [c.shape[0] for c in self.centers]
 
         # Encode data
-        embedded_data = encode_batchwise(dataloader, model, device)
+        embedded_data = encode_batchwise(dataloader, model)
         embedded_rot = np.matmul(embedded_data, V)
 
         # Apply reclustering in the rotated space, because V does not have to be orthogonal, so it could learn a mapping that is not recoverable by nrkmeans.
@@ -1810,13 +1810,15 @@ def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers
         subsampleloader = testloader
     if debug: print("Setup autoencoder")
     # Setup autoencoder
-    autoencoder = get_trained_autoencoder(trainloader, pretrain_optimizer_params, pretrain_epochs, device,
-                                          optimizer_class, loss_fn, embedding_size, autoencoder)
+    autoencoder = get_trained_autoencoder(trainloader, n_epochs=pretrain_epochs,
+                                          optimizer_params=pretrain_optimizer_params, optimizer_class=optimizer_class,
+                                          device=device, loss_fn=loss_fn, embedding_size=embedding_size,
+                                          autoencoder=autoencoder)
     # Run ENRC init
     if debug:
         print("Run init: ", init)
         print("Start encoding")
-    embedded_data = encode_batchwise(subsampleloader, autoencoder, device)
+    embedded_data = encode_batchwise(subsampleloader, autoencoder)
     if debug: print("Start initializing parameters")
     # set init epochs proportional to clustering_epochs
     init_epochs = np.max([10, int(0.2*clustering_epochs)])
@@ -2125,7 +2127,7 @@ class ENRC(BaseEstimator, ClusterMixin):
         """
         if not embedded:
             dataloader = get_dataloader(X, batch_size=self.batch_size, shuffle=False, drop_last=False)
-            emb = encode_batchwise(dataloader=dataloader, module=self.autoencoder, device=self.device)
+            emb = encode_batchwise(dataloader=dataloader, module=self.autoencoder)
         else:
             emb = X
         rotated = np.matmul(emb, self.V)
@@ -2151,7 +2153,7 @@ class ENRC(BaseEstimator, ClusterMixin):
         """
         if not embedded:
             dataloader = get_dataloader(X, batch_size=self.batch_size, shuffle=False, drop_last=False)
-            emb = encode_batchwise(dataloader=dataloader, module=self.autoencoder, device=self.device)
+            emb = encode_batchwise(dataloader=dataloader, module=self.autoencoder)
         else:
             emb = X
         cluster_space_V = self.V[:, self.P[subspace_index]]

@@ -9,6 +9,7 @@ from clustpy.partition import UniDip
 from sklearn.decomposition import PCA
 from clustpy.partition.dipext import _angle, _n_starting_vectors_default, _ambiguous_modal_triangle_random
 from sklearn.utils import check_random_state
+from sklearn.base import BaseEstimator, ClusterMixin
 
 
 def _dip_n_sub(X: np.ndarray, significance: float, threshold: float, step_size: float, momentum: float,
@@ -375,7 +376,7 @@ def _get_min_dippvalue_using_grouped_gradient(X: np.ndarray, labels: np.ndarray,
     return gradient, dip_values, projected_data
 
 
-class DipNSub():
+class DipNSub(BaseEstimator, ClusterMixin):
     """
     Execute the Dip`n`Sub clustering procedure.
     It searches for projection axes in which as many samples as possible are part of multimodal clusters.

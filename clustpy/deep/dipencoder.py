@@ -3,19 +3,19 @@
 Collin Leiber
 """
 
-from sklearn.base import BaseEstimator, ClusterMixin
+from sklearn.base import ClusterMixin
 from sklearn.cluster import KMeans
 from clustpy.utils import dip_test
 import torch
 import numpy as np
 from clustpy.partition.skinnydip import _dip_mirrored_data
-from clustpy.deep._utils import detect_device, encode_batchwise, set_torch_seed, run_initial_clustering
+from clustpy.deep._utils import detect_device, encode_batchwise, run_initial_clustering
 from clustpy.deep._data_utils import get_dataloader, augmentation_invariance_check
 from clustpy.deep._train_utils import get_trained_autoencoder
+from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
 from clustpy.deep.autoencoders._resnet_ae_modules import EncoderBlock, DecoderBlock
 import matplotlib.pyplot as plt
 from clustpy.utils import plot_scatter_matrix
-from sklearn.utils import check_random_state
 
 """
 Dip module - holds backward functions
@@ -544,8 +544,10 @@ def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size:
     else:
         trainloader, testloader = custom_dataloaders
     # Get initial AE
-    autoencoder = get_trained_autoencoder(trainloader, pretrain_optimizer_params, pretrain_epochs, device,
-                                          optimizer_class, loss_fn, embedding_size, autoencoder)
+    autoencoder = get_trained_autoencoder(trainloader, n_epochs=pretrain_epochs,
+                                          optimizer_params=pretrain_optimizer_params, optimizer_class=optimizer_class,
+                                          device=device, loss_fn=loss_fn, embedding_size=embedding_size,
+                                          autoencoder=autoencoder)
     # Get factor for AE loss
     # rand_samples = torch.rand((batch_size, X.shape[1]))
     # data_min = np.min(X)
@@ -559,7 +561,7 @@ def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size:
         if debug:
             print("Choose reconstruction_loss_weight automatically; set to", reconstruction_loss_weight)
     # Create initial projections
-    X_embed = encode_batchwise(testloader, autoencoder, device)
+    X_embed = encode_batchwise(testloader, autoencoder)
     if labels_gt is None:
         # Execute intitial clustering to get labels and centers
         n_clusters, labels_new, centers, _ = run_initial_clustering(X_embed, n_clusters,
@@ -589,7 +591,7 @@ def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size:
     for iteration in range(clustering_epochs + 1):
         # Update labels for clustering
         if labels_gt is None:
-            X_embed = encode_batchwise(testloader, autoencoder, device)
+            X_embed = encode_batchwise(testloader, autoencoder)
             labels_new = _predict(X_embed, X_embed,
                                   labels_new,
                                   dip_module.projection_axes.detach().cpu().numpy(),
@@ -649,7 +651,7 @@ def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size:
                                                                           mean_dip_losses, mean_ae_losses))
     # Get final labels
     if labels_gt is None:
-        X_embed = encode_batchwise(testloader, autoencoder, device)
+        X_embed = encode_batchwise(testloader, autoencoder)
         labels_final = _predict(X_embed, X_embed,
                                 labels_new,
                                 dip_module.projection_axes.detach().cpu().numpy(),
@@ -665,7 +667,7 @@ DipEncoder
 """
 
 
-class DipEncoder(BaseEstimator, ClusterMixin):
+class DipEncoder(_AbstractDeepClusteringAlgo):
     """
     The DipEncoder.
     Can be used either as a clustering procedure if no ground truth labels are given or as a supervised dimensionality reduction technique.
@@ -750,27 +752,25 @@ class DipEncoder(BaseEstimator, ClusterMixin):
                  embedding_size: int = 10, max_cluster_size_diff_factor: float = 3,
                  reconstruction_loss_weight: float = None, custom_dataloaders: tuple = None,
                  augmentation_invariance: bool = False, initial_clustering_class: ClusterMixin = KMeans,
-                 initial_clustering_params: dict = None, random_state: np.random.RandomState = None, debug: bool = False):
+                 initial_clustering_params: dict = None, random_state: np.random.RandomState = None,
+                 debug: bool = False):
+        super().__init__(25 * n_clusters if batch_size is None else batch_size, autoencoder, embedding_size,
+                         random_state)
         self.n_clusters = n_clusters
-        if batch_size is None:
-            batch_size = 25 * n_clusters
-        self.batch_size = batch_size
-        self.pretrain_optimizer_params = {"lr": 1e-3} if pretrain_optimizer_params is None else pretrain_optimizer_params
-        self.clustering_optimizer_params = {"lr": 1e-4} if clustering_optimizer_params is None else clustering_optimizer_params
+        self.pretrain_optimizer_params = {
+            "lr": 1e-3} if pretrain_optimizer_params is None else pretrain_optimizer_params
+        self.clustering_optimizer_params = {
+            "lr": 1e-4} if clustering_optimizer_params is None else clustering_optimizer_params
         self.pretrain_epochs = pretrain_epochs
         self.clustering_epochs = clustering_epochs
         self.optimizer_class = optimizer_class
         self.loss_fn = loss_fn
-        self.autoencoder = autoencoder
-        self.embedding_size = embedding_size
         self.max_cluster_size_diff_factor = max_cluster_size_diff_factor
         self.reconstruction_loss_weight = reconstruction_loss_weight
         self.custom_dataloaders = custom_dataloaders
         self.augmentation_invariance = augmentation_invariance
         self.initial_clustering_class = initial_clustering_class
         self.initial_clustering_params = {} if initial_clustering_params is None else initial_clustering_params
-        self.random_state = check_random_state(random_state)
-        set_torch_seed(self.random_state)
         self.debug = debug
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DipEncoder':
@@ -830,11 +830,8 @@ class DipEncoder(BaseEstimator, ClusterMixin):
         labels_pred : np.ndarray
             The predicted labels for X_test
         """
-        testloader = get_dataloader(X_train, self.batch_size, False, False)
-        testloader_supervised = get_dataloader(X_test, self.batch_size, False, False)
-        device = detect_device()
-        X_train = encode_batchwise(testloader, self.autoencoder, device)
-        X_test = encode_batchwise(testloader_supervised, self.autoencoder, device)
+        X_train = self.transform(X_train)
+        X_test = self.transform(X_test)
         labels_pred = _predict(X_train, X_test, self.labels_, self.projection_axes_, self.n_clusters,
                                self.index_dict_)
         return labels_pred.astype(np.int32)
@@ -854,8 +851,6 @@ class DipEncoder(BaseEstimator, ClusterMixin):
         show_legend : bool
             Specifies whether a legend should be added to the plot
         """
-        device = detect_device()
-        testloader = get_dataloader(X, self.batch_size, False, False)
-        X_embed = encode_batchwise(testloader, self.autoencoder, device)
+        X_embed = self.transform(X)
         plot_dipencoder_embedding(X_embed, self.n_clusters, self.labels_, self.projection_axes_, self.index_dict_,
                                   edge_width, show_legend=show_legend)

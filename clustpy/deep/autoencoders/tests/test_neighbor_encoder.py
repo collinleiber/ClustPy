@@ -30,10 +30,9 @@ def test_neighbor_encoder():
     forwarded = neighborencoder.forward(data_batch)
     assert torch.equal(decoded, forwarded)
     # Test loss
-    device = torch.device('cpu')
     loss_fn = torch.nn.MSELoss()
     first_batch = next(iter(dataloader))
-    loss, embedded, decoded = neighborencoder.loss(first_batch, loss_fn, device)
+    loss, embedded, decoded = neighborencoder.loss(first_batch, loss_fn, torch.device("cpu"))
     assert loss.item() >= 0
     # Test fitting (without self decoding)
     assert neighborencoder.fitted is False

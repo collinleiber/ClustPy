@@ -42,7 +42,7 @@ def test_encode_batchwise():
     device = torch.device('cpu')
     dataloader = _get_test_dataloader(data, 256, False, False)
     autoencoder = _TestAutoencoder(data.shape[1], embedding_size)
-    encoded = encode_batchwise(dataloader, autoencoder, device)
+    encoded = encode_batchwise(dataloader, autoencoder)
     # Each embedded feature should match the sum of the original features
     desired = np.sum(data, axis=1).reshape((-1, 1))
     desired = np.tile(desired, embedding_size)
@@ -58,7 +58,7 @@ def test_predict_batchwise():
     dataloader = _get_test_dataloader(data, 256, False, False)
     autoencoder = _TestAutoencoder(data.shape[1], embedding_size)
     cluster_module = _TestClusterModule(threshold)
-    predictions = predict_batchwise(dataloader, autoencoder, cluster_module, device)
+    predictions = predict_batchwise(dataloader, autoencoder, cluster_module)
     # Check whether sum of the features (= embedded samples) is larger than the threshold
     desired = (np.sum(data, axis=1) >= threshold) * 1
     assert np.array_equal(predictions, desired)
@@ -71,7 +71,7 @@ def test_decode_batchwise():
     device = torch.device('cpu')
     dataloader = _get_test_dataloader(data, 256, False, False)
     autoencoder = _TestAutoencoder(data.shape[1], embedding_size)
-    decoded = decode_batchwise(dataloader, autoencoder, device)
+    decoded = decode_batchwise(dataloader, autoencoder)
     assert data.shape == decoded.shape
 
 
@@ -82,7 +82,7 @@ def test_encode_decode_batchwise():
     device = torch.device('cpu')
     dataloader = _get_test_dataloader(data, 256, False, False)
     autoencoder = _TestAutoencoder(data.shape[1], embedding_size)
-    encoded, decoded = encode_decode_batchwise(dataloader, autoencoder, device)
+    encoded, decoded = encode_decode_batchwise(dataloader, autoencoder)
     # Each embedded feature should match the sum of the original features
     desired = np.sum(data, axis=1).reshape((-1, 1))
     desired = np.tile(desired, embedding_size)
@@ -138,13 +138,9 @@ def test_run_initial_clustering():
 
 def test_embedded_kmeans_prediction():
     # Create dataset and centers
-    data = np.array([[2, 1, 2], [1, 2, 2], [2, 2, 1], [10, 0, 1], [11, 0, 0], [19, 1, 0], [18, 2, 0]])
+    data_embed = np.array([[5,6], [6,5], [5,5], [12,11], [11,11], [21,20], [20,20]])
     cluster_centers = np.array([[10, 10], [20, 20], [5, 5]])
-    # Create AE-related objects
-    embedding_size = 2
-    dataloader = _get_test_dataloader(data, 256, False, False)
-    autoencoder = _TestAutoencoder(data.shape[1], embedding_size)
     # Predict embedded labels
-    predicted_labels = embedded_kmeans_prediction(dataloader, cluster_centers, autoencoder)
+    predicted_labels = embedded_kmeans_prediction(data_embed, cluster_centers)
     expected = np.array([2, 2, 2, 0, 0, 1, 1])
     assert np.array_equal(expected, predicted_labels)

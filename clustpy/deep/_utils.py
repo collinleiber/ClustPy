@@ -94,8 +94,29 @@ def detect_device(device: torch.device = None) -> torch.device:
     return device
 
 
-def encode_batchwise(dataloader: torch.utils.data.DataLoader, module: torch.nn.Module,
-                     device: torch.device) -> np.ndarray:
+def get_device_from_module(module: torch.nn.Module) -> torch.device:
+    """
+    Get the device from a given module.
+
+    Parameters
+    ----------
+    module : torch.nn.Module
+        the module that is used for the encoding (e.g. an autoencoder)
+
+    Returns
+    -------
+    device : torch.device
+        device of the module
+    """
+    example_param = next(module.parameters())
+    if example_param.is_cuda:
+        device = torch.device('cuda:' + str(example_param.get_device()))
+    else:
+        device = torch.device('cpu')
+    return device
+
+
+def encode_batchwise(dataloader: torch.utils.data.DataLoader, module: torch.nn.Module) -> np.ndarray:
     """
     Utility function for embedding the whole data set in a mini-batch fashion
 
@@ -105,14 +126,13 @@ def encode_batchwise(dataloader: torch.utils.data.DataLoader, module: torch.nn.M
         dataloader to be used
     module : torch.nn.Module
         the module that is used for the encoding (e.g. an autoencoder)
-    device : torch.device
-        device to be trained on
 
     Returns
     -------
     embeddings_numpy : np.ndarray
         The embedded data set
     """
+    device = get_device_from_module(module)
     embeddings = []
     for batch in dataloader:
         batch_data = batch[1].to(device)
@@ -125,8 +145,7 @@ def encode_batchwise(dataloader: torch.utils.data.DataLoader, module: torch.nn.M
     return embeddings_numpy
 
 
-def decode_batchwise(dataloader: torch.utils.data.DataLoader, module: torch.nn.Module,
-                     device: torch.device) -> np.ndarray:
+def decode_batchwise(dataloader: torch.utils.data.DataLoader, module: torch.nn.Module) -> np.ndarray:
     """
     Utility function for decoding the whole data set in a mini-batch fashion with an autoencoder.
     Note: Assumes an implemented decode function
@@ -145,6 +164,7 @@ def decode_batchwise(dataloader: torch.utils.data.DataLoader, module: torch.nn.M
     reconstructions_numpy : np.ndarray
         The reconstructed data set
     """
+    device = get_device_from_module(module)
     reconstructions = []
     for batch in dataloader:
         batch_data = batch[1].to(device)
@@ -159,8 +179,8 @@ def decode_batchwise(dataloader: torch.utils.data.DataLoader, module: torch.nn.M
     return reconstructions_numpy
 
 
-def encode_decode_batchwise(dataloader: torch.utils.data.DataLoader, module: torch.nn.Module,
-                            device: torch.device) -> (np.ndarray, np.ndarray):
+def encode_decode_batchwise(dataloader: torch.utils.data.DataLoader, module: torch.nn.Module) -> (
+        np.ndarray, np.ndarray):
     """
     Utility function for encoding and decoding the whole data set in a mini-batch fashion with an autoencoder.
     Note: Assumes an implemented decode function
@@ -171,8 +191,6 @@ def encode_decode_batchwise(dataloader: torch.utils.data.DataLoader, module: tor
         dataloader to be used
     module : torch.nn.Module
         the module that is used for the encoding and decoding (e.g. an autoencoder)
-    device : torch.device
-        device to be trained on
 
     Returns
     -------
@@ -180,6 +198,7 @@ def encode_decode_batchwise(dataloader: torch.utils.data.DataLoader, module: tor
         The embedded data set,
         The reconstructed data set
     """
+    device = get_device_from_module(module)
     embeddings = []
     reconstructions = []
     for batch in dataloader:
@@ -192,8 +211,8 @@ def encode_decode_batchwise(dataloader: torch.utils.data.DataLoader, module: tor
     return embeddings_numpy, reconstructions_numpy
 
 
-def predict_batchwise(dataloader: torch.utils.data.DataLoader, module: torch.nn.Module, cluster_module: torch.nn.Module,
-                      device: torch.device) -> np.ndarray:
+def predict_batchwise(dataloader: torch.utils.data.DataLoader, module: torch.nn.Module,
+                      cluster_module: torch.nn.Module) -> np.ndarray:
     """
     Utility function for predicting the cluster labels over the whole data set in a mini-batch fashion.
     Method calls the predict_hard method of the cluster_module for each batch of data.
@@ -206,14 +225,13 @@ def predict_batchwise(dataloader: torch.utils.data.DataLoader, module: torch.nn.
         the module that is used for the encoding (e.g. an autoencoder)
     cluster_module : torch.nn.Module
         the cluster module that is used for the encoding (e.g. DEC). Usually contains the predict method.
-    device : torch.device
-        device to be trained on
 
     Returns
     -------
     predictions_numpy : np.ndarray
         The predictions of the cluster_module for the data set
     """
+    device = get_device_from_module(module)
     predictions = []
     for batch in dataloader:
         batch_data = batch[1].to(device)
@@ -269,29 +287,24 @@ def int_to_one_hot(int_tensor: torch.Tensor, n_integers: int) -> torch.Tensor:
     return onehot
 
 
-def embedded_kmeans_prediction(dataloader: torch.utils.data.DataLoader, cluster_centers: np.ndarray,
-                               module: torch.nn.Module) -> np.ndarray:
+def embedded_kmeans_prediction(X_embed: np.ndarray, cluster_centers: np.ndarray) -> np.ndarray:
     """
-    Predicts the labels of the data within the given dataloader.
+    Predicts the labels of the given embedded data.
     Labels correspond to the id of the closest cluster center.
 
     Parameters
     ----------
-    dataloader : torch.utils.data.DataLoader
+    X_embed : np.ndarray
         dataloader to be used
     cluster_centers : np.ndarray
         input cluster centers
-    module : torch.nn.Module
-        the module that is used for the encoding (e.g. an autoencoder)
 
     Returns
     -------
     predicted_labels : np.ndarray
         The predicted labels
     """
-    device = detect_device()
-    embedded_data = encode_batchwise(dataloader, module, device)
-    predicted_labels, _ = pairwise_distances_argmin_min(X=embedded_data, Y=cluster_centers, metric='euclidean',
+    predicted_labels, _ = pairwise_distances_argmin_min(X=X_embed, Y=cluster_centers, metric='euclidean',
                                                         metric_kwargs={'squared': True})
     predicted_labels = predicted_labels.astype(np.int32)
     return predicted_labels
@@ -310,7 +323,8 @@ def run_initial_clustering(X: np.ndarray, n_clusters: int, clustering_class: Clu
     n_clusters : int
         number of clusters. Can be None if a corresponding initial_clustering_class is given, e.g. DBSCAN
     clustering_class : ClusterMixin
-        the class of the initial clustering algorithm
+        the class of the initial clustering algorithm.
+        If it is None, random labels will be chosen
     clustering_params : dict
         the parameters for the initial clustering algorithm
     random_state : np.random.RandomState
@@ -324,27 +338,31 @@ def run_initial_clustering(X: np.ndarray, n_clusters: int, clustering_class: Clu
         The initial cluster centers,
         The clustering object
     """
-    # Get possible input parameters of the clustering algorithm
-    clustering_class_parameters = inspect.getfullargspec(clustering_class).args + inspect.getfullargspec(
-        clustering_class).kwonlyargs
-    # Check if n_clusters or n_components is contained in the possible parameters
-    if "n_clusters" in clustering_class_parameters:
-        if "random_state" in clustering_class_parameters and "random_state" not in clustering_params.keys():
-            clustering_algo = clustering_class(n_clusters=n_clusters, random_state=random_state, **clustering_params)
-        else:
-            clustering_algo = clustering_class(n_clusters=n_clusters, **clustering_params)
-    elif "n_components" in clustering_class_parameters:  # in case of GMM
-        if "random_state" in clustering_class_parameters and "random_state" not in clustering_params.keys():
-            clustering_algo = clustering_class(n_components=n_clusters, random_state=random_state, **clustering_params)
-        else:
-            clustering_algo = clustering_class(n_components=n_clusters, **clustering_params)
-    else:  # in case of e.g., DBSCAN
-        if "random_state" in clustering_class_parameters and "random_state" not in clustering_params.keys():
-            clustering_algo = clustering_class(random_state=random_state, **clustering_params)
-        else:
-            clustering_algo = clustering_class(**clustering_params)
-    # Run algorithm
-    clustering_algo.fit(X)
+    if clustering_class is None:
+        clustering_algo = ClusterMixin()
+        clustering_algo.labels_ = np.random.randint(n_clusters, size=X.shape[0])
+    else:
+        # Get possible input parameters of the clustering algorithm
+        clustering_class_parameters = inspect.getfullargspec(clustering_class).args + inspect.getfullargspec(
+            clustering_class).kwonlyargs
+        # Check if n_clusters or n_components is contained in the possible parameters
+        if "n_clusters" in clustering_class_parameters:
+            if "random_state" in clustering_class_parameters and "random_state" not in clustering_params.keys():
+                clustering_algo = clustering_class(n_clusters=n_clusters, random_state=random_state, **clustering_params)
+            else:
+                clustering_algo = clustering_class(n_clusters=n_clusters, **clustering_params)
+        elif "n_components" in clustering_class_parameters:  # in case of GMM
+            if "random_state" in clustering_class_parameters and "random_state" not in clustering_params.keys():
+                clustering_algo = clustering_class(n_components=n_clusters, random_state=random_state, **clustering_params)
+            else:
+                clustering_algo = clustering_class(n_components=n_clusters, **clustering_params)
+        else:  # in case of e.g., DBSCAN
+            if "random_state" in clustering_class_parameters and "random_state" not in clustering_params.keys():
+                clustering_algo = clustering_class(random_state=random_state, **clustering_params)
+            else:
+                clustering_algo = clustering_class(**clustering_params)
+        # Run algorithm
+        clustering_algo.fit(X)
     # Check if clustering algorithm return cluster centers
     if hasattr(clustering_algo, "cluster_centers_"):
         labels = clustering_algo.labels_

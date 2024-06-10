@@ -137,8 +137,8 @@ class VariationalAutoencoder(FeedforwardAutoencoder):
         reconstruction = self.decode(z)
         return z, q_mean, q_logvar, reconstruction
 
-    def loss(self, batch: list, loss_fn: torch.nn.modules.loss._Loss, device: torch.device,
-             beta: float = 1) -> (torch.Tensor, torch.Tensor, torch.Tensor):
+    def loss(self, batch: list, loss_fn: torch.nn.modules.loss._Loss, device: torch.device, beta: float = 1) -> (
+            torch.Tensor, torch.Tensor, torch.Tensor):
         """
         Calculate the loss of a single batch of data.
 
