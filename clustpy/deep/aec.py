@@ -76,7 +76,7 @@ def _aec(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_par
         X, n_clusters, batch_size, pretrain_optimizer_params, pretrain_epochs, optimizer_class, loss_fn, autoencoder,
         embedding_size, custom_dataloaders, initial_clustering_class, initial_clustering_params, random_state)
     # Setup AEC Module
-    aec_module = _AEC_Module(n_clusters, init_labels, init_centers, augmentation_invariance).to_device(device)
+    aec_module = _AEC_Module(init_labels, init_centers, augmentation_invariance).to_device(device)
     # Use AEC optimizer parameters (usually learning rate is reduced by a magnitude of 10)
     optimizer = optimizer_class(list(autoencoder.parameters()), **clustering_optimizer_params)
     # AEC Training loop
@@ -94,8 +94,6 @@ class _AEC_Module(_DCN_Module):
 
     Parameters
     ----------
-    n_clusters : int
-        number of clusters
     init_np_labels : np.ndarray
         The initial numpy labels
     init_np_centers : np.ndarray
@@ -114,31 +112,11 @@ class _AEC_Module(_DCN_Module):
         Is augmentation invariance used
     """
 
-    def __init__(self, n_clusters: int, init_np_labels: np.ndarray, init_np_centers: np.ndarray,
+    def __init__(self, init_np_labels: np.ndarray, init_np_centers: np.ndarray,
                  augmentation_invariance: bool = False):
-        super().__init__(init_np_centers, augmentation_invariance)
-        self.labels = torch.tensor(init_np_labels)
-        self.n_clusters = n_clusters
+        super().__init__(init_np_labels, init_np_centers, augmentation_invariance)
 
-    def to_device(self, device: torch.device) -> '_AEC_Module':
-        """
-        Move the _AEC_Module and the cluster labels and centers to the specified device (cpu or cuda).
-
-        Parameters
-        ----------
-        device : torch.device
-            device to be trained on
-
-        Returns
-        -------
-        self : _AEC_Module
-            this instance of the _AEC_Module
-        """
-        super().to_device(device)
-        self.labels = self.labels.to(device)
-        return self
-
-    def update_centroids(self, embedded: np.ndarray) -> torch.Tensor:
+    def update_centroids(self, embedded: np.ndarray, labels: np.ndarray) -> torch.Tensor:
         """
         Update the cluster centers of the _AEC_Module.
 
@@ -146,69 +124,23 @@ class _AEC_Module(_DCN_Module):
         ----------
         embedded : np.ndarray
             the embedded samples
+        labels : np.ndarray
+            The current hard labels
 
         Returns
         -------
         centers : torch.Tensor
             The updated centers
         """
-        labels_cpu = self.labels.cpu().detach().numpy()
+        n_clusters = self.centers.shape[0]
         centers = torch.from_numpy(np.array(
-            [np.mean(embedded[labels_cpu == i], axis=0) for i in range(self.n_clusters)]))
+            [np.mean(embedded[labels == i], axis=0) for i in range(n_clusters)]))
         return centers
 
-    def _loss(self, batch: list, autoencoder: torch.nn.Module, loss_fn: torch.nn.modules.loss._Loss,
-              reconstruction_loss_weight: float, clustering_loss_weight: float, device: torch.device) -> torch.Tensor:
-        """
-        Calculate the complete AEC + Autoencoder loss.
-
-        Parameters
-        ----------
-        batch : list
-            the minibatch
-        autoencoder : torch.nn.Module
-            the autoencoder
-        loss_fn : torch.nn.modules.loss._Loss
-            loss function for the reconstruction
-        clustering_loss_weight : float
-            weight of the clustering loss
-        reconstruction_loss_weight : float
-            weight of the reconstruction loss
-        device : torch.device
-            device to be trained on
-
-        Returns
-        -------
-        loss : torch.Tensor
-            the final AEC loss
-        """
-        # compute reconstruction loss
-        if self.augmentation_invariance:
-            # Convention is that the augmented sample is at the first position and the original one at the second position
-            ae_loss, embedded, _ = autoencoder.loss([batch[0], batch[2]], loss_fn, device)
-            ae_loss_aug, embedded_aug, _ = autoencoder.loss([batch[0], batch[1]], loss_fn, device)
-            ae_loss = (ae_loss + ae_loss_aug) / 2
-        else:
-            ae_loss, embedded, _ = autoencoder.loss(batch, loss_fn, device)
-
-        # compute cluster loss
-        assignments = self.labels[batch[0]]
-        cluster_loss = self.dcn_loss(embedded, assignments)
-        if self.augmentation_invariance:
-            # assign augmented samples to the same cluster as original samples
-            cluster_loss_aug = self.dcn_loss(embedded_aug, assignments)
-            cluster_loss = (cluster_loss + cluster_loss_aug) / 2
-
-        # compute total loss
-        loss = reconstruction_loss_weight * ae_loss + clustering_loss_weight * cluster_loss
-
-        return loss
-
     def fit(self, autoencoder: torch.nn.Module, trainloader: torch.utils.data.DataLoader,
-            testloader: torch.utils.data.DataLoader,
-            n_epochs: int,
-            device: torch.device, optimizer: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss,
-            clustering_loss_weight: float, reconstruction_loss_weight: float) -> '_AEC_Module':
+            testloader: torch.utils.data.DataLoader, n_epochs: int, device: torch.device,
+            optimizer: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss, clustering_loss_weight: float,
+            reconstruction_loss_weight: float) -> '_AEC_Module':
         """
         Trains the _AEC_Module in place.
 
@@ -242,7 +174,8 @@ class _AEC_Module(_DCN_Module):
         for _ in range(n_epochs):
             # Update Network
             for batch in trainloader:
-                loss = self._loss(batch, autoencoder, loss_fn, reconstruction_loss_weight, clustering_loss_weight,
+                # Beware that the clustering loss of DCN is divided by 2, therefore we use 2 * clustering_loss_weight
+                loss = self._loss(batch, autoencoder, loss_fn, reconstruction_loss_weight, 2 * clustering_loss_weight,
                                   device)
                 # Backward pass - update weights
                 optimizer.zero_grad()
@@ -251,7 +184,7 @@ class _AEC_Module(_DCN_Module):
             # Update Assignments and Centroids
             embedded = encode_batchwise(testloader, autoencoder)
             # update centroids
-            centers = self.update_centroids(embedded)
+            centers = self.update_centroids(embedded, self.labels.cpu().detach().numpy())
             self.centers = centers.to(device)
             # update assignments
             labels = self.predict_hard(torch.tensor(embedded).to(device))

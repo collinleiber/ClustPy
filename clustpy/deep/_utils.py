@@ -20,7 +20,7 @@ def set_torch_seed(random_state: np.random.RandomState | int) -> None:
     if type(random_state) is int:
         seed = random_state
     elif type(random_state) is np.random.RandomState:
-        seed = (random_state.get_state()[1][0]).item()
+        seed = random_state.randint(np.iinfo(np.int32).max)
     else:
         raise ValueError("random_state must be of type int or np.random.RandomState")
     torch.manual_seed(seed)
