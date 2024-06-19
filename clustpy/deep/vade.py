@@ -18,8 +18,9 @@ from sklearn.base import ClusterMixin
 def _vade(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_params: dict,
           clustering_optimizer_params: dict, pretrain_epochs: int, clustering_epochs: int,
           optimizer_class: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss, autoencoder: torch.nn.Module,
-          embedding_size: int, custom_dataloaders: tuple, initial_clustering_class: ClusterMixin,
-          initial_clustering_params: dict, random_state: np.random.RandomState) -> (
+          embedding_size: int, clustering_loss_weight: float, reconstruction_loss_weight: float,
+          custom_dataloaders: tuple, initial_clustering_class: ClusterMixin, initial_clustering_params: dict,
+          random_state: np.random.RandomState) -> (
         np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, torch.nn.Module):
     """
     Start the actual VaDE clustering procedure on the input data set.
@@ -48,6 +49,10 @@ def _vade(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_pa
         the input autoencoder. If None a variation of a VariationalAutoencoder will be created
     embedding_size : int
         size of the embedding within the autoencoder (central layer with mean and variance)
+    clustering_loss_weight : float
+        weight of the clustering loss
+    reconstruction_loss_weight : float
+        weight of the reconstruction loss
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         If None, the default dataloaders will be used
@@ -84,16 +89,19 @@ def _vade(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_pa
     optimizer = optimizer_class(list(autoencoder.parameters()) + list(vade_module.parameters()),
                                 **clustering_optimizer_params)
     # Vade Training loop
-    vade_module.fit(autoencoder, trainloader, clustering_epochs, device, optimizer, loss_fn)
+    vade_module.fit(autoencoder, testloader, trainloader, clustering_epochs, device, optimizer, loss_fn,
+                    clustering_loss_weight, reconstruction_loss_weight)
     # Get labels
     vade_labels = _vade_predict_batchwise(testloader, autoencoder, vade_module)
+
     vade_centers = vade_module.p_mean.detach().cpu().numpy()
-    vade_covariances = vade_module.p_var.detach().cpu().numpy()
+    vade_covariances = vade_module.p_log_var.detach().cpu().numpy()
     # Do reclustering with GMM
     embedded_data = encode_batchwise(testloader, autoencoder)
     gmm = GaussianMixture(n_components=n_clusters, covariance_type='full', n_init=1, random_state=random_state,
                           means_init=vade_centers)
     gmm_labels = gmm.fit_predict(embedded_data).astype(np.int32)
+
     # Return results
     return gmm_labels, gmm.means_, gmm.covariances_, gmm.weights_, vade_labels, vade_centers, vade_covariances, autoencoder
 
@@ -181,7 +189,7 @@ class _VaDE_VAE(VariationalAutoencoder):
             loss = loss_fn(reconstruction, batch_data)
         else:
             # After pretraining the usual loss of a VAE should be used. Super() uses function from VariationalAutoencoder
-            loss = super().loss(batch, loss_fn, beta)
+            loss = super().loss(batch, loss_fn, device, beta)
         return loss, z, reconstruction
 
 
@@ -208,7 +216,7 @@ class _VaDE_Module(torch.nn.Module):
         the soft assignments
     p_mean : torch.nn.Parameter
         the cluster centers
-    p_var : torch.nn.Parameter
+    p_log_var : torch.nn.Parameter
         the variances of the clusters
     normalize_prob : torch.nn.Softmax
         torch.nn.Softmax function for the prediction method
@@ -229,7 +237,7 @@ class _VaDE_Module(torch.nn.Module):
             variances = torch.ones(n_clusters, embedding_size)
         assert variances.shape == (n_clusters,
                                    embedding_size), "Shape of the initial variances for the Vade_Module must be (n_clusters, embedding_size)"
-        self.p_var = torch.nn.Parameter(torch.tensor(variances), requires_grad=True)
+        self.p_log_var = torch.nn.Parameter(torch.log(torch.tensor(variances)), requires_grad=True)
         self.normalize_prob = torch.nn.Softmax(dim=0)
 
     def predict(self, q_mean: torch.Tensor, q_logvar: torch.Tensor) -> torch.Tensor:
@@ -251,12 +259,13 @@ class _VaDE_Module(torch.nn.Module):
         """
         z = _vae_sampling(q_mean, q_logvar)
         pi_normalized = self.normalize_prob(self.pi)
-        p_c_z = _get_gamma(pi_normalized, self.p_mean, self.p_var, z)
+        p_c_z = _get_gamma(pi_normalized, self.p_mean, self.p_log_var, z)
         pred = torch.argmax(p_c_z, dim=1)
         return pred
 
     def vade_loss(self, autoencoder: VariationalAutoencoder, batch_data: torch.Tensor,
-                  loss_fn: torch.nn.modules.loss._Loss) -> torch.Tensor:
+                  loss_fn: torch.nn.modules.loss._Loss, clustering_loss_weight: float,
+                  reconstruction_loss_weight: float) -> torch.Tensor:
         """
         Calculate the VaDE loss of given samples.
 
@@ -268,6 +277,10 @@ class _VaDE_Module(torch.nn.Module):
             the samples
         loss_fn : torch.nn.modules.loss._Loss
             loss function to be used for reconstruction
+        clustering_loss_weight : float
+            weight of the clustering loss
+        reconstruction_loss_weight : float
+            weight of the reconstruction loss
 
         Returns
         -------
@@ -276,15 +289,15 @@ class _VaDE_Module(torch.nn.Module):
         """
         z, q_mean, q_logvar, reconstruction = autoencoder.forward(batch_data)
         pi_normalized = self.normalize_prob(self.pi)
-        p_var = torch.maximum(self.p_var, torch.tensor(0))
-        p_c_z = _get_gamma(pi_normalized, self.p_mean, p_var, z)
-        loss = _compute_vade_loss(pi_normalized, self.p_mean, p_var, q_mean, q_logvar, batch_data, p_c_z,
-                                  reconstruction, loss_fn)
+        p_c_z = _get_gamma(pi_normalized, self.p_mean, self.p_log_var, z)
+        loss = _compute_vade_loss(pi_normalized, self.p_mean, self.p_log_var, q_mean, q_logvar, batch_data, p_c_z,
+                                  reconstruction, loss_fn, clustering_loss_weight, reconstruction_loss_weight)
         return loss
 
-    def fit(self, autoencoder: VariationalAutoencoder, trainloader: torch.utils.data.DataLoader, n_epochs: int,
-            device: torch.device, optimizer: torch.optim.Optimizer,
-            loss_fn: torch.nn.modules.loss._Loss) -> '_VaDE_Module':
+    def fit(self, autoencoder: VariationalAutoencoder, testloader: torch.utils.data.DataLoader,
+            trainloader: torch.utils.data.DataLoader, n_epochs: int, device: torch.device,
+            optimizer: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss, clustering_loss_weight: float,
+            reconstruction_loss_weight: float) -> '_VaDE_Module':
         """
         Trains the _VaDE_Module in place.
 
@@ -302,6 +315,10 @@ class _VaDE_Module(torch.nn.Module):
             the optimizer
         loss_fn : torch.nn.modules.loss._Loss
             loss function for the reconstruction
+        clustering_loss_weight : float
+            weight of the clustering loss
+        reconstruction_loss_weight : float
+            weight of the reconstruction loss
 
         Returns
         -------
@@ -315,7 +332,8 @@ class _VaDE_Module(torch.nn.Module):
             for batch in trainloader:
                 # load batch on device
                 batch_data = batch[1].to(device)
-                loss = self.vade_loss(autoencoder, batch_data, loss_fn)
+                loss = self.vade_loss(autoencoder, batch_data, loss_fn, clustering_loss_weight,
+                                      reconstruction_loss_weight)
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
@@ -352,7 +370,7 @@ def _vade_predict_batchwise(dataloader: torch.utils.data.DataLoader, autoencoder
     return predictions_numpy
 
 
-def _get_gamma(pi: torch.Tensor, p_mean: torch.Tensor, p_var: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
+def _get_gamma(pi: torch.Tensor, p_mean: torch.Tensor, p_log_var: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     """
     Calculate the gamma of samples created by the VAE.
 
@@ -362,8 +380,8 @@ def _get_gamma(pi: torch.Tensor, p_mean: torch.Tensor, p_var: torch.Tensor, z: t
         softmax version of the soft cluster assignments in the _VaDE_Module
     p_mean : torch.Tensor
         cluster centers of the _VaDE_Module
-    p_var : torch.Tensor
-        variances of the _VaDE_Module
+    p_log_var : torch.Tensor
+        log variances of the _VaDE_Module
     z : torch.Tensor
         the created samples
 
@@ -373,19 +391,23 @@ def _get_gamma(pi: torch.Tensor, p_mean: torch.Tensor, p_var: torch.Tensor, z: t
         The gamma values
     """
     z = z.unsqueeze(1)
-    p_var = p_var.unsqueeze(0)
+    p_log_var = p_log_var.unsqueeze(0)
     pi = pi.unsqueeze(0)
 
-    p_z_c = -torch.sum(0.5 * (np.log(2 * np.pi)) + p_var + ((z - p_mean).pow(2) / (2. * torch.exp(p_var))), dim=2)
+    p_z_c = -torch.sum(0.5 * (np.log(2 * np.pi)) + p_log_var + ((z - p_mean).pow(2) / (2. * torch.exp(p_log_var))),
+                       dim=2)
+
     p_c_z_c = torch.exp(torch.log(pi) + p_z_c) + 1e-10
     p_c_z = p_c_z_c / torch.sum(p_c_z_c, dim=1, keepdim=True)
 
     return p_c_z
 
 
-def _compute_vade_loss(pi: torch.Tensor, p_mean: torch.Tensor, p_var: torch.Tensor, q_mean: torch.Tensor,
-                       q_var: torch.Tensor, batch_data: torch.Tensor, p_c_z: torch.Tensor, reconstruction: torch.Tensor,
-                       loss_fn: torch.nn.modules.loss._Loss) -> torch.Tensor:
+def _compute_vade_loss(pi: torch.Tensor, p_mean: torch.Tensor, p_log_var: torch.Tensor, q_mean: torch.Tensor,
+                       q_log_var: torch.Tensor, batch_data: torch.Tensor, p_c_z: torch.Tensor,
+                       reconstruction: torch.Tensor,
+                       loss_fn: torch.nn.modules.loss._Loss, clustering_loss_weight: float,
+                       reconstruction_loss_weight: float) -> torch.Tensor:
     """
     Calculate the final loss of the input samples for the VaDE algorithm.
 
@@ -395,11 +417,11 @@ def _compute_vade_loss(pi: torch.Tensor, p_mean: torch.Tensor, p_var: torch.Tens
         softmax version of the soft cluster assignments in the _VaDE_Module
     p_mean : torch.Tensor
         cluster centers of the _VaDE_Module
-    p_var : torch.Tensor
-        variances of the _VaDE_Module
+    p_log_var : torch.Tensor
+        log variances of the _VaDE_Module
     q_mean : torch.Tensor
         mean value of the central layer of the VAE
-    q_var : torch.Tensor
+    q_log_var : torch.Tensor
         logarithmic variance of the central layer of the VAE
     batch_data : torch.Tensor
         the samples
@@ -409,6 +431,10 @@ def _compute_vade_loss(pi: torch.Tensor, p_mean: torch.Tensor, p_var: torch.Tens
         the reconstructed version of the input samples
     loss_fn : torch.nn.modules.loss._Loss
         loss function to be used for reconstruction
+    clustering_loss_weight : float
+        weight of the clustering loss
+    reconstruction_loss_weight : float
+        weight of the reconstruction loss
 
     Returns
     -------
@@ -416,21 +442,21 @@ def _compute_vade_loss(pi: torch.Tensor, p_mean: torch.Tensor, p_var: torch.Tens
         Tha VaDE loss
     """
     q_mean = q_mean.unsqueeze(1)
-    p_var = p_var.unsqueeze(0)
+    p_log_var = p_log_var.unsqueeze(0)
 
     p_x_z = loss_fn(reconstruction, batch_data)
 
     p_z_c = torch.sum(p_c_z * (0.5 * np.log(2 * np.pi) + 0.5 * (
-            torch.sum(p_var, dim=2) + torch.sum(torch.exp(q_var.unsqueeze(1)) / torch.exp(p_var),
-                                                dim=2) + torch.sum((q_mean - p_mean).pow(2) / torch.exp(p_var),
-                                                                   dim=2))))
+            torch.sum(p_log_var, dim=2) + torch.sum(torch.exp(q_log_var.unsqueeze(1)) / torch.exp(p_log_var),
+                                                    dim=2) + torch.sum((q_mean - p_mean).pow(2) / torch.exp(p_log_var),
+                                                                       dim=2))))
     p_c = torch.sum(p_c_z * torch.log(pi))
-    q_z_x = 0.5 * (np.log(2 * np.pi)) + 0.5 * torch.sum(1 + q_var)
+    q_z_x = 0.5 * (np.log(2 * np.pi)) + 0.5 * torch.sum(1 + q_log_var)
     q_c_x = torch.sum(p_c_z * torch.log(p_c_z))
 
     loss = p_z_c - p_c - q_z_x + q_c_x
     loss /= batch_data.size(0)
-    loss += p_x_z  # Beware that we do not divide two times by number of samples
+    loss = clustering_loss_weight * loss + reconstruction_loss_weight * p_x_z  # Beware that we do not divide two times by number of samples
     return loss
 
 
@@ -458,7 +484,11 @@ class VaDE(_AbstractDeepClusteringAlgo):
     optimizer_class : torch.optim.Optimizer
         the optimizer class (default: torch.optim.Adam)
     loss_fn : torch.nn.modules.loss._Loss
-        loss function for the reconstruction (default: torch.nn.BCELoss())
+        loss function for the reconstruction (default: torch.nn.BCELoss(reduction='sum'))
+    clustering_loss_weight : float
+        weight of the clustering loss (default: 1.0)
+    reconstruction_loss_weight : float
+        weight of the reconstruction loss (default: 1.0)
     autoencoder : torch.nn.Module
         the input autoencoder. If None a variation of a VariationalAutoencoder will be created (default: None)
     embedding_size : int
@@ -508,11 +538,11 @@ class VaDE(_AbstractDeepClusteringAlgo):
     def __init__(self, n_clusters: int, batch_size: int = 256, pretrain_optimizer_params: dict = None,
                  clustering_optimizer_params: dict = None, pretrain_epochs: int = 100,
                  clustering_epochs: int = 150, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
-                 loss_fn: torch.nn.modules.loss._Loss = torch.nn.BCELoss(), autoencoder: torch.nn.Module = None,
-                 embedding_size: int = 10, custom_dataloaders: tuple = None,
+                 loss_fn: torch.nn.modules.loss._Loss = torch.nn.BCELoss(reduction='sum'),
+                 clustering_loss_weight: float = 1.0, reconstruction_loss_weight: float = 1.0,
+                 autoencoder: torch.nn.Module = None, embedding_size: int = 10, custom_dataloaders: tuple = None,
                  initial_clustering_class: ClusterMixin = GaussianMixture,
-                 initial_clustering_params: dict = None,
-                 random_state: np.random.RandomState = None):
+                 initial_clustering_params: dict = None, random_state: np.random.RandomState = None):
         super().__init__(batch_size, autoencoder, embedding_size, random_state)
         self.n_clusters = n_clusters
         self.pretrain_optimizer_params = {
@@ -523,6 +553,8 @@ class VaDE(_AbstractDeepClusteringAlgo):
         self.clustering_epochs = clustering_epochs
         self.optimizer_class = optimizer_class
         self.loss_fn = loss_fn
+        self.clustering_loss_weight = clustering_loss_weight
+        self.reconstruction_loss_weight = reconstruction_loss_weight
         self.custom_dataloaders = custom_dataloaders
         self.initial_clustering_class = initial_clustering_class
         self.initial_clustering_params = {"n_init": 10,
@@ -559,6 +591,8 @@ class VaDE(_AbstractDeepClusteringAlgo):
             self.loss_fn,
             self.autoencoder,
             self.embedding_size,
+            self.clustering_loss_weight,
+            self.reconstruction_loss_weight,
             self.custom_dataloaders,
             self.initial_clustering_class,
             self.initial_clustering_params,

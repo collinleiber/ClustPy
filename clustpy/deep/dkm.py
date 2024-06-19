@@ -17,9 +17,10 @@ from sklearn.base import ClusterMixin
 def _dkm(X: np.ndarray, n_clusters: int, alphas: list, batch_size: int, pretrain_optimizer_params: dict,
          clustering_optimizer_params: dict, pretrain_epochs: int, clustering_epochs: int,
          optimizer_class: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss, autoencoder: torch.nn.Module,
-         embedding_size: int, clustering_loss_weight: float, custom_dataloaders: tuple, augmentation_invariance: bool,
-         initial_clustering_class: ClusterMixin, initial_clustering_params: dict,
-         random_state: np.random.RandomState) -> (np.ndarray, np.ndarray, np.ndarray, np.ndarray, torch.nn.Module):
+         embedding_size: int, clustering_loss_weight: float, reconstruction_loss_weight: float,
+         custom_dataloaders: tuple, augmentation_invariance: bool, initial_clustering_class: ClusterMixin,
+         initial_clustering_params: dict, random_state: np.random.RandomState) -> (
+        np.ndarray, np.ndarray, np.ndarray, np.ndarray, torch.nn.Module):
     """
     Start the actual DKM clustering procedure on the input data set.
 
@@ -53,6 +54,8 @@ def _dkm(X: np.ndarray, n_clusters: int, alphas: list, batch_size: int, pretrain
         size of the embedding within the autoencoder
     clustering_loss_weight : float
         weight of the clustering loss compared to the reconstruction loss
+    reconstruction_loss_weight : float
+        weight of the reconstruction loss
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         If None, the default dataloaders will be used
@@ -85,7 +88,8 @@ def _dkm(X: np.ndarray, n_clusters: int, alphas: list, batch_size: int, pretrain
     optimizer = optimizer_class(list(autoencoder.parameters()) + list(dkm_module.parameters()),
                                 **clustering_optimizer_params)
     # DKM Training loop
-    dkm_module.fit(autoencoder, trainloader, clustering_epochs, device, optimizer, loss_fn, clustering_loss_weight)
+    dkm_module.fit(autoencoder, trainloader, clustering_epochs, device, optimizer, loss_fn, clustering_loss_weight,
+                   reconstruction_loss_weight)
     # Get labels
     dkm_labels = predict_batchwise(testloader, autoencoder, dkm_module)
     dkm_centers = dkm_module.centers.detach().cpu().numpy()
@@ -269,7 +273,8 @@ class _DKM_Module(torch.nn.Module):
         return loss
 
     def _loss(self, batch: list, alpha: float, autoencoder: torch.nn.Module, clustering_loss_weight: float,
-              loss_fn: torch.nn.modules.loss._Loss, device: torch.device) -> torch.Tensor:
+              reconstruction_loss_weight: float, loss_fn: torch.nn.modules.loss._Loss,
+              device: torch.device) -> torch.Tensor:
         """
         Calculate the complete DKM + Autoencoder loss.
 
@@ -283,6 +288,8 @@ class _DKM_Module(torch.nn.Module):
             the autoencoder
         clustering_loss_weight : float
             weight of the clustering loss compared to the reconstruction loss
+        reconstruction_loss_weight : float
+            weight of the reconstruction loss
         loss_fn : torch.nn.modules.loss._Loss
             loss function for the reconstruction
         device : torch.device
@@ -306,12 +313,12 @@ class _DKM_Module(torch.nn.Module):
             ae_loss, embedded, _ = autoencoder.loss(batch, loss_fn, device)
             # Calculate clustering loss
             cluster_loss = self.dkm_loss(embedded, alpha)
-        loss = ae_loss + cluster_loss * clustering_loss_weight
+        loss = reconstruction_loss_weight * ae_loss + cluster_loss * clustering_loss_weight
         return loss
 
     def fit(self, autoencoder: torch.nn.Module, trainloader: torch.utils.data.DataLoader, n_epochs: int,
             device: torch.device, optimizer: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss,
-            clustering_loss_weight: float) -> '_DKM_Module':
+            clustering_loss_weight: float, reconstruction_loss_weight: float) -> '_DKM_Module':
         """
         Trains the _DKM_Module in place.
 
@@ -332,6 +339,8 @@ class _DKM_Module(torch.nn.Module):
             loss function for the reconstruction
         clustering_loss_weight : float
             weight of the clustering loss compared to the reconstruction loss
+        reconstruction_loss_weight : float
+            weight of the reconstruction loss
 
         Returns
         -------
@@ -341,7 +350,8 @@ class _DKM_Module(torch.nn.Module):
         for alpha in self.alphas:
             for e in range(n_epochs):
                 for batch in trainloader:
-                    loss = self._loss(batch, alpha, autoencoder, clustering_loss_weight, loss_fn, device)
+                    loss = self._loss(batch, alpha, autoencoder, clustering_loss_weight, reconstruction_loss_weight,
+                                      loss_fn, device)
                     # Backward pass
                     optimizer.zero_grad()
                     loss.backward()
@@ -387,6 +397,8 @@ class DKM(_AbstractDeepClusteringAlgo):
         size of the embedding within the autoencoder (default: 10)
     clustering_loss_weight : float
         weight of the clustering loss compared to the reconstruction loss (default: 1)
+    reconstruction_loss_weight : float
+        weight of the reconstruction loss (default: 1.0)
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         If None, the default dataloaders will be used (default: None)
@@ -432,9 +444,10 @@ class DKM(_AbstractDeepClusteringAlgo):
                  pretrain_epochs: int = 50, clustering_epochs: int = 100,
                  optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), autoencoder: torch.nn.Module = None,
-                 embedding_size: int = 10, clustering_loss_weight: float = 1, custom_dataloaders: tuple = None,
-                 augmentation_invariance: bool = False, initial_clustering_class: ClusterMixin = KMeans,
-                 initial_clustering_params: dict = None, random_state: np.random.RandomState = None):
+                 embedding_size: int = 10, clustering_loss_weight: float = 1, reconstruction_loss_weight: float = 1.,
+                 custom_dataloaders: tuple = None, augmentation_invariance: bool = False,
+                 initial_clustering_class: ClusterMixin = KMeans, initial_clustering_params: dict = None,
+                 random_state: np.random.RandomState = None):
         super().__init__(batch_size, autoencoder, embedding_size, random_state)
         self.n_clusters = n_clusters
         if alphas is None:
@@ -454,6 +467,7 @@ class DKM(_AbstractDeepClusteringAlgo):
         self.optimizer_class = optimizer_class
         self.loss_fn = loss_fn
         self.clustering_loss_weight = clustering_loss_weight
+        self.reconstruction_loss_weight = reconstruction_loss_weight
         self.custom_dataloaders = custom_dataloaders
         self.augmentation_invariance = augmentation_invariance
         self.initial_clustering_class = initial_clustering_class
@@ -487,6 +501,7 @@ class DKM(_AbstractDeepClusteringAlgo):
                                                                                    self.autoencoder,
                                                                                    self.embedding_size,
                                                                                    self.clustering_loss_weight,
+                                                                                   self.reconstruction_loss_weight,
                                                                                    self.custom_dataloaders,
                                                                                    self.augmentation_invariance,
                                                                                    self.initial_clustering_class,

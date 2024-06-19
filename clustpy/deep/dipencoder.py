@@ -108,7 +108,7 @@ class _Dip_Gradient(torch.autograd.Function):
             torch.Tensor, torch.Tensor):
         """
         Execute the backward method which will return the gradients of the Dip-value calculated in the forward method.
-        First gradient corresponds the the data, second gradient corresponds to the projection axis.
+        First gradient corresponds the data, second gradient corresponds to the projection axis.
 
         Parameters
         ----------
@@ -472,9 +472,10 @@ def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size:
                 optimizer_class: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss, clustering_epochs: int,
                 clustering_optimizer_params: dict, pretrain_epochs: int,
                 pretrain_optimizer_params: dict, autoencoder: torch.nn.Module, max_cluster_size_diff_factor: float,
-                reconstruction_loss_weight: float, custom_dataloaders: tuple, augmentation_invariance: bool,
-                initial_clustering_class: ClusterMixin, initial_clustering_params: dict, labels_gt: np.ndarray,
-                random_state: np.random.RandomState, debug: bool) -> (np.ndarray, np.ndarray, dict, torch.nn.Module):
+                clustering_loss_weight: float, reconstruction_loss_weight: float, custom_dataloaders: tuple,
+                augmentation_invariance: bool, initial_clustering_class: ClusterMixin, initial_clustering_params: dict,
+                labels_gt: np.ndarray, random_state: np.random.RandomState, debug: bool) -> (
+        np.ndarray, np.ndarray, dict, torch.nn.Module):
     """
     Start the actual DipEncoder procedure on the input data set.
     If labels_gt is None this method will act as a clustering algorithm else it will only be used to learn an embedding.
@@ -506,6 +507,8 @@ def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size:
     max_cluster_size_diff_factor : float
         The maximum different in size when comparing two clusters regarding the number of samples.
         If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) closest samples will be used
+    clustering_loss_weight : float
+        weight of the clustering loss compared to the reconstruction loss
     reconstruction_loss_weight : float
         weight of the reconstruction loss compared to the clustering loss.
         If None it will be equal to 1/(4L), where L is the reconstruction loss of the first batch of an untrained autoencoder
@@ -634,7 +637,7 @@ def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size:
                         n_points_in_all_clusters[m], n_points_in_all_clusters[n], max_cluster_size_diff_factor,
                         device)
                     dip_loss = dip_loss + dip_loss_new
-            final_dip_loss = torch.true_divide(dip_loss, n_cluster_combinations)
+            final_dip_loss = clustering_loss_weight * torch.true_divide(dip_loss, n_cluster_combinations)
             total_loss = final_dip_loss + ae_loss
             # Optimize
             optimizer.zero_grad()
@@ -701,6 +704,8 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
     max_cluster_size_diff_factor : float
         The maximum different in size when comparing two clusters regarding the number of samples.
         If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) closest samples will be used (default: 3)
+    clustering_loss_weight : float
+        weight of the clustering loss compared to the reconstruction loss (default: 1.0)
     reconstruction_loss_weight : float
         weight of the reconstruction loss compared to the clustering loss.
         If None it will be equal to 1/(4L), where L is the reconstruction loss of the first batch of an untrained autoencoder (default: None)
@@ -750,10 +755,10 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
                  clustering_epochs: int = 100, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), autoencoder: torch.nn.Module = None,
                  embedding_size: int = 10, max_cluster_size_diff_factor: float = 3,
-                 reconstruction_loss_weight: float = None, custom_dataloaders: tuple = None,
-                 augmentation_invariance: bool = False, initial_clustering_class: ClusterMixin = KMeans,
-                 initial_clustering_params: dict = None, random_state: np.random.RandomState = None,
-                 debug: bool = False):
+                 clustering_loss_weight: float = 1., reconstruction_loss_weight: float = None,
+                 custom_dataloaders: tuple = None, augmentation_invariance: bool = False,
+                 initial_clustering_class: ClusterMixin = KMeans, initial_clustering_params: dict = None,
+                 random_state: np.random.RandomState = None, debug: bool = False):
         super().__init__(25 * n_clusters if batch_size is None else batch_size, autoencoder, embedding_size,
                          random_state)
         self.n_clusters = n_clusters
@@ -766,6 +771,7 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
         self.optimizer_class = optimizer_class
         self.loss_fn = loss_fn
         self.max_cluster_size_diff_factor = max_cluster_size_diff_factor
+        self.clustering_loss_weight = clustering_loss_weight
         self.reconstruction_loss_weight = reconstruction_loss_weight
         self.custom_dataloaders = custom_dataloaders
         self.augmentation_invariance = augmentation_invariance
@@ -800,6 +806,7 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
                                                                        self.pretrain_epochs,
                                                                        self.pretrain_optimizer_params, self.autoencoder,
                                                                        self.max_cluster_size_diff_factor,
+                                                                       self.clustering_loss_weight,
                                                                        self.reconstruction_loss_weight,
                                                                        self.custom_dataloaders,
                                                                        self.augmentation_invariance,

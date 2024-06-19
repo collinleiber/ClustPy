@@ -16,7 +16,7 @@ from sklearn.base import ClusterMixin
 
 
 def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, clustering_loss_weight: float,
-              max_n_clusters: int, min_n_clusters: int, batch_size: int,
+              reconstruction_loss_weight:float, max_n_clusters: int, min_n_clusters: int, batch_size: int,
               pretrain_optimizer_params: dict, clustering_optimizer_params: dict, pretrain_epochs: int,
               clustering_epochs: int, optimizer_class: torch.optim.Optimizer,
               loss_fn: torch.nn.modules.loss._Loss, autoencoder: torch.nn.Module, embedding_size: int,
@@ -36,6 +36,8 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
         threshold regarding the Dip-p-value that defines if two clusters should be merged. Must be bvetween 0 and 1
     clustering_loss_weight : float
         weight of the clustering loss compared to the reconstruction loss
+    reconstruction_loss_weight : float
+        weight of the reconstruction loss
     max_n_clusters : int
         maximum number of clusters. Must be larger than min_n_clusters. If the result has more clusters, a merge will be forced
     min_n_clusters : int
@@ -119,6 +121,7 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
     cluster_labels_cpu, n_clusters_current, centers_cpu, autoencoder = _dip_deck_training(X, n_clusters_init,
                                                                                           dip_merge_threshold,
                                                                                           clustering_loss_weight,
+                                                                                          reconstruction_loss_weight,
                                                                                           centers_cpu,
                                                                                           cluster_labels_cpu,
                                                                                           dip_matrix_cpu,
@@ -138,7 +141,7 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
 
 
 def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_threshold: float,
-                       clustering_loss_weight: float,
+                       clustering_loss_weight: float, reconstruction_loss_weight: float,
                        centers_cpu: np.ndarray, cluster_labels_cpu: np.ndarray,
                        dip_matrix_cpu: np.ndarray, max_n_clusters: int, min_n_clusters: int, clustering_epochs: int,
                        optimizer: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss,
@@ -160,6 +163,8 @@ def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_thresho
         threshold regarding the Dip-p-value that defines if two clusters should be merged. Must be bvetween 0 and 1
     clustering_loss_weight : float
         weight of the clustering loss compared to the reconstruction loss
+    reconstruction_loss_weight : float
+        weight of the reconstruction loss
     centers_cpu : np.ndarray
         The current cluster centers, saved as numpy array (not torch.Tensor)
         Equals the result of the initial KMeans clusters in the beginning.
@@ -260,8 +265,7 @@ def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_thresho
                 cluster_loss_aug = escaped_diffs_aug.sum(1).mean() * (
                         1 + masked_center_diffs_std) / sqrt_masked_center_diffs.mean()
                 cluster_loss = (cluster_loss + cluster_loss_aug) / 2
-            cluster_loss *= clustering_loss_weight
-            loss = ae_loss + cluster_loss
+            loss = reconstruction_loss_weight * ae_loss + clustering_loss_weight * cluster_loss
             # Backward pass
             optimizer.zero_grad()
             loss.backward()
@@ -562,7 +566,9 @@ class DipDECK(_AbstractDeepClusteringAlgo):
     dip_merge_threshold : float
         threshold regarding the Dip-p-value that defines if two clusters should be merged. Must be bvetween 0 and 1 (default: 0.9)
     clustering_loss_weight : float
-        weight of the clustering loss compared to the reconstruction loss (default: 1)
+        weight of the clustering loss compared to the reconstruction loss (default: 1.0)
+    reconstruction_loss_weight : float
+        weight of the reconstruction loss (default: 1.0)
     max_n_clusters : int
         maximum number of clusters. Must be larger than min_n_clusters. If the result has more clusters, a merge will be forced (default: np.inf)
     min_n_clusters : int
@@ -633,10 +639,10 @@ class DipDECK(_AbstractDeepClusteringAlgo):
     Proceedings of the 27th ACM SIGKDD Conference on Knowledge Discovery & Data Mining. 2021.
     """
 
-    def __init__(self, n_clusters_init: int = 35, dip_merge_threshold: float = 0.9, clustering_loss_weight: float = 1,
-                 max_n_clusters: int = np.inf, min_n_clusters: int = 1, batch_size: int = 256,
-                 pretrain_optimizer_params: dict = None, clustering_optimizer_params: dict = None,
-                 pretrain_epochs: int = 100, clustering_epochs: int = 50,
+    def __init__(self, n_clusters_init: int = 35, dip_merge_threshold: float = 0.9, clustering_loss_weight: float = 1.,
+                 reconstruction_loss_weight: float = 1., max_n_clusters: int = np.inf, min_n_clusters: int = 1,
+                 batch_size: int = 256, pretrain_optimizer_params: dict = None,
+                 clustering_optimizer_params: dict = None, pretrain_epochs: int = 100, clustering_epochs: int = 50,
                  optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), autoencoder: torch.nn.Module = None,
                  embedding_size: int = 5, max_cluster_size_diff_factor: float = 2, pval_strategy: str = "table",
@@ -647,6 +653,7 @@ class DipDECK(_AbstractDeepClusteringAlgo):
         self.n_clusters_init = n_clusters_init
         self.dip_merge_threshold = dip_merge_threshold
         self.clustering_loss_weight = clustering_loss_weight
+        self.reconstruction_loss_weight = reconstruction_loss_weight
         self.max_n_clusters = max_n_clusters
         self.min_n_clusters = min_n_clusters
         self.pretrain_optimizer_params = {
@@ -685,7 +692,8 @@ class DipDECK(_AbstractDeepClusteringAlgo):
         """
         augmentation_invariance_check(self.augmentation_invariance, self.custom_dataloaders)
         labels, n_clusters, centers, autoencoder = _dip_deck(X, self.n_clusters_init, self.dip_merge_threshold,
-                                                             self.clustering_loss_weight, self.max_n_clusters,
+                                                             self.clustering_loss_weight,
+                                                             self.reconstruction_loss_weight, self.max_n_clusters,
                                                              self.min_n_clusters, self.batch_size,
                                                              self.pretrain_optimizer_params,
                                                              self.clustering_optimizer_params,

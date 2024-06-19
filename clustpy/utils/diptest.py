@@ -150,7 +150,7 @@ def _dip_python_impl(X: np.ndarray, debug: bool) -> (
     N = len(X)
     if N < 4 or X[0] == X[-1]:
         d = 0.0
-        return d, None, None, None, None, None, None
+        return d, (0 ,0), (-1, -1, -1), None, None, None, None
     low = 0
     high = N - 1
     dip_value = 0.0
@@ -248,17 +248,17 @@ def _dip_python_impl(X: np.ndarray, debug: bool) -> (
             break
         if debug:
             print("  calculating dip ..")
-        j_l = None
-        j_u = None
-        lcm_modalTriangle_i1 = None
-        lcm_modalTriangle_i3 = None
-        gcm_modalTriangle_i1 = None
-        gcm_modalTriangle_i3 = None
+        j_l = -1
+        j_u = -1
+        lcm_modalTriangle_i1 = -1
+        lcm_modalTriangle_i3 = -1
+        gcm_modalTriangle_i1 = -1
+        gcm_modalTriangle_i3 = -1
         # The DIP for the convex minorant
         dip_l = 0
         for j in range(ig, l_gcm):
             max_t = 1
-            j_ = None
+            j_ = -1
             jb = gcm[j + 1]
             je = gcm[j]
             if je - jb > 1 and X[je] != X[jb]:
@@ -277,7 +277,7 @@ def _dip_python_impl(X: np.ndarray, debug: bool) -> (
         dip_u = 0
         for j in range(ih, l_lcm):
             max_t = 1
-            j_ = None
+            j_ = -1
             jb = lcm[j]
             je = lcm[j + 1]
             if je - jb > 1 and X[je] != X[jb]:
