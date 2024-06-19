@@ -502,29 +502,3 @@ class DeepECT:
         self.tree_ = tree
         self.autoencoder = autoencoder
         return self
-
-
-if __name__ == "__main__":
-    from clustpy.deep.autoencoders import FeedforwardAutoencoder
-
-    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-    dataset, labels = load_mnist(return_X_y=True)
-    autoencoder = (
-        FeedforwardAutoencoder([dataset.shape[1], 500, 500, 2000, 10])
-        .to(device)
-        .fit(
-            n_epochs=20,
-            optimizer_params={},
-            data=dataset,
-            batch_size=256,
-            device=device,
-            print_step=1,
-        )
-    )
-    deepect = DeepECT(autoencoder=autoencoder, max_leaf_nodes=20, max_iterations=10000)
-    deepect.fit_predict(dataset)
-    print(deepect.tree_.flat_accuracy(labels, n_clusters=10))
-    print(deepect.tree_.flat_nmi(labels, n_clusters=10))
-    print(deepect.tree_.flat_ari(labels, n_clusters=10))
-    print(deepect.tree_.dendrogram_purity(labels))
-    print(deepect.tree_.leaf_purity(labels))
