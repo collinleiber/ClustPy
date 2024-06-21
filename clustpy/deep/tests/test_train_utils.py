@@ -1,5 +1,5 @@
 from clustpy.deep.autoencoders import FeedforwardAutoencoder, VariationalAutoencoder
-from clustpy.deep._train_utils import get_trained_autoencoder, _get_default_layers
+from clustpy.deep._train_utils import get_trained_network, _get_default_layers
 from clustpy.deep.tests._helpers_for_tests import _get_test_dataloader
 from clustpy.data import create_subspace_data
 import numpy as np
@@ -17,34 +17,34 @@ def test_get_default_layers():
     assert np.array_equal(layers, [input_dim, 500, 500, 2000, embedding_dim])
 
 
-def test_get_trained_autoencoder():
+def test_get_trained_network():
     # Load dataset
     data, _ = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
     dataloader = _get_test_dataloader(data, 256, True, False)
     # Get AE using the default AE class
     device = torch.device('cpu')
-    ae = get_trained_autoencoder(trainloader=dataloader, optimizer_params={"lr":1e-3}, n_epochs=5, device=device,
-                                 optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(), embedding_size=10)
-    # Check output of get_trained_autoencoder
+    ae = get_trained_network(trainloader=dataloader, optimizer_params={"lr":1e-3}, n_epochs=5, device=device,
+                             optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(), embedding_size=10)
+    # Check output of get_trained_network
     assert type(ae) is FeedforwardAutoencoder
     assert ae.fitted == True
 
 
-def test_get_trained_autoencoder_with_custom_ae_class():
+def test_get_trained_network_with_custom_ae_class():
     # Load dataset
     data, _ = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
     dataloader = _get_test_dataloader(data, 256, True, False)
     # Get AE using a custom AE class
     device = torch.device('cpu')
-    ae = get_trained_autoencoder(trainloader=dataloader, optimizer_params={"lr":1e-3}, n_epochs=5, device=device,
-                                 optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(), embedding_size=10,
-                                 autoencoder_class=VariationalAutoencoder)
-    # Check output of get_trained_autoencoder
+    ae = get_trained_network(trainloader=dataloader, optimizer_params={"lr":1e-3}, n_epochs=5, device=device,
+                             optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(), embedding_size=10,
+                             neural_network_class=VariationalAutoencoder)
+    # Check output of get_trained_network
     assert type(ae) is VariationalAutoencoder
     assert ae.fitted == True
 
 
-def test_get_trained_autoencoder_with_custom_ae():
+def test_get_trained_network_with_custom_ae():
     # Load dataset
     data, _ = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
     dataloader = _get_test_dataloader(data, 256, True, False)
@@ -54,10 +54,10 @@ def test_get_trained_autoencoder_with_custom_ae():
     assert ae.fitted == False
     encoder_0_params = ae.encoder.block[0].weight.data.detach().clone()
     decoder_0_params = ae.decoder.block[0].weight.data.detach().clone()
-    ae_out = get_trained_autoencoder(trainloader=dataloader, optimizer_params={"lr":1e-3}, n_epochs=5, device=device,
+    ae_out = get_trained_network(trainloader=dataloader, optimizer_params={"lr":1e-3}, n_epochs=5, device=device,
                                  optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(), embedding_size=10,
-                                 autoencoder=ae)
-    # Check output of get_trained_autoencoder
+                                 neural_network=ae)
+    # Check output of get_trained_network
     assert type(ae_out) is FeedforwardAutoencoder
     assert ae_out.fitted == True
     assert not torch.equal(encoder_0_params, ae_out.encoder.block[0].weight.data)
@@ -65,11 +65,11 @@ def test_get_trained_autoencoder_with_custom_ae():
     assert ae is ae_out
 
 
-def test_get_trained_autoencoder_with_custom_pretrained_ae():
+def test_get_trained_network_with_custom_pretrained_ae():
     # Load dataset
     data, _ = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
     dataloader = _get_test_dataloader(data, 256, True, False)
-    # Get same pretrained version out of get_trained_autoencoder
+    # Get same pretrained version out of get_trained_network
     device = torch.device('cpu')
     ae = FeedforwardAutoencoder(layers=[data.shape[1], 256, 128, 64, 10], reusable=True)
     assert ae.fitted == False
@@ -77,10 +77,10 @@ def test_get_trained_autoencoder_with_custom_pretrained_ae():
            loss_fn=torch.nn.MSELoss())
     encoder_0_params = ae.encoder.block[0].weight.data.detach().clone()
     decoder_0_params = ae.decoder.block[0].weight.data.detach().clone()
-    ae_out = get_trained_autoencoder(trainloader=dataloader, optimizer_params={"lr":1e-3}, n_epochs=5, device=device,
+    ae_out = get_trained_network(trainloader=dataloader, optimizer_params={"lr":1e-3}, n_epochs=5, device=device,
                                  optimizer_class=torch.optim.Adam, loss_fn=torch.nn.MSELoss(), embedding_size=10,
-                                 autoencoder=ae)
-    # Check output of get_trained_autoencoder
+                                 neural_network=ae)
+    # Check output of get_trained_network
     assert type(ae_out) is FeedforwardAutoencoder
     assert ae_out.fitted == True
     assert torch.equal(encoder_0_params, ae_out.encoder.block[0].weight.data)

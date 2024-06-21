@@ -155,7 +155,7 @@ def get_dataloader(X: np.ndarray | torch.Tensor, batch_size: int, shuffle: bool 
     >>> mean = data.mean()
     >>> std = data.std()
     >>> normalize_fn = torchvision.transforms.Normalize([mean], [std])
-    >>> # flatten is only needed if a FeedForward Autoencoder is used, otherwise this can be skipped.
+    >>> # flatten is only needed if a FeedForward network is used, otherwise this can be skipped.
     >>> flatten_fn = torchvision.transforms.Lambda(torch.flatten)
     >>> #
     >>> # augmentation transforms

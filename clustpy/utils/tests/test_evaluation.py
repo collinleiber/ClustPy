@@ -1,6 +1,6 @@
 import torch
 from clustpy.utils import evaluate_multiple_datasets, evaluate_dataset, EvaluationAlgorithm, EvaluationDataset, \
-    EvaluationMetric, EvaluationAutoencoder, load_saved_autoencoder, evaluation_df_to_latex_table
+    EvaluationMetric, EvaluationAutoencoder, load_saved_neural_network, evaluation_df_to_latex_table
 from clustpy.utils.evaluation import _preprocess_dataset, _get_n_clusters_from_algo
 import numpy as np
 from clustpy.deep.autoencoders import FeedforwardAutoencoder
@@ -38,7 +38,7 @@ def test_load_saved_autoencoder():
     assert ae.fitted is False
     ae.fit(2, optimizer_params={"lr": 1e-3}, data=X, model_path=path)
     assert ae.fitted is True
-    ae2 = load_saved_autoencoder(path, FeedforwardAutoencoder, {"layers": layers})
+    ae2 = load_saved_neural_network(path, FeedforwardAutoencoder, {"layers": layers})
     assert ae2.fitted is True
     # Check if all parameters are equal
     for p1, p2 in zip(ae.parameters(), ae2.parameters()):

@@ -8,7 +8,7 @@ Collin Leiber
 from clustpy.deep._utils import encode_batchwise, squared_euclidean_distance, predict_batchwise, \
     embedded_kmeans_prediction
 from clustpy.deep._data_utils import augmentation_invariance_check
-from clustpy.deep._train_utils import get_standard_initial_deep_clustering_setting
+from clustpy.deep._train_utils import get_default_deep_clustering_initialization
 from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
 import torch
 import numpy as np
@@ -19,11 +19,10 @@ from sklearn.base import ClusterMixin
 def _dec(X: np.ndarray, n_clusters: int, alpha: float, batch_size: int, pretrain_optimizer_params: dict,
          clustering_optimizer_params: dict, pretrain_epochs: int, clustering_epochs: int,
          optimizer_class: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss,
-         autoencoder: torch.nn.Module, embedding_size: int, reconstruction_loss_weight: float,
+         neural_network: torch.nn.Module, embedding_size: int, reconstruction_loss_weight: float,
          clustering_loss_weight: float, custom_dataloaders: tuple, augmentation_invariance: bool,
-         initial_clustering_class: ClusterMixin,
-         initial_clustering_params: dict, random_state: np.random.RandomState) -> (
-        np.ndarray, np.ndarray, np.ndarray, np.ndarray, torch.nn.Module):
+         initial_clustering_class: ClusterMixin, initial_clustering_params: dict, device: torch.device,
+         random_state: np.random.RandomState) -> (np.ndarray, np.ndarray, np.ndarray, np.ndarray, torch.nn.Module):
     """
     Start the actual DEC clustering procedure on the input data set.
 
@@ -38,21 +37,21 @@ def _dec(X: np.ndarray, n_clusters: int, alpha: float, batch_size: int, pretrain
     batch_size : int
         size of the data batches
     pretrain_optimizer_params : dict
-        parameters of the optimizer for the pretraining of the autoencoder, includes the learning rate
+        parameters of the optimizer for the pretraining of the neural network, includes the learning rate
     clustering_optimizer_params : dict
         parameters of the optimizer for the actual clustering procedure, includes the learning rate
     pretrain_epochs : int
-        number of epochs for the pretraining of the autoencoder
+        number of epochs for the pretraining of the neural network
     clustering_epochs : int
         number of epochs for the actual clustering procedure
     optimizer_class : torch.optim.Optimizer
         the optimizer
     loss_fn : torch.nn.modules.loss._Loss
          loss function for the reconstruction
-    autoencoder : torch.nn.Module
-        the input autoencoder. If None a new FeedforwardAutoencoder will be created
+    neural_network : torch.nn.Module
+        the input neural network
     embedding_size : int
-        size of the embedding within the autoencoder
+        size of the embedding within the neural network
     reconstruction_loss_weight : float
         weight of the reconstruction loss
     clustering_loss_weight : float
@@ -67,6 +66,8 @@ def _dec(X: np.ndarray, n_clusters: int, alpha: float, batch_size: int, pretrain
         clustering class to obtain the initial cluster labels after the pretraining
     initial_clustering_params : dict
         parameters for the initial clustering class
+    device : torch.device
+        The device on which to perform the computations
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution
 
@@ -77,28 +78,28 @@ def _dec(X: np.ndarray, n_clusters: int, alpha: float, batch_size: int, pretrain
         The cluster centers as identified by a final KMeans execution,
         The labels as identified by DEC after the training terminated,
         The cluster centers as identified by DEC after the training terminated,
-        The final autoencoder
+        The final neural network
     """
     # Get initial setting (device, dataloaders, pretrained AE and initial clustering result)
-    device, trainloader, testloader, autoencoder, _, n_clusters, _, init_centers, _ = get_standard_initial_deep_clustering_setting(
-        X, n_clusters, batch_size, pretrain_optimizer_params, pretrain_epochs, optimizer_class, loss_fn, autoencoder,
-        embedding_size, custom_dataloaders, initial_clustering_class, initial_clustering_params, random_state)
+    device, trainloader, testloader, neural_network, _, n_clusters, _, init_centers, _ = get_default_deep_clustering_initialization(
+        X, n_clusters, batch_size, pretrain_optimizer_params, pretrain_epochs, optimizer_class, loss_fn, neural_network,
+        embedding_size, custom_dataloaders, initial_clustering_class, initial_clustering_params, device, random_state)
     # Setup DEC Module
     dec_module = _DEC_Module(init_centers, alpha, augmentation_invariance).to(device)
     # Use DEC optimizer parameters (usually learning rate is reduced by a magnitude of 10)
-    optimizer = optimizer_class(list(autoencoder.parameters()) + list(dec_module.parameters()),
+    optimizer = optimizer_class(list(neural_network.parameters()) + list(dec_module.parameters()),
                                 **clustering_optimizer_params)
     # DEC Training loop
-    dec_module.fit(autoencoder, trainloader, clustering_epochs, device, optimizer, loss_fn,
+    dec_module.fit(neural_network, trainloader, clustering_epochs, device, optimizer, loss_fn,
                    reconstruction_loss_weight, clustering_loss_weight)
     # Get labels
-    dec_labels = predict_batchwise(testloader, autoencoder, dec_module)
+    dec_labels = predict_batchwise(testloader, neural_network, dec_module)
     dec_centers = dec_module.centers.detach().cpu().numpy()
     # Do reclustering with Kmeans
-    embedded_data = encode_batchwise(testloader, autoencoder)
+    embedded_data = encode_batchwise(testloader, neural_network)
     kmeans = KMeans(n_clusters=n_clusters, random_state=random_state)
     kmeans.fit(embedded_data)
-    return kmeans.labels_, kmeans.cluster_centers_, dec_labels, dec_centers, autoencoder
+    return kmeans.labels_, kmeans.cluster_centers_, dec_labels, dec_centers, neural_network
 
 
 def _dec_predict(centers: torch.Tensor, embedded: torch.Tensor, alpha: float, weights) -> torch.Tensor:
@@ -297,18 +298,18 @@ class _DEC_Module(torch.nn.Module):
         loss = (clean_loss + aug_loss) / 2
         return loss
 
-    def _loss(self, batch: list, autoencoder: torch.nn.Module, clustering_loss_weight: float,
+    def _loss(self, batch: list, neural_network: torch.nn.Module, clustering_loss_weight: float,
               reconstruction_loss_weight: float, loss_fn: torch.nn.modules.loss._Loss,
               device: torch.device) -> torch.Tensor:
         """
-        Calculate the complete DEC + optional Autoencoder loss.
+        Calculate the complete DEC + optional neural network loss.
 
         Parameters
         ----------
         batch : list
             the minibatch
-        autoencoder : torch.nn.Module
-            the autoencoder
+        neural_network : torch.nn.Module
+            the neural network
         clustering_loss_weight : float
             weight of the clustering loss compared to the reconstruction loss
         reconstruction_loss_weight : float
@@ -328,21 +329,21 @@ class _DEC_Module(torch.nn.Module):
         if reconstruction_loss_weight != 0:
             if self.augmentation_invariance:
                 # Convention is that the augmented sample is at the first position and the original one at the second position
-                ae_loss, embedded, _ = autoencoder.loss([batch[0], batch[2]], loss_fn, device)
-                ae_loss_aug, embedded_aug, _ = autoencoder.loss([batch[0], batch[1]], loss_fn, device)
+                ae_loss, embedded, _ = neural_network.loss([batch[0], batch[2]], loss_fn, device)
+                ae_loss_aug, embedded_aug, _ = neural_network.loss([batch[0], batch[1]], loss_fn, device)
                 loss += reconstruction_loss_weight * ((ae_loss + ae_loss_aug) / 2)
             else:
-                ae_loss, embedded, _ = autoencoder.loss(batch, loss_fn, device)
+                ae_loss, embedded, _ = neural_network.loss(batch, loss_fn, device)
                 loss += reconstruction_loss_weight * ae_loss
         else:
             if self.augmentation_invariance:
                 aug_data = batch[1].to(device)
-                embedded_aug = autoencoder.encode(aug_data)
+                embedded_aug = neural_network.encode(aug_data)
                 orig_data = batch[2].to(device)
-                embedded = autoencoder.encode(orig_data)
+                embedded = neural_network.encode(orig_data)
             else:
                 batch_data = batch[1].to(device)
-                embedded = autoencoder.encode(batch_data)
+                embedded = neural_network.encode(batch_data)
 
         # CLuster loss
         if self.augmentation_invariance:
@@ -353,7 +354,7 @@ class _DEC_Module(torch.nn.Module):
 
         return loss
 
-    def fit(self, autoencoder: torch.nn.Module, trainloader: torch.utils.data.DataLoader, n_epochs: int,
+    def fit(self, neural_network: torch.nn.Module, trainloader: torch.utils.data.DataLoader, n_epochs: int,
             device: torch.device, optimizer: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss,
             reconstruction_loss_weight: float, clustering_loss_weight: float) -> '_DEC_Module':
         """
@@ -361,8 +362,8 @@ class _DEC_Module(torch.nn.Module):
 
         Parameters
         ----------
-        autoencoder : torch.nn.Module
-            the autoencoder
+        neural_network : torch.nn.Module
+            the neural network
         trainloader : torch.utils.data.DataLoader
             dataloader to be used for training
         n_epochs : int
@@ -385,7 +386,7 @@ class _DEC_Module(torch.nn.Module):
         """
         for _ in range(n_epochs):
             for batch in trainloader:
-                loss = self._loss(batch, autoencoder, clustering_loss_weight, reconstruction_loss_weight, loss_fn,
+                loss = self._loss(batch, neural_network, clustering_loss_weight, reconstruction_loss_weight, loss_fn,
                                   device)
                 # Backward pass
                 optimizer.zero_grad()
@@ -397,7 +398,7 @@ class _DEC_Module(torch.nn.Module):
 class DEC(_AbstractDeepClusteringAlgo):
     """
     The Deep Embedded Clustering (DEC) algorithm.
-    First, an autoencoder (AE) will be trained (will be skipped if input autoencoder is given).
+    First, a neural_network will be trained (will be skipped if input neural network is given).
     Afterward, KMeans identifies the initial clusters.
     Last, the AE will be optimized using the DEC loss function.
 
@@ -410,21 +411,21 @@ class DEC(_AbstractDeepClusteringAlgo):
     batch_size : int
         size of the data batches (default: 256)
     pretrain_optimizer_params : dict
-        parameters of the optimizer for the pretraining of the autoencoder, includes the learning rate (default: {"lr": 1e-3})
+        parameters of the optimizer for the pretraining of the neural network, includes the learning rate (default: {"lr": 1e-3})
     clustering_optimizer_params : dict
         parameters of the optimizer for the actual clustering procedure, includes the learning rate (default: {"lr": 1e-4})
     pretrain_epochs : int
-        number of epochs for the pretraining of the autoencoder (default: 100)
+        number of epochs for the pretraining of the neural network (default: 100)
     clustering_epochs : int
         number of epochs for the actual clustering procedure (default: 150)
     optimizer_class : torch.optim.Optimizer
         the optimizer class (default: torch.optim.Adam)
     loss_fn : torch.nn.modules.loss._Loss
         loss function for the reconstruction (default: torch.nn.MSELoss())
-    autoencoder : torch.nn.Module
-        the input autoencoder. If None a new FeedforwardAutoencoder will be created (default: None)
+    neural_network : torch.nn.Module
+        the input neural network. If None a new FeedforwardAutoencoder will be created (default: None)
     embedding_size : int
-        size of the embedding within the autoencoder (default: 10)
+        size of the embedding within the neural network (default: 10)
     clustering_loss_weight : float
         weight of the clustering loss compared to the reconstruction loss (default: 1.0)
     custom_dataloaders : tuple
@@ -437,6 +438,9 @@ class DEC(_AbstractDeepClusteringAlgo):
         clustering class to obtain the initial cluster labels after the pretraining (default: KMeans)
     initial_clustering_params : dict
         parameters for the initial clustering class (default: {})
+    device : torch.device
+        The device on which to perform the computations.
+        If device is None then it will be automatically chosen: if a gpu is available the gpu with the highest amount of free memory will be chosen (default: None)
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
@@ -450,8 +454,8 @@ class DEC(_AbstractDeepClusteringAlgo):
         The final DEC labels
     dec_cluster_centers_ : np.ndarray
         The final DEC cluster centers
-    autoencoder : torch.nn.Module
-        The final autoencoder
+    neural_network : torch.nn.Module
+        The final neural network
 
     Examples
     ----------
@@ -471,12 +475,12 @@ class DEC(_AbstractDeepClusteringAlgo):
                  pretrain_optimizer_params: dict = None, clustering_optimizer_params: dict = None,
                  pretrain_epochs: int = 100, clustering_epochs: int = 150,
                  optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
-                 loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), autoencoder: torch.nn.Module = None,
+                 loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), neural_network: torch.nn.Module = None,
                  embedding_size: int = 10, clustering_loss_weight: float = 1,
                  custom_dataloaders: tuple = None, augmentation_invariance: bool = False,
                  initial_clustering_class: ClusterMixin = KMeans, initial_clustering_params: dict = None,
-                 random_state: np.random.RandomState = None):
-        super().__init__(batch_size, autoencoder, embedding_size, random_state)
+                 device: torch.device = None, random_state: np.random.RandomState = None):
+        super().__init__(batch_size, neural_network, embedding_size, device, random_state)
         self.n_clusters = n_clusters
         self.alpha = alpha
         self.pretrain_optimizer_params = {
@@ -512,27 +516,28 @@ class DEC(_AbstractDeepClusteringAlgo):
             this instance of the DEC algorithm
         """
         augmentation_invariance_check(self.augmentation_invariance, self.custom_dataloaders)
-        kmeans_labels, kmeans_centers, dec_labels, dec_centers, autoencoder = _dec(X, self.n_clusters, self.alpha,
-                                                                                   self.batch_size,
-                                                                                   self.pretrain_optimizer_params,
-                                                                                   self.clustering_optimizer_params,
-                                                                                   self.pretrain_epochs,
-                                                                                   self.clustering_epochs,
-                                                                                   self.optimizer_class, self.loss_fn,
-                                                                                   self.autoencoder,
-                                                                                   self.embedding_size,
-                                                                                   self.reconstruction_loss_weight,
-                                                                                   self.clustering_loss_weight,
-                                                                                   self.custom_dataloaders,
-                                                                                   self.augmentation_invariance,
-                                                                                   self.initial_clustering_class,
-                                                                                   self.initial_clustering_params,
-                                                                                   self.random_state)
+        kmeans_labels, kmeans_centers, dec_labels, dec_centers, neural_network = _dec(X, self.n_clusters, self.alpha,
+                                                                                      self.batch_size,
+                                                                                      self.pretrain_optimizer_params,
+                                                                                      self.clustering_optimizer_params,
+                                                                                      self.pretrain_epochs,
+                                                                                      self.clustering_epochs,
+                                                                                      self.optimizer_class,
+                                                                                      self.loss_fn,
+                                                                                      self.neural_network,
+                                                                                      self.embedding_size,
+                                                                                      self.reconstruction_loss_weight,
+                                                                                      self.clustering_loss_weight,
+                                                                                      self.custom_dataloaders,
+                                                                                      self.augmentation_invariance,
+                                                                                      self.initial_clustering_class,
+                                                                                      self.initial_clustering_params,
+                                                                                      self.device, self.random_state)
         self.labels_ = kmeans_labels
         self.cluster_centers_ = kmeans_centers
         self.dec_labels_ = dec_labels
         self.dec_cluster_centers_ = dec_centers
-        self.autoencoder = autoencoder
+        self.neural_network = neural_network
         return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:
@@ -569,21 +574,21 @@ class IDEC(DEC):
     batch_size : int
         size of the data batches (default: 256)
     pretrain_optimizer_params : dict
-        parameters of the optimizer for the pretraining of the autoencoder, includes the learning rate (default: {"lr": 1e-3})
+        parameters of the optimizer for the pretraining of the neural network, includes the learning rate (default: {"lr": 1e-3})
     clustering_optimizer_params : dict
         parameters of the optimizer for the actual clustering procedure, includes the learning rate (default: {"lr": 1e-4})
     pretrain_epochs : int
-        number of epochs for the pretraining of the autoencoder (default: 100)
+        number of epochs for the pretraining of the neural network (default: 100)
     clustering_epochs : int
         number of epochs for the actual clustering procedure (default: 150)
     optimizer_class : torch.optim.Optimizer
         the optimizer class (default: torch.optim.Adam)
     loss_fn : torch.nn.modules.loss._Loss
         loss function for the reconstruction (default: torch.nn.MSELoss())
-    autoencoder : torch.nn.Module
-        the input autoencoder. If None a new FeedforwardAutoencoder will be created (default: None)
+    neural_network : torch.nn.Module
+        the input neural network. If None a new FeedforwardAutoencoder will be created (default: None)
     embedding_size : int
-        size of the embedding within the autoencoder (default: 10)
+        size of the embedding within the neural network (default: 10)
     clustering_loss_weight : float
         weight of the clustering loss compared to the reconstruction loss (default: 0.1)
     reconstruction_loss_weight : float
@@ -598,6 +603,9 @@ class IDEC(DEC):
         clustering class to obtain the initial cluster labels after the pretraining (default: KMeans)
     initial_clustering_params : dict
         parameters for the initial clustering class (default: {})
+    device : torch.device
+        The device on which to perform the computations.
+        If device is None then it will be automatically chosen: if a gpu is available the gpu with the highest amount of free memory will be chosen (default: None)
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
@@ -611,8 +619,8 @@ class IDEC(DEC):
         The final DEC labels
     dec_cluster_centers_ : np.ndarray
         The final DEC cluster centers
-    autoencoder : torch.nn.Module
-        The final autoencoder
+    neural_network : torch.nn.Module
+        The final neural network
 
     Examples
     ----------
@@ -631,13 +639,13 @@ class IDEC(DEC):
                  pretrain_optimizer_params: dict = None,
                  clustering_optimizer_params: dict = None, pretrain_epochs: int = 100,
                  clustering_epochs: int = 150, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
-                 loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), autoencoder: torch.nn.Module = None,
+                 loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), neural_network: torch.nn.Module = None,
                  embedding_size: int = 10, clustering_loss_weight: float = 0.1, reconstruction_loss_weight: float = 1.0,
                  custom_dataloaders: tuple = None, augmentation_invariance: bool = False,
                  initial_clustering_class: ClusterMixin = KMeans, initial_clustering_params: dict = None,
-                 random_state: np.random.RandomState = None):
+                 device: torch.device = None, random_state: np.random.RandomState = None):
         super().__init__(n_clusters, alpha, batch_size, pretrain_optimizer_params, clustering_optimizer_params,
-                         pretrain_epochs, clustering_epochs, optimizer_class, loss_fn, autoencoder, embedding_size,
+                         pretrain_epochs, clustering_epochs, optimizer_class, loss_fn, neural_network, embedding_size,
                          clustering_loss_weight, custom_dataloaders, augmentation_invariance, initial_clustering_class,
-                         initial_clustering_params, random_state)
+                         initial_clustering_params, device, random_state)
         self.reconstruction_loss_weight = reconstruction_loss_weight

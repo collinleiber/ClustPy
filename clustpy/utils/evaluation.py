@@ -10,28 +10,28 @@ import inspect
 from sklearn.datasets._base import Bunch
 
 
-def load_saved_autoencoder(path: str, autoencoder_class: torch.nn.Module, params: dict = None) -> torch.nn.Module:
+def load_saved_neural_network(path: str, neural_network_class: torch.nn.Module, params: dict = None) -> torch.nn.Module:
     """
-    Load the states of an already trained autoencoder.
-    It will be assumed that the autoencoder was already fitted, so the 'fitted' parameter will be set to True.
+    Load the states of an already trained neural network.
+    It will be assumed that the neural network was already fitted, so the 'fitted' parameter will be set to True.
 
     Parameters
     ----------
     path : str
         Path to the state dict that should be loaded
-    autoencoder_class : torch.nn.Module
-        The actual autoencoder class
+    neural_network_class : torch.nn.Module
+        The actual neural network class
     params : dict
-        Parameters given to the autoencoder class (default: {})
+        Parameters given to the neural network class (default: {})
 
     Returns
     -------
-    The autoencoder with the loaded states
+    The neural network with the loaded states
     """
     params = {} if params is None else params
-    autoencoder = autoencoder_class(**params)
-    autoencoder.load_parameters(path)
-    return autoencoder
+    neural_network = neural_network_class(**params)
+    neural_network.load_parameters(path)
+    return neural_network
 
 
 def _preprocess_dataset(X: np.ndarray, preprocess_methods: list, preprocess_params: list) -> np.ndarray:
@@ -105,7 +105,7 @@ def _get_n_clusters_from_algo(algo_obj: ClusterMixin) -> int:
 def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metrics: list = None,
                      labels_true: np.ndarray = None, n_repetitions: int = 10,
                      X_test: np.ndarray = None, labels_true_test: np.ndarray = None,
-                     iteration_specific_autoencoders: list = None, aggregation_functions: tuple = (np.mean, np.std),
+                     iteration_specific_neural_networks: list = None, aggregation_functions: tuple = (np.mean, np.std),
                      add_runtime: bool = True, add_n_clusters: bool = False, save_path: str = None,
                      save_labels_path: str = None, ignore_algorithms: tuple = (),
                      random_state: np.random.RandomState = None) -> pd.DataFrame:
@@ -130,12 +130,12 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
         An optional test data set that will be evaluated using the predict method of the clustering algorithms (default: None)
     labels_true_test : np.ndarray
         The ground truth labels of the test data set (default: None)
-    iteration_specific_autoencoders : list
-        List containing EvaluationAutoencoder objects for each iteration of deep clustering algorithm.
+    iteration_specific_neural_networks : list
+        List containing EvaluationNetwork objects for each iteration of deep clustering algorithm.
         Length of the list must be equal to 'n_repetitions'.
-        Each entry in the list must be of type EvaluationAutoencoder.
-        If a clustering algorithm does not have a 'autoencoder' parameter, this parameter will be ignored.
-        Can be None if no iteration-specific autoencoders are used (default: None)
+        Each entry in the list must be of type EvaluationNetwork.
+        If a clustering algorithm does not have a 'neural_network' parameter, this parameter will be ignored.
+        Can be None if no iteration-specific neural networks are used (default: None)
     aggregation_functions : tuple
         List of aggregation functions that should be applied to the n_repetitions different results of a single clustering algorithm (default: [np.mean, np.std])
     add_runtime : bool
@@ -185,10 +185,10 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
         "Either evaluation metrics must be defined or add_runtime/add_n_clusters must be True"
     assert type(aggregation_functions) is list or type(
         aggregation_functions) is tuple, "aggregation_functions must be list or tuple"
-    # Check if length of iteration_specific_autoencoders is correct
-    assert iteration_specific_autoencoders is None or len(
-        iteration_specific_autoencoders) == n_repetitions, "If iteration_specific_autoencoders is specified, the length of the list must be equal to n_repetitions. Should be {0}, but is {1}".format(
-        n_repetitions, len(iteration_specific_autoencoders))
+    # Check if length of iteration_specific_neural_networks is correct
+    assert iteration_specific_neural_networks is None or len(
+        iteration_specific_neural_networks) == n_repetitions, "If iteration_specific_neural_networks is specified, the length of the list must be equal to n_repetitions. Should be {0}, but is {1}".format(
+        n_repetitions, len(iteration_specific_neural_networks))
     if type(evaluation_algorithms) is not list:
         evaluation_algorithms = [evaluation_algorithms]
     if type(evaluation_metrics) is not list and evaluation_metrics is not None:
@@ -248,18 +248,18 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
                 # Execute algorithm
                 start_time = time.time()
                 algo_obj = eval_algo.algorithm(**eval_algo.params)
-                # Check if algorithm uses an autoencoder and wether iteration_specific autoencoders are defined
-                if iteration_specific_autoencoders is not None:
-                    eval_autoencoder = iteration_specific_autoencoders[rep]
+                # Check if algorithm uses a neural network and whether iteration_specific_neural_networks are defined
+                if iteration_specific_neural_networks is not None:
+                    eval_neural_network = iteration_specific_neural_networks[rep]
                     assert type(
-                        eval_autoencoder) is EvaluationAutoencoder, "Each entry in iteration_specific_params must be a EvaluationAutoencoder"
-                    if hasattr(algo_obj, "autoencoder"):
-                        autoencoder = load_saved_autoencoder(eval_autoencoder.path, eval_autoencoder.autoencoder_class,
-                                                             eval_autoencoder.params)
-                        algo_obj.autoencoder = autoencoder
-                    if eval_autoencoder.path_custom_dataloaders is not None and hasattr(algo_obj, "custom_dataloaders"):
-                        custom_dataloaders = (torch.load(eval_autoencoder.path_custom_dataloaders[0]),
-                                              torch.load(eval_autoencoder.path_custom_dataloaders[1]))
+                        eval_neural_network) is EvaluationNetwork, "Each entry in iteration_specific_params must be a EvaluationNetwork"
+                    if hasattr(algo_obj, "neural_network"):
+                        neural_network = load_saved_neural_network(eval_neural_network.path, eval_neural_network.neural_network_class,
+                                                                eval_neural_network.params)
+                        algo_obj.neural_network = neural_network
+                    if eval_neural_network.path_custom_dataloaders is not None and hasattr(algo_obj, "custom_dataloaders"):
+                        custom_dataloaders = (torch.load(eval_neural_network.path_custom_dataloaders[0]),
+                                              torch.load(eval_neural_network.path_custom_dataloaders[1]))
                         algo_obj.custom_dataloaders = custom_dataloaders
                 try:
                     algo_obj.fit(X_processed)
@@ -467,7 +467,7 @@ def evaluate_multiple_datasets(evaluation_datasets: list, evaluation_algorithms:
             df = evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=evaluation_metrics,
                                   labels_true=labels_true,
                                   n_repetitions=n_repetitions, X_test=X_test, labels_true_test=labels_true_test,
-                                  iteration_specific_autoencoders=eval_data.iteration_specific_autoencoders,
+                                  iteration_specific_neural_networks=eval_data.iteration_specific_neural_networks,
                                   aggregation_functions=aggregation_functions,
                                   add_runtime=add_runtime, add_n_clusters=add_n_clusters, save_path=inner_save_path,
                                   save_labels_path=inner_save_labels_path,
@@ -726,12 +726,12 @@ class EvaluationDataset():
         List of dictionaries containing the parameters for the preprocessing methods.
         Needs one entry for each method in preprocess_methods.
         If only a single preprocessing method is given (instead of a list) a single dictionary is expected (default: {})
-    iteration_specific_autoencoders : list
-        List containing EvaluationAutoencoder objects for each iteration of deep clustering algorithm.
+    iteration_specific_neural_networks : list
+        List containing EvaluationNetwork objects for each iteration of deep clustering algorithm.
         Length of the list must be equal to 'n_repetitions' in 'evaluate_multiple_datasets()' and 'evaluate_dataset()'.
-        Each entry in the list must be of type EvaluationAutoencoder.
-        If a clustering algorithm does not have a 'autoencoder' parameter, this parameter will be ignored.
-        Can be None if no iteration-specific autoencoders are used (default: None)
+        Each entry in the list must be of type EvaluationNetwork.
+        If a clustering algorithm does not have a 'neural_network' parameter, this parameter will be ignored.
+        Can be None if no iteration-specific neural networks are used (default: None)
     ignore_algorithms : tuple
         List of algorithm names (as specified in the EvaluationAlgorithm object) that should be ignored for this specific data set (default: [])
 
@@ -747,7 +747,7 @@ class EvaluationDataset():
 
     def __init__(self, name: str, data: np.ndarray, labels_true: np.ndarray = None, data_loader_params: dict = None,
                  train_test_split: bool = None, preprocess_methods: list = None, preprocess_params: list = None,
-                 iteration_specific_autoencoders: list = None, ignore_algorithms: tuple = ()):
+                 iteration_specific_neural_networks: list = None, ignore_algorithms: tuple = ()):
         assert type(name) is str, "name must be a string"
         self.name = name
         assert "." not in name, "name must not contain a dot"
@@ -772,8 +772,8 @@ class EvaluationDataset():
             preprocess_methods) is list, "preprocess_params must be a dict or a list of dicts"
         self.preprocess_params = {} if preprocess_params is None else preprocess_params
         assert type(
-            iteration_specific_autoencoders) is list or iteration_specific_autoencoders is None, "iteration_specific_autoencoders must be a list or None"
-        self.iteration_specific_autoencoders = iteration_specific_autoencoders
+            iteration_specific_neural_networks) is list or iteration_specific_neural_networks is None, "iteration_specific_neural_networks must be a list or None"
+        self.iteration_specific_neural_networks = iteration_specific_neural_networks
         assert type(ignore_algorithms) is list or type(
             ignore_algorithms) is tuple, "ignore_algorithms must be a tuple or a list"
         self.ignore_algorithms = ignore_algorithms
@@ -872,20 +872,20 @@ class EvaluationAlgorithm():
         self.preprocess_params = {} if preprocess_params is None else preprocess_params
 
 
-class EvaluationAutoencoder():
+class EvaluationNetwork():
     """
-    The EvaluationAutoencoder object is a wrapper for autoencoders that can be used by deep clustering algorithms.
-    It contains all the information necessary to load a pretrained autoencoder that for the evaluate_dataset or evaluate_multiple_datasets method.
+    The EvaluationNetwork object is a wrapper for neural networks that can be used by deep clustering algorithms.
+    It contains all the information necessary to load a pretrained neural network that for the evaluate_dataset or evaluate_multiple_datasets method.
     Can also contain paths to saved dataloaders (e.g. when using augmentation).
 
     Parameters
     ----------
     path : str
         Path to the state dict that should be loaded
-    autoencoder_class : torch.nn.Module
-        The actual autoencoder class
+    neural_network_class : torch.nn.Module
+        The actual neural network class
     params : dict
-        Parameters given to the autoencoder class (default: {})
+        Parameters given to the neural network class (default: {})
     path_custom_dataloaders : tuple
         Tuple containing the path of saved dataloaders.
         First entry is for the saved trainloader and second for the saved testloader (default: None)
@@ -893,15 +893,15 @@ class EvaluationAutoencoder():
     Examples
     ----------
     >>> from clustpy.deep.autoencoders import FeedforwardAutoencoder
-    >>> ea = EvaluationAutoencoder(path="PATH", autoencoder_class=FeedforwardAutoencoder, params={"layers": [256, 128, 64, 10], "bias": False})
+    >>> ea = EvaluationNetwork(path="PATH", neural_network_class=FeedforwardAutoencoder, params={"layers": [256, 128, 64, 10], "bias": False})
     """
 
-    def __init__(self, path: str, autoencoder_class: torch.nn.Module, params: dict = None,
+    def __init__(self, path: str, neural_network_class: torch.nn.Module, params: dict = None,
                  path_custom_dataloaders: tuple = None):
         assert type(path) is str, "path must be a string"
         self.path = path
-        assert issubclass(autoencoder_class, torch.nn.Module), "autoencoder_class must be a torch.nn.Module"
-        self.autoencoder_class = autoencoder_class
+        assert issubclass(neural_network_class, torch.nn.Module), "neural_network_class must be a torch.nn.Module"
+        self.neural_network_class = neural_network_class
         assert params is None or type(params) is dict, "params must be a dict"
         self.params = {} if params is None else params
         assert path_custom_dataloaders is None or (

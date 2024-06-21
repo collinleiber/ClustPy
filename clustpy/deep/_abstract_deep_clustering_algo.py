@@ -13,25 +13,28 @@ class _AbstractDeepClusteringAlgo(BaseEstimator, ClusterMixin):
     ----------
     batch_size : int
         size of the data batches
-    autoencoder : torch.nn.Module
-        the input autoencoder. If None a new FeedforwardAutoencoder will be created
+    neural_network : torch.nn.Module
+        the neural network used for the computations
     embedding_size : int
         size of the embedding within the autoencoder
+    device : torch.device
+        The device on which to perform the computations
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution. Can also be of type int
     """
 
-    def __init__(self, batch_size: int, autoencoder: torch.nn.Module, embedding_size: int,
-                 random_state: np.random.RandomState):
+    def __init__(self, batch_size: int, neural_network: torch.nn.Module, embedding_size: int,
+                 device: torch.device, random_state: np.random.RandomState):
         self.batch_size = batch_size
-        self.autoencoder = autoencoder
+        self.neural_network = neural_network
         self.embedding_size = embedding_size
+        self.device = device
         self.random_state = check_random_state(random_state)
         set_torch_seed(self.random_state)
 
     def transform(self, X: np.ndarray) -> np.ndarray:
         """
-        Embed the given data set using the trained autoencoder.
+        Embed the given data set using the trained neural network.
 
         Parameters
         ----------
@@ -43,5 +46,5 @@ class _AbstractDeepClusteringAlgo(BaseEstimator, ClusterMixin):
         X_embed : np.ndarray
             The embedded data set
         """
-        X_embed = self.autoencoder.transform(X, self.batch_size)
+        X_embed = self.neural_network.transform(X, self.batch_size)
         return X_embed

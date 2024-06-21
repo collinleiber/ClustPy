@@ -8,7 +8,7 @@ from .dkm import DKM
 from .ddc_n2d import DDC, N2D
 from .aec import AEC
 from ._data_utils import get_dataloader
-from ._train_utils import get_trained_autoencoder
+from ._train_utils import get_trained_network
 from ._utils import encode_batchwise, decode_batchwise, encode_decode_batchwise, predict_batchwise, detect_device, \
     get_device_from_module
 
@@ -25,7 +25,7 @@ __all__ = ['DEC',
            'ACeDeC',
            'DipEncoder',
            'get_dataloader',
-           'get_trained_autoencoder',
+           'get_trained_network',
            'encode_batchwise',
            'decode_batchwise',
            'encode_decode_batchwise',

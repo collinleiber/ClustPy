@@ -10,7 +10,7 @@ import numpy as np
 from clustpy.deep._utils import int_to_one_hot, squared_euclidean_distance, encode_batchwise, detect_device, \
     set_torch_seed
 from clustpy.deep._data_utils import get_dataloader, augmentation_invariance_check
-from clustpy.deep._train_utils import get_trained_autoencoder
+from clustpy.deep._train_utils import get_trained_network
 from clustpy.alternative import NrKmeans
 from sklearn.utils import check_random_state
 from scipy.stats import ortho_group
@@ -1810,10 +1810,10 @@ def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers
         subsampleloader = testloader
     if debug: print("Setup autoencoder")
     # Setup autoencoder
-    autoencoder = get_trained_autoencoder(trainloader, n_epochs=pretrain_epochs,
-                                          optimizer_params=pretrain_optimizer_params, optimizer_class=optimizer_class,
-                                          device=device, loss_fn=loss_fn, embedding_size=embedding_size,
-                                          autoencoder=autoencoder)
+    autoencoder = get_trained_network(trainloader, n_epochs=pretrain_epochs,
+                                      optimizer_params=pretrain_optimizer_params, optimizer_class=optimizer_class,
+                                      device=device, loss_fn=loss_fn, embedding_size=embedding_size,
+                                      autoencoder=autoencoder)
     # Run ENRC init
     if debug:
         print("Run init: ", init)
@@ -1931,7 +1931,8 @@ class ENRC(BaseEstimator, ClusterMixin):
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
     device : torch.device
-        if device is None then it will be checked whether a gpu is available or not (default: None)
+        The device on which to perform the computations.
+        If device is None then it will be automatically chosen: if a gpu is available the gpu with the highest amount of free memory will be chosen (default: None)
     scheduler : torch.optim.lr_scheduler
         learning rate scheduler that should be used (default: None)
     scheduler_params : dict
@@ -2261,7 +2262,8 @@ class ACeDeC(ENRC):
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
     device : torch.device
-        if device is None then it will be checked whether a gpu is available or not (default: None)
+        The device on which to perform the computations.
+        If device is None then it will be automatically chosen: if a gpu is available the gpu with the highest amount of free memory will be chosen (default: None)
     scheduler : torch.optim.lr_scheduler
         learning rate scheduler that should be used (default: None)
     scheduler_params : dict
