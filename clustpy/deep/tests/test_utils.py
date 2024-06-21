@@ -29,10 +29,26 @@ def test_squared_euclidean_distance():
 
 
 def test_detect_device():
-    # TODO idea for better test
+    # Test default
     device = detect_device()
     assert type(device) is torch.device
     assert device.type == "cpu" or device.type == "cuda"
+    # Test with input
+    device = detect_device(torch.device("cuda"))
+    assert type(device) is torch.device
+    assert device.type == "cuda"
+    # Test for -1
+    device = detect_device(-1)
+    assert type(device) is torch.device
+    assert device.type == "cpu"
+    # Test for other integer
+    device = detect_device(1)
+    assert type(device) is torch.device
+    assert device.type == "cuda"
+    # Test for str
+    device = detect_device("cuda")
+    assert type(device) is torch.device
+    assert device.type == "cuda"
 
 
 def test_encode_batchwise():

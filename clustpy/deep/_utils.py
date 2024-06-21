@@ -66,7 +66,7 @@ def squared_euclidean_distance(tensor1: torch.Tensor, tensor2: torch.Tensor,
     return squared_diffs
 
 
-def detect_device(device: torch.device = None) -> torch.device:
+def detect_device(device: torch.device | int | str = None) -> torch.device:
     """
     Automatically detects if you have a cuda enabled GPU.
     Device can also be read from environment variable "CLUSTPY_DEVICE".
@@ -74,7 +74,7 @@ def detect_device(device: torch.device = None) -> torch.device:
 
     Parameters
     ----------
-    device : torch.device
+    device : torch.device | int | str
         the input device. Will be returned if it is not None (default: None)
 
     Returns
@@ -83,6 +83,7 @@ def detect_device(device: torch.device = None) -> torch.device:
         device on which the prediction should take place
     """
     if device == -1:
+        # Special case
         device = torch.device('cpu')
     elif device is None:
         env_device = os.environ.get("CLUSTPY_DEVICE", None)
@@ -103,6 +104,8 @@ def detect_device(device: torch.device = None) -> torch.device:
                 device = torch.device('cpu')
         else:
             device = torch.device(env_device)
+    elif type(device) is int or type(device) is str:
+        device = torch.device(device)
     return device
 
 

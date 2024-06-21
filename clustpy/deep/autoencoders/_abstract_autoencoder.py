@@ -212,9 +212,10 @@ class _AbstractAutoencoder(torch.nn.Module):
             loss /= len(dataloader)
         return loss
 
-    def fit(self, n_epochs: int = 100, optimizer_params: dict = None, batch_size: int = 128, data: np.ndarray = None,
-            data_eval: np.ndarray = None, dataloader: torch.utils.data.DataLoader = None,
-            evalloader: torch.utils.data.DataLoader = None, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
+    def fit(self, n_epochs: int = 100, optimizer_params: dict = None, batch_size: int = 128,
+            data: np.ndarray | torch.Tensor = None, data_eval: np.ndarray | torch.Tensor = None,
+            dataloader: torch.utils.data.DataLoader = None, evalloader: torch.utils.data.DataLoader = None,
+            optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
             loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), patience: int = 5,
             scheduler: torch.optim.lr_scheduler = None, scheduler_params: dict = {}, model_path: str = None,
             print_step: int = 0) -> '_AbstractAutoencoder':
@@ -229,9 +230,9 @@ class _AbstractAutoencoder(torch.nn.Module):
             parameters of the optimizer, includes the learning rate (default: {"lr": 1e-3})
         batch_size : int
             size of the data batches (default: 128)
-        data : np.ndarray
+        data : np.ndarray | torch.Tensor
             train data set. If data is passed then dataloader can remain empty (default: None)
-        data_eval : np.ndarray
+        data_eval : np.ndarray | torch.Tensor
             evaluation data set. If data_eval is passed then evalloader can remain empty (default: None)
         dataloader : torch.utils.data.DataLoader
             dataloader to be used for training (default: default=None)
