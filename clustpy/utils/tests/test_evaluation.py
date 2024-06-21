@@ -1,6 +1,6 @@
 import torch
 from clustpy.utils import evaluate_multiple_datasets, evaluate_dataset, EvaluationAlgorithm, EvaluationDataset, \
-    EvaluationMetric, EvaluationAutoencoder, load_saved_neural_network, evaluation_df_to_latex_table
+    EvaluationMetric, EvaluationNetwork, load_saved_neural_network, evaluation_df_to_latex_table
 from clustpy.utils.evaluation import _preprocess_dataset, _get_n_clusters_from_algo
 import numpy as np
 from clustpy.deep.autoencoders import FeedforwardAutoencoder
@@ -30,7 +30,7 @@ def cleanup_autoencoders():
 
 
 @pytest.mark.usefixtures("cleanup_autoencoders")
-def test_load_saved_autoencoder():
+def test_load_saved_neural_network():
     path = "autoencoder1.ae"
     layers = [4, 2]
     X, _ = create_subspace_data(500, subspace_features=(2, 2), random_state=1)
@@ -101,7 +101,7 @@ def test_evaluate_dataset():
 
 
 @pytest.mark.usefixtures("cleanup_autoencoders")
-def test_evaluate_dataset_with_autoencoders():
+def test_evaluate_dataset_with_neural_networks():
     from sklearn.cluster import KMeans
     from clustpy.deep import DEC
     from sklearn.metrics import normalized_mutual_info_score as nmi, silhouette_score as silhouette
@@ -117,8 +117,8 @@ def test_evaluate_dataset_with_autoencoders():
         ae = FeedforwardAutoencoder(layers=layers)
         ae.fit(1 if path == path1 else 10, optimizer_params={"lr": 1e-3}, data=X, model_path=path)
         aes.append(ae)
-    autoencoders = [EvaluationAutoencoder(path1, FeedforwardAutoencoder, {"layers": layers}),
-                    EvaluationAutoencoder(path2, FeedforwardAutoencoder, {"layers": layers})]
+    neural_networks = [EvaluationNetwork(path1, FeedforwardAutoencoder, {"layers": layers}),
+                    EvaluationNetwork(path2, FeedforwardAutoencoder, {"layers": layers})]
     algorithms = [
         EvaluationAlgorithm(name="KMeans", algorithm=KMeans, params={"n_clusters": None, "random_state": 10}),
         EvaluationAlgorithm(name="DEC1", algorithm=DEC,
@@ -129,7 +129,7 @@ def test_evaluate_dataset_with_autoencoders():
     metrics = [EvaluationMetric(name="nmi", metric=nmi, params={"average_method": "geometric"}, use_gt=True),
                EvaluationMetric(name="silhouette", metric=silhouette, use_gt=False)]
     df = evaluate_dataset(X=X, evaluation_algorithms=algorithms, evaluation_metrics=metrics,
-                          iteration_specific_autoencoders=autoencoders,
+                          iteration_specific_neural_networks=neural_networks,
                           labels_true=L, n_repetitions=n_repetitions, add_runtime=False, add_n_clusters=False,
                           save_path=None, random_state=1)
     # Check if scores are equal

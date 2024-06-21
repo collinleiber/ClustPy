@@ -578,7 +578,7 @@ class DipExt(TransformerMixin, BaseEstimator):
         The strategy with which to handle an ambiguous modal triangle. Can be 'ignore', 'random' or 'all'.
         In the case of 'random', a valid triangle is created at random.
         In the case of 'all', for each possible triangle the gradient is calculated and it is checked for which gradient the following result looks most promising - this strategy can increase the runtime noticeably (default: 'ignore')
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int. Only used if ambiguous_triangle_strategy is 'random' (default: None)
 
     Attributes
@@ -598,7 +598,7 @@ class DipExt(TransformerMixin, BaseEstimator):
 
     def __init__(self, n_components: int = None, do_dip_scaling: bool = True, step_size: float = 0.1,
                  momentum: float = 0.95, dip_threshold: float = 0.5, n_starting_vectors: int = None,
-                 ambiguous_triangle_strategy: str = "ignore", random_state: np.random.RandomState = None):
+                 ambiguous_triangle_strategy: str = "ignore", random_state: np.random.RandomState | int = None):
         self.n_components = n_components
         self.do_dip_scaling = do_dip_scaling
         self.step_size = step_size
@@ -705,7 +705,7 @@ class DipInit(DipExt, BaseEstimator, ClusterMixin):
         The strategy with which to handle an ambiguous modal triangle. Can be 'ignore', 'random' or 'all'.
         In the case of 'random', a valid triangle is created at random.
         In the case of 'all', for each possible triangle the gradient is calculated and it is checked for which gradient the following result looks most promising - this strategy can increase the runtime noticeably (default: 'ignore')
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int. Only used if ambiguous_triangle_strategy is 'random' (default: None)
 
     Attributes
@@ -723,7 +723,7 @@ class DipInit(DipExt, BaseEstimator, ClusterMixin):
 
     def __init__(self, n_clusters: int, n_components: int = None, do_dip_scaling: bool = True, step_size: float = 0.1,
                  momentum: float = 0.95, dip_threshold: float = 0.5, n_starting_vectors: int = None,
-                 ambiguous_triangle_strategy: str = "ignore", random_state: np.random.RandomState = None):
+                 ambiguous_triangle_strategy: str = "ignore", random_state: np.random.RandomState | int = None):
         super().__init__(n_components, do_dip_scaling, step_size, momentum, dip_threshold, n_starting_vectors,
                          ambiguous_triangle_strategy, random_state)
         self.n_clusters = n_clusters

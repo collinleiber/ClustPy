@@ -1813,7 +1813,7 @@ def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers
     autoencoder = get_trained_network(trainloader, n_epochs=pretrain_epochs,
                                       optimizer_params=pretrain_optimizer_params, optimizer_class=optimizer_class,
                                       device=device, loss_fn=loss_fn, embedding_size=embedding_size,
-                                      autoencoder=autoencoder)
+                                      neural_network=autoencoder)
     # Run ENRC init
     if debug:
         print("Run init: ", init)
@@ -1928,7 +1928,7 @@ class ENRC(BaseEstimator, ClusterMixin):
         size of the embedding within the autoencoder. Only used if autoencoder is None (default: 20)
     init : str
         choose which initialization strategy should be used. Has to be one of 'nrkmeans', 'random' or 'sgd' (default: 'nrkmeans')
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
     device : torch.device
         The device on which to perform the computations.
@@ -1980,7 +1980,7 @@ class ENRC(BaseEstimator, ClusterMixin):
                  autoencoder: torch.nn.Module = None, embedding_size: int = 20, init: str = "nrkmeans",
                  device: torch.device = None, scheduler: torch.optim.lr_scheduler = None,
                  scheduler_params: dict = None, init_kwargs: dict = None, init_subsample_size: int = 10000,
-                 random_state: np.random.RandomState = None, custom_dataloaders: tuple = None, augmentation_invariance: bool = False, final_reclustering: bool = True, debug: bool = False):
+                 random_state: np.random.RandomState | int = None, custom_dataloaders: tuple = None, augmentation_invariance: bool = False, final_reclustering: bool = True, debug: bool = False):
         self.n_clusters = n_clusters.copy()
         self.device = device
         if self.device is None:
@@ -2259,7 +2259,7 @@ class ACeDeC(ENRC):
         size of the embedding within the autoencoder. Only used if autoencoder is None (default: 20)
     init : str
         choose which initialization strategy should be used. Has to be one of 'acedec', 'subkmeans', 'random' or 'sgd' (default: 'acedec')
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
     device : torch.device
         The device on which to perform the computations.
@@ -2311,7 +2311,7 @@ class ACeDeC(ENRC):
                  autoencoder: torch.nn.Module = None, embedding_size: int = 20, init: str = "acedec",
                  device: torch.device = None, scheduler: torch.optim.lr_scheduler = None,
                  scheduler_params: dict = None, init_kwargs: dict = None, init_subsample_size: int = 10000,
-                 random_state: np.random.RandomState = None, custom_dataloaders: tuple = None, augmentation_invariance: bool = False, 
+                 random_state: np.random.RandomState | int = None, custom_dataloaders: tuple = None, augmentation_invariance: bool = False,
                  final_reclustering: bool = True, debug: bool = False):
         
         super().__init__([n_clusters, 1], V, P, input_centers,

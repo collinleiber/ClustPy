@@ -3,7 +3,6 @@ import matplotlib
 from matplotlib.colors import Colormap
 from matplotlib.colors import Normalize
 from sklearn.decomposition import PCA
-from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 from scipy import stats
 import matplotlib.patches as mpatches

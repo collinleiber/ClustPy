@@ -363,7 +363,7 @@ class XMeans(BaseEstimator, ClusterMixin):
          Normally, if allow_merging is True, check_global_score should be False (default: False)
     n_split_trials : int
         Number tries to split a cluster. For each try 2-KMeans is executed with different cluster centers (default: 10)
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Attributes
@@ -401,7 +401,8 @@ class XMeans(BaseEstimator, ClusterMixin):
     """
 
     def __init__(self, n_clusters_init: int = 2, max_n_clusters: int = np.inf, check_global_score: bool = True,
-                 allow_merging: bool = False, n_split_trials: int = 10, random_state: np.random.RandomState = None):
+                 allow_merging: bool = False, n_split_trials: int = 10,
+                 random_state: np.random.RandomState | int = None):
         self.n_clusters_init = n_clusters_init
         self.max_n_clusters = max_n_clusters
         self.check_global_score = check_global_score

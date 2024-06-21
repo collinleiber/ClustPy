@@ -108,7 +108,7 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
                      iteration_specific_neural_networks: list = None, aggregation_functions: tuple = (np.mean, np.std),
                      add_runtime: bool = True, add_n_clusters: bool = False, save_path: str = None,
                      save_labels_path: str = None, ignore_algorithms: tuple = (),
-                     random_state: np.random.RandomState = None) -> pd.DataFrame:
+                     random_state: np.random.RandomState | int = None) -> pd.DataFrame:
     """
     Evaluate the clustering result of different clustering algorithms (as specified by evaluation_algorithms) on a given data set using different metrics (as specified by evaluation_metrics).
     Each algorithm will be executed n_repetitions times and all specified metrics will be used to evaluate the clustering result.
@@ -148,7 +148,7 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
         The path where the clustering labels should be saved as csv. If None, the labels will not be saved (default: None)
     ignore_algorithms : tuple
         List of algorithm names (as specified in the EvaluationAlgorithm object) that should be ignored for this specific data set (default: [])
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Returns
@@ -366,7 +366,7 @@ def evaluate_multiple_datasets(evaluation_datasets: list, evaluation_algorithms:
                                n_repetitions: int = 10, aggregation_functions: tuple = (np.mean, np.std),
                                add_runtime: bool = True, add_n_clusters: bool = False, save_path: str = None,
                                save_intermediate_results: bool = False, save_labels_path: str = None,
-                               random_state: np.random.RandomState = None) -> pd.DataFrame:
+                               random_state: np.random.RandomState | int = None) -> pd.DataFrame:
     """
     Evaluate the clustering result of different clustering algorithms (as specified by evaluation_algorithms) on a set of data sets (as specified by evaluation_datasets) using different metrics (as specified by evaluation_metrics).
     Each algorithm will be executed n_repetitions times and all specified metrics will be used to evaluate the clustering result.
@@ -394,7 +394,7 @@ def evaluate_multiple_datasets(evaluation_datasets: list, evaluation_algorithms:
         Defines whether the result of each data set should be separately saved. Useful if the evaluation takes a lot of time (default: False)
     save_labels_path : str
         The path where the clustering labels should be saved as csv. If None, the labels will not be saved (default: None)
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Returns

@@ -242,7 +242,7 @@ class PGMeans(BaseEstimator, ClusterMixin):
         The initial number of clusters. Can also by of type np.ndarray if initial cluster centers are specified (default: 1)
     max_n_clusters : int
         Maximum number of clusters. Must be larger than n_clusters_init (default: np.inf)
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Attributes
@@ -262,7 +262,7 @@ class PGMeans(BaseEstimator, ClusterMixin):
 
     def __init__(self, significance: float = 0.001, n_projections: int = None, n_samples: int = None,
                  n_new_centers: int = 10, amount_random_centers: float = 0.5, n_clusters_init: int = 1,
-                 max_n_clusters: int = np.inf, random_state: np.random.RandomState = None):
+                 max_n_clusters: int = np.inf, random_state: np.random.RandomState | int = None):
         self.significance = significance
         if n_projections is None:
             n_projections = int(-2.6198 * np.log(significance)) + 1

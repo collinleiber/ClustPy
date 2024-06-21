@@ -7,7 +7,7 @@ from sklearn.utils import check_random_state
 
 def create_subspace_data(n_samples: int = 1000, n_clusters: int = 3, subspace_features: tuple = (2, 2),
                          n_outliers: tuple = (0, 0), std: float = 1., box: tuple = (-10, 10), rotate_space: bool = True,
-                         random_state: int = None) -> (np.ndarray, np.ndarray):
+                         random_state: np.random.RandomState | int = None) -> (np.ndarray, np.ndarray):
     """
     Create a synthetic subspace data set consisting of a subspace containing multiple Gaussian clusters (called
     clustered space) and a subspace containing a single Gaussian cluster (called noise space).
@@ -32,7 +32,7 @@ def create_subspace_data(n_samples: int = 1000, n_clusters: int = 3, subspace_fe
         The bounding box of the cluster centers. Can be a list specifying an individual value for each subspace (default: (-10, 10))
     rotate_space : bool
         Specifies whether the feature space should be rotated by an orthonormal matrix (default: True)
-    random_state: int / np.random.RandomState
+    random_state: np.random.RandomState | int
         The random state (default: None)
 
     Returns
@@ -49,7 +49,7 @@ def create_subspace_data(n_samples: int = 1000, n_clusters: int = 3, subspace_fe
 
 def create_nr_data(n_samples: int = 1000, n_clusters: tuple = (3, 3, 1), subspace_features: tuple = (2, 2, 2),
                    n_outliers: tuple = (0, 0, 0), std: float = 1., box: tuple = (-10, 10), rotate_space: bool = True,
-                   random_state: int = None) -> (np.ndarray, np.ndarray):
+                   random_state: np.random.RandomState | int = None) -> (np.ndarray, np.ndarray):
     """
     Create a synthetic non-redundant data set consisting of multiple subspaces containing Gaussian clusters (called
     clustered spaces). You can also create subspaces with a single Gaussian cluster (called noise space).
@@ -81,7 +81,7 @@ def create_nr_data(n_samples: int = 1000, n_clusters: tuple = (3, 3, 1), subspac
         The bounding box of the cluster centers. Can be a list specifying an individual value for each subspace (default: (-10, 10))
     rotate_space : bool
         Specifies whether the feature space should be rotated by an orthonormal matrix (default: True)
-    random_state: int / np.random.RandomState
+    random_state: np.random.RandomState | int
         The random state (default: None)
 
     Returns

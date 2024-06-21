@@ -81,9 +81,9 @@ def _manifold_based_sequential_dc(X: np.ndarray, n_clusters: int, batch_size: in
         trainloader, testloader = custom_dataloaders
     # Get initial AE
     neural_network = get_trained_network(trainloader, n_epochs=pretrain_epochs,
-                                      optimizer_params=pretrain_optimizer_params, optimizer_class=optimizer_class,
-                                      device=device, loss_fn=loss_fn, embedding_size=embedding_size,
-                                      neural_network=neural_network)
+                                         optimizer_params=pretrain_optimizer_params, optimizer_class=optimizer_class,
+                                         device=device, loss_fn=loss_fn, embedding_size=embedding_size,
+                                         neural_network=neural_network)
     # Encode data
     X_embed = encode_batchwise(testloader, neural_network)
     # Get possible input parameters of the manifold class
@@ -259,7 +259,7 @@ class DDC(_AbstractDeepClusteringAlgo):
     device : torch.device
         The device on which to perform the computations.
         If device is None then it will be automatically chosen: if a gpu is available the gpu with the highest amount of free memory will be chosen (default: None)
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Attributes
@@ -291,7 +291,7 @@ class DDC(_AbstractDeepClusteringAlgo):
                  pretrain_epochs: int = 100, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), neural_network: torch.nn.Module = None,
                  embedding_size: int = 10, custom_dataloaders: tuple = None, tsne_params: dict = None,
-                 device : torch.device = None, random_state: np.random.RandomState = None):
+                 device: torch.device = None, random_state: np.random.RandomState | int = None):
         super().__init__(batch_size, neural_network, embedding_size, device, random_state)
         self.ratio = ratio
         if ratio > 1:
@@ -322,16 +322,16 @@ class DDC(_AbstractDeepClusteringAlgo):
             this instance of the DDC algorithm
         """
         n_clusters, labels, _, neural_network, tsne = _manifold_based_sequential_dc(X, None, self.batch_size,
-                                                                                 self.pretrain_optimizer_params,
-                                                                                 self.pretrain_epochs,
-                                                                                 self.optimizer_class, self.loss_fn,
-                                                                                 self.neural_network,
-                                                                                 self.embedding_size,
-                                                                                 self.custom_dataloaders, TSNE,
-                                                                                 self.tsne_params,
-                                                                                 DDC_density_peak_clustering,
-                                                                                 {"ratio": self.ratio}, self.device,
-                                                                                 self.random_state)
+                                                                                    self.pretrain_optimizer_params,
+                                                                                    self.pretrain_epochs,
+                                                                                    self.optimizer_class, self.loss_fn,
+                                                                                    self.neural_network,
+                                                                                    self.embedding_size,
+                                                                                    self.custom_dataloaders, TSNE,
+                                                                                    self.tsne_params,
+                                                                                    DDC_density_peak_clustering,
+                                                                                    {"ratio": self.ratio}, self.device,
+                                                                                    self.random_state)
         self.labels_ = labels
         self.n_clusters_ = n_clusters
         self.neural_network = neural_network
@@ -374,7 +374,7 @@ class N2D(_AbstractDeepClusteringAlgo):
     device : torch.device
         The device on which to perform the computations.
         If device is None then it will be automatically chosen: if a gpu is available the gpu with the highest amount of free memory will be chosen (default: None)
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Attributes
@@ -400,7 +400,8 @@ class N2D(_AbstractDeepClusteringAlgo):
                  pretrain_epochs: int = 100, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), neural_network: torch.nn.Module = None,
                  embedding_size: int = 10, custom_dataloaders: tuple = None, manifold_class: TransformerMixin = TSNE,
-                 manifold_params: dict = None, device : torch.device = None, random_state: np.random.RandomState = None):
+                 manifold_params: dict = None, device: torch.device = None,
+                 random_state: np.random.RandomState | int = None):
         super().__init__(batch_size, neural_network, embedding_size, device, random_state)
         self.n_clusters = n_clusters
         self.pretrain_optimizer_params = {
@@ -430,18 +431,18 @@ class N2D(_AbstractDeepClusteringAlgo):
             this instance of the N2D algorithm
         """
         n_clusters, labels, centers, neural_network, manifold = _manifold_based_sequential_dc(X, self.n_clusters,
-                                                                                           self.batch_size,
-                                                                                           self.pretrain_optimizer_params,
-                                                                                           self.pretrain_epochs,
-                                                                                           self.optimizer_class,
-                                                                                           self.loss_fn,
-                                                                                           self.neural_network,
-                                                                                           self.embedding_size,
-                                                                                           self.custom_dataloaders,
-                                                                                           self.manifold_class,
-                                                                                           self.manifold_params,
-                                                                                           GMM, {}, self.device,
-                                                                                           self.random_state)
+                                                                                              self.batch_size,
+                                                                                              self.pretrain_optimizer_params,
+                                                                                              self.pretrain_epochs,
+                                                                                              self.optimizer_class,
+                                                                                              self.loss_fn,
+                                                                                              self.neural_network,
+                                                                                              self.embedding_size,
+                                                                                              self.custom_dataloaders,
+                                                                                              self.manifold_class,
+                                                                                              self.manifold_params,
+                                                                                              GMM, {}, self.device,
+                                                                                              self.random_state)
         self.labels_ = labels.astype(np.int32)
         self.cluster_centers_ = centers
         self.neural_network = neural_network

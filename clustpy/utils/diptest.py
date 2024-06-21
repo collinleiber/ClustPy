@@ -150,7 +150,7 @@ def _dip_python_impl(X: np.ndarray, debug: bool) -> (
     N = len(X)
     if N < 4 or X[0] == X[-1]:
         d = 0.0
-        return d, (0 ,0), (-1, -1, -1), None, None, None, None
+        return d, (0, 0), (-1, -1, -1), None, None, None, None
     low = 0
     high = N - 1
     dip_value = 0.0
@@ -331,7 +331,7 @@ def _dip_python_impl(X: np.ndarray, debug: bool) -> (
 
 
 def dip_pval(dip_value: float, n_points: int, pval_strategy: str = "table", n_boots: int = 1000,
-             random_state: np.random.RandomState = None) -> float:
+             random_state: np.random.RandomState | int = None) -> float:
     """
     Get the p-value of a corresponding Dip-value.
     P-values depend on the input Dip-value and the sample size.
@@ -348,7 +348,7 @@ def dip_pval(dip_value: float, n_points: int, pval_strategy: str = "table", n_bo
         Specifies the strategy that should be used to calculate the p-value (default: 'table')
     n_boots : int
         Number of random data sets that should be created to calculate Dip-values. Only relevant if pval_strategy is 'bootstrap' (default: 1000)
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int. Only relevant if pval_strategy is 'bootstrap' (default: None)
 
     Returns
@@ -386,7 +386,8 @@ def dip_pval(dip_value: float, n_points: int, pval_strategy: str = "table", n_bo
     return pval
 
 
-def dip_boot_samples(n_points: int, n_boots: int = 1000, random_state: np.random.RandomState = None) -> np.ndarray:
+def dip_boot_samples(n_points: int, n_boots: int = 1000,
+                     random_state: np.random.RandomState | int = None) -> np.ndarray:
     """
     Sample random data sets and calculate corresponding Dip-values.
     E.g. used to determine p-values.
@@ -397,7 +398,7 @@ def dip_boot_samples(n_points: int, n_boots: int = 1000, random_state: np.random
         The number of samples
     n_boots : int
         Number of random data sets that should be created to calculate Dip-values (default: 1000)
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Returns

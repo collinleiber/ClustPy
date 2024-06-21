@@ -124,7 +124,7 @@ class _Dip_Gradient(torch.autograd.Function):
         """
         # Load parameters from forward
         X, X_proj, sorted_indices, projection_vector, modal_triangle, dip_value = ctx.saved_tensors
-        device = projection_vector.get_device()
+        device = detect_device(projection_vector.get_device())
         if -1 in modal_triangle:
             return torch.zeros((X_proj.shape[0], projection_vector.shape[0])).to(device), torch.zeros(
                 projection_vector.shape).to(device)
@@ -724,7 +724,7 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
     device : torch.device
         The device on which to perform the computations.
         If device is None then it will be automatically chosen: if a gpu is available the gpu with the highest amount of free memory will be chosen (default: None)
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
     debug : bool
         If true, additional information will be printed to the console (default: False)
@@ -763,7 +763,7 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
                  clustering_loss_weight: float = 1., reconstruction_loss_weight: float = None,
                  custom_dataloaders: tuple = None, augmentation_invariance: bool = False,
                  initial_clustering_class: ClusterMixin = KMeans, initial_clustering_params: dict = None,
-                 device: torch.device = None, random_state: np.random.RandomState = None, debug: bool = False):
+                 device: torch.device = None, random_state: np.random.RandomState | int = None, debug: bool = False):
         super().__init__(25 * n_clusters if batch_size is None else batch_size, neural_network, embedding_size,
                          device, random_state)
         self.n_clusters = n_clusters

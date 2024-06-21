@@ -612,7 +612,7 @@ class DipDECK(_AbstractDeepClusteringAlgo):
         clustering class to obtain the initial cluster labels after the pretraining (default: KMeans)
     initial_clustering_params : dict
         parameters for the initial clustering class (default: {})
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
     device : torch.device
         The device on which to perform the computations.
@@ -654,7 +654,7 @@ class DipDECK(_AbstractDeepClusteringAlgo):
                  embedding_size: int = 5, max_cluster_size_diff_factor: float = 2, pval_strategy: str = "table",
                  n_boots: int = 1000, custom_dataloaders: tuple = None, augmentation_invariance: bool = False,
                  initial_clustering_class: ClusterMixin = KMeans, initial_clustering_params: dict = None,
-                 device: torch.device = None, random_state: np.random.RandomState = None, debug: bool = False):
+                 device: torch.device = None, random_state: np.random.RandomState | int = None, debug: bool = False):
         super().__init__(batch_size, neural_network, embedding_size, device, random_state)
         self.n_clusters_init = n_clusters_init
         self.dip_merge_threshold = dip_merge_threshold

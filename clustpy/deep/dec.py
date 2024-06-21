@@ -441,7 +441,7 @@ class DEC(_AbstractDeepClusteringAlgo):
     device : torch.device
         The device on which to perform the computations.
         If device is None then it will be automatically chosen: if a gpu is available the gpu with the highest amount of free memory will be chosen (default: None)
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Attributes
@@ -479,7 +479,7 @@ class DEC(_AbstractDeepClusteringAlgo):
                  embedding_size: int = 10, clustering_loss_weight: float = 1,
                  custom_dataloaders: tuple = None, augmentation_invariance: bool = False,
                  initial_clustering_class: ClusterMixin = KMeans, initial_clustering_params: dict = None,
-                 device: torch.device = None, random_state: np.random.RandomState = None):
+                 device: torch.device = None, random_state: np.random.RandomState | int = None):
         super().__init__(batch_size, neural_network, embedding_size, device, random_state)
         self.n_clusters = n_clusters
         self.alpha = alpha
@@ -606,7 +606,7 @@ class IDEC(DEC):
     device : torch.device
         The device on which to perform the computations.
         If device is None then it will be automatically chosen: if a gpu is available the gpu with the highest amount of free memory will be chosen (default: None)
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Attributes
@@ -643,7 +643,7 @@ class IDEC(DEC):
                  embedding_size: int = 10, clustering_loss_weight: float = 0.1, reconstruction_loss_weight: float = 1.0,
                  custom_dataloaders: tuple = None, augmentation_invariance: bool = False,
                  initial_clustering_class: ClusterMixin = KMeans, initial_clustering_params: dict = None,
-                 device: torch.device = None, random_state: np.random.RandomState = None):
+                 device: torch.device = None, random_state: np.random.RandomState | int = None):
         super().__init__(n_clusters, alpha, batch_size, pretrain_optimizer_params, clustering_optimizer_params,
                          pretrain_epochs, clustering_epochs, optimizer_class, loss_fn, neural_network, embedding_size,
                          clustering_loss_weight, custom_dataloaders, augmentation_invariance, initial_clustering_class,

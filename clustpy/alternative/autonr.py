@@ -1140,7 +1140,7 @@ class AutoNR(BaseEstimator, ClusterMixin):
         precision used to convert probability densities to actual probabilities (default: None)
     similarity_threshold : float
         threshold that defines if the noise space has not changed for two subsequent iterations by checking the subspace costs (default: 1e-5)
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
     debug : bool
         If true, additional information will be printed to the console (default: False)
@@ -1167,7 +1167,7 @@ class AutoNR(BaseEstimator, ClusterMixin):
     def __init__(self, nrkmeans_repetitions: int = 15, outliers: bool = True, max_subspaces: int = None,
                  max_n_clusters: int = None, mdl_for_noisespace: bool = True, max_distance: float = None,
                  precision: float = None, similarity_threshold: float = 1e-5,
-                 random_state: np.random.RandomState = None, debug: bool = False):
+                 random_state: np.random.RandomState | int = None, debug: bool = False):
         # Fixed attributes
         self.nrkmeans_repetitions = nrkmeans_repetitions
         self.outliers = outliers

@@ -82,7 +82,9 @@ def detect_device(device: torch.device = None) -> torch.device:
     device : torch.device
         device on which the prediction should take place
     """
-    if device is None:
+    if device == -1:
+        device = torch.device('cpu')
+    elif device is None:
         env_device = os.environ.get("CLUSTPY_DEVICE", None)
         # Check if environment device is None - in that case CLUSTPY_DEVICE has not been specified
         if env_device is None:

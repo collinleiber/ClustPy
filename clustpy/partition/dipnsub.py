@@ -402,7 +402,7 @@ class DipNSub(BaseEstimator, ClusterMixin):
         Defines if outliers should be identified as described by UniDip (default: False)
     consider_duplicates : bool
         If multiple instances on the projection axis share a value, the gradient is ambiguous. If those duplicate values should be considered a random instances will be choses for furhter calculations. Beware: The calculation will not be deterministic anymore (default: False)
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
     debug : bool
         If true, additional information will be printed to the console (default: False)
@@ -424,7 +424,8 @@ class DipNSub(BaseEstimator, ClusterMixin):
 
     def __init__(self, significance: float = 0.01, threshold: float = 0.15, step_size: float = 0.1,
                  momentum: float = 0.95, n_starting_vectors: int = None, add_tails=True, outliers=False,
-                 consider_duplicates: bool = False, random_state: np.random.RandomState = None, debug=False):
+                 consider_duplicates: bool = False, random_state: np.random.RandomState | int = None,
+                 debug: bool = False):
         self.significance = significance
         self.threshold = threshold
         self.step_size = step_size

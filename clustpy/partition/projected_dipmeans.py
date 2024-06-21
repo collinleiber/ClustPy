@@ -135,7 +135,7 @@ class ProjectedDipMeans(BaseEstimator, ClusterMixin):
         The initial number of clusters. Can also by of type np.ndarray if initial cluster centers are specified (default: 1)
     max_n_clusters : int
         Maximum number of clusters. Must be larger than n_clusters_init (default: np.inf)
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Attributes
@@ -155,7 +155,7 @@ class ProjectedDipMeans(BaseEstimator, ClusterMixin):
 
     def __init__(self, significance: float = 0.001, n_random_projections: int = 0, pval_strategy: str = "table",
                  n_boots: int = 1000, n_split_trials: int = 10, n_clusters_init: int = 1, max_n_clusters: int = np.inf,
-                 random_state: np.random.RandomState = None):
+                 random_state: np.random.RandomState | int = None):
         self.significance = significance
         self.n_random_projections = n_random_projections
         self.pval_strategy = pval_strategy

@@ -279,7 +279,7 @@ class ClusteringInOrthogonalSpaces(OrthogonalClustering):
     explained_variance_for_clustering : float
         Defines the variance that is contained in the subspace used for clustering. This subspace is received by performing PCA.
         If explained_variance_for_clustering is 1, PCA will not be executed before performing KMeans (default: 0.9)
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Attributes
@@ -302,7 +302,7 @@ class ClusteringInOrthogonalSpaces(OrthogonalClustering):
     """
 
     def __init__(self, n_clusters: list, explained_variance_for_clustering: float = 0.9,
-                 random_state: np.random.RandomState = None):
+                 random_state: np.random.RandomState | int = None):
         super().__init__(n_clusters, explained_variance_for_clustering, random_state)
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'ClusteringInOrthogonalSpaces':

@@ -19,12 +19,12 @@ class _AbstractDeepClusteringAlgo(BaseEstimator, ClusterMixin):
         size of the embedding within the autoencoder
     device : torch.device
         The device on which to perform the computations
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int
     """
 
     def __init__(self, batch_size: int, neural_network: torch.nn.Module, embedding_size: int,
-                 device: torch.device, random_state: np.random.RandomState):
+                 device: torch.device, random_state: np.random.RandomState | int):
         self.batch_size = batch_size
         self.neural_network = neural_network
         self.embedding_size = embedding_size

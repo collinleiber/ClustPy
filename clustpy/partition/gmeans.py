@@ -132,7 +132,7 @@ class GMeans(BaseEstimator, ClusterMixin):
         Maximum number of clusters. Must be larger than n_clusters_init (default: np.inf)
     n_split_trials : int
         Number tries to split a cluster. For each try 2-KMeans is executed with different cluster centers (default: 10)
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Attributes
@@ -156,7 +156,7 @@ class GMeans(BaseEstimator, ClusterMixin):
     """
 
     def __init__(self, significance: float = 0.0001, n_clusters_init: int = 1, max_n_clusters: int = np.inf,
-                 n_split_trials: int = 10, random_state: np.random.RandomState = None):
+                 n_split_trials: int = 10, random_state: np.random.RandomState | int = None):
         self.significance = significance
         self.n_clusters_init = n_clusters_init
         self.max_n_clusters = max_n_clusters
