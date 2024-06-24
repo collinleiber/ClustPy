@@ -101,7 +101,7 @@ class LDAKmeans(BaseEstimator, ClusterMixin):
         number of times LDAKmeans is executed using different seeds. The final result will be the one with lowest costs (default: 1)
     kmeans_repetitions : int
         Number of repetitions when executing KMeans. For more information see sklearn.cluster.KMeans (default: 10)
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Attributes
@@ -122,7 +122,7 @@ class LDAKmeans(BaseEstimator, ClusterMixin):
     """
 
     def __init__(self, n_clusters: int, n_dims: int = None, max_iter: int = 300, n_init: int = 1,
-                 kmeans_repetitions: int = 10, random_state: np.random.RandomState = None):
+                 kmeans_repetitions: int = 10, random_state: np.random.RandomState | int = None):
         self.n_clusters = n_clusters
         self.n_dims = n_clusters - 1 if n_dims is None else n_dims
         self.max_iter = max_iter

@@ -742,7 +742,7 @@ class UniDip(BaseEstimator, ClusterMixin):
     max_cluster_size_diff_factor : float
         The maximum different in size when comparing two clusters regarding the number of samples.
         If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) closest samples will be used for merging and assigning tails of distributions if 'add_tails' is True (default: 2)
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int. Only relevant if pval_strategy is 'bootstrap'  (default: None)
     debug : bool
         If true, additional information will be printed to the console (default: False)
@@ -769,7 +769,7 @@ class UniDip(BaseEstimator, ClusterMixin):
 
     def __init__(self, significance: float = 0.05, pval_strategy: str = "table", n_boots: int = 1000,
                  add_tails: bool = False, outliers: bool = True, max_cluster_size_diff_factor: float = 2,
-                 random_state: np.random.RandomState = None, debug: bool = False):
+                 random_state: np.random.RandomState | int = None, debug: bool = False):
         self.significance = significance
         self.pval_strategy = pval_strategy
         self.n_boots = n_boots

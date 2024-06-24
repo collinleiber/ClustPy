@@ -182,7 +182,7 @@ class GapStatistic(BaseEstimator, ClusterMixin):
     use_log : bool
         True, if the logarithm of the within cluster dispersion should be used.
         For more information see Mohajer et al. (default: True)
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Attributes
@@ -220,7 +220,7 @@ class GapStatistic(BaseEstimator, ClusterMixin):
 
     def __init__(self, min_n_clusters: int = 1, max_n_clusters: int = 10, n_boots: int = 10,
                  use_principal_components: bool = True, use_log: bool = True,
-                 random_state: np.random.RandomState = None):
+                 random_state: np.random.RandomState | int = None):
         self.min_n_clusters = min_n_clusters
         self.max_n_clusters = max_n_clusters
         self.n_boots = n_boots

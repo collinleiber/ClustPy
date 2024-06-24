@@ -6,6 +6,7 @@ import numpy as np
 import random
 from sklearn.metrics.pairwise import pairwise_distances_argmin_min
 import os
+import subprocess
 
 
 def set_torch_seed(random_state: np.random.RandomState | int) -> None:
@@ -20,7 +21,7 @@ def set_torch_seed(random_state: np.random.RandomState | int) -> None:
     if type(random_state) is int:
         seed = random_state
     elif type(random_state) is np.random.RandomState:
-        seed = (random_state.get_state()[1][0]).item()
+        seed = random_state.randint(np.iinfo(np.int32).max)
     else:
         raise ValueError("random_state must be of type int or np.random.RandomState")
     torch.manual_seed(seed)
@@ -33,7 +34,7 @@ def set_torch_seed(random_state: np.random.RandomState | int) -> None:
 def squared_euclidean_distance(tensor1: torch.Tensor, tensor2: torch.Tensor,
                                weights: torch.Tensor = None) -> torch.Tensor:
     """
-    Calculate the pairwise squared euclidean distance between two tensors.
+    Calculate the pairwise squared Euclidean distance between two tensors.
     Each row in the tensors is interpreted as a separate object, while each column represents its features.
     Therefore, the result of an (4x3) and (12x3) tensor will be a (4x12) tensor.
     Optionally, features can be individually weighted.
@@ -51,7 +52,7 @@ def squared_euclidean_distance(tensor1: torch.Tensor, tensor2: torch.Tensor,
     Returns
     -------
     squared_diffs : torch.Tensor
-        the pairwise squared euclidean distances
+        the pairwise squared Euclidean distances
     """
     assert tensor1.shape[1] == tensor2.shape[1], "The number of features of the two input tensors must match."
     ta = tensor1.unsqueeze(1)
@@ -65,7 +66,7 @@ def squared_euclidean_distance(tensor1: torch.Tensor, tensor2: torch.Tensor,
     return squared_diffs
 
 
-def detect_device(device: torch.device = None) -> torch.device:
+def detect_device(device: torch.device | int | str = None) -> torch.device:
     """
     Automatically detects if you have a cuda enabled GPU.
     Device can also be read from environment variable "CLUSTPY_DEVICE".
@@ -73,7 +74,7 @@ def detect_device(device: torch.device = None) -> torch.device:
 
     Parameters
     ----------
-    device : torch.device
+    device : torch.device | int | str
         the input device. Will be returned if it is not None (default: None)
 
     Returns
@@ -81,21 +82,56 @@ def detect_device(device: torch.device = None) -> torch.device:
     device : torch.device
         device on which the prediction should take place
     """
-    if device is None:
+    if device == -1:
+        # Special case
+        device = torch.device('cpu')
+    elif device is None:
         env_device = os.environ.get("CLUSTPY_DEVICE", None)
-        # Check if environment device is None
+        # Check if environment device is None - in that case CLUSTPY_DEVICE has not been specified
         if env_device is None:
             if torch.cuda.is_available():
-                device = torch.device('cuda')
+                # Try to automatically identify best GPU
+                try:
+                    shell_output = (subprocess.check_output("nvidia-smi -q -d Utilization |grep Memory", shell=True)).decode('utf-8')[:-1]
+                    entries = shell_output.split("\n")[::2]
+                    used_memory = [int(e.split(":")[1].replace(" %", "")) for e in entries]
+                    device = torch.device("cuda:{0}".format(np.argmin(used_memory)))
+                    print(device, "was automatically chosen as device for the computation.")
+                except Exception:
+                    # Default: Use first available GPU
+                    device = torch.device('cuda')
             else:
                 device = torch.device('cpu')
         else:
             device = torch.device(env_device)
+    elif type(device) is int or type(device) is str:
+        device = torch.device(device)
     return device
 
 
-def encode_batchwise(dataloader: torch.utils.data.DataLoader, module: torch.nn.Module,
-                     device: torch.device) -> np.ndarray:
+def get_device_from_module(neural_network: torch.nn.Module) -> torch.device:
+    """
+    Get the device from a given module.
+
+    Parameters
+    ----------
+    neural_network : torch.nn.Module
+        the neural network that is used for the encoding (e.g. an autoencoder)
+
+    Returns
+    -------
+    device : torch.device
+        device of the module
+    """
+    example_param = next(neural_network.parameters())
+    if example_param.is_cuda:
+        device = torch.device('cuda:' + str(example_param.get_device()))
+    else:
+        device = torch.device('cpu')
+    return device
+
+
+def encode_batchwise(dataloader: torch.utils.data.DataLoader, neural_network: torch.nn.Module) -> np.ndarray:
     """
     Utility function for embedding the whole data set in a mini-batch fashion
 
@@ -103,20 +139,19 @@ def encode_batchwise(dataloader: torch.utils.data.DataLoader, module: torch.nn.M
     ----------
     dataloader : torch.utils.data.DataLoader
         dataloader to be used
-    module : torch.nn.Module
-        the module that is used for the encoding (e.g. an autoencoder)
-    device : torch.device
-        device to be trained on
+    neural_network : torch.nn.Module
+        the neural network that is used for the encoding (e.g. an autoencoder)
 
     Returns
     -------
     embeddings_numpy : np.ndarray
         The embedded data set
     """
+    device = get_device_from_module(neural_network)
     embeddings = []
     for batch in dataloader:
         batch_data = batch[1].to(device)
-        embedded_data = module.encode(batch_data)
+        embedded_data = neural_network.encode(batch_data)
         # In case encode() returns more than one value (e.g., for a variational autoencoder), we will pick the first
         if type(embedded_data) is tuple:
             embedded_data = embedded_data[0]
@@ -125,18 +160,17 @@ def encode_batchwise(dataloader: torch.utils.data.DataLoader, module: torch.nn.M
     return embeddings_numpy
 
 
-def decode_batchwise(dataloader: torch.utils.data.DataLoader, module: torch.nn.Module,
-                     device: torch.device) -> np.ndarray:
+def decode_batchwise(dataloader: torch.utils.data.DataLoader, neural_network: torch.nn.Module) -> np.ndarray:
     """
-    Utility function for decoding the whole data set in a mini-batch fashion with an autoencoder.
+    Utility function for decoding the whole data set in a mini-batch fashion, e.g., with an autoencoder.
     Note: Assumes an implemented decode function
 
     Parameters
     ----------
     dataloader : torch.utils.data.DataLoader
         dataloader to be used
-    module : torch.nn.Module
-        the module that is used for the decoding (e.g. an autoencoder)
+    neural_network : torch.nn.Module
+        the neural network that is used for the decoding (e.g. an autoencoder)
     device : torch.device
         device to be trained on
 
@@ -145,34 +179,33 @@ def decode_batchwise(dataloader: torch.utils.data.DataLoader, module: torch.nn.M
     reconstructions_numpy : np.ndarray
         The reconstructed data set
     """
+    device = get_device_from_module(neural_network)
     reconstructions = []
     for batch in dataloader:
         batch_data = batch[1].to(device)
-        embedded_data = module.encode(batch_data)
+        embedded_data = neural_network.encode(batch_data)
         # In case encode() returns more than one value (e.g., for a variational autoencoder), we all of them will be used for decoding
         if type(embedded_data) is tuple:
-            decoded_data = module.decode(*embedded_data)
+            decoded_data = neural_network.decode(*embedded_data)
         else:
-            decoded_data = module.decode(embedded_data)
+            decoded_data = neural_network.decode(embedded_data)
         reconstructions.append(decoded_data.detach().cpu())
     reconstructions_numpy = torch.cat(reconstructions, dim=0).numpy()
     return reconstructions_numpy
 
 
-def encode_decode_batchwise(dataloader: torch.utils.data.DataLoader, module: torch.nn.Module,
-                            device: torch.device) -> (np.ndarray, np.ndarray):
+def encode_decode_batchwise(dataloader: torch.utils.data.DataLoader, neural_network: torch.nn.Module) -> (
+        np.ndarray, np.ndarray):
     """
-    Utility function for encoding and decoding the whole data set in a mini-batch fashion with an autoencoder.
+    Utility function for encoding and decoding the whole data set in a mini-batch fashion, e.g., with an autoencoder.
     Note: Assumes an implemented decode function
 
     Parameters
     ----------
     dataloader : torch.utils.data.DataLoader
         dataloader to be used
-    module : torch.nn.Module
-        the module that is used for the encoding and decoding (e.g. an autoencoder)
-    device : torch.device
-        device to be trained on
+    neural_network : torch.nn.Module
+        the neural network that is used for the encoding and decoding (e.g. an autoencoder)
 
     Returns
     -------
@@ -180,20 +213,21 @@ def encode_decode_batchwise(dataloader: torch.utils.data.DataLoader, module: tor
         The embedded data set,
         The reconstructed data set
     """
+    device = get_device_from_module(neural_network)
     embeddings = []
     reconstructions = []
     for batch in dataloader:
         batch_data = batch[1].to(device)
-        embedding = module.encode(batch_data)
+        embedding = neural_network.encode(batch_data)
         embeddings.append(embedding.detach().cpu())
-        reconstructions.append(module.decode(embedding).detach().cpu())
+        reconstructions.append(neural_network.decode(embedding).detach().cpu())
     embeddings_numpy = torch.cat(embeddings, dim=0).numpy()
     reconstructions_numpy = torch.cat(reconstructions, dim=0).numpy()
     return embeddings_numpy, reconstructions_numpy
 
 
-def predict_batchwise(dataloader: torch.utils.data.DataLoader, module: torch.nn.Module, cluster_module: torch.nn.Module,
-                      device: torch.device) -> np.ndarray:
+def predict_batchwise(dataloader: torch.utils.data.DataLoader, neural_network: torch.nn.Module,
+                      cluster_module: torch.nn.Module) -> np.ndarray:
     """
     Utility function for predicting the cluster labels over the whole data set in a mini-batch fashion.
     Method calls the predict_hard method of the cluster_module for each batch of data.
@@ -202,22 +236,21 @@ def predict_batchwise(dataloader: torch.utils.data.DataLoader, module: torch.nn.
     ----------
     dataloader : torch.utils.data.DataLoader
         dataloader to be used
-    module : torch.nn.Module
-        the module that is used for the encoding (e.g. an autoencoder)
+    neural_network : torch.nn.Module
+        the neural network that is used for the encoding (e.g. an autoencoder)
     cluster_module : torch.nn.Module
         the cluster module that is used for the encoding (e.g. DEC). Usually contains the predict method.
-    device : torch.device
-        device to be trained on
 
     Returns
     -------
     predictions_numpy : np.ndarray
         The predictions of the cluster_module for the data set
     """
+    device = get_device_from_module(neural_network)
     predictions = []
     for batch in dataloader:
         batch_data = batch[1].to(device)
-        prediction = cluster_module.predict_hard(module.encode(batch_data)).detach().cpu()
+        prediction = cluster_module.predict_hard(neural_network.encode(batch_data)).detach().cpu()
         predictions.append(prediction)
     predictions_numpy = torch.cat(predictions, dim=0).numpy()
     return predictions_numpy
@@ -269,29 +302,24 @@ def int_to_one_hot(int_tensor: torch.Tensor, n_integers: int) -> torch.Tensor:
     return onehot
 
 
-def embedded_kmeans_prediction(dataloader: torch.utils.data.DataLoader, cluster_centers: np.ndarray,
-                               module: torch.nn.Module) -> np.ndarray:
+def embedded_kmeans_prediction(X_embed: np.ndarray, cluster_centers: np.ndarray) -> np.ndarray:
     """
-    Predicts the labels of the data within the given dataloader.
+    Predicts the labels of the given embedded data.
     Labels correspond to the id of the closest cluster center.
 
     Parameters
     ----------
-    dataloader : torch.utils.data.DataLoader
+    X_embed : np.ndarray
         dataloader to be used
     cluster_centers : np.ndarray
         input cluster centers
-    module : torch.nn.Module
-        the module that is used for the encoding (e.g. an autoencoder)
 
     Returns
     -------
     predicted_labels : np.ndarray
         The predicted labels
     """
-    device = detect_device()
-    embedded_data = encode_batchwise(dataloader, module, device)
-    predicted_labels, _ = pairwise_distances_argmin_min(X=embedded_data, Y=cluster_centers, metric='euclidean',
+    predicted_labels, _ = pairwise_distances_argmin_min(X=X_embed, Y=cluster_centers, metric='euclidean',
                                                         metric_kwargs={'squared': True})
     predicted_labels = predicted_labels.astype(np.int32)
     return predicted_labels
@@ -301,16 +329,17 @@ def run_initial_clustering(X: np.ndarray, n_clusters: int, clustering_class: Clu
                            random_state: np.random.RandomState) -> (int, np.ndarray, np.ndarray, ClusterMixin):
     """
     Get an initial clustering result for a deep clustering algorithm.
-    This result can then be refined by the optimization of the autoencoder.
+    This result can then be refined by the optimization of the neural network.
 
     Parameters
     ----------
     X : np.ndarray
-        the given data set
+        the embedded data set
     n_clusters : int
         number of clusters. Can be None if a corresponding initial_clustering_class is given, e.g. DBSCAN
     clustering_class : ClusterMixin
-        the class of the initial clustering algorithm
+        the class of the initial clustering algorithm.
+        If it is None, random labels will be chosen
     clustering_params : dict
         the parameters for the initial clustering algorithm
     random_state : np.random.RandomState
@@ -324,27 +353,31 @@ def run_initial_clustering(X: np.ndarray, n_clusters: int, clustering_class: Clu
         The initial cluster centers,
         The clustering object
     """
-    # Get possible input parameters of the clustering algorithm
-    clustering_class_parameters = inspect.getfullargspec(clustering_class).args + inspect.getfullargspec(
-        clustering_class).kwonlyargs
-    # Check if n_clusters or n_components is contained in the possible parameters
-    if "n_clusters" in clustering_class_parameters:
-        if "random_state" in clustering_class_parameters and "random_state" not in clustering_params.keys():
-            clustering_algo = clustering_class(n_clusters=n_clusters, random_state=random_state, **clustering_params)
-        else:
-            clustering_algo = clustering_class(n_clusters=n_clusters, **clustering_params)
-    elif "n_components" in clustering_class_parameters:  # in case of GMM
-        if "random_state" in clustering_class_parameters and "random_state" not in clustering_params.keys():
-            clustering_algo = clustering_class(n_components=n_clusters, random_state=random_state, **clustering_params)
-        else:
-            clustering_algo = clustering_class(n_components=n_clusters, **clustering_params)
-    else:  # in case of e.g., DBSCAN
-        if "random_state" in clustering_class_parameters and "random_state" not in clustering_params.keys():
-            clustering_algo = clustering_class(random_state=random_state, **clustering_params)
-        else:
-            clustering_algo = clustering_class(**clustering_params)
-    # Run algorithm
-    clustering_algo.fit(X)
+    if clustering_class is None:
+        clustering_algo = ClusterMixin()
+        clustering_algo.labels_ = np.random.randint(n_clusters, size=X.shape[0])
+    else:
+        # Get possible input parameters of the clustering algorithm
+        clustering_class_parameters = inspect.getfullargspec(clustering_class).args + inspect.getfullargspec(
+            clustering_class).kwonlyargs
+        # Check if n_clusters or n_components is contained in the possible parameters
+        if "n_clusters" in clustering_class_parameters:
+            if "random_state" in clustering_class_parameters and "random_state" not in clustering_params.keys():
+                clustering_algo = clustering_class(n_clusters=n_clusters, random_state=random_state, **clustering_params)
+            else:
+                clustering_algo = clustering_class(n_clusters=n_clusters, **clustering_params)
+        elif "n_components" in clustering_class_parameters:  # in case of GMM
+            if "random_state" in clustering_class_parameters and "random_state" not in clustering_params.keys():
+                clustering_algo = clustering_class(n_components=n_clusters, random_state=random_state, **clustering_params)
+            else:
+                clustering_algo = clustering_class(n_components=n_clusters, **clustering_params)
+        else:  # in case of e.g., DBSCAN
+            if "random_state" in clustering_class_parameters and "random_state" not in clustering_params.keys():
+                clustering_algo = clustering_class(random_state=random_state, **clustering_params)
+            else:
+                clustering_algo = clustering_class(**clustering_params)
+        # Run algorithm
+        clustering_algo.fit(X)
     # Check if clustering algorithm return cluster centers
     if hasattr(clustering_algo, "cluster_centers_"):
         labels = clustering_algo.labels_

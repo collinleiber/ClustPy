@@ -30,10 +30,9 @@ def test_neighbor_encoder():
     forwarded = neighborencoder.forward(data_batch)
     assert torch.equal(decoded, forwarded)
     # Test loss
-    device = torch.device('cpu')
     loss_fn = torch.nn.MSELoss()
     first_batch = next(iter(dataloader))
-    loss, embedded, decoded = neighborencoder.loss(first_batch, loss_fn, device)
+    loss, embedded, decoded = neighborencoder.loss(first_batch, loss_fn, torch.device("cpu"))
     assert loss.item() >= 0
     # Test fitting (without self decoding)
     assert neighborencoder.fitted is False
@@ -65,7 +64,7 @@ def test_neighbor_encoder_in_deep_clustering():
     # Test combining the NeighborEncoder with DCN
     neighborencoder = NeighborEncoder(layers=[data.shape[1], 128, 64, embedding_dim], n_neighbors=n_neighbors,
                                       decode_self=False)
-    dcn = DCN(3, pretrain_epochs=3, clustering_epochs=3, autoencoder=neighborencoder,
+    dcn = DCN(3, pretrain_epochs=3, clustering_epochs=3, neural_network=neighborencoder,
               custom_dataloaders=custom_dataloaders, random_state=1)
     dcn.fit(data)
     assert dcn.labels_.dtype == np.int32
