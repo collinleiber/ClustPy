@@ -452,9 +452,12 @@ class Cluster_Tree:
                 .div(len(sibling_losses) * batch_size)
             )
         else:
-            loss = torch.stack(sibling_losses, dim=0).sum().div(
-                len(sibling_losses) * batch_size
-            ) + torch.stack(sibling_aug_losses, dim=0).sum().div(batch_size)
+            loss = (
+                torch.stack(sibling_losses, dim=0)
+                .add(torch.stack(sibling_aug_losses, dim=0))
+                .sum()
+                .div(len(sibling_losses) * batch_size)
+            )
         return loss
 
     def _calculate_sibling_loss(
@@ -503,9 +506,9 @@ class Cluster_Tree:
             loss_right, loss_aug_right = self._single_sibling_loss(
                 root.right_child, root.left_child, encoded_augmented_batch
             )
-            sibling_loss.extend([loss_left, loss_right])
+            sibling_loss.extend([loss_left + loss_right])
             if encoded_augmented_batch is not None:
-                sibling_aug_loss.extend([loss_aug_left, loss_aug_right])
+                sibling_aug_loss.extend([loss_aug_left + loss_aug_right])
 
     def _single_sibling_loss(
         self,

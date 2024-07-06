@@ -12,7 +12,7 @@ import torch.utils
 import torch.utils.data
 from clustpy.data.real_torchvision_data import load_mnist
 from clustpy.deep._data_utils import augmentation_invariance_check
-from clustpy.deep._train_utils import get_standard_initial_deep_clustering_setting
+from clustpy.deep._train_utils import get_default_deep_clustering_initialization
 from clustpy.deep._utils import set_torch_seed
 from clustpy.deep.autoencoders._abstract_autoencoder import _AbstractAutoencoder
 from sklearn.cluster import KMeans
@@ -319,7 +319,7 @@ def _deep_ect(
         _,
         init_leafnode_centers,
         _,
-    ) = get_standard_initial_deep_clustering_setting(
+    ) = get_default_deep_clustering_initialization(
         X,
         2,
         batch_size,
@@ -332,10 +332,10 @@ def _deep_ect(
         custom_dataloaders,
         KMeans,
         {"n_init": 20, "random_state": random_state},
-        random_state,
+        None,
+        random_state
     )
 
-    print(device)
     if save_ae_state_dict:
         autoencoder.save_parameters(autoencoder_save_param_path)
     # Setup DeepECT Module
@@ -502,3 +502,29 @@ class DeepECT:
         self.tree_ = tree
         self.autoencoder = autoencoder
         return self
+
+
+if __name__ == "__main__":
+    from clustpy.deep.autoencoders import FeedforwardAutoencoder
+
+    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    dataset, labels = load_mnist(return_X_y=True)
+    autoencoder = (
+        FeedforwardAutoencoder([dataset.shape[1], 500, 500, 2000, 10])
+        .to(device)
+        .fit(
+            n_epochs=20,
+            optimizer_params={},
+            data=dataset,
+            batch_size=256,
+            device=device,
+            print_step=1,
+        )
+    )
+    deepect = DeepECT(autoencoder=autoencoder, max_leaf_nodes=20, max_iterations=10000)
+    deepect.fit_predict(dataset)
+    print(deepect.tree_.flat_accuracy(labels, n_clusters=10))
+    print(deepect.tree_.flat_nmi(labels, n_clusters=10))
+    print(deepect.tree_.flat_ari(labels, n_clusters=10))
+    print(deepect.tree_.dendrogram_purity(labels))
+    print(deepect.tree_.leaf_purity(labels))
