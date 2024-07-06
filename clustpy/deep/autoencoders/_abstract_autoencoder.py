@@ -7,6 +7,7 @@ import torch
 import numpy as np
 from clustpy.deep._early_stopping import EarlyStopping
 from clustpy.deep._data_utils import get_dataloader
+from clustpy.deep._utils import encode_batchwise, get_device_from_module
 import os
 
 
@@ -184,7 +185,7 @@ class _AbstractAutoencoder(torch.nn.Module):
         return loss, embedded, reconstructed
 
     def evaluate(self, dataloader: torch.utils.data.DataLoader, loss_fn: torch.nn.modules.loss._Loss,
-                 device: torch.device = torch.device("cpu")) -> torch.Tensor:
+                 device: torch.device) -> torch.Tensor:
         """
         Evaluates the autoencoder.
 
@@ -195,7 +196,7 @@ class _AbstractAutoencoder(torch.nn.Module):
         loss_fn : torch.nn.modules.loss._Loss
             loss function to be used for reconstruction
         device : torch.device
-            device to be trained on (default: torch.device('cpu'))
+            device to be trained on
 
         Returns
         -------
@@ -211,12 +212,12 @@ class _AbstractAutoencoder(torch.nn.Module):
             loss /= len(dataloader)
         return loss
 
-    def fit(self, n_epochs: int, optimizer_params: dict, batch_size: int = 128, data: np.ndarray = None,
-            data_eval: np.ndarray = None, dataloader: torch.utils.data.DataLoader = None,
-            evalloader: torch.utils.data.DataLoader = None, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
+    def fit(self, n_epochs: int = 100, optimizer_params: dict = None, batch_size: int = 128,
+            data: np.ndarray | torch.Tensor = None, data_eval: np.ndarray | torch.Tensor = None,
+            dataloader: torch.utils.data.DataLoader = None, evalloader: torch.utils.data.DataLoader = None,
+            optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
             loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), patience: int = 5,
-            scheduler: torch.optim.lr_scheduler = None, scheduler_params: dict = {},
-            device: torch.device = torch.device("cpu"), model_path: str = None,
+            scheduler: torch.optim.lr_scheduler = None, scheduler_params: dict = {}, model_path: str = None,
             print_step: int = 0) -> '_AbstractAutoencoder':
         """
         Trains the autoencoder in place.
@@ -224,14 +225,14 @@ class _AbstractAutoencoder(torch.nn.Module):
         Parameters
         ----------
         n_epochs : int
-            number of epochs for training
+            number of epochs for training (default: 100)
         optimizer_params : dict
-            parameters of the optimizer, includes the learning rate
+            parameters of the optimizer, includes the learning rate (default: {"lr": 1e-3})
         batch_size : int
             size of the data batches (default: 128)
-        data : np.ndarray
+        data : np.ndarray | torch.Tensor
             train data set. If data is passed then dataloader can remain empty (default: None)
-        data_eval : np.ndarray
+        data_eval : np.ndarray | torch.Tensor
             evaluation data set. If data_eval is passed then evalloader can remain empty (default: None)
         dataloader : torch.utils.data.DataLoader
             dataloader to be used for training (default: default=None)
@@ -248,8 +249,6 @@ class _AbstractAutoencoder(torch.nn.Module):
             If torch.optim.lr_scheduler.ReduceLROnPlateau is used then the behaviour is matched by providing the validation_loss calculated based on samples from evalloader (default: None)
         scheduler_params : dict
             dictionary of the parameters of the scheduler object (default: {})
-        device : torch.device
-            device to be trained on (default: torch.device('cpu'))
         model_path : str
             if specified will save the trained model to the location. If evalloader is used, then only the best model w.r.t. evaluation loss is saved (default: None)
         print_step : int
@@ -273,6 +272,7 @@ class _AbstractAutoencoder(torch.nn.Module):
         if evalloader is None:
             if data_eval is not None:
                 evalloader = get_dataloader(data_eval, batch_size, False)
+        optimizer_params = {"lr": 1e-3} if optimizer_params is None else optimizer_params
         optimizer = optimizer_class(params=self.parameters(), **optimizer_params)
 
         early_stopping = EarlyStopping(patience=patience)
@@ -288,6 +288,7 @@ class _AbstractAutoencoder(torch.nn.Module):
                 eval_step_scheduler = False
         best_loss = np.inf
         # training loop
+        device = get_device_from_module(self)
         for epoch_i in range(n_epochs):
             self.train()
             for batch in dataloader:
@@ -361,3 +362,23 @@ class _AbstractAutoencoder(torch.nn.Module):
         self.load_state_dict(torch.load(path))
         self.fitted = True
         return self
+
+    def transform(self, X: np.ndarray, batch_size: int) -> np.ndarray:
+        """
+        Embed the given data set using the trained autoencoder.
+
+        Parameters
+        ----------
+        X: np.ndarray
+            The given data set
+        batch_size : int
+            size of the data batches
+
+        Returns
+        -------
+        X_embed : np.ndarray
+            The embedded data set
+        """
+        dataloader = get_dataloader(X, batch_size, False, False)
+        X_embed = encode_batchwise(dataloader, self)
+        return X_embed

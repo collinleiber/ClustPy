@@ -14,7 +14,7 @@ HELPERS also used by other classes
 """
 
 
-def _initial_kmeans_clusters(X: np.ndarray, n_clusters_init: int, random_state: np.random.RandomState) -> (
+def _initial_kmeans_clusters(X: np.ndarray, n_clusters_init: int | np.ndarray, random_state: np.random.RandomState) -> (
         int, np.ndarray, np.ndarray, float):
     """
     Get the initial cluster centers and cluster labels based on the n_clusters_init parameter.
@@ -25,8 +25,8 @@ def _initial_kmeans_clusters(X: np.ndarray, n_clusters_init: int, random_state: 
     ----------
     X : np.ndarray
         the given data set
-    n_clusters_init : int
-        The initial number of clusters. Can also by of type np.ndarray if initial cluster centers are specified
+    n_clusters_init : int | np.ndarray
+        The initial number of clusters. Can also be of type np.ndarray if initial cluster centers are specified
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution
 
@@ -162,7 +162,7 @@ def _xmeans(X: np.ndarray, n_clusters_init: int, max_n_clusters: int, check_glob
         best_global_bic_score = _bic_score(X.shape[0], cluster_sizes, n_dims, global_variance)
         # Save best result
         best_result = (n_clusters, labels, centers, ids_in_each_cluster, cluster_sizes, cluster_variances)
-    while n_clusters <= max_n_clusters:
+    while n_clusters < max_n_clusters:
         n_clusters_old = n_clusters
         # Split Clusters => Improve-Structure
         for c in range(n_clusters_old):
@@ -191,6 +191,9 @@ def _xmeans(X: np.ndarray, n_clusters_init: int, max_n_clusters: int, check_glob
                 centers = np.r_[centers, [centers_split[1]]]
                 labels[ids_in_cluster[labels_split == 1]] = n_clusters
                 n_clusters += 1
+                # If maximum number of clusters is reached, stop iterating over the current clusters
+                if n_clusters == max_n_clusters:
+                    break
         # If no cluster changed, XMeans terminates
         if n_clusters == n_clusters_old:
             break
@@ -360,7 +363,7 @@ class XMeans(BaseEstimator, ClusterMixin):
          Normally, if allow_merging is True, check_global_score should be False (default: False)
     n_split_trials : int
         Number tries to split a cluster. For each try 2-KMeans is executed with different cluster centers (default: 10)
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Attributes
@@ -398,7 +401,8 @@ class XMeans(BaseEstimator, ClusterMixin):
     """
 
     def __init__(self, n_clusters_init: int = 2, max_n_clusters: int = np.inf, check_global_score: bool = True,
-                 allow_merging: bool = False, n_split_trials: int = 10, random_state: np.random.RandomState = None):
+                 allow_merging: bool = False, n_split_trials: int = 10,
+                 random_state: np.random.RandomState | int = None):
         self.n_clusters_init = n_clusters_init
         self.max_n_clusters = max_n_clusters
         self.check_global_score = check_global_score

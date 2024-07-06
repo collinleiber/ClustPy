@@ -24,19 +24,18 @@ def test_abstract_autoencoder_with_dummy_torch_parameter():
     data, _ = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
     batch_size = 256
     data_batch = [torch.arange(256), torch.Tensor(data[:batch_size])]
-    device = torch.device('cpu')
     loss_fn = torch.nn.MSELoss()
     autoencoder = _AbstractAutoencoder()
     autoencoder.dummy_parameter = torch.nn.Parameter(torch.tensor([0.]))  # Needed for fit to work
     autoencoder.encode = lambda x: x + autoencoder.dummy_parameter
     # Test loss
-    loss, embedded, decoded = autoencoder.loss(data_batch, loss_fn, device)
+    loss, embedded, decoded = autoencoder.loss(data_batch, loss_fn, torch.device("cpu"))
     assert torch.equal(data_batch[1], embedded)
     assert torch.equal(data_batch[1], decoded)
     assert torch.equal(loss, torch.tensor(0.))
     # Test evaluate
     dataloader = get_dataloader(data, batch_size)
-    loss = autoencoder.evaluate(dataloader, loss_fn, device)
+    loss = autoencoder.evaluate(dataloader, loss_fn, torch.device("cpu"))
     assert torch.equal(loss, torch.tensor(0.))
     # Test fitting (with data)
     assert autoencoder.fitted is False

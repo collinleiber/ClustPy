@@ -7,23 +7,23 @@ from scipy.spatial.distance import cdist
 import numpy as np
 from clustpy.utils import dip_test, dip_pval
 import torch
-from clustpy.deep._utils import detect_device, encode_batchwise, squared_euclidean_distance, int_to_one_hot, \
-    set_torch_seed, embedded_kmeans_prediction
-from clustpy.deep._train_utils import get_standard_initial_deep_clustering_setting
-from clustpy.deep._data_utils import get_dataloader, augmentation_invariance_check
+from clustpy.deep._utils import encode_batchwise, squared_euclidean_distance, int_to_one_hot, embedded_kmeans_prediction
+from clustpy.deep._train_utils import get_default_deep_clustering_initialization
+from clustpy.deep._data_utils import augmentation_invariance_check
+from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
 from sklearn.cluster import KMeans
-from sklearn.base import BaseEstimator, ClusterMixin
-from sklearn.utils import check_random_state
+from sklearn.base import ClusterMixin
 
 
-def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, cluster_loss_weight: float,
-              max_n_clusters: int, min_n_clusters: int, batch_size: int,
+def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, clustering_loss_weight: float,
+              reconstruction_loss_weight: float, max_n_clusters: int, min_n_clusters: int, batch_size: int,
               pretrain_optimizer_params: dict, clustering_optimizer_params: dict, pretrain_epochs: int,
               clustering_epochs: int, optimizer_class: torch.optim.Optimizer,
-              loss_fn: torch.nn.modules.loss._Loss, autoencoder: torch.nn.Module, embedding_size: int,
+              loss_fn: torch.nn.modules.loss._Loss, neural_network: torch.nn.Module, embedding_size: int,
               max_cluster_size_diff_factor: float, pval_strategy: str, n_boots: int, custom_dataloaders: tuple,
               augmentation_invariance: bool, initial_clustering_class: ClusterMixin, initial_clustering_params: dict,
-              random_state: np.random.RandomState, debug: bool) -> (np.ndarray, int, np.ndarray, torch.nn.Module):
+              device: torch.device, random_state: np.random.RandomState, debug: bool) -> (
+        np.ndarray, int, np.ndarray, torch.nn.Module):
     """
     Start the actual DipDECK clustering procedure on the input data set.
 
@@ -35,8 +35,10 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
         initial number of clusters. Can be None if a corresponding initial_clustering_class is given, e.g. DBSCAN
     dip_merge_threshold : float
         threshold regarding the Dip-p-value that defines if two clusters should be merged. Must be bvetween 0 and 1
-    cluster_loss_weight : float
+    clustering_loss_weight : float
         weight of the clustering loss compared to the reconstruction loss
+    reconstruction_loss_weight : float
+        weight of the reconstruction loss
     max_n_clusters : int
         maximum number of clusters. Must be larger than min_n_clusters. If the result has more clusters, a merge will be forced
     min_n_clusters : int
@@ -45,21 +47,21 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
     batch_size : int
         size of the data batches
     pretrain_optimizer_params : dict
-        parameters of the optimizer for the pretraining of the autoencoder, includes the learning rate
+        parameters of the optimizer for the pretraining of the neural network, includes the learning rate
     clustering_optimizer_params : dict
         parameters of the optimizer for the actual clustering procedure, includes the learning rate
     pretrain_epochs : int
-        number of epochs for the pretraining of the autoencoder
+        number of epochs for the pretraining of the neural network
     clustering_epochs : int
         number of epochs for the actual clustering procedure. Will reset after each merge
     optimizer_class : torch.optim.Optimizer
         the optimizer class
     loss_fn : torch.nn.modules.loss._Loss
         loss function for the reconstruction
-    autoencoder : torch.nn.Module
-        the input autoencoder. If None a new FeedforwardAutoencoder will be created
+    neural_network : torch.nn.Module
+        the input neural network
     embedding_size : int
-        size of the embedding within the autoencoder
+        size of the embedding within the neural network
     max_cluster_size_diff_factor : float
         The maximum different in size when comparing two clusters regarding the number of samples.
         If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) closest samples will be used for the Dip calculation
@@ -77,6 +79,8 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
         clustering class to obtain the initial cluster labels after the pretraining
     initial_clustering_params : dict
         parameters for the initial clustering class
+    device : torch.device
+        The device on which to perform the computations
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution
     debug : bool
@@ -88,7 +92,7 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
         The labels as identified by DipDECK,
         The final number of clusters,
         The cluster centers as identified by DipDECK,
-        The final autoencoder
+        The final neural network
     """
     if max_n_clusters < min_n_clusters:
         raise Exception("max_n_clusters can not be smaller than min_n_clusters")
@@ -99,10 +103,10 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
     if dip_merge_threshold < 0 or dip_merge_threshold > 1:
         raise Exception("dip_merge_threshold must be between 0 and 1")
     # Get initial setting (device, dataloaders, pretrained AE and initial clustering result)
-    device, trainloader, testloader, autoencoder, embedded_data, n_clusters_init, cluster_labels_cpu, init_centers, _ = get_standard_initial_deep_clustering_setting(
+    device, trainloader, testloader, neural_network, embedded_data, n_clusters_init, cluster_labels_cpu, init_centers, _ = get_default_deep_clustering_initialization(
         X, n_clusters_init, batch_size, pretrain_optimizer_params, pretrain_epochs, optimizer_class, loss_fn,
-        autoencoder, embedding_size, custom_dataloaders, initial_clustering_class, initial_clustering_params,
-        random_state)
+        neural_network, embedding_size, custom_dataloaders, initial_clustering_class, initial_clustering_params,
+        device, random_state)
     if custom_dataloaders is not None:
         # Get new X from testloader (important if transformations are used within the dataloader)
         X_new = []
@@ -115,34 +119,36 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
     dip_matrix_cpu = _get_dip_matrix(embedded_data, embedded_centers_cpu, cluster_labels_cpu, n_clusters_init,
                                      max_cluster_size_diff_factor, pval_strategy, n_boots, random_state)
     # Use DipDECK optimizer parameters (usually learning rate is reduced by a magnitude of 10)
-    optimizer = optimizer_class(autoencoder.parameters(), **clustering_optimizer_params)
+    optimizer = optimizer_class(neural_network.parameters(), **clustering_optimizer_params)
     # Start training
-    cluster_labels_cpu, n_clusters_current, centers_cpu, autoencoder = _dip_deck_training(X, n_clusters_init,
-                                                                                          dip_merge_threshold,
-                                                                                          cluster_loss_weight,
-                                                                                          centers_cpu,
-                                                                                          cluster_labels_cpu,
-                                                                                          dip_matrix_cpu,
-                                                                                          max_n_clusters,
-                                                                                          min_n_clusters,
-                                                                                          clustering_epochs,
-                                                                                          optimizer, loss_fn,
-                                                                                          autoencoder,
-                                                                                          device, trainloader,
-                                                                                          testloader,
-                                                                                          augmentation_invariance,
-                                                                                          max_cluster_size_diff_factor,
-                                                                                          pval_strategy, n_boots,
-                                                                                          random_state, debug)
+    cluster_labels_cpu, n_clusters_current, centers_cpu, neural_network = _dip_deck_training(X, n_clusters_init,
+                                                                                             dip_merge_threshold,
+                                                                                             clustering_loss_weight,
+                                                                                             reconstruction_loss_weight,
+                                                                                             centers_cpu,
+                                                                                             cluster_labels_cpu,
+                                                                                             dip_matrix_cpu,
+                                                                                             max_n_clusters,
+                                                                                             min_n_clusters,
+                                                                                             clustering_epochs,
+                                                                                             optimizer, loss_fn,
+                                                                                             neural_network,
+                                                                                             device, trainloader,
+                                                                                             testloader,
+                                                                                             augmentation_invariance,
+                                                                                             max_cluster_size_diff_factor,
+                                                                                             pval_strategy, n_boots,
+                                                                                             random_state, debug)
     # Return results
-    return cluster_labels_cpu, n_clusters_current, centers_cpu, autoencoder
+    return cluster_labels_cpu, n_clusters_current, centers_cpu, neural_network
 
 
-def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_threshold: float, cluster_loss_weight: float,
+def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_threshold: float,
+                       clustering_loss_weight: float, reconstruction_loss_weight: float,
                        centers_cpu: np.ndarray, cluster_labels_cpu: np.ndarray,
                        dip_matrix_cpu: np.ndarray, max_n_clusters: int, min_n_clusters: int, clustering_epochs: int,
                        optimizer: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss,
-                       autoencoder: torch.nn.Module, device: torch.device, trainloader: torch.utils.data.DataLoader,
+                       neural_network: torch.nn.Module, device: torch.device, trainloader: torch.utils.data.DataLoader,
                        testloader: torch.utils.data.DataLoader, augmentation_invariance: bool,
                        max_cluster_size_diff_factor: float, pval_strategy: str, n_boots: int,
                        random_state: np.random.RandomState, debug: bool) -> (
@@ -158,8 +164,10 @@ def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_thresho
         current number of clusters. Is equal to n_clusters_init in the beginning
     dip_merge_threshold : float
         threshold regarding the Dip-p-value that defines if two clusters should be merged. Must be bvetween 0 and 1
-    cluster_loss_weight : float
+    clustering_loss_weight : float
         weight of the clustering loss compared to the reconstruction loss
+    reconstruction_loss_weight : float
+        weight of the reconstruction loss
     centers_cpu : np.ndarray
         The current cluster centers, saved as numpy array (not torch.Tensor)
         Equals the result of the initial KMeans clusters in the beginning.
@@ -180,8 +188,8 @@ def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_thresho
         the optimizer object
     loss_fn : torch.nn.modules.loss._Loss
         loss function for the reconstruction
-    autoencoder : torch.nn.Module
-        the input autoencoder
+    neural_network : torch.nn.Module
+        the input neural network
     device : torch.device
         device to be trained on
     trainloader : torch.utils.data.DataLoader
@@ -209,7 +217,7 @@ def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_thresho
         The labels as identified by DipDECK,
         The final number of clusters,
         The cluster centers as identified by DipDECK,
-        The final autoencoder
+        The final neural network
     """
     i = 0
     while i < clustering_epochs:
@@ -224,13 +232,13 @@ def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_thresho
             ids = batch[0]
             # Reconstruction Loss
             if augmentation_invariance:
-                ae_loss, embedded, _ = autoencoder.loss([batch[0], batch[2]], loss_fn, device)
-                ae_loss_aug, embedded_aug, _ = autoencoder.loss([batch[0], batch[1]], loss_fn, device)
+                ae_loss, embedded, _ = neural_network.loss([batch[0], batch[2]], loss_fn, device)
+                ae_loss_aug, embedded_aug, _ = neural_network.loss([batch[0], batch[1]], loss_fn, device)
                 ae_loss = (ae_loss + ae_loss_aug) / 2
             else:
-                ae_loss, embedded, _ = autoencoder.loss(batch, loss_fn, device)
+                ae_loss, embedded, _ = neural_network.loss(batch, loss_fn, device)
             # Encode centers
-            embedded_centers_torch = autoencoder.encode(centers_torch)
+            embedded_centers_torch = neural_network.encode(centers_torch)
             # Get distances between points and centers. Get nearest center
             squared_diffs = squared_euclidean_distance(embedded, embedded_centers_torch)
             # Update labels? Pause is needed, so cluster labels can adjust to the new structure
@@ -260,15 +268,14 @@ def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_thresho
                 cluster_loss_aug = escaped_diffs_aug.sum(1).mean() * (
                         1 + masked_center_diffs_std) / sqrt_masked_center_diffs.mean()
                 cluster_loss = (cluster_loss + cluster_loss_aug) / 2
-            cluster_loss *= cluster_loss_weight
-            loss = ae_loss + cluster_loss
+            loss = reconstruction_loss_weight * ae_loss + clustering_loss_weight * cluster_loss
             # Backward pass
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
         # Update centers
-        embedded_data = encode_batchwise(testloader, autoencoder, device)
-        embedded_centers_cpu = autoencoder.encode(centers_torch).detach().cpu().numpy()
+        embedded_data = encode_batchwise(testloader, neural_network)
+        embedded_centers_cpu = neural_network.encode(centers_torch).detach().cpu().numpy()
         cluster_labels_cpu = np.argmin(cdist(embedded_centers_cpu, embedded_data), axis=0).astype(np.int32)
         optimal_centers = np.array([np.mean(embedded_data[cluster_labels_cpu == cluster_id], axis=0) for cluster_id in
                                     range(n_clusters_current)])
@@ -344,7 +351,7 @@ def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_thresho
             if debug:
                 print("Only one cluster left")
             break
-    return cluster_labels_cpu, n_clusters_current, centers_cpu, autoencoder
+    return cluster_labels_cpu, n_clusters_current, centers_cpu, neural_network
 
 
 def _merge_by_dip_value(X: np.ndarray, embedded_data: np.ndarray, cluster_labels_cpu: np.ndarray,
@@ -547,10 +554,10 @@ def _get_dip_matrix(embedded_data: np.ndarray, embedded_centers_cpu: np.ndarray,
     return dip_matrix
 
 
-class DipDECK(BaseEstimator, ClusterMixin):
+class DipDECK(_AbstractDeepClusteringAlgo):
     """
     The Deep Embedded Clustering with k-Estimation (DipDECK) algorithm.
-    First, an autoencoder (AE) will be trained (will be skipped if input autoencoder is given).
+    First, a neural network will be trained (will be skipped if input neural network is given).
     Afterward, KMeans identifies the initial clusters using an overestimated number of clusters.
     Last, the AE will be optimized using the DipDECK loss function.
     If any Dip-value exceeds the dip_merge_threshold, the corresponding clusters will be merged.
@@ -561,8 +568,10 @@ class DipDECK(BaseEstimator, ClusterMixin):
         initial number of clusters. Can be None if a corresponding initial_clustering_class is given, e.g. DBSCAN (default: 35)
     dip_merge_threshold : float
         threshold regarding the Dip-p-value that defines if two clusters should be merged. Must be bvetween 0 and 1 (default: 0.9)
-    cluster_loss_weight : float
-        weight of the clustering loss compared to the reconstruction loss (default: 1)
+    clustering_loss_weight : float
+        weight of the clustering loss compared to the reconstruction loss (default: 1.0)
+    reconstruction_loss_weight : float
+        weight of the reconstruction loss (default: 1.0)
     max_n_clusters : int
         maximum number of clusters. Must be larger than min_n_clusters. If the result has more clusters, a merge will be forced (default: np.inf)
     min_n_clusters : int
@@ -571,21 +580,21 @@ class DipDECK(BaseEstimator, ClusterMixin):
     batch_size : int
         size of the data batches (default: 256)
     pretrain_optimizer_params : dict
-        parameters of the optimizer for the pretraining of the autoencoder, includes the learning rate (default: {"lr": 1e-3})
+        parameters of the optimizer for the pretraining of the neural network, includes the learning rate (default: {"lr": 1e-3})
     clustering_optimizer_params : dict
         parameters of the optimizer for the actual clustering procedure, includes the learning rate (default: {"lr": 1e-4})
     pretrain_epochs : int
-        number of epochs for the pretraining of the autoencoder (default: 100)
+        number of epochs for the pretraining of the neural network (default: 100)
     clustering_epochs : int
         number of epochs for the actual clustering procedure. Will reset after each merge (default: 50)
     optimizer_class : torch.optim.Optimizer
         the optimizer class (default: torch.optim.Adam)
     loss_fn : torch.nn.modules.loss._Loss
         loss function for the reconstruction (default: torch.nn.MSELoss())
-    autoencoder : torch.nn.Module
-        the input autoencoder. If None a new FeedforwardAutoencoder will be created (default: None)
+    neural_network : torch.nn.Module
+        the input neural network. If None a new FeedforwardAutoencoder will be created (default: None)
     embedding_size : int
-        size of the embedding within the autoencoder (default: 5)
+        size of the embedding within the neural network (default: 5)
     max_cluster_size_diff_factor : float
         The maximum different in size when comparing two clusters regarding the number of samples.
         If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) closest samples will be used for the Dip calculation (default: 2)
@@ -603,8 +612,11 @@ class DipDECK(BaseEstimator, ClusterMixin):
         clustering class to obtain the initial cluster labels after the pretraining (default: KMeans)
     initial_clustering_params : dict
         parameters for the initial clustering class (default: {})
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
+    device : torch.device
+        The device on which to perform the computations.
+        If device is None then it will be automatically chosen: if a gpu is available the gpu with the highest amount of free memory will be chosen (default: None)
     debug : bool
         If true, additional information will be printed to the console (default: False)
 
@@ -616,8 +628,8 @@ class DipDECK(BaseEstimator, ClusterMixin):
         The final number of clusters
     cluster_centers_ : np.ndarray
         The final cluster centers
-    autoencoder : torch.nn.Module
-        The final autoencoder
+    neural_network : torch.nn.Module
+        The final neural network
 
     Examples
     ----------
@@ -633,30 +645,31 @@ class DipDECK(BaseEstimator, ClusterMixin):
     Proceedings of the 27th ACM SIGKDD Conference on Knowledge Discovery & Data Mining. 2021.
     """
 
-    def __init__(self, n_clusters_init: int = 35, dip_merge_threshold: float = 0.9, cluster_loss_weight: float = 1,
-                 max_n_clusters: int = np.inf, min_n_clusters: int = 1, batch_size: int = 256,
-                 pretrain_optimizer_params: dict = None, clustering_optimizer_params: dict = None,
-                 pretrain_epochs: int = 100, clustering_epochs: int = 50,
+    def __init__(self, n_clusters_init: int = 35, dip_merge_threshold: float = 0.9, clustering_loss_weight: float = 1.,
+                 reconstruction_loss_weight: float = 1., max_n_clusters: int = np.inf, min_n_clusters: int = 1,
+                 batch_size: int = 256, pretrain_optimizer_params: dict = None,
+                 clustering_optimizer_params: dict = None, pretrain_epochs: int = 100, clustering_epochs: int = 50,
                  optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
-                 loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), autoencoder: torch.nn.Module = None,
+                 loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), neural_network: torch.nn.Module = None,
                  embedding_size: int = 5, max_cluster_size_diff_factor: float = 2, pval_strategy: str = "table",
                  n_boots: int = 1000, custom_dataloaders: tuple = None, augmentation_invariance: bool = False,
                  initial_clustering_class: ClusterMixin = KMeans, initial_clustering_params: dict = None,
-                 random_state: np.random.RandomState = None, debug: bool = False):
+                 device: torch.device = None, random_state: np.random.RandomState | int = None, debug: bool = False):
+        super().__init__(batch_size, neural_network, embedding_size, device, random_state)
         self.n_clusters_init = n_clusters_init
         self.dip_merge_threshold = dip_merge_threshold
-        self.cluster_loss_weight = cluster_loss_weight
+        self.clustering_loss_weight = clustering_loss_weight
+        self.reconstruction_loss_weight = reconstruction_loss_weight
         self.max_n_clusters = max_n_clusters
         self.min_n_clusters = min_n_clusters
-        self.batch_size = batch_size
-        self.pretrain_optimizer_params = {"lr": 1e-3} if pretrain_optimizer_params is None else pretrain_optimizer_params
-        self.clustering_optimizer_params = {"lr": 1e-4} if clustering_optimizer_params is None else clustering_optimizer_params
+        self.pretrain_optimizer_params = {
+            "lr": 1e-3} if pretrain_optimizer_params is None else pretrain_optimizer_params
+        self.clustering_optimizer_params = {
+            "lr": 1e-4} if clustering_optimizer_params is None else clustering_optimizer_params
         self.pretrain_epochs = pretrain_epochs
         self.clustering_epochs = clustering_epochs
         self.optimizer_class = optimizer_class
         self.loss_fn = loss_fn
-        self.autoencoder = autoencoder
-        self.embedding_size = embedding_size
         self.max_cluster_size_diff_factor = max_cluster_size_diff_factor
         self.pval_strategy = pval_strategy
         self.n_boots = n_boots
@@ -664,8 +677,6 @@ class DipDECK(BaseEstimator, ClusterMixin):
         self.augmentation_invariance = augmentation_invariance
         self.initial_clustering_class = initial_clustering_class
         self.initial_clustering_params = {} if initial_clustering_params is None else initial_clustering_params
-        self.random_state = check_random_state(random_state)
-        set_torch_seed(self.random_state)
         self.debug = debug
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DipDECK':
@@ -686,23 +697,25 @@ class DipDECK(BaseEstimator, ClusterMixin):
             this instance of the DipDECK algorithm
         """
         augmentation_invariance_check(self.augmentation_invariance, self.custom_dataloaders)
-        labels, n_clusters, centers, autoencoder = _dip_deck(X, self.n_clusters_init, self.dip_merge_threshold,
-                                                             self.cluster_loss_weight, self.max_n_clusters,
-                                                             self.min_n_clusters, self.batch_size,
-                                                             self.pretrain_optimizer_params,
-                                                             self.clustering_optimizer_params,
-                                                             self.pretrain_epochs, self.clustering_epochs,
-                                                             self.optimizer_class, self.loss_fn, self.autoencoder,
-                                                             self.embedding_size, self.max_cluster_size_diff_factor,
-                                                             self.pval_strategy, self.n_boots, self.custom_dataloaders,
-                                                             self.augmentation_invariance,
-                                                             self.initial_clustering_class,
-                                                             self.initial_clustering_params, self.random_state,
-                                                             self.debug)
+        labels, n_clusters, centers, neural_network = _dip_deck(X, self.n_clusters_init, self.dip_merge_threshold,
+                                                                self.clustering_loss_weight,
+                                                                self.reconstruction_loss_weight, self.max_n_clusters,
+                                                                self.min_n_clusters, self.batch_size,
+                                                                self.pretrain_optimizer_params,
+                                                                self.clustering_optimizer_params,
+                                                                self.pretrain_epochs, self.clustering_epochs,
+                                                                self.optimizer_class, self.loss_fn, self.neural_network,
+                                                                self.embedding_size, self.max_cluster_size_diff_factor,
+                                                                self.pval_strategy, self.n_boots,
+                                                                self.custom_dataloaders,
+                                                                self.augmentation_invariance,
+                                                                self.initial_clustering_class,
+                                                                self.initial_clustering_params, self.device,
+                                                                self.random_state, self.debug)
         self.labels_ = labels
         self.n_clusters_ = n_clusters
         self.cluster_centers_ = centers
-        self.autoencoder = autoencoder
+        self.neural_network = neural_network
         return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:
@@ -720,10 +733,8 @@ class DipDECK(BaseEstimator, ClusterMixin):
             The predicted labels
         """
         # Get embedded centers
-        device = detect_device()
-        centers_torch = torch.from_numpy(self.cluster_centers_).float().to(device)
-        embedded_centers = self.autoencoder.encode(centers_torch).detach().cpu().numpy()
+        embedded_centers = self.transform(self.cluster_centers_)
         # Get labels
-        dataloader = get_dataloader(X, self.batch_size, False, False)
-        predicted_labels = embedded_kmeans_prediction(dataloader, embedded_centers, self.autoencoder)
+        X_embed = self.transform(X)
+        predicted_labels = embedded_kmeans_prediction(X_embed, embedded_centers)
         return predicted_labels

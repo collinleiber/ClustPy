@@ -774,7 +774,7 @@ class NrKmeans(BaseEstimator, ClusterMixin):
         distance used to encode cluster centers and outliers. Only relevant if a MDL strategy is used (default: None)
     precision : float
         precision used to convert probability densities to actual probabilities. Only relevant if a MDL strategy is used (default: None)
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
     debug : bool
         If true, additional information will be printed to the console (default: False)
@@ -802,7 +802,7 @@ class NrKmeans(BaseEstimator, ClusterMixin):
                  cluster_centers: list = None, mdl_for_noisespace: bool = False, outliers: bool = False,
                  max_iter: int = 300, n_init: int = 1, cost_type: str = "default",
                  threshold_negative_eigenvalue: float = -1e-7, max_distance: float = None, precision: float = None,
-                 random_state: np.random.RandomState = None, debug: bool = False):
+                 random_state: np.random.RandomState | int = None, debug: bool = False):
         # Fixed attributes
         self.input_n_clusters = n_clusters.copy()
         self.max_iter = max_iter

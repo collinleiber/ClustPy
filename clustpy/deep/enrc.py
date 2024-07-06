@@ -10,7 +10,7 @@ import numpy as np
 from clustpy.deep._utils import int_to_one_hot, squared_euclidean_distance, encode_batchwise, detect_device, \
     set_torch_seed
 from clustpy.deep._data_utils import get_dataloader, augmentation_invariance_check
-from clustpy.deep._train_utils import get_trained_autoencoder
+from clustpy.deep._train_utils import get_trained_network
 from clustpy.alternative import NrKmeans
 from sklearn.utils import check_random_state
 from scipy.stats import ortho_group
@@ -371,7 +371,7 @@ class _ENRC_Module(torch.nn.Module):
         n_clusters = [c.shape[0] for c in self.centers]
 
         # Encode data
-        embedded_data = encode_batchwise(dataloader, model, device)
+        embedded_data = encode_batchwise(dataloader, model)
         embedded_rot = np.matmul(embedded_data, V)
 
         # Apply reclustering in the rotated space, because V does not have to be orthogonal, so it could learn a mapping that is not recoverable by nrkmeans.
@@ -1810,13 +1810,15 @@ def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers
         subsampleloader = testloader
     if debug: print("Setup autoencoder")
     # Setup autoencoder
-    autoencoder = get_trained_autoencoder(trainloader, pretrain_optimizer_params, pretrain_epochs, device,
-                                          optimizer_class, loss_fn, embedding_size, autoencoder)
+    autoencoder = get_trained_network(trainloader, n_epochs=pretrain_epochs,
+                                      optimizer_params=pretrain_optimizer_params, optimizer_class=optimizer_class,
+                                      device=device, loss_fn=loss_fn, embedding_size=embedding_size,
+                                      neural_network=autoencoder)
     # Run ENRC init
     if debug:
         print("Run init: ", init)
         print("Start encoding")
-    embedded_data = encode_batchwise(subsampleloader, autoencoder, device)
+    embedded_data = encode_batchwise(subsampleloader, autoencoder)
     if debug: print("Start initializing parameters")
     # set init epochs proportional to clustering_epochs
     init_epochs = np.max([10, int(0.2*clustering_epochs)])
@@ -1926,10 +1928,11 @@ class ENRC(BaseEstimator, ClusterMixin):
         size of the embedding within the autoencoder. Only used if autoencoder is None (default: 20)
     init : str
         choose which initialization strategy should be used. Has to be one of 'nrkmeans', 'random' or 'sgd' (default: 'nrkmeans')
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
     device : torch.device
-        if device is None then it will be checked whether a gpu is available or not (default: None)
+        The device on which to perform the computations.
+        If device is None then it will be automatically chosen: if a gpu is available the gpu with the highest amount of free memory will be chosen (default: None)
     scheduler : torch.optim.lr_scheduler
         learning rate scheduler that should be used (default: None)
     scheduler_params : dict
@@ -1977,7 +1980,7 @@ class ENRC(BaseEstimator, ClusterMixin):
                  autoencoder: torch.nn.Module = None, embedding_size: int = 20, init: str = "nrkmeans",
                  device: torch.device = None, scheduler: torch.optim.lr_scheduler = None,
                  scheduler_params: dict = None, init_kwargs: dict = None, init_subsample_size: int = 10000,
-                 random_state: np.random.RandomState = None, custom_dataloaders: tuple = None, augmentation_invariance: bool = False, final_reclustering: bool = True, debug: bool = False):
+                 random_state: np.random.RandomState | int = None, custom_dataloaders: tuple = None, augmentation_invariance: bool = False, final_reclustering: bool = True, debug: bool = False):
         self.n_clusters = n_clusters.copy()
         self.device = device
         if self.device is None:
@@ -2125,7 +2128,7 @@ class ENRC(BaseEstimator, ClusterMixin):
         """
         if not embedded:
             dataloader = get_dataloader(X, batch_size=self.batch_size, shuffle=False, drop_last=False)
-            emb = encode_batchwise(dataloader=dataloader, module=self.autoencoder, device=self.device)
+            emb = encode_batchwise(dataloader=dataloader, module=self.autoencoder)
         else:
             emb = X
         rotated = np.matmul(emb, self.V)
@@ -2151,7 +2154,7 @@ class ENRC(BaseEstimator, ClusterMixin):
         """
         if not embedded:
             dataloader = get_dataloader(X, batch_size=self.batch_size, shuffle=False, drop_last=False)
-            emb = encode_batchwise(dataloader=dataloader, module=self.autoencoder, device=self.device)
+            emb = encode_batchwise(dataloader=dataloader, module=self.autoencoder)
         else:
             emb = X
         cluster_space_V = self.V[:, self.P[subspace_index]]
@@ -2256,10 +2259,11 @@ class ACeDeC(ENRC):
         size of the embedding within the autoencoder. Only used if autoencoder is None (default: 20)
     init : str
         choose which initialization strategy should be used. Has to be one of 'acedec', 'subkmeans', 'random' or 'sgd' (default: 'acedec')
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
     device : torch.device
-        if device is None then it will be checked whether a gpu is available or not (default: None)
+        The device on which to perform the computations.
+        If device is None then it will be automatically chosen: if a gpu is available the gpu with the highest amount of free memory will be chosen (default: None)
     scheduler : torch.optim.lr_scheduler
         learning rate scheduler that should be used (default: None)
     scheduler_params : dict
@@ -2307,7 +2311,7 @@ class ACeDeC(ENRC):
                  autoencoder: torch.nn.Module = None, embedding_size: int = 20, init: str = "acedec",
                  device: torch.device = None, scheduler: torch.optim.lr_scheduler = None,
                  scheduler_params: dict = None, init_kwargs: dict = None, init_subsample_size: int = 10000,
-                 random_state: np.random.RandomState = None, custom_dataloaders: tuple = None, augmentation_invariance: bool = False, 
+                 random_state: np.random.RandomState | int = None, custom_dataloaders: tuple = None, augmentation_invariance: bool = False,
                  final_reclustering: bool = True, debug: bool = False):
         
         super().__init__([n_clusters, 1], V, P, input_centers,

@@ -150,7 +150,7 @@ def _dip_python_impl(X: np.ndarray, debug: bool) -> (
     N = len(X)
     if N < 4 or X[0] == X[-1]:
         d = 0.0
-        return d, None, None, None, None, None, None
+        return d, (0, 0), (-1, -1, -1), None, None, None, None
     low = 0
     high = N - 1
     dip_value = 0.0
@@ -248,17 +248,17 @@ def _dip_python_impl(X: np.ndarray, debug: bool) -> (
             break
         if debug:
             print("  calculating dip ..")
-        j_l = None
-        j_u = None
-        lcm_modalTriangle_i1 = None
-        lcm_modalTriangle_i3 = None
-        gcm_modalTriangle_i1 = None
-        gcm_modalTriangle_i3 = None
+        j_l = -1
+        j_u = -1
+        lcm_modalTriangle_i1 = -1
+        lcm_modalTriangle_i3 = -1
+        gcm_modalTriangle_i1 = -1
+        gcm_modalTriangle_i3 = -1
         # The DIP for the convex minorant
         dip_l = 0
         for j in range(ig, l_gcm):
             max_t = 1
-            j_ = None
+            j_ = -1
             jb = gcm[j + 1]
             je = gcm[j]
             if je - jb > 1 and X[je] != X[jb]:
@@ -277,7 +277,7 @@ def _dip_python_impl(X: np.ndarray, debug: bool) -> (
         dip_u = 0
         for j in range(ih, l_lcm):
             max_t = 1
-            j_ = None
+            j_ = -1
             jb = lcm[j]
             je = lcm[j + 1]
             if je - jb > 1 and X[je] != X[jb]:
@@ -331,7 +331,7 @@ def _dip_python_impl(X: np.ndarray, debug: bool) -> (
 
 
 def dip_pval(dip_value: float, n_points: int, pval_strategy: str = "table", n_boots: int = 1000,
-             random_state: np.random.RandomState = None) -> float:
+             random_state: np.random.RandomState | int = None) -> float:
     """
     Get the p-value of a corresponding Dip-value.
     P-values depend on the input Dip-value and the sample size.
@@ -348,7 +348,7 @@ def dip_pval(dip_value: float, n_points: int, pval_strategy: str = "table", n_bo
         Specifies the strategy that should be used to calculate the p-value (default: 'table')
     n_boots : int
         Number of random data sets that should be created to calculate Dip-values. Only relevant if pval_strategy is 'bootstrap' (default: 1000)
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int. Only relevant if pval_strategy is 'bootstrap' (default: None)
 
     Returns
@@ -386,7 +386,8 @@ def dip_pval(dip_value: float, n_points: int, pval_strategy: str = "table", n_bo
     return pval
 
 
-def dip_boot_samples(n_points: int, n_boots: int = 1000, random_state: np.random.RandomState = None) -> np.ndarray:
+def dip_boot_samples(n_points: int, n_boots: int = 1000,
+                     random_state: np.random.RandomState | int = None) -> np.ndarray:
     """
     Sample random data sets and calculate corresponding Dip-values.
     E.g. used to determine p-values.
@@ -397,7 +398,7 @@ def dip_boot_samples(n_points: int, n_boots: int = 1000, random_state: np.random
         The number of samples
     n_boots : int
         Number of random data sets that should be created to calculate Dip-values (default: 1000)
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Returns
@@ -614,8 +615,9 @@ def plot_dip(X: np.ndarray, is_data_sorted: bool = False, dip_value: float = Non
                        show_legend=histogram_show_legend,
                        container=ax1, show_plot=False)
         if modal_interval is not None:
-            ax1.plot([X[modal_interval[0]], X[modal_interval[0]]], ax1.get_ylim(), "g--", linewidth=linewidth_extra)
-            ax1.plot([X[modal_interval[1]], X[modal_interval[1]]], ax1.get_ylim(), "g--", linewidth=linewidth_extra)
+            y_axis_limit = ax1.get_ylim()
+            ax1.plot([X[modal_interval[0]], X[modal_interval[0]]], y_axis_limit, "g--", linewidth=linewidth_extra)
+            ax1.plot([X[modal_interval[1]], X[modal_interval[1]]], y_axis_limit, "g--", linewidth=linewidth_extra)
         dip_container = ax2
         # Remove spacing between the two plots
         fig.subplots_adjust(hspace=0)
@@ -625,7 +627,8 @@ def plot_dip(X: np.ndarray, is_data_sorted: bool = False, dip_value: float = Non
     dip_container.plot(X, np.arange(N) / N, "b", label="eCDF", linewidth=linewidth_ecdf)
     if dip_value is not None:
         # Add Dip range around ECDF
-        dip_container.plot(X, np.arange(N) / N - dip_value * 2, "k:", alpha=0.7, label="2x dip", linewidth=linewidth_extra)
+        dip_container.plot(X, np.arange(N) / N - dip_value * 2, "k:", alpha=0.7, label="2x dip",
+                           linewidth=linewidth_extra)
         dip_container.plot(X, np.arange(N) / N + dip_value * 2, "k:", alpha=0.7, linewidth=linewidth_extra)
     if modal_interval is not None:
         # Add modal interval in green

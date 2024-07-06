@@ -65,7 +65,7 @@ def test_convolutional_autoencoder_in_deep_clustering():
     embedding_dim = 10
     # Test combining the Convolutional Autoencoder with DCN
     autoencoder = ConvolutionalAutoencoder(32, [512, embedding_dim])
-    dcn = DCN(3, pretrain_epochs=1, clustering_epochs=3, autoencoder=autoencoder, random_state=1)
+    dcn = DCN(3, pretrain_epochs=1, clustering_epochs=3, neural_network=autoencoder, random_state=1)
     dcn.fit(data)
     assert dcn.labels_.dtype == np.int32
     assert dcn.labels_.shape == (512,)

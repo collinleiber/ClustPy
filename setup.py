@@ -25,7 +25,7 @@ setup(
     description='A Python library for advanced clustering algorithms',
     long_description=_load_readme(),
     long_description_content_type="text/markdown",
-    python_requires='>=3.7',
+    python_requires='>=3.10',
     install_requires=['numpy',
                       'scipy',
                       'scikit-learn',
@@ -33,7 +33,7 @@ setup(
                       'torch',
                       'pandas'],
     extras_require={
-        'full': ['torchvision', 'Pillow', 'nltk', 'xlrd', 'opencv-python']
+        'full': ['torchvision', 'Pillow', 'nltk', 'xlrd', 'opencv-python', 'requests']
     },
     ext_modules=[dip_extension]
 )

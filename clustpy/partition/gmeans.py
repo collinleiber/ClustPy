@@ -42,7 +42,7 @@ def _gmeans(X: np.ndarray, significance: float, n_clusters_init: int, max_n_clus
     assert significance >= 0 and significance <= 1, "significance must be a value in the range [0, 1]"
     # Initialize parameters
     n_clusters, labels, centers, _ = _initial_kmeans_clusters(X, n_clusters_init, random_state)
-    while n_clusters <= max_n_clusters:
+    while n_clusters < max_n_clusters:
         n_clusters_old = n_clusters
         for c in range(n_clusters_old):
             ids_in_cluster = np.where(labels == c)[0]
@@ -62,6 +62,9 @@ def _gmeans(X: np.ndarray, significance: float, n_clusters_init: int, max_n_clus
                 centers = np.r_[centers, [centers_split[1]]]
                 labels[ids_in_cluster[labels_split == 1]] = n_clusters
                 n_clusters += 1
+                # If maximum number of clusters is reached, stop iterating over the current clusters
+                if n_clusters == max_n_clusters:
+                    break
         # If no cluster changed, GMeans terminates
         if n_clusters == n_clusters_old:
             break
@@ -129,7 +132,7 @@ class GMeans(BaseEstimator, ClusterMixin):
         Maximum number of clusters. Must be larger than n_clusters_init (default: np.inf)
     n_split_trials : int
         Number tries to split a cluster. For each try 2-KMeans is executed with different cluster centers (default: 10)
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Attributes
@@ -152,8 +155,8 @@ class GMeans(BaseEstimator, ClusterMixin):
     Statistics: Textbooks and Monographs (1986).
     """
 
-    def __init__(self, significance: float = 0.001, n_clusters_init: int = 1, max_n_clusters: int = np.inf,
-                 n_split_trials: int = 10, random_state: np.random.RandomState = None):
+    def __init__(self, significance: float = 0.0001, n_clusters_init: int = 1, max_n_clusters: int = np.inf,
+                 n_split_trials: int = 10, random_state: np.random.RandomState | int = None):
         self.significance = significance
         self.n_clusters_init = n_clusters_init
         self.max_n_clusters = max_n_clusters

@@ -247,7 +247,7 @@ class SpecialK(BaseEstimator, ClusterMixin):
         Smaller values for n_cluster_pairs_to_consider will decrease the computing time (default: 10)
     max_n_clusters : int
         Maximum number of clusters. Must be larger than n_clusters_init (default: np.inf)
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution (default: None)
     debug : bool
         If true, additional information will be printed to the console (default: False)
@@ -267,7 +267,7 @@ class SpecialK(BaseEstimator, ClusterMixin):
 
     def __init__(self, significance: float = 0.01, n_dimensions: int = 200, similarity_matrix: str = 'NAM',
                  n_neighbors: int = 10, percentage: float = 0.99, n_cluster_pairs_to_consider: int = 10,
-                 max_n_clusters: int = np.inf, random_state: np.random.RandomState = None, debug: bool = False):
+                 max_n_clusters: int = np.inf, random_state: np.random.RandomState | int = None, debug: bool = False):
         self.significance = significance
         self.n_dimensions = n_dimensions
         self.similarity_matrix = similarity_matrix
