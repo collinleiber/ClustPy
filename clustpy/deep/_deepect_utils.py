@@ -321,6 +321,8 @@ class Cluster_Tree:
                     node.sum_squared_dist = torch.sum(
                         min_dists[indices.squeeze()].pow(2)
                     )
+                    
+        self._assign_to_splitnodes(self.root)
 
     def _assign_to_splitnodes(self, node: Cluster_Node):
         """
