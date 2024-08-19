@@ -1,8 +1,8 @@
 from clustpy.deep import DipEncoder, get_dataloader, detect_device
-from clustpy.deep.dipencoder import plot_dipencoder_embedding, _get_rec_loss_of_first_batch
+from clustpy.deep.dipencoder import plot_dipencoder_embedding, _get_ssl_loss_of_first_batch
 from clustpy.data import create_subspace_data, load_optdigits
 from clustpy.deep.tests._helpers_for_tests import _get_test_augmentation_dataloaders
-from clustpy.deep.autoencoders import FeedforwardAutoencoder, ConvolutionalAutoencoder
+from clustpy.deep.neural_networks import FeedforwardAutoencoder, ConvolutionalAutoencoder
 import numpy as np
 import torch
 from unittest.mock import patch
@@ -75,12 +75,12 @@ def test_get_rec_loss_of_first_batch():
     X_flat = X.reshape(512, -1)
     ff_trainloader = get_dataloader(X_flat, 32, shuffle=True)
     ff_autoencoder = FeedforwardAutoencoder([X_flat.shape[1], 32, 10])
-    ae_loss = _get_rec_loss_of_first_batch(ff_trainloader, ff_autoencoder, torch.nn.MSELoss(), device)
+    ae_loss = _get_ssl_loss_of_first_batch(ff_trainloader, ff_autoencoder, torch.nn.MSELoss(), device)
     assert ae_loss > 0
     # Test with ConvolutionalAutoencoder
     conv_trainloader = get_dataloader(X, 32, shuffle=True)
     conv_autoencoder = ConvolutionalAutoencoder(X.shape[-1], [512, 10])
-    ae_loss = _get_rec_loss_of_first_batch(conv_trainloader, conv_autoencoder, torch.nn.MSELoss(), device)
+    ae_loss = _get_ssl_loss_of_first_batch(conv_trainloader, conv_autoencoder, torch.nn.MSELoss(), device)
     assert ae_loss > 0
 
 

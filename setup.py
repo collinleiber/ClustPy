@@ -31,7 +31,8 @@ setup(
                       'scikit-learn',
                       'matplotlib',
                       'torch',
-                      'pandas'],
+                      'pandas',
+                      'tqdm'],
     extras_require={
         'full': ['torchvision', 'Pillow', 'nltk', 'xlrd', 'opencv-python', 'requests']
     },

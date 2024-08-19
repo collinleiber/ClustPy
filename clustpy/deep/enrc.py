@@ -13,11 +13,9 @@ from clustpy.deep._data_utils import get_dataloader, augmentation_invariance_che
 from clustpy.deep._train_utils import get_trained_network
 from clustpy.alternative import NrKmeans
 from sklearn.utils import check_random_state
-from scipy.stats import ortho_group
 from sklearn.metrics import normalized_mutual_info_score
 from clustpy.utils.plots import plot_scatter_matrix
 from clustpy.alternative.nrkmeans import _get_total_cost_function
-from copy import deepcopy
 
 class _ENRC_Module(torch.nn.Module):
     """
@@ -290,7 +288,7 @@ class _ENRC_Module(torch.nn.Module):
                 one_hot_mask = assignment_matrix_dict[i]
             weighted_squared_diff_masked = weighted_squared_diff * one_hot_mask
             subspace_losses += weighted_squared_diff_masked.sum()
-            
+
         subspace_losses = subspace_losses / subspace_betas.shape[0]
         return subspace_losses, z_rot, z_rot_back, assignment_matrix_dict
 
@@ -391,7 +389,7 @@ class _ENRC_Module(torch.nn.Module):
         self.centers = [torch.tensor(centers_sub, dtype=torch.float32) for centers_sub in centers_reclustered]
         self.to_device(device)
 
-    def fit(self, trainloader: torch.utils.data.DataLoader, evalloader: torch.utils.data.DataLoader, 
+    def fit(self, trainloader: torch.utils.data.DataLoader, evalloader: torch.utils.data.DataLoader,
             optimizer: torch.optim.Optimizer, max_epochs: int, model: torch.nn.Module,
             batch_size: int, loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(),
             device: torch.device = torch.device("cpu"), print_step: int = 5, debug: bool = True,
@@ -1012,7 +1010,7 @@ def nrkmeans_init(data: np.ndarray, n_clusters: list, rounds: int = 10, max_iter
     lowest = np.inf
     if max(n_clusters) >= data.shape[1]:
         mdl_for_noisespace = True
-        if debug: 
+        if debug:
             print("mdl_for_noisespace=True, because number of clusters is larger then data dimensionality")
     else:
         mdl_for_noisespace = False
@@ -1032,7 +1030,7 @@ def nrkmeans_init(data: np.ndarray, n_clusters: list, rounds: int = 10, max_iter
                 lowest = cost
             if debug:
                 print(f"Round {i}: Found solution with: {cost} (current best: {lowest})")
-    
+
     # Best parameters
     if best is None:
         centers, P, V = centers_i, P_i, V_i
@@ -1304,7 +1302,7 @@ def acedec_init(data: np.ndarray, n_clusters: list, optimizer_params: dict, batc
         # Initialize betas with uniform distribution
         enrc_module = _ENRC_Module(init_centers, P_init, V_init, beta_init_value=1.0 / len(P_init)).to_device(device)
         enrc_module.to_device(device)
-        
+
         optimizer_beta_params = optimizer_params.copy()
         optimizer_beta_params["lr"] = optimizer_beta_params["lr"] * 10
         param_dict = [dict({'params': [enrc_module.V]}, **optimizer_params),
@@ -1330,14 +1328,14 @@ def acedec_init(data: np.ndarray, n_clusters: list, optimizer_params: dict, batc
 
         cost, z_rot = _determine_sgd_init_costs(enrc=enrc_module, dataloader=dataloader, loss_fn=torch.nn.MSELoss(),
                                          device=device, return_rot=True)
-        
+
         # Recluster with KMeans to get better centroid estimate
         kmeans = KMeans(n_clusters[0], n_init=10)
         kmeans.fit(z_rot)
         # cluster and shared space centers
         enrc_rotated_centers = [kmeans.cluster_centers_, z_rot.mean(0).reshape(1,-1)]
         enrc_module.centers = [torch.tensor(centers_sub, dtype=torch.float32) for centers_sub in enrc_rotated_centers]
-    
+
         if lowest > cost:
             best = [enrc_module.centers, enrc_module.P, enrc_module.V, enrc_module.beta_weights]
             lowest = cost
@@ -1345,7 +1343,7 @@ def acedec_init(data: np.ndarray, n_clusters: list, optimizer_params: dict, batc
             print(f"Round {round_i}: Found solution with: {cost} (current best: {lowest})")
 
     centers, P, V, beta_weights = best
-    
+
     beta_weights = calculate_beta_weight(data=torch.from_numpy(data).float(), centers=centers, V=V, P=P)
     centers = [centers_i.detach().cpu().numpy() for centers_i in centers]
     beta_weights = beta_weights.detach().cpu().numpy()
@@ -1859,21 +1857,21 @@ def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers
                     scheduler=scheduler,
                     tolerance_threshold=tolerance_threshold,
                     debug=debug)
-    
-    if debug: 
+
+    if debug:
         print("Betas after training")
         print(enrc_module.subspace_betas().detach().cpu().numpy())
-    
+
     cluster_labels_before_reclustering = enrc_module.predict_batchwise(model=autoencoder, dataloader=testloader, device=device, use_P=True)
     # Recluster
     if final_reclustering:
-        if debug: 
+        if debug:
             print("Recluster")
         enrc_module.recluster(dataloader=subsampleloader, model=autoencoder, device=device, optimizer_params=clustering_optimizer_params,
                               optimizer_class=optimizer_class, reclustering_strategy=init, init_kwargs=init_kwargs)
         # Predict labels and transfer other parameters to numpy
         cluster_labels = enrc_module.predict_batchwise(model=autoencoder, dataloader=testloader, device=device, use_P=True)
-        if debug: 
+        if debug:
             print("Betas after reclustering")
             print(enrc_module.subspace_betas().detach().cpu().numpy())
     else:
@@ -2313,7 +2311,7 @@ class ACeDeC(ENRC):
                  scheduler_params: dict = None, init_kwargs: dict = None, init_subsample_size: int = 10000,
                  random_state: np.random.RandomState | int = None, custom_dataloaders: tuple = None, augmentation_invariance: bool = False,
                  final_reclustering: bool = True, debug: bool = False):
-        
+
         super().__init__([n_clusters, 1], V, P, input_centers,
                  batch_size, pretrain_optimizer_params, clustering_optimizer_params, pretrain_epochs, clustering_epochs,
                  tolerance_threshold, optimizer_class, loss_fn, degree_of_space_distortion, degree_of_space_preservation,

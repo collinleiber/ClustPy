@@ -130,7 +130,7 @@ Remove clustpy via pip to avoid ambiguities during development, e.g., when chang
 | N2D        | [N2d:(not too) deep clustering via clustering the local manifold of an autoencoded embedding](https://ieeexplore.ieee.org/document/9413131) | ICPR 2021                        | [Link](https://github.com/XifengGuo/IDEC) (Python + Keras)                    | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.deep.html#clustpy.deep.ddc_n2d.N2D)           |
 | VaDE       | [Variational Deep Embedding: An Unsupervised and Generative Approach to Clustering](https://www.ijcai.org/proceedings/2017/0273) | IJCAI 2017                       | [Link](https://github.com/slim1017/VaDE) (Python + Keras)                     | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.deep.html#clustpy.deep.vade.VaDE)             |
 
-#### Autoencoder
+#### Neural Networks
 
 | Algorithm                          | Publication                                                                                                                    | Published at | Original Code | Docs                                                                                                                                                         |
 |------------------------------------|--------------------------------------------------------------------------------------------------------------------------------|--------------|---------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|

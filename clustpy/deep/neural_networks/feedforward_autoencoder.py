@@ -4,7 +4,7 @@ Lukas Miklautz
 """
 
 import torch
-from clustpy.deep.autoencoders._abstract_autoencoder import _AbstractAutoencoder, FullyConnectedBlock
+from clustpy.deep.neural_networks._abstract_autoencoder import _AbstractAutoencoder, FullyConnectedBlock
 
 
 class FeedforwardAutoencoder(_AbstractAutoencoder):
@@ -29,7 +29,7 @@ class FeedforwardAutoencoder(_AbstractAutoencoder):
     decoder_output_fn : torch.nn.Module
         activation function from torch.nn, set the activation function for the decoder output layer, if None then it will be linear.
         E.g. set to torch.nn.Sigmoid if you want to scale the decoder output between 0 and 1 (default: None)
-    reusable : bool
+    work_on_copy : bool
         If set to true, deep clustering algorithms will optimize a copy of the autoencoder and not the autoencoder itself.
         Ensures that the same autoencoder can be used by multiple deep clustering algorithms.
         As copies of this object are created, the memory requirement increases (default: True)
@@ -42,8 +42,8 @@ class FeedforwardAutoencoder(_AbstractAutoencoder):
         decoder part of the autoencoder, responsible for reconstructing data points from the embedding (class is FullyConnectedBlock)
     fitted  : bool
         indicates whether the autoencoder is already fitted
-    reusable : bool
-        indicates whether the autoencoder should be reused by multiple deep clustering algorithms
+    work_on_copy : bool
+        indicates whether deep clustering algorithms should work on a copy of the original autoencoder
 
     References
     ----------
@@ -58,8 +58,8 @@ class FeedforwardAutoencoder(_AbstractAutoencoder):
 
     def __init__(self, layers: list, batch_norm: bool = False, dropout: float = None,
                  activation_fn: torch.nn.Module = torch.nn.LeakyReLU, bias: bool = True, decoder_layers: list = None,
-                 decoder_output_fn: torch.nn.Module = None, reusable: bool = True):
-        super(FeedforwardAutoencoder, self).__init__(reusable)
+                 decoder_output_fn: torch.nn.Module = None, work_on_copy: bool = True):
+        super(FeedforwardAutoencoder, self).__init__(work_on_copy)
         if decoder_layers is None:
             decoder_layers = layers[::-1]
         if (layers[-1] != decoder_layers[0]):

@@ -1,5 +1,5 @@
 from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
-from clustpy.deep.autoencoders import FeedforwardAutoencoder
+from clustpy.deep.neural_networks import FeedforwardAutoencoder
 from clustpy.data import create_subspace_data
 import torch
 

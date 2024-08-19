@@ -13,8 +13,11 @@ class _AbstractDeepClusteringAlgo(BaseEstimator, ClusterMixin):
     ----------
     batch_size : int
         size of the data batches
-    neural_network : torch.nn.Module
-        the neural network used for the computations
+    neural_network : torch.nn.Module | tuple
+        the neural network used for the computations.
+        Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict).
+    neural_network_weights : str
+        Path to a file containing the state_dict of the neural_network.
     embedding_size : int
         size of the embedding within the autoencoder
     device : torch.device
@@ -23,10 +26,11 @@ class _AbstractDeepClusteringAlgo(BaseEstimator, ClusterMixin):
         use a fixed random state to get a repeatable solution. Can also be of type int
     """
 
-    def __init__(self, batch_size: int, neural_network: torch.nn.Module, embedding_size: int,
-                 device: torch.device, random_state: np.random.RandomState | int):
+    def __init__(self, batch_size: int, neural_network: torch.nn.Module | tuple, neural_network_weights: str,
+                 embedding_size: int, device: torch.device, random_state: np.random.RandomState | int):
         self.batch_size = batch_size
         self.neural_network = neural_network
+        self.neural_network_weights = neural_network_weights
         self.embedding_size = embedding_size
         self.device = device
         self.random_state = check_random_state(random_state)

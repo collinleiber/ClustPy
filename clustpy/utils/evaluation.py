@@ -624,25 +624,23 @@ def evaluation_df_to_latex_table(df: pd.DataFrame, output_path: str, use_std: bo
             f.write("l|" + "c" * len(algorithms) + "}\n\\toprule\n\\textbf{Dataset} & ")
         else:
             f.write("c" * len(algorithms) + "}\n\\toprule\n")
-        f.write("\\textbf{Metric} & " + " & ".join(algorithms) + "\\\\\n\\midrule\n")
+        f.write("\\textbf{Metric} & " + " & ".join([a.replace("_", "\\_") for a in algorithms]) + "\\\\\n\\midrule\n")
         # Write values into table
         for j, d in enumerate(datasets):
-            # Check if underscore in dataset name
-            if d is not None:
-                d = d.replace("_", "\\_")
             for i, m in enumerate(metrics):
-                # Check if underscore in metric name
-                m = m.replace("_", "\\_")
                 # Check if a higher value is better for this metric
                 metric_is_higher_better = (m != "runtime") if higher_is_better is None else higher_is_better[i]
+                # Escape underscore that could be contained in metric name
+                m_write = m.replace("_", "\\_")
                 # Write name of dataset and metric
                 if multiple_datasets:
                     if i == 0:
-                        to_write = d + " & " + m
+                        # Escape underscore that could be contained in dataset name
+                        to_write = d.replace("_", "\\_") + " & " + m_write
                     else:
-                        to_write = "& " + m
+                        to_write = "& " + m_write
                 else:
-                    to_write = m
+                    to_write = m_write
                 # Get all values from the experiments (are stored separately to calculated min values)
                 all_values = []
                 for a in algorithms:
@@ -656,8 +654,6 @@ def evaluation_df_to_latex_table(df: pd.DataFrame, output_path: str, use_std: bo
                     all_values.append(mean_value)
                 all_values_sorted = np.unique(all_values)  # automatically sorted
                 for k, a in enumerate(algorithms):
-                    # Check if underscore in algorithm name
-                    a = a.replace("_", "\\_")
                     mean_value = all_values[k]
                     # If standard deviation is contained in the dataframe, information will be added
                     if use_std and std_contained:
@@ -892,7 +888,7 @@ class EvaluationNetwork():
 
     Examples
     ----------
-    >>> from clustpy.deep.autoencoders import FeedforwardAutoencoder
+    >>> from clustpy.deep.neural_networks import FeedforwardAutoencoder
     >>> ea = EvaluationNetwork(path="PATH", neural_network_class=FeedforwardAutoencoder, params={"layers": [256, 128, 64, 10], "bias": False})
     """
 

@@ -1,4 +1,4 @@
-from clustpy.deep.autoencoders import FeedforwardAutoencoder, VariationalAutoencoder
+from clustpy.deep.neural_networks import FeedforwardAutoencoder, VariationalAutoencoder
 from clustpy.deep._train_utils import get_trained_network, _get_default_layers
 from clustpy.deep.tests._helpers_for_tests import _get_test_dataloader
 from clustpy.data import create_subspace_data
@@ -50,7 +50,7 @@ def test_get_trained_network_with_custom_ae():
     dataloader = _get_test_dataloader(data, 256, True, False)
     # Get trained version of custom AE
     device = torch.device('cpu')
-    ae = FeedforwardAutoencoder(layers=[data.shape[1], 256, 128, 64, 10], reusable=False)
+    ae = FeedforwardAutoencoder(layers=[data.shape[1], 256, 128, 64, 10], work_on_copy=False)
     assert ae.fitted == False
     encoder_0_params = ae.encoder.block[0].weight.data.detach().clone()
     decoder_0_params = ae.decoder.block[0].weight.data.detach().clone()
@@ -71,7 +71,7 @@ def test_get_trained_network_with_custom_pretrained_ae():
     dataloader = _get_test_dataloader(data, 256, True, False)
     # Get same pretrained version out of get_trained_network
     device = torch.device('cpu')
-    ae = FeedforwardAutoencoder(layers=[data.shape[1], 256, 128, 64, 10], reusable=True)
+    ae = FeedforwardAutoencoder(layers=[data.shape[1], 256, 128, 64, 10], work_on_copy=True)
     assert ae.fitted == False
     ae.fit(dataloader=dataloader, optimizer_params={"lr":1e-3}, n_epochs=5, optimizer_class=torch.optim.Adam,
            loss_fn=torch.nn.MSELoss())
