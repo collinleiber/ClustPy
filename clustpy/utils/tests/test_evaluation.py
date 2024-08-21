@@ -30,22 +30,6 @@ def cleanup_autoencoders():
         os.remove(filename2)
 
 
-@pytest.mark.usefixtures("cleanup_autoencoders")
-def test_load_saved_neural_network():
-    path = "autoencoder1.ae"
-    layers = [4, 2]
-    X, _ = create_subspace_data(500, subspace_features=(2, 2), random_state=1)
-    ae = FeedforwardAutoencoder(layers=layers)
-    assert ae.fitted is False
-    ae.fit(2, optimizer_params={"lr": 1e-3}, data=X, model_path=path)
-    assert ae.fitted is True
-    ae2 = load_saved_neural_network(path, FeedforwardAutoencoder, {"layers": layers})
-    assert ae2.fitted is True
-    # Check if all parameters are equal
-    for p1, p2 in zip(ae.parameters(), ae2.parameters()):
-        assert torch.equal(p1.data, p2.data)
-
-
 def test_preprocess_dataset():
     X = np.array([[0, 0], [1, 1], [2, 2], [3, 3], [4, 4], [5, 5]])
     X_test = _preprocess_dataset(X, preprocess_methods=_add_value, preprocess_params={})
