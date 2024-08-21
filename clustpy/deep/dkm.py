@@ -63,6 +63,8 @@ def _dkm(X: np.ndarray, n_clusters: int, alphas: list, batch_size: int, pretrain
         weight of the self-supervised learning (ssl) loss
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
+        Can also be a tuple of strings, where the first entry is the path to a saved trainloader and the second entry the path to a saved testloader.
+        In this case the dataloaders will be loaded by torch.load(PATH).
         If None, the default dataloaders will be used
     augmentation_invariance : bool
         If True, augmented samples provided in custom_dataloaders[0] will be used to learn 
@@ -86,7 +88,7 @@ def _dkm(X: np.ndarray, n_clusters: int, alphas: list, batch_size: int, pretrain
         The final neural network
     """
     # Get initial setting (device, dataloaders, pretrained AE and initial clustering result)
-    device, trainloader, testloader, neural_network, _, n_clusters, _, init_centers, _ = get_default_deep_clustering_initialization(
+    device, trainloader, testloader, _, neural_network, _, n_clusters, _, init_centers, _ = get_default_deep_clustering_initialization(
         X, n_clusters, batch_size, pretrain_optimizer_params, pretrain_epochs, optimizer_class, ssl_loss_fn,
         neural_network, embedding_size, custom_dataloaders, initial_clustering_class, initial_clustering_params, device,
         random_state, neural_network_weights=neural_network_weights)
@@ -415,6 +417,8 @@ class DKM(_AbstractDeepClusteringAlgo):
         weight of the self-supervised learning (ssl) loss (default: 1.0)
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
+        Can also be a tuple of strings, where the first entry is the path to a saved trainloader and the second entry the path to a saved testloader.
+        In this case the dataloaders will be loaded by torch.load(PATH).
         If None, the default dataloaders will be used (default: None)
     augmentation_invariance : bool
         If True, augmented samples provided in custom_dataloaders[0] will be used to learn 

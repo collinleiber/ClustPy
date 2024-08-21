@@ -1,7 +1,6 @@
-from clustpy.deep import DipDECK
+from clustpy.deep import DipDECK, get_default_augmented_dataloaders
 from clustpy.deep.dipdeck import _get_nearest_points_to_optimal_centers, _get_nearest_points, _get_dip_matrix
 from clustpy.data import create_subspace_data, load_optdigits
-from clustpy.deep.tests._helpers_for_tests import _get_test_augmentation_dataloaders
 import numpy as np
 import torch
 
@@ -15,7 +14,7 @@ def test_simple_dipdeck():
     assert dipdeck.labels_.dtype == np.int32
     assert dipdeck.labels_.shape == labels.shape
     # Test if random state is working
-    dipdeck2 = DipDECK(pretrain_epochs=3, clustering_epochs=3, random_state=1, debug=True)
+    dipdeck2 = DipDECK(pretrain_epochs=3, clustering_epochs=3, random_state=1)
     dipdeck2.fit(X)
     assert np.array_equal(dipdeck.labels_, dipdeck2.labels_)
     assert np.array_equal(dipdeck.cluster_centers_, dipdeck2.cluster_centers_)
@@ -29,7 +28,7 @@ def test_dipdeck_augmentation():
     dataset = load_optdigits()
     data = dataset.images[:1000]
     labels = dataset.target[:1000]
-    aug_dl, orig_dl = _get_test_augmentation_dataloaders(data)
+    aug_dl, orig_dl = get_default_augmented_dataloaders(data)
     clusterer = DipDECK(pretrain_epochs=3, clustering_epochs=3, random_state=1,
                         custom_dataloaders=[aug_dl, orig_dl], augmentation_invariance=True)
     assert not hasattr(clusterer, "labels_")

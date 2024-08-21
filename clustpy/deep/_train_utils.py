@@ -3,7 +3,7 @@ import torch
 import copy
 import numpy as np
 from sklearn.base import ClusterMixin
-from clustpy.deep._data_utils import get_dataloader
+from clustpy.deep._data_utils import get_dataloader, get_train_and_test_dataloader
 from clustpy.deep._utils import run_initial_clustering, detect_device, encode_batchwise
 
 
@@ -64,8 +64,14 @@ def _get_neural_network(input_dim: int, embedding_size: int = 10, neural_network
                     embedding_size, input_dim))
         # Init neural network parameters
         if neural_network_params is None:
+            neural_network_params = dict()
+        if "layers" not in neural_network_params.keys():
             layers = _get_default_layers(input_dim, embedding_size)
             neural_network_params = {"layers": layers}
+        if neural_network_params["layers"][-1] != embedding_size:
+            print(
+                "WARNING: embedding_size ({0}) in _get_neural_network does not correspond to the layers used to create the neural network. In the following an embedding size of {1} as specified in the layers will be used".format(
+                    embedding_size, neural_network_params["layers"][-1]))
         neural_network = neural_network_class(**neural_network_params)
     assert hasattr(neural_network,
                    "fitted"), "Neural network has no attribute 'fitted' and is therefore not compatible. Check documentation of fitted, e.g., at clustpy.deep.neural_networks._abstract_autoencoder._AbstractAutoencoder"
@@ -134,6 +140,7 @@ def get_trained_network(trainloader: torch.utils.data.DataLoader = None, data: n
             neural_network) == 2, "If neural_network is a tuple, it has to contain two entries: the neural network class (torch.nn.Module) and the initialization parameters (dict)"
         neural_network_class = neural_network[0]
         neural_network_params = neural_network[1]
+        neural_network = None
     neural_network = _get_neural_network(input_dim, embedding_size, neural_network, neural_network_class,
                                          neural_network_params, neural_network_weights)
     # Move neural network to device
@@ -162,7 +169,7 @@ def get_default_deep_clustering_initialization(X: np.ndarray | torch.Tensor, n_c
                                                neural_network_class: torch.nn.Module = FeedforwardAutoencoder,
                                                neural_network_params: dict = None,
                                                neural_network_weights: str = None) -> (
-        torch.device, torch.utils.data.DataLoader, torch.utils.data.DataLoader, torch.nn.Module, np.ndarray, int,
+        torch.device, torch.utils.data.DataLoader, torch.utils.data.DataLoader, int, torch.nn.Module, np.ndarray, int,
         np.ndarray, np.ndarray, ClusterMixin):
     """
     Get the initial setting for most deep clustering algorithms by pretraining a neural network and obtaining an initial clustering result.
@@ -191,6 +198,8 @@ def get_default_deep_clustering_initialization(X: np.ndarray | torch.Tensor, n_c
         size of the embedding within the neural network
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
+        Can also be a tuple of strings, where the first entry is the path to a saved trainloader and the second entry the path to a saved testloader.
+        In this case the dataloaders will be loaded by torch.load(PATH).
         If None, the default dataloaders will be used
     initial_clustering_class : ClusterMixin
         clustering class to obtain the initial cluster labels after the pretraining.
@@ -210,10 +219,11 @@ def get_default_deep_clustering_initialization(X: np.ndarray | torch.Tensor, n_c
 
     Returns
     -------
-    tuple : (torch.device, torch.utils.data.DataLoader, torch.utils.data.DataLoader, torch.nn.Module, np.ndarray, int, np.ndarray, np.ndarray, ClusterMixin)
+    tuple : (torch.device, torch.utils.data.DataLoader, torch.utils.data.DataLoader, int, torch.nn.Module, np.ndarray, int, np.ndarray, np.ndarray, ClusterMixin)
         The device,
         The trainloader,
         The testloader,
+        The batch size (can be different from input if another value is used within custom_dataloader),
         The pretrained neural network,
         The embedded data,
         The number of clusters (can change if e.g. DBSCAN is used),
@@ -222,11 +232,7 @@ def get_default_deep_clustering_initialization(X: np.ndarray | torch.Tensor, n_c
         The clustering object
     """
     device = detect_device(device)
-    if custom_dataloaders is None:
-        trainloader = get_dataloader(X, batch_size, True, False)
-        testloader = get_dataloader(X, batch_size, False, False)
-    else:
-        trainloader, testloader = custom_dataloaders
+    trainloader, testloader, batch_size = get_train_and_test_dataloader(X, batch_size, custom_dataloaders)
     neural_network = get_trained_network(trainloader, n_epochs=pretrain_epochs,
                                          optimizer_params=pretrain_optimizer_params, optimizer_class=optimizer_class,
                                          device=device, ssl_loss_fn=ssl_loss_fn, embedding_size=embedding_size,
@@ -239,4 +245,4 @@ def get_default_deep_clustering_initialization(X: np.ndarray | torch.Tensor, n_c
                                                                                      initial_clustering_class,
                                                                                      initial_clustering_params,
                                                                                      random_state)
-    return device, trainloader, testloader, neural_network, embedded_data, n_clusters, init_labels, init_centers, init_cluster_obj
+    return device, trainloader, testloader, batch_size, neural_network, embedded_data, n_clusters, init_labels, init_centers, init_cluster_obj

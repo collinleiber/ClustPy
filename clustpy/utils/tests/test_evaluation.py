@@ -1,6 +1,6 @@
 import torch
 from clustpy.utils import evaluate_multiple_datasets, evaluate_dataset, EvaluationAlgorithm, EvaluationDataset, \
-    EvaluationMetric, EvaluationNetwork, load_saved_neural_network, evaluation_df_to_latex_table
+    EvaluationMetric, evaluation_df_to_latex_table
 from clustpy.utils.evaluation import _preprocess_dataset, _get_n_clusters_from_algo
 import numpy as np
 from clustpy.deep.neural_networks import FeedforwardAutoencoder
@@ -8,6 +8,7 @@ from clustpy.data import create_subspace_data
 import os
 import pytest
 import shutil
+from clustpy.deep import set_torch_seed
 
 
 def _add_value(X: np.ndarray, value: int = 1):
@@ -101,35 +102,34 @@ def test_evaluate_dataset():
 
 
 @pytest.mark.usefixtures("cleanup_autoencoders")
-def test_evaluate_dataset_with_neural_networks():
+def test_evaluate_dataset_with_neural_networks_as_iteration_parameters():
     from sklearn.cluster import KMeans
     from clustpy.deep import DEC
     from sklearn.metrics import normalized_mutual_info_score as nmi, silhouette_score as silhouette
-    np.random.seed(10)
+    set_torch_seed(10)
     torch.use_deterministic_algorithms(True)
     n_repetitions = 2
     path1 = "autoencoder1.ae"
     path2 = "autoencoder2.ae"
     layers = [12, 5]
     X, L = create_subspace_data(500, subspace_features=(2, 10), random_state=1)
-    aes = []
     for path in [path1, path2]:
         ae = FeedforwardAutoencoder(layers=layers)
         ae.fit(1 if path == path1 else 10, optimizer_params={"lr": 1e-3}, data=X, model_path=path)
-        aes.append(ae)
-    neural_networks = [EvaluationNetwork(path1, FeedforwardAutoencoder, {"layers": layers}),
-                    EvaluationNetwork(path2, FeedforwardAutoencoder, {"layers": layers})]
     algorithms = [
         EvaluationAlgorithm(name="KMeans", algorithm=KMeans, params={"n_clusters": None, "random_state": 10}),
         EvaluationAlgorithm(name="DEC1", algorithm=DEC,
-                            params={"n_clusters": None, "embedding_size": 5, "clustering_epochs": 0}),
+                            params={"n_clusters": None, "embedding_size": 5, "clustering_epochs": 0,
+                                    "neural_network": (FeedforwardAutoencoder, {"layers": layers})},
+                            iteration_specific_params={"neural_network_weights": [path1, path2]}),
         EvaluationAlgorithm(name="DEC2", algorithm=DEC,
-                            params={"n_clusters": None, "embedding_size": 5, "clustering_epochs": 0}),
+                            params={"n_clusters": None, "embedding_size": 5, "clustering_epochs": 0,
+                                    "neural_network": (FeedforwardAutoencoder, {"layers": layers})},
+                            iteration_specific_params={"neural_network_weights": [path1, path2]}),
     ]
     metrics = [EvaluationMetric(name="nmi", metric=nmi, params={"average_method": "geometric"}, use_gt=True),
                EvaluationMetric(name="silhouette", metric=silhouette, use_gt=False)]
     df = evaluate_dataset(X=X, evaluation_algorithms=algorithms, evaluation_metrics=metrics,
-                          iteration_specific_neural_networks=neural_networks,
                           labels_true=L, n_repetitions=n_repetitions, add_runtime=False, add_n_clusters=False,
                           save_path=None, random_state=1)
     # Check if scores are equal
@@ -166,7 +166,11 @@ def test_evaluate_multiple_datasets():
                             preprocess_methods=[_add_value],
                             preprocess_params=[{"value": 1}]),
         EvaluationAlgorithm(name="DBSCAN", algorithm=DBSCAN, params={"eps": 0.5, "min_samples": 2},
-                            deterministic=True)]
+                            deterministic=True),
+        EvaluationAlgorithm(name="DBSCAN_ITER", algorithm=DBSCAN, params={"min_samples": 2},
+                            deterministic=True,
+                            iteration_specific_params={("soybean", "min_samples"): [2, 10], "eps": [0.5, 1.5]})
+    ]
     metrics = [EvaluationMetric(name="nmi", metric=nmi, params={"average_method": "geometric"}, use_gt=True),
                EvaluationMetric(name="silhouette", metric=silhouette, use_gt=False)]
     datasets = [EvaluationDataset(name="X", data=X, labels_true=L),

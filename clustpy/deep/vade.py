@@ -60,6 +60,8 @@ def _vade(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_pa
         weight of the self-supervised learning (ssl) loss
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
+        Can also be a tuple of strings, where the first entry is the path to a saved trainloader and the second entry the path to a saved testloader.
+        In this case the dataloaders will be loaded by torch.load(PATH).
         If None, the default dataloaders will be used
     initial_clustering_class : ClusterMixin
         clustering class to obtain the initial cluster labels after the pretraining
@@ -82,7 +84,7 @@ def _vade(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_pa
         The final neural network
     """
     # Get initial setting (device, dataloaders, pretrained AE and initial clustering result)
-    device, trainloader, testloader, neural_network, _, n_clusters, init_labels, init_means, init_clustering_algo = get_default_deep_clustering_initialization(
+    device, trainloader, testloader, _, neural_network, _, n_clusters, init_labels, init_means, init_clustering_algo = get_default_deep_clustering_initialization(
         X, n_clusters, batch_size, pretrain_optimizer_params, pretrain_epochs, optimizer_class, ssl_loss_fn,
         neural_network, embedding_size, custom_dataloaders, initial_clustering_class, initial_clustering_params, device,
         random_state, _VaDE_VAE, neural_network_weights=neural_network_weights)
@@ -511,6 +513,8 @@ class VaDE(_AbstractDeepClusteringAlgo):
         size of the embedding within the neural network (central layer with mean and variance) (default: 10)
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
+        Can also be a tuple of strings, where the first entry is the path to a saved trainloader and the second entry the path to a saved testloader.
+        In this case the dataloaders will be loaded by torch.load(PATH).
         If None, the default dataloaders will be used (default: None)
     initial_clustering_class : ClusterMixin
         clustering class to obtain the initial cluster labels after the pretraining (default: GaussianMixture)

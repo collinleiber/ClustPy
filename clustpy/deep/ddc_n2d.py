@@ -6,7 +6,7 @@ Collin Leiber
 import torch
 import numpy as np
 from clustpy.deep._utils import detect_device, encode_batchwise, run_initial_clustering
-from clustpy.deep._data_utils import get_dataloader
+from clustpy.deep._data_utils import get_train_and_test_dataloader
 from clustpy.deep._train_utils import get_trained_network
 from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
 from sklearn.manifold import TSNE
@@ -52,6 +52,8 @@ def _manifold_based_sequential_dc(X: np.ndarray, n_clusters: int, batch_size: in
         size of the embedding within the neural network
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
+        Can also be a tuple of strings, where the first entry is the path to a saved trainloader and the second entry the path to a saved testloader.
+        In this case the dataloaders will be loaded by torch.load(PATH).
         If None, the default dataloaders will be used
     manifold_class : TransformerMixin
         the manifold technique class
@@ -77,12 +79,7 @@ def _manifold_based_sequential_dc(X: np.ndarray, n_clusters: int, batch_size: in
     """
     # Get the device to train on
     device = detect_device(device)
-    # sample random mini-batches from the data -> shuffle = True
-    if custom_dataloaders is None:
-        trainloader = get_dataloader(X, batch_size, True, False)
-        testloader = get_dataloader(X, batch_size, False, False)
-    else:
-        trainloader, testloader = custom_dataloaders
+    trainloader, testloader, _ = get_train_and_test_dataloader(X, batch_size, custom_dataloaders)
     # Get initial AE
     neural_network = get_trained_network(trainloader, n_epochs=pretrain_epochs,
                                          optimizer_params=pretrain_optimizer_params, optimizer_class=optimizer_class,
@@ -173,10 +170,10 @@ def _density_peak_clustering(X: np.ndarray, ratio: float) -> (int, np.ndarray):
     max_dist = np.max(distances)
     d_c = np.mean(distances) * ratio
     if d_c >= max_dist:
-        print(
-            "[WARNING] ratio parameter was chosen too large (ratio={0}). It is recommended to set ratio smaller than 1. d_c will be set to the maximum possible value".format(
-                ratio))
         d_c = max_dist - 1e-8  # d_c can not be larger than the max distance
+        print(
+            "[WARNING] ratio parameter was chosen too large (ratio={0}). It is recommended to set ratio smaller than 1. d_c will be set to the maximum possible value of {1}".format(
+                ratio, d_c))
     # Calculate rho_i
     adj_distancse = np.exp(-((distances / d_c) ** 2))  # Equation 7
     rhos = np.sum(squareform(adj_distancse), axis=1)
@@ -259,6 +256,8 @@ class DDC(_AbstractDeepClusteringAlgo):
         size of the embedding within the neural network (default: 10)
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
+        Can also be a tuple of strings, where the first entry is the path to a saved trainloader and the second entry the path to a saved testloader.
+        In this case the dataloaders will be loaded by torch.load(PATH).
         If None, the default dataloaders will be used (default: None)
     tsne_params : dict
         Parameters for the t-SNE execution. For example, perplexity can be changed by setting tsne_params to {"n_components": 2, "perplexity": 25}.
@@ -379,6 +378,8 @@ class N2D(_AbstractDeepClusteringAlgo):
         size of the embedding within the neural network (default: 10)
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
+        Can also be a tuple of strings, where the first entry is the path to a saved trainloader and the second entry the path to a saved testloader.
+        In this case the dataloaders will be loaded by torch.load(PATH).
         If None, the default dataloaders will be used (default: None)
     manifold_class : TransformerMixin
         the manifold technique class (default: TSNE)

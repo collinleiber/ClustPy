@@ -75,6 +75,8 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
         Number of bootstraps used to calculate dip-p-values. Only necessary if pval_strategy is 'bootstrap'
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
+        Can also be a tuple of strings, where the first entry is the path to a saved trainloader and the second entry the path to a saved testloader.
+        In this case the dataloaders will be loaded by torch.load(PATH).
         If None, the default dataloaders will be used
     augmentation_invariance : bool
         If True, augmented samples provided in custom_dataloaders[0] will be used to learn
@@ -105,7 +107,7 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
     if dip_merge_threshold < 0 or dip_merge_threshold > 1:
         raise Exception("dip_merge_threshold must be between 0 and 1")
     # Get initial setting (device, dataloaders, pretrained AE and initial clustering result)
-    device, trainloader, testloader, neural_network, embedded_data, n_clusters_init, cluster_labels_cpu, init_centers, _ = get_default_deep_clustering_initialization(
+    device, trainloader, testloader, _, neural_network, embedded_data, n_clusters_init, cluster_labels_cpu, init_centers, _ = get_default_deep_clustering_initialization(
         X, n_clusters_init, batch_size, pretrain_optimizer_params, pretrain_epochs, optimizer_class, ssl_loss_fn,
         neural_network, embedding_size, custom_dataloaders, initial_clustering_class, initial_clustering_params,
         device, random_state, neural_network_weights=neural_network_weights)
@@ -610,6 +612,8 @@ class DipDECK(_AbstractDeepClusteringAlgo):
         Number of bootstraps used to calculate dip-p-values. Only necessary if pval_strategy is 'bootstrap' (default: 1000)
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
+        Can also be a tuple of strings, where the first entry is the path to a saved trainloader and the second entry the path to a saved testloader.
+        In this case the dataloaders will be loaded by torch.load(PATH).
         If None, the default dataloaders will be used (default: None)
     augmentation_invariance : bool
         If True, augmented samples provided in custom_dataloaders[0] will be used to learn

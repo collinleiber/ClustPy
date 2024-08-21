@@ -10,7 +10,7 @@ import torch
 import numpy as np
 from clustpy.partition.skinnydip import _dip_mirrored_data
 from clustpy.deep._utils import detect_device, encode_batchwise, run_initial_clustering
-from clustpy.deep._data_utils import get_dataloader, augmentation_invariance_check
+from clustpy.deep._data_utils import get_train_and_test_dataloader, augmentation_invariance_check
 from clustpy.deep._train_utils import get_trained_network
 from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
 from clustpy.deep.neural_networks._resnet_ae_modules import EncoderBlock, DecoderBlock
@@ -519,6 +519,8 @@ def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size:
         If None, it will be equal to 1/(4L), where L is the reconstruction loss of the first batch of an untrained neural network
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
+        Can also be a tuple of strings, where the first entry is the path to a saved trainloader and the second entry the path to a saved testloader.
+        In this case the dataloaders will be loaded by torch.load(PATH).
         If None, the default dataloaders will be used
     augmentation_invariance : bool
         If True, augmented samples provided in custom_dataloaders[0] will be used to learn
@@ -533,8 +535,6 @@ def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size:
         The device on which to perform the computations
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution
-    debug : bool
-        If true, additional information will be printed to the console
 
     Returns
     -------
@@ -547,12 +547,7 @@ def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size:
     MIN_NUMBER_OF_POINTS = 10
     # Deep Learning stuff
     device = detect_device(device)
-    # sample random mini-batches from the data -> shuffle = True
-    if custom_dataloaders is None:
-        trainloader = get_dataloader(X, batch_size, True, False)
-        testloader = get_dataloader(X, batch_size, False, False)
-    else:
-        trainloader, testloader = custom_dataloaders
+    trainloader, testloader, _ = get_train_and_test_dataloader(X, batch_size, custom_dataloaders)
     # Get initial AE
     neural_network = get_trained_network(trainloader, n_epochs=pretrain_epochs,
                                          optimizer_params=pretrain_optimizer_params, optimizer_class=optimizer_class,
@@ -706,6 +701,8 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
         If None, it will be equal to 1/(4L), where L is the reconstruction loss of the first batch of an untrained neural network (default: None)
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
+        Can also be a tuple of strings, where the first entry is the path to a saved trainloader and the second entry the path to a saved testloader.
+        In this case the dataloaders will be loaded by torch.load(PATH).
         If None, the default dataloaders will be used (default: None)
     augmentation_invariance : bool
         If True, augmented samples provided in custom_dataloaders[0] will be used to learn

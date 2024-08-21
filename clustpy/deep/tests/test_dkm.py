@@ -1,7 +1,6 @@
-from clustpy.deep import DKM
+from clustpy.deep import DKM, get_default_augmented_dataloaders
 from clustpy.deep.dkm import _get_default_alphas
 from clustpy.data import create_subspace_data, load_optdigits
-from clustpy.deep.tests._helpers_for_tests import _get_test_augmentation_dataloaders
 import torch
 import numpy as np
 
@@ -42,7 +41,7 @@ def test_dkm_augmentation():
     dataset = load_optdigits()
     data = dataset.images[:1000]
     labels = dataset.target[:1000]
-    aug_dl, orig_dl = _get_test_augmentation_dataloaders(data)
+    aug_dl, orig_dl = get_default_augmented_dataloaders(data)
     clusterer = DKM(10, pretrain_epochs=3, alphas=(None, 0.1, 2), clustering_epochs=3, random_state=1,
                     custom_dataloaders=[aug_dl, orig_dl], augmentation_invariance=True)
     assert not hasattr(clusterer, "labels_")
