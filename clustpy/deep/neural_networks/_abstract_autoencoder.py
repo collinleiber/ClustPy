@@ -338,9 +338,7 @@ class _AbstractAutoencoder(torch.nn.Module):
             if evalloader is not None:
                 # self.evaluate calls self.eval()
                 val_loss = self.evaluate(dataloader=evalloader, ssl_loss_fn=ssl_loss_fn, device=device)
-
                 postfix_str["Eval Loss"] = val_loss.item()
-
                 early_stopping(val_loss)
                 if val_loss < best_loss:
                     best_loss = val_loss

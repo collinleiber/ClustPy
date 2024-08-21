@@ -366,7 +366,6 @@ class N2D(_AbstractDeepClusteringAlgo):
         number of epochs for the pretraining of the neural network (default: 100)
     optimizer_class : torch.optim.Optimizer
         the optimizer class (default: torch.optim.Adam)
-
     ssl_loss_fn : torch.nn.modules.loss._Loss
          self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: torch.nn.MSELoss())
     neural_network : torch.nn.Module | tuple

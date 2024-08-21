@@ -1812,7 +1812,6 @@ def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers
     # Set device to train on
     if device is None:
         device = detect_device()
-
     # Setup dataloaders
     trainloader, testloader, batch_size = get_train_and_test_dataloader(X, batch_size, custom_dataloaders)
     if custom_dataloaders is not None:
@@ -1820,7 +1819,6 @@ def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers
         _preprocessed = []
         for batch in testloader: _preprocessed.append(batch[1])
         X = torch.cat(_preprocessed)
-
     # Use subsample of the data if specified and subsample is smaller than dataset
     if init_subsample_size is not None and init_subsample_size > 0 and init_subsample_size < X.shape[0]:
         rand_idx = random_state.choice(X.shape[0], init_subsample_size, replace=False)
