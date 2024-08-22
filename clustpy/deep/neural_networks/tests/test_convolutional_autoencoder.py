@@ -1,4 +1,4 @@
-from clustpy.deep.autoencoders import ConvolutionalAutoencoder
+from clustpy.deep.neural_networks import ConvolutionalAutoencoder
 from clustpy.deep import DCN
 import torch
 import numpy as np

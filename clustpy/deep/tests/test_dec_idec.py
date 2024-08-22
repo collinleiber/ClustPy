@@ -1,13 +1,12 @@
-from clustpy.deep import DEC, IDEC
+from clustpy.deep import DEC, IDEC, get_default_augmented_dataloaders
 from clustpy.data import create_subspace_data, load_optdigits
-from clustpy.deep.tests._helpers_for_tests import _get_test_augmentation_dataloaders
 import numpy as np
 import torch
 
 
 def test_simple_dec():
     torch.use_deterministic_algorithms(True)
-    X, labels = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    X, labels = create_subspace_data(1000, subspace_features=(3, 50), random_state=1)
     dec = DEC(3, pretrain_epochs=3, clustering_epochs=3, random_state=1)
     assert not hasattr(dec, "labels_")
     dec.fit(X)
@@ -27,7 +26,7 @@ def test_simple_dec():
 
 def test_simple_idec():
     torch.use_deterministic_algorithms(True)
-    X, labels = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    X, labels = create_subspace_data(1000, subspace_features=(3, 50), random_state=1)
     idec = IDEC(3, pretrain_epochs=3, clustering_epochs=3, random_state=1)
     assert not hasattr(idec, "labels_")
     idec.fit(X)
@@ -51,7 +50,7 @@ def test_dec_augmentation():
     dataset = load_optdigits()
     data = dataset.images[:1000]
     labels = dataset.target[:1000]
-    aug_dl, orig_dl = _get_test_augmentation_dataloaders(data)
+    aug_dl, orig_dl = get_default_augmented_dataloaders(data)
     dec = DEC(3, pretrain_epochs=3, clustering_epochs=3, random_state=1,
               custom_dataloaders=[aug_dl, orig_dl], augmentation_invariance=True)
     assert not hasattr(dec, "labels_")
@@ -65,7 +64,7 @@ def test_idec_augmentation():
     dataset = load_optdigits()
     data = dataset.images[:1000]
     labels = dataset.target[:1000]
-    aug_dl, orig_dl = _get_test_augmentation_dataloaders(data)
+    aug_dl, orig_dl = get_default_augmented_dataloaders(data)
     idec = IDEC(3, pretrain_epochs=3, clustering_epochs=3, random_state=1,
                 custom_dataloaders=[aug_dl, orig_dl], augmentation_invariance=True)
     assert not hasattr(idec, "labels_")

@@ -1,13 +1,14 @@
 import torch
 from clustpy.utils import evaluate_multiple_datasets, evaluate_dataset, EvaluationAlgorithm, EvaluationDataset, \
-    EvaluationMetric, EvaluationNetwork, load_saved_neural_network, evaluation_df_to_latex_table
+    EvaluationMetric, evaluation_df_to_latex_table
 from clustpy.utils.evaluation import _preprocess_dataset, _get_n_clusters_from_algo
 import numpy as np
-from clustpy.deep.autoencoders import FeedforwardAutoencoder
+from clustpy.deep.neural_networks import FeedforwardAutoencoder
 from clustpy.data import create_subspace_data
 import os
 import pytest
 import shutil
+from clustpy.deep import set_torch_seed
 
 
 def _add_value(X: np.ndarray, value: int = 1):
@@ -27,22 +28,6 @@ def cleanup_autoencoders():
     filename2 = "autoencoder2.ae"
     if os.path.isfile(filename2):
         os.remove(filename2)
-
-
-@pytest.mark.usefixtures("cleanup_autoencoders")
-def test_load_saved_neural_network():
-    path = "autoencoder1.ae"
-    layers = [4, 2]
-    X, _ = create_subspace_data(500, subspace_features=(2, 2), random_state=1)
-    ae = FeedforwardAutoencoder(layers=layers)
-    assert ae.fitted is False
-    ae.fit(2, optimizer_params={"lr": 1e-3}, data=X, model_path=path)
-    assert ae.fitted is True
-    ae2 = load_saved_neural_network(path, FeedforwardAutoencoder, {"layers": layers})
-    assert ae2.fitted is True
-    # Check if all parameters are equal
-    for p1, p2 in zip(ae.parameters(), ae2.parameters()):
-        assert torch.equal(p1.data, p2.data)
 
 
 def test_preprocess_dataset():
@@ -101,35 +86,34 @@ def test_evaluate_dataset():
 
 
 @pytest.mark.usefixtures("cleanup_autoencoders")
-def test_evaluate_dataset_with_neural_networks():
+def test_evaluate_dataset_with_neural_networks_as_iteration_parameters():
     from sklearn.cluster import KMeans
     from clustpy.deep import DEC
     from sklearn.metrics import normalized_mutual_info_score as nmi, silhouette_score as silhouette
-    np.random.seed(10)
+    set_torch_seed(10)
     torch.use_deterministic_algorithms(True)
     n_repetitions = 2
     path1 = "autoencoder1.ae"
     path2 = "autoencoder2.ae"
     layers = [12, 5]
     X, L = create_subspace_data(500, subspace_features=(2, 10), random_state=1)
-    aes = []
     for path in [path1, path2]:
         ae = FeedforwardAutoencoder(layers=layers)
         ae.fit(1 if path == path1 else 10, optimizer_params={"lr": 1e-3}, data=X, model_path=path)
-        aes.append(ae)
-    neural_networks = [EvaluationNetwork(path1, FeedforwardAutoencoder, {"layers": layers}),
-                    EvaluationNetwork(path2, FeedforwardAutoencoder, {"layers": layers})]
     algorithms = [
         EvaluationAlgorithm(name="KMeans", algorithm=KMeans, params={"n_clusters": None, "random_state": 10}),
         EvaluationAlgorithm(name="DEC1", algorithm=DEC,
-                            params={"n_clusters": None, "embedding_size": 5, "clustering_epochs": 0}),
+                            params={"n_clusters": None, "embedding_size": 5, "clustering_epochs": 0,
+                                    "neural_network": (FeedforwardAutoencoder, {"layers": layers})},
+                            iteration_specific_params={"neural_network_weights": [path1, path2]}),
         EvaluationAlgorithm(name="DEC2", algorithm=DEC,
-                            params={"n_clusters": None, "embedding_size": 5, "clustering_epochs": 0}),
+                            params={"n_clusters": None, "embedding_size": 5, "clustering_epochs": 0,
+                                    "neural_network": (FeedforwardAutoencoder, {"layers": layers})},
+                            iteration_specific_params={"neural_network_weights": [path1, path2]}),
     ]
     metrics = [EvaluationMetric(name="nmi", metric=nmi, params={"average_method": "geometric"}, use_gt=True),
                EvaluationMetric(name="silhouette", metric=silhouette, use_gt=False)]
     df = evaluate_dataset(X=X, evaluation_algorithms=algorithms, evaluation_metrics=metrics,
-                          iteration_specific_neural_networks=neural_networks,
                           labels_true=L, n_repetitions=n_repetitions, add_runtime=False, add_n_clusters=False,
                           save_path=None, random_state=1)
     # Check if scores are equal
@@ -166,7 +150,11 @@ def test_evaluate_multiple_datasets():
                             preprocess_methods=[_add_value],
                             preprocess_params=[{"value": 1}]),
         EvaluationAlgorithm(name="DBSCAN", algorithm=DBSCAN, params={"eps": 0.5, "min_samples": 2},
-                            deterministic=True)]
+                            deterministic=True),
+        EvaluationAlgorithm(name="DBSCAN_ITER", algorithm=DBSCAN, params={"min_samples": 2},
+                            deterministic=True,
+                            iteration_specific_params={("soybean", "min_samples"): [2, 10], "eps": [0.5, 1.5]})
+    ]
     metrics = [EvaluationMetric(name="nmi", metric=nmi, params={"average_method": "geometric"}, use_gt=True),
                EvaluationMetric(name="silhouette", metric=silhouette, use_gt=False)]
     datasets = [EvaluationDataset(name="X", data=X, labels_true=L),
@@ -205,14 +193,14 @@ def test_evaluation_df_to_latex_table_multiple_datasets():
     X, L = create_subspace_data(1500, subspace_features=(4, 10), random_state=1)
     X2, L2 = create_subspace_data(1500, subspace_features=(2, 10), random_state=1)
     n_repetitions = 2
-    datasets = [EvaluationDataset(name="Data1", data=X, labels_true=L),
+    datasets = [EvaluationDataset(name="Data_1", data=X, labels_true=L),
                 EvaluationDataset(name="Data2", data=X2, labels_true=L2)]
     algorithms = [
-        EvaluationAlgorithm(name="KMeans1", algorithm=KMeans, params={"n_clusters": 6}),
+        EvaluationAlgorithm(name="KMeans_1", algorithm=KMeans, params={"n_clusters": 6}),
         EvaluationAlgorithm(name="KMeans2", algorithm=KMeans, params={"n_clusters": 3}),
         EvaluationAlgorithm(name="Spectral", algorithm=SpectralClustering, params={"n_clusters": None})]
     metrics = [EvaluationMetric(name="nmi", metric=nmi, params={"average_method": "geometric"}, use_gt=True),
-               EvaluationMetric(name="silhouette", metric=silhouette, use_gt=False)]
+               EvaluationMetric(name="silhouette_", metric=silhouette, use_gt=False)]
     df = evaluate_multiple_datasets(evaluation_datasets=datasets, evaluation_algorithms=algorithms,
                                     evaluation_metrics=metrics, n_repetitions=n_repetitions, add_runtime=True,
                                     add_n_clusters=False,
@@ -236,12 +224,12 @@ def test_evaluation_df_to_latex_table_multiple_datasets():
     for rf in [read_file1, read_file2]:
         assert rf[5] == "\\toprule\n" and rf[7] == "\\midrule\n" and rf[11] == "\\midrule\n" and rf[
             15] == "\\bottomrule\n"
-        assert rf[6] == "\\textbf{Dataset} & \\textbf{Metric} & KMeans1 & KMeans2 & Spectral\\\\\n"
-        assert rf[non_equal_lines[0]].startswith("Data1 & nmi &")
-        assert rf[non_equal_lines[1]].startswith("& silhouette &")
+        assert rf[6] == "\\textbf{Dataset} & \\textbf{Metric} & KMeans\\_1 & KMeans2 & Spectral\\\\\n"
+        assert rf[non_equal_lines[0]].startswith("Data\\_1 & nmi &")
+        assert rf[non_equal_lines[1]].startswith("& silhouette\\_ &")
         assert rf[non_equal_lines[2]].startswith("& runtime &")
         assert rf[non_equal_lines[3]].startswith("Data2 & nmi &")
-        assert rf[non_equal_lines[4]].startswith("& silhouette &")
+        assert rf[non_equal_lines[4]].startswith("& silhouette\\_ &")
         assert rf[non_equal_lines[5]].startswith("& runtime &")
     assert all(["pm" in read_file2[i] and "pm" not in read_file1[i] for i in non_equal_lines])
     assert all(["bm" in read_file2[i] and "bm" not in read_file1[i] for i in non_equal_lines])
@@ -257,11 +245,11 @@ def test_evaluation_df_to_latex_table_single_dataset():
     X, L = create_subspace_data(1500, subspace_features=(4, 10), random_state=1)
     n_repetitions = 2
     algorithms = [
-        EvaluationAlgorithm(name="KMeans1", algorithm=KMeans, params={"n_clusters": 6}),
+        EvaluationAlgorithm(name="KMeans_1", algorithm=KMeans, params={"n_clusters": 6}),
         EvaluationAlgorithm(name="KMeans2", algorithm=KMeans, params={"n_clusters": 3}),
         EvaluationAlgorithm(name="Spectral", algorithm=SpectralClustering, params={"n_clusters": None})]
     metrics = [EvaluationMetric(name="nmi", metric=nmi, params={"average_method": "geometric"}, use_gt=True),
-               EvaluationMetric(name="silhouette", metric=silhouette, use_gt=False)]
+               EvaluationMetric(name="silhouette_", metric=silhouette, use_gt=False)]
     df = evaluate_dataset(X=X, evaluation_algorithms=algorithms, evaluation_metrics=metrics, labels_true=L,
                           n_repetitions=n_repetitions, add_runtime=True,
                           add_n_clusters=False, save_path="df.csv", random_state=1)
@@ -283,9 +271,9 @@ def test_evaluation_df_to_latex_table_single_dataset():
     assert all([len(read_file1[i].split("&")) == 4 and len(read_file2[i].split("&")) == 4 for i in non_equal_lines])
     for rf in [read_file1, read_file2]:
         assert rf[5] == "\\toprule\n" and rf[7] == "\\midrule\n" and rf[11] == "\\bottomrule\n"
-        assert rf[6] == "\\textbf{Metric} & KMeans1 & KMeans2 & Spectral\\\\\n"
+        assert rf[6] == "\\textbf{Metric} & KMeans\\_1 & KMeans2 & Spectral\\\\\n"
         assert rf[non_equal_lines[0]].startswith("nmi &")
-        assert rf[non_equal_lines[1]].startswith("silhouette &")
+        assert rf[non_equal_lines[1]].startswith("silhouette\\_ &")
         assert rf[non_equal_lines[2]].startswith("runtime &")
     assert all(["pm" in read_file2[i] and "pm" not in read_file1[i] for i in non_equal_lines])
     assert all(["bm" in read_file2[i] and "bm" not in read_file1[i] for i in non_equal_lines])

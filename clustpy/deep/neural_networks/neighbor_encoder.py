@@ -6,8 +6,8 @@ Collin Leiber
 import torch
 import numpy as np
 from scipy.spatial.distance import cdist
-from clustpy.deep.autoencoders.feedforward_autoencoder import FeedforwardAutoencoder
-from clustpy.deep.autoencoders._abstract_autoencoder import FullyConnectedBlock
+from clustpy.deep.neural_networks.feedforward_autoencoder import FeedforwardAutoencoder
+from clustpy.deep.neural_networks._abstract_autoencoder import FullyConnectedBlock
 
 
 def get_neighbors_batchwise(X: np.ndarray, n_neighbors: int, metric: str = "sqeuclidean",
@@ -95,7 +95,7 @@ class NeighborEncoder(FeedforwardAutoencoder):
     decoder_output_fn : torch.nn.Module
         activation function from torch.nn, set the activation function for the decoder output layer, if None then it will be linear.
         E.g. set to torch.nn.Sigmoid if you want to scale the decoder output between 0 and 1 (default: None)
-    reusable : bool
+    work_on_copy : bool
         If set to true, deep clustering algorithms will optimize a copy of the autoencoder and not the autoencoder itself.
         Ensures that the same autoencoder can be used by multiple deep clustering algorithms.
         As copies of this object are created, the memory requirement increases (default: True)
@@ -111,8 +111,8 @@ class NeighborEncoder(FeedforwardAutoencoder):
         list containing one decoder network (class is FullyConnectedBlock) for each nearest neighbor
     fitted  : bool
         boolean value indicating whether the autoencoder is already fitted
-    reusable : bool
-        indicates whether the autoencoder should be reused by multiple deep clustering algorithms
+    work_on_copy : bool
+        indicates whether deep clustering algorithms should work on a copy of the original autoencoder
 
     Examples
     --------
@@ -139,10 +139,10 @@ class NeighborEncoder(FeedforwardAutoencoder):
 
     def __init__(self, layers: list, n_neighbors: int, decode_self: bool = False, batch_norm: bool = False,
                  dropout: float = None, activation_fn: torch.nn.Module = torch.nn.LeakyReLU, bias: bool = True,
-                 decoder_layers: list = None, decoder_output_fn: torch.nn.Module = None, reusable: bool = True):
+                 decoder_layers: list = None, decoder_output_fn: torch.nn.Module = None, work_on_copy: bool = True):
         assert n_neighbors > 0 or decode_self, "n_neighbors must be an integer larger than 0 or decode_self must be true"
         super(NeighborEncoder, self).__init__(layers, batch_norm, dropout, activation_fn, bias,
-                                              decoder_layers, decoder_output_fn, reusable)
+                                              decoder_layers, decoder_output_fn, work_on_copy)
         self.n_neighbors = n_neighbors
         self.decode_self = decode_self
         neighbor_decoders = torch.nn.ModuleList([FullyConnectedBlock(layers=self.decoder.layers, batch_norm=batch_norm,
@@ -176,7 +176,7 @@ class NeighborEncoder(FeedforwardAutoencoder):
             decoded_neighbors[-1] = self.decoder(embedded)
         return decoded_neighbors
 
-    def loss(self, batch: list, loss_fn: torch.nn.modules.loss._Loss, device: torch.device) -> (
+    def loss(self, batch: list, ssl_loss_fn: torch.nn.modules.loss._Loss, device: torch.device) -> (
             torch.Tensor, torch.Tensor, torch.Tensor):
         """
         Calculate the loss of a single batch of data.
@@ -187,8 +187,8 @@ class NeighborEncoder(FeedforwardAutoencoder):
         ----------
         batch: list
             the different parts of a dataloader (id, samples, 1-nearest-neighbor, 2-nearest-neighbor, ...)
-        loss_fn : torch.nn.modules.loss._Loss
-            loss function to be used for reconstruction
+        ssl_loss_fn : torch.nn.modules.loss._Loss
+            self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss
         device : torch.device
             device to be trained on
 
@@ -206,16 +206,16 @@ class NeighborEncoder(FeedforwardAutoencoder):
         loss = torch.tensor(0.)
         for i in range(self.n_neighbors):  # TODO: Maybe use functorch.vmap in the future for vectorization
             neighbors = batch[2 + i].to(device)
-            loss = loss + loss_fn(decoded_neighbors[i], neighbors)
+            loss = loss + ssl_loss_fn(decoded_neighbors[i], neighbors)
         if self.decode_self:
             reconstruction = decoded_neighbors[-1]
-            loss = loss + loss_fn(reconstruction, batch_data)
+            loss = loss + ssl_loss_fn(reconstruction, batch_data)
         return loss, embedded, decoded_neighbors
 
     def fit(self, n_epochs: int, optimizer_params: dict, batch_size: int = 128,
             dataloader: torch.utils.data.DataLoader = None, evalloader: torch.utils.data.DataLoader = None,
             optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
-            loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), patience: int = 5,
+            ssl_loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), patience: int = 5,
             scheduler: torch.optim.lr_scheduler = None, scheduler_params: dict = None, model_path: str = None,
             print_step: int = 0) -> 'NeighborEncoder':
         """
@@ -237,8 +237,8 @@ class NeighborEncoder(FeedforwardAutoencoder):
             dataloader to be used for evaluation, early stopping and learning rate scheduling if scheduler=torch.optim.lr_scheduler.ReduceLROnPlateau (default: None)
         optimizer_class : torch.optim.Optimizer
             optimizer to be used (default: torch.optim.Adam)
-        loss_fn : torch.nn.modules.loss._Loss
-            loss function to be used for reconstruction (default: torch.nn.MSELoss())
+        ssl_loss_fn : torch.nn.modules.loss._Loss
+            self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss (default: torch.nn.MSELoss())
         patience : int
             patience parameter for EarlyStopping (default: 5)
         scheduler : torch.optim.lr_scheduler
@@ -248,8 +248,6 @@ class NeighborEncoder(FeedforwardAutoencoder):
             dictionary of the parameters of the scheduler object (default: None)
         model_path : str
             if specified will save the trained model to the location. If evalloader is used, then only the best model w.r.t. evaluation loss is saved (default: None)
-        print_step : int
-            specifies how often the losses are printed. If 0, no prints will occur (default: 0)
 
         Returns
         -------
@@ -257,5 +255,5 @@ class NeighborEncoder(FeedforwardAutoencoder):
             this instance of the NeighborEncoder
         """
         super().fit(n_epochs, optimizer_params, batch_size, None, None, dataloader, evalloader, optimizer_class,
-                    loss_fn, patience, scheduler, scheduler_params, model_path, print_step)
+                    ssl_loss_fn, patience, scheduler, scheduler_params, model_path)
         return self

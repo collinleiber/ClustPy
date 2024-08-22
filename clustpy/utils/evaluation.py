@@ -1,5 +1,4 @@
 import pandas as pd
-import torch
 import numpy as np
 import time
 from sklearn.utils import check_random_state
@@ -8,30 +7,6 @@ from collections.abc import Callable
 import os
 import inspect
 from sklearn.datasets._base import Bunch
-
-
-def load_saved_neural_network(path: str, neural_network_class: torch.nn.Module, params: dict = None) -> torch.nn.Module:
-    """
-    Load the states of an already trained neural network.
-    It will be assumed that the neural network was already fitted, so the 'fitted' parameter will be set to True.
-
-    Parameters
-    ----------
-    path : str
-        Path to the state dict that should be loaded
-    neural_network_class : torch.nn.Module
-        The actual neural network class
-    params : dict
-        Parameters given to the neural network class (default: {})
-
-    Returns
-    -------
-    The neural network with the loaded states
-    """
-    params = {} if params is None else params
-    neural_network = neural_network_class(**params)
-    neural_network.load_parameters(path)
-    return neural_network
 
 
 def _preprocess_dataset(X: np.ndarray, preprocess_methods: list, preprocess_params: list) -> np.ndarray:
@@ -105,9 +80,9 @@ def _get_n_clusters_from_algo(algo_obj: ClusterMixin) -> int:
 def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metrics: list = None,
                      labels_true: np.ndarray = None, n_repetitions: int = 10,
                      X_test: np.ndarray = None, labels_true_test: np.ndarray = None,
-                     iteration_specific_neural_networks: list = None, aggregation_functions: tuple = (np.mean, np.std),
-                     add_runtime: bool = True, add_n_clusters: bool = False, save_path: str = None,
-                     save_labels_path: str = None, ignore_algorithms: tuple = (),
+                     aggregation_functions: tuple = (np.mean, np.std), add_runtime: bool = True,
+                     add_n_clusters: bool = False, save_path: str = None, save_labels_path: str = None,
+                     ignore_algorithms: tuple = (), dataset_name: str = None,
                      random_state: np.random.RandomState | int = None) -> pd.DataFrame:
     """
     Evaluate the clustering result of different clustering algorithms (as specified by evaluation_algorithms) on a given data set using different metrics (as specified by evaluation_metrics).
@@ -130,12 +105,6 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
         An optional test data set that will be evaluated using the predict method of the clustering algorithms (default: None)
     labels_true_test : np.ndarray
         The ground truth labels of the test data set (default: None)
-    iteration_specific_neural_networks : list
-        List containing EvaluationNetwork objects for each iteration of deep clustering algorithm.
-        Length of the list must be equal to 'n_repetitions'.
-        Each entry in the list must be of type EvaluationNetwork.
-        If a clustering algorithm does not have a 'neural_network' parameter, this parameter will be ignored.
-        Can be None if no iteration-specific neural networks are used (default: None)
     aggregation_functions : tuple
         List of aggregation functions that should be applied to the n_repetitions different results of a single clustering algorithm (default: [np.mean, np.std])
     add_runtime : bool
@@ -148,6 +117,8 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
         The path where the clustering labels should be saved as csv. If None, the labels will not be saved (default: None)
     ignore_algorithms : tuple
         List of algorithm names (as specified in the EvaluationAlgorithm object) that should be ignored for this specific data set (default: [])
+    dataset_name : str
+        The name of the dataset; only relevant if iteration_specific_params are defined for an EvaluationAlgorithm (default: None)
     random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
@@ -185,17 +156,14 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
         "Either evaluation metrics must be defined or add_runtime/add_n_clusters must be True"
     assert type(aggregation_functions) is list or type(
         aggregation_functions) is tuple, "aggregation_functions must be list or tuple"
-    # Check if length of iteration_specific_neural_networks is correct
-    assert iteration_specific_neural_networks is None or len(
-        iteration_specific_neural_networks) == n_repetitions, "If iteration_specific_neural_networks is specified, the length of the list must be equal to n_repetitions. Should be {0}, but is {1}".format(
-        n_repetitions, len(iteration_specific_neural_networks))
     if type(evaluation_algorithms) is not list:
         evaluation_algorithms = [evaluation_algorithms]
     if type(evaluation_metrics) is not list and evaluation_metrics is not None:
         evaluation_metrics = [evaluation_metrics]
     if save_labels_path is not None and not "." in save_labels_path:
         save_labels_path = save_labels_path + ".csv"
-    assert save_labels_path is None or len(save_labels_path.split(".")) == 2, "save_labels_path must only contain a single dot. E.g., NAME.csv"
+    assert save_labels_path is None or len(
+        save_labels_path.split(".")) == 2, "save_labels_path must only contain a single dot. E.g., NAME.csv"
     # Use same seed for each algorithm
     random_state = check_random_state(random_state)
     seeds = random_state.choice(10000, n_repetitions, replace=False)
@@ -245,22 +213,25 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
                 print("- Iteration {0}".format(rep))
                 # set seed
                 np.random.seed(seeds[rep])
+                tmp_params = eval_algo.params.copy()
+                # Check if algorithm uses iteration_specific_params and if length of values is correct
+                if eval_algo.iteration_specific_params is not None:
+                    for iteration_params_key in eval_algo.iteration_specific_params.keys():
+                        assert type(iteration_params_key) is str or (type(iteration_params_key) is tuple and len(
+                            iteration_params_key) == 2), "All keys within iteration_specific_params must be str or a tuple of length 2, i.e., (dataset name, parameter name). Your key: {0}".format(
+                            iteration_params_key)
+                        assert len(eval_algo.iteration_specific_params[
+                                       iteration_params_key]) == n_repetitions, "All values within iteration_specific_params must be lists with length equal to n_repetitions. Should be {0}, but is {1}".format(
+                            n_repetitions, len(eval_algo.iteration_specific_params[iteration_params_key]))
+                        if type(iteration_params_key) is str:
+                            tmp_params[iteration_params_key] = \
+                                eval_algo.iteration_specific_params[iteration_params_key][rep]
+                        elif iteration_params_key[0] == dataset_name:
+                            tmp_params[iteration_params_key[1]] = \
+                                eval_algo.iteration_specific_params[iteration_params_key][rep]
                 # Execute algorithm
                 start_time = time.time()
-                algo_obj = eval_algo.algorithm(**eval_algo.params)
-                # Check if algorithm uses a neural network and whether iteration_specific_neural_networks are defined
-                if iteration_specific_neural_networks is not None:
-                    eval_neural_network = iteration_specific_neural_networks[rep]
-                    assert type(
-                        eval_neural_network) is EvaluationNetwork, "Each entry in iteration_specific_params must be a EvaluationNetwork"
-                    if hasattr(algo_obj, "neural_network"):
-                        neural_network = load_saved_neural_network(eval_neural_network.path, eval_neural_network.neural_network_class,
-                                                                eval_neural_network.params)
-                        algo_obj.neural_network = neural_network
-                    if eval_neural_network.path_custom_dataloaders is not None and hasattr(algo_obj, "custom_dataloaders"):
-                        custom_dataloaders = (torch.load(eval_neural_network.path_custom_dataloaders[0]),
-                                              torch.load(eval_neural_network.path_custom_dataloaders[1]))
-                        algo_obj.custom_dataloaders = custom_dataloaders
+                algo_obj = eval_algo.algorithm(**tmp_params)
                 try:
                     algo_obj.fit(X_processed)
                 except Exception as e:
@@ -442,7 +413,8 @@ def evaluate_multiple_datasets(evaluation_datasets: list, evaluation_algorithms:
         evaluation_datasets = [evaluation_datasets]
     if save_labels_path is not None and not "." in save_labels_path:
         save_labels_path = save_labels_path + ".csv"
-    assert save_labels_path is None or len(save_labels_path.split(".")) == 2, "save_labels_path must only contain a single dot. E.g., NAME.csv"
+    assert save_labels_path is None or len(
+        save_labels_path.split(".")) == 2, "save_labels_path must only contain a single dot. E.g., NAME.csv"
     data_names = [d.name for d in evaluation_datasets]
     df_list = []
     for eval_data in evaluation_datasets:
@@ -467,11 +439,11 @@ def evaluate_multiple_datasets(evaluation_datasets: list, evaluation_algorithms:
             df = evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=evaluation_metrics,
                                   labels_true=labels_true,
                                   n_repetitions=n_repetitions, X_test=X_test, labels_true_test=labels_true_test,
-                                  iteration_specific_neural_networks=eval_data.iteration_specific_neural_networks,
                                   aggregation_functions=aggregation_functions,
                                   add_runtime=add_runtime, add_n_clusters=add_n_clusters, save_path=inner_save_path,
                                   save_labels_path=inner_save_labels_path,
-                                  ignore_algorithms=eval_data.ignore_algorithms, random_state=random_state)
+                                  ignore_algorithms=eval_data.ignore_algorithms, dataset_name=eval_data.name,
+                                  random_state=random_state)
             df_list.append(df)
         except Exception as e:
             print("Dataset {0} raised an exception and will be skipped".format(eval_data.name))
@@ -505,7 +477,7 @@ def _get_data_and_labels_from_evaluation_dataset(data_input: np.ndarray, data_lo
     train_test_split : bool
         Specifies if the laoded dataset should be split into a train and test set. Can be of type bool, list or np.ndarray.
         If train_test_split is a boolean and true, the data loader will use the parameter "subset" to load a train and test set. In that case data must be a callable.
-        If train_test_split is a list/np.ndarray, the entries specify the indices of the data array that should be used for the train set
+        If train_test_split is a list/np.ndarray, the entries specify the indices of the data array that should be used for the test set
 
     Returns
     -------
@@ -624,25 +596,23 @@ def evaluation_df_to_latex_table(df: pd.DataFrame, output_path: str, use_std: bo
             f.write("l|" + "c" * len(algorithms) + "}\n\\toprule\n\\textbf{Dataset} & ")
         else:
             f.write("c" * len(algorithms) + "}\n\\toprule\n")
-        f.write("\\textbf{Metric} & " + " & ".join(algorithms) + "\\\\\n\\midrule\n")
+        f.write("\\textbf{Metric} & " + " & ".join([a.replace("_", "\\_") for a in algorithms]) + "\\\\\n\\midrule\n")
         # Write values into table
         for j, d in enumerate(datasets):
-            # Check if underscore in dataset name
-            if d is not None:
-                d = d.replace("_", "\\_")
             for i, m in enumerate(metrics):
-                # Check if underscore in metric name
-                m = m.replace("_", "\\_")
                 # Check if a higher value is better for this metric
                 metric_is_higher_better = (m != "runtime") if higher_is_better is None else higher_is_better[i]
+                # Escape underscore that could be contained in metric name
+                m_write = m.replace("_", "\\_")
                 # Write name of dataset and metric
                 if multiple_datasets:
                     if i == 0:
-                        to_write = d + " & " + m
+                        # Escape underscore that could be contained in dataset name
+                        to_write = d.replace("_", "\\_") + " & " + m_write
                     else:
-                        to_write = "& " + m
+                        to_write = "& " + m_write
                 else:
-                    to_write = m
+                    to_write = m_write
                 # Get all values from the experiments (are stored separately to calculated min values)
                 all_values = []
                 for a in algorithms:
@@ -656,8 +626,6 @@ def evaluation_df_to_latex_table(df: pd.DataFrame, output_path: str, use_std: bo
                     all_values.append(mean_value)
                 all_values_sorted = np.unique(all_values)  # automatically sorted
                 for k, a in enumerate(algorithms):
-                    # Check if underscore in algorithm name
-                    a = a.replace("_", "\\_")
                     mean_value = all_values[k]
                     # If standard deviation is contained in the dataframe, information will be added
                     if use_std and std_contained:
@@ -717,7 +685,7 @@ class EvaluationDataset():
     train_test_split : bool
         Specifies if the laoded dataset should be split into a train and test set. Can be of type bool, list or np.ndarray.
         If train_test_split is a boolean and true, the data loader will use the parameter "subset" to load a train and test set. In that case data must be a callable.
-        If train_test_split is a list/np.ndarray, the entries specify the indices of the data array that should be used for the train set (default: None)
+        If train_test_split is a list/np.ndarray, the entries specify the indices of the data array that should be used for the test set (default: None)
     preprocess_methods : list
         Specify preprocessing steps before evaluating the data set.
         Can be either a list of callable functions or a single callable function.
@@ -726,12 +694,6 @@ class EvaluationDataset():
         List of dictionaries containing the parameters for the preprocessing methods.
         Needs one entry for each method in preprocess_methods.
         If only a single preprocessing method is given (instead of a list) a single dictionary is expected (default: {})
-    iteration_specific_neural_networks : list
-        List containing EvaluationNetwork objects for each iteration of deep clustering algorithm.
-        Length of the list must be equal to 'n_repetitions' in 'evaluate_multiple_datasets()' and 'evaluate_dataset()'.
-        Each entry in the list must be of type EvaluationNetwork.
-        If a clustering algorithm does not have a 'neural_network' parameter, this parameter will be ignored.
-        Can be None if no iteration-specific neural networks are used (default: None)
     ignore_algorithms : tuple
         List of algorithm names (as specified in the EvaluationAlgorithm object) that should be ignored for this specific data set (default: [])
 
@@ -747,7 +709,7 @@ class EvaluationDataset():
 
     def __init__(self, name: str, data: np.ndarray, labels_true: np.ndarray = None, data_loader_params: dict = None,
                  train_test_split: bool = None, preprocess_methods: list = None, preprocess_params: list = None,
-                 iteration_specific_neural_networks: list = None, ignore_algorithms: tuple = ()):
+                 ignore_algorithms: tuple = ()):
         assert type(name) is str, "name must be a string"
         self.name = name
         assert "." not in name, "name must not contain a dot"
@@ -771,9 +733,6 @@ class EvaluationDataset():
         assert preprocess_params is None or type(preprocess_params) is dict or type(
             preprocess_methods) is list, "preprocess_params must be a dict or a list of dicts"
         self.preprocess_params = {} if preprocess_params is None else preprocess_params
-        assert type(
-            iteration_specific_neural_networks) is list or iteration_specific_neural_networks is None, "iteration_specific_neural_networks must be a list or None"
-        self.iteration_specific_neural_networks = iteration_specific_neural_networks
         assert type(ignore_algorithms) is list or type(
             ignore_algorithms) is tuple, "ignore_algorithms must be a tuple or a list"
         self.ignore_algorithms = ignore_algorithms
@@ -835,6 +794,13 @@ class EvaluationAlgorithm():
     deterministic : bool
         Defines if the algorithm produces a deterministic clustering result (e.g. like DBSCAN).
         In this case the algorithm will only be executed once even though a higher number of repetitions is specified when evaluating a data set (default: False)
+    iteration_specific_params : dict
+        Dictionary containing parameters that are specefic for a certain iteration.
+        The keys of the dict can be either of type str which referes to the name of the parameter or of type tuple.
+        If a key is a tuple, the parameters are only valid for a specific dataset.
+        Here, the name of the dataset (see EvaluationDataset) is defined in the first entry of the tuple and the name of the parameter in the second, e.g. {("Iris", "eps"): [0.1,0.2,...]}.
+        All values within the dict must be of type list, where the length must be equal to 'n_repetitions' in 'evaluate_multiple_datasets()' and 'evaluate_dataset()'.
+        Can be None if no iteration-specific parameters are used (default: None)
     preprocess_methods : list
         Specify preprocessing steps performed on each data set before executing the clustering algorithm.
         Can be either a list of callable functions or a single callable function.
@@ -843,6 +809,7 @@ class EvaluationAlgorithm():
         List of dictionaries containing the parameters for the preprocessing methods.
         Needs one entry for each method in preprocess_methods.
         If only a single preprocessing method is given (instead of a list) a single dictionary is expected (default: {})
+
 
     Examples
     ----------
@@ -855,7 +822,8 @@ class EvaluationAlgorithm():
     """
 
     def __init__(self, name: str, algorithm: ClusterMixin, params: dict = None, deterministic: bool = False,
-                 preprocess_methods: list = None, preprocess_params: dict = None):
+                 iteration_specific_params: dict = None, preprocess_methods: list = None,
+                 preprocess_params: dict = None):
         assert type(name) is str, "name must be a string"
         assert "." not in name, "name must not contain a dot"
         self.name = name
@@ -864,48 +832,12 @@ class EvaluationAlgorithm():
         self.params = {} if params is None else params
         assert type(deterministic) is bool, "deterministic must be bool"
         self.deterministic = deterministic
+        assert type(
+            iteration_specific_params) is dict or iteration_specific_params is None, "iteration_specific_params must be a dict or None"
+        self.iteration_specific_params = iteration_specific_params
         assert callable(preprocess_methods) or type(
             preprocess_methods) is list or preprocess_methods is None, "preprocess_methods must be a method, a list of methods or None"
         self.preprocess_methods = preprocess_methods
         assert preprocess_params is None or type(preprocess_params) is dict or type(
             preprocess_methods) is list, "preprocess_params must be a dict or a list of dicts"
         self.preprocess_params = {} if preprocess_params is None else preprocess_params
-
-
-class EvaluationNetwork():
-    """
-    The EvaluationNetwork object is a wrapper for neural networks that can be used by deep clustering algorithms.
-    It contains all the information necessary to load a pretrained neural network that for the evaluate_dataset or evaluate_multiple_datasets method.
-    Can also contain paths to saved dataloaders (e.g. when using augmentation).
-
-    Parameters
-    ----------
-    path : str
-        Path to the state dict that should be loaded
-    neural_network_class : torch.nn.Module
-        The actual neural network class
-    params : dict
-        Parameters given to the neural network class (default: {})
-    path_custom_dataloaders : tuple
-        Tuple containing the path of saved dataloaders.
-        First entry is for the saved trainloader and second for the saved testloader (default: None)
-
-    Examples
-    ----------
-    >>> from clustpy.deep.autoencoders import FeedforwardAutoencoder
-    >>> ea = EvaluationNetwork(path="PATH", neural_network_class=FeedforwardAutoencoder, params={"layers": [256, 128, 64, 10], "bias": False})
-    """
-
-    def __init__(self, path: str, neural_network_class: torch.nn.Module, params: dict = None,
-                 path_custom_dataloaders: tuple = None):
-        assert type(path) is str, "path must be a string"
-        self.path = path
-        assert issubclass(neural_network_class, torch.nn.Module), "neural_network_class must be a torch.nn.Module"
-        self.neural_network_class = neural_network_class
-        assert params is None or type(params) is dict, "params must be a dict"
-        self.params = {} if params is None else params
-        assert path_custom_dataloaders is None or (
-                len(path_custom_dataloaders) == 2 and type(path_custom_dataloaders[0]) is str and type(
-            path_custom_dataloaders[
-                1]) is str), "path_custom_dataloaders must be None or must contain the path to a saved trainloader at the first position and the path to a saved testloader at the second position"
-        self.path_custom_dataloaders = path_custom_dataloaders

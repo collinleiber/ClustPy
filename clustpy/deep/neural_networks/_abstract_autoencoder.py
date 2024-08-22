@@ -9,6 +9,7 @@ from clustpy.deep._early_stopping import EarlyStopping
 from clustpy.deep._data_utils import get_dataloader
 from clustpy.deep._utils import encode_batchwise, get_device_from_module
 import os
+import tqdm
 
 
 class FullyConnectedBlock(torch.nn.Module):
@@ -87,7 +88,7 @@ class _AbstractAutoencoder(torch.nn.Module):
 
     Parameters
     ----------
-    reusable : bool
+    work_on_copy : bool
         If set to true, deep clustering algorithms will optimize a copy of the autoencoder and not the autoencoder itself.
         Ensures that the same autoencoder can be used by multiple deep clustering algorithms.
         As copies of this object are created, the memory requirement increases (default: True)
@@ -96,14 +97,14 @@ class _AbstractAutoencoder(torch.nn.Module):
     ----------
     fitted  : bool
         indicates whether the autoencoder is already fitted
-    reusable : bool
-        indicates whether the autoencoder should be reused by multiple deep clustering algorithms
+    work_on_copy : bool
+        indicates whether deep clustering algorithms should work on a copy of the original autoencoder
     """
 
-    def __init__(self, reusable: bool = True):
+    def __init__(self, work_on_copy: bool = True):
         super(_AbstractAutoencoder, self).__init__()
         self.fitted = False
-        self.reusable = reusable
+        self.work_on_copy = work_on_copy
 
     def encode(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -156,7 +157,7 @@ class _AbstractAutoencoder(torch.nn.Module):
         reconstruction = self.decode(embedded)
         return reconstruction
 
-    def loss(self, batch: list, loss_fn: torch.nn.modules.loss._Loss, device: torch.device) -> (
+    def loss(self, batch: list, ssl_loss_fn: torch.nn.modules.loss._Loss, device: torch.device) -> (
             torch.Tensor, torch.Tensor, torch.Tensor):
         """
         Calculate the loss of a single batch of data.
@@ -165,8 +166,8 @@ class _AbstractAutoencoder(torch.nn.Module):
         ----------
         batch : list
             the different parts of a dataloader (id, samples, ...)
-        loss_fn : torch.nn.modules.loss._Loss
-            loss function to be used for reconstruction
+        ssl_loss_fn : torch.nn.modules.loss._Loss
+            self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss
         device : torch.device
             device to be trained on
 
@@ -181,10 +182,45 @@ class _AbstractAutoencoder(torch.nn.Module):
         batch_data = batch[1].to(device)
         embedded = self.encode(batch_data)
         reconstructed = self.decode(embedded)
-        loss = loss_fn(reconstructed, batch_data)
+        loss = ssl_loss_fn(reconstructed, batch_data)
         return loss, embedded, reconstructed
 
-    def evaluate(self, dataloader: torch.utils.data.DataLoader, loss_fn: torch.nn.modules.loss._Loss,
+    def loss_augmentation(self, batch: list, ssl_loss_fn: torch.nn.modules.loss._Loss, device: torch.device) -> (
+            torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor):
+        """
+        Calculate the loss of a single batch of data and an augmented version of the data.
+        Note that the augmented samples come at position batch[1] and the original samples at batch[2].
+
+        Parameters
+        ----------
+        batch : list
+            the different parts of a dataloader (id, augmented samples, original samples, ...)
+        ssl_loss_fn : torch.nn.modules.loss._Loss
+            self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss
+        device : torch.device
+            device to be trained on
+
+        Returns
+        -------
+        loss : (torch.Tensor, torch.Tensor, torch.Tensor)
+            the combined network loss of the sample and the augmented sample,
+            the embedded input sample,
+            the reconstructed input sample,
+            the embedded augmented sample,
+            the reconstructed augmented sample
+        """
+        assert type(batch) is list, "batch must come from a dataloader and therefore be of type list"
+        # First entry (batch[0]) are the indices, second entry (batch[1]) are the augmented samples, third entry (batch[2]) are the original samples
+        # If additional inputs are used in the dataloader, entries at an uneven position (batch[3], batch[5], ...) are augmented and entries at even positions (batch[4], batch[6], ...) original
+        # Considering also the additional inputs can be relevant, e.g., when using a NeighborEncoder
+        batches_orig = [batch[i] for i in range(2, len(batch), 2)]
+        batches_aug = [batch[i] for i in range(1, len(batch), 2)]
+        loss_orig, embedded, reconstructed = self.loss([batch[0]] + batches_orig, ssl_loss_fn, device)
+        loss_augmented, embedded_aug, reconstructed_aug = self.loss([batch[0]] + batches_aug, ssl_loss_fn, device)
+        loss_total = (loss_orig + loss_augmented) / 2
+        return loss_total, embedded, reconstructed, embedded_aug, reconstructed_aug
+
+    def evaluate(self, dataloader: torch.utils.data.DataLoader, ssl_loss_fn: torch.nn.modules.loss._Loss,
                  device: torch.device) -> torch.Tensor:
         """
         Evaluates the autoencoder.
@@ -193,8 +229,8 @@ class _AbstractAutoencoder(torch.nn.Module):
         ----------
         dataloader : torch.utils.data.DataLoader
             dataloader to be used for training
-        loss_fn : torch.nn.modules.loss._Loss
-            loss function to be used for reconstruction
+        ssl_loss_fn : torch.nn.modules.loss._Loss
+            self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss
         device : torch.device
             device to be trained on
 
@@ -207,7 +243,7 @@ class _AbstractAutoencoder(torch.nn.Module):
             self.eval()
             loss = torch.tensor(0.)
             for batch in dataloader:
-                new_loss, _, _ = self.loss(batch, loss_fn, device)
+                new_loss, _, _ = self.loss(batch, ssl_loss_fn, device)
                 loss += new_loss
             loss /= len(dataloader)
         return loss
@@ -216,9 +252,9 @@ class _AbstractAutoencoder(torch.nn.Module):
             data: np.ndarray | torch.Tensor = None, data_eval: np.ndarray | torch.Tensor = None,
             dataloader: torch.utils.data.DataLoader = None, evalloader: torch.utils.data.DataLoader = None,
             optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
-            loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), patience: int = 5,
-            scheduler: torch.optim.lr_scheduler = None, scheduler_params: dict = {}, model_path: str = None,
-            print_step: int = 0) -> '_AbstractAutoencoder':
+            ssl_loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), patience: int = 5,
+            scheduler: torch.optim.lr_scheduler = None, scheduler_params: dict = {},
+            model_path: str = None) -> '_AbstractAutoencoder':
         """
         Trains the autoencoder in place.
 
@@ -240,8 +276,8 @@ class _AbstractAutoencoder(torch.nn.Module):
             dataloader to be used for evaluation, early stopping and learning rate scheduling if scheduler=torch.optim.lr_scheduler.ReduceLROnPlateau (default: None)
         optimizer_class : torch.optim.Optimizer
             optimizer to be used (default: torch.optim.Adam)
-        loss_fn : torch.nn.modules.loss._Loss
-            loss function to be used for reconstruction (default: torch.nn.MSELoss())
+        ssl_loss_fn : torch.nn.modules.loss._Loss
+            self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss (default: torch.nn.MSELoss())
         patience : int
             patience parameter for EarlyStopping (default: 5)
         scheduler : torch.optim.lr_scheduler
@@ -251,8 +287,6 @@ class _AbstractAutoencoder(torch.nn.Module):
             dictionary of the parameters of the scheduler object (default: {})
         model_path : str
             if specified will save the trained model to the location. If evalloader is used, then only the best model w.r.t. evaluation loss is saved (default: None)
-        print_step : int
-            specifies how often the losses are printed. If 0, no prints will occur (default: 0)
 
         Returns
         -------
@@ -289,24 +323,25 @@ class _AbstractAutoencoder(torch.nn.Module):
         best_loss = np.inf
         # training loop
         device = get_device_from_module(self)
-        for epoch_i in range(n_epochs):
+        tbar = tqdm.trange(n_epochs, desc="AE training")
+        for epoch_i in tbar:
             self.train()
+            total_loss = 0
             for batch in dataloader:
-                loss, _, _ = self.loss(batch, loss_fn, device)
+                loss, _, _ = self.loss(batch, ssl_loss_fn, device)
+                total_loss += loss.item()
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-            if print_step > 0 and ((epoch_i - 1) % print_step == 0 or epoch_i == (n_epochs - 1)):
-                print(f"Epoch {epoch_i}/{n_epochs - 1} - Batch Reconstruction loss: {loss.item():.6f}")
+            postfix_str = {"Training Loss": total_loss}
 
             if scheduler is not None and not eval_step_scheduler:
                 scheduler.step()
             # Evaluate autoencoder
             if evalloader is not None:
                 # self.evaluate calls self.eval()
-                val_loss = self.evaluate(dataloader=evalloader, loss_fn=loss_fn, device=device)
-                if print_step > 0 and ((epoch_i - 1) % print_step == 0 or epoch_i == (n_epochs - 1)):
-                    print(f"Epoch {epoch_i} EVAL loss total: {val_loss.item():.6f}")
+                val_loss = self.evaluate(dataloader=evalloader, ssl_loss_fn=ssl_loss_fn, device=device)
+                postfix_str["Eval Loss"] = val_loss.item()
                 early_stopping(val_loss)
                 if val_loss < best_loss:
                     best_loss = val_loss
@@ -315,12 +350,10 @@ class _AbstractAutoencoder(torch.nn.Module):
                     if model_path is not None:
                         self.save_parameters(model_path)
                 if early_stopping.early_stop:
-                    if print_step > 0:
-                        print(f"Stop training at epoch {best_epoch}")
-                        print(f"Best Loss: {best_loss:.6f}, Last Loss: {val_loss:.6f}")
-                    break
+                    print(f"Stop training at epoch {best_epoch}. Best Loss: {best_loss:.6f}, Last Loss: {val_loss:.6f}")
                 if scheduler is not None and eval_step_scheduler:
                     scheduler.step(val_loss)
+            tbar.set_postfix(postfix_str)
         # change to eval mode after training
         self.eval()
         # Save last version of model

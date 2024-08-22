@@ -1,4 +1,4 @@
-from clustpy.deep.autoencoders._abstract_autoencoder import _AbstractAutoencoder
+from clustpy.deep.neural_networks._abstract_autoencoder import _AbstractAutoencoder
 from clustpy.deep import get_dataloader
 from clustpy.data import create_subspace_data
 import torch
@@ -32,6 +32,15 @@ def test_abstract_autoencoder_with_dummy_torch_parameter():
     loss, embedded, decoded = autoencoder.loss(data_batch, loss_fn, torch.device("cpu"))
     assert torch.equal(data_batch[1], embedded)
     assert torch.equal(data_batch[1], decoded)
+    assert torch.equal(loss, torch.tensor(0.))
+    # Test augmented loss
+    data_batch_aug = [torch.arange(256), torch.Tensor(data[batch_size:2 * batch_size]), torch.Tensor(data[:batch_size])]
+    loss, embedded, decoded, embedded_aug, decoded_aug = autoencoder.loss_augmentation(
+        data_batch_aug, loss_fn, torch.device("cpu"))
+    assert torch.equal(data_batch_aug[2], embedded)
+    assert torch.equal(data_batch_aug[2], decoded)
+    assert torch.equal(data_batch_aug[1], embedded_aug)
+    assert torch.equal(data_batch_aug[1], decoded_aug)
     assert torch.equal(loss, torch.tensor(0.))
     # Test evaluate
     dataloader = get_dataloader(data, batch_size)

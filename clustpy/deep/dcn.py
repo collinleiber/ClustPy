@@ -13,12 +13,14 @@ import torch
 import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.base import ClusterMixin
+import tqdm
 
 
 def _dcn(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_params: dict,
          clustering_optimizer_params: dict, pretrain_epochs: int, clustering_epochs: int,
-         optimizer_class: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss, neural_network: torch.nn.Module,
-         embedding_size: int, clustering_loss_weight: float, reconstruction_loss_weight: float,
+         optimizer_class: torch.optim.Optimizer, ssl_loss_fn: torch.nn.modules.loss._Loss,
+         neural_network: torch.nn.Module | tuple, neural_network_weights: str,
+         embedding_size: int, clustering_loss_weight: float, ssl_loss_weight: float,
          custom_dataloaders: tuple, augmentation_invariance: bool, initial_clustering_class: ClusterMixin,
          initial_clustering_params: dict, device: torch.device,
          random_state: np.random.RandomState) -> (np.ndarray, np.ndarray, np.ndarray, np.ndarray, torch.nn.Module):
@@ -43,18 +45,23 @@ def _dcn(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_par
         number of epochs for the actual clustering procedure
     optimizer_class : torch.optim.Optimizer
         the optimizer class
-    loss_fn : torch.nn.modules.loss._Loss
-         loss function for the reconstruction
-    neural_network : torch.nn.Module
-        the input neural network
+    ssl_loss_fn : torch.nn.modules.loss._Loss
+         self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
+    neural_network : torch.nn.Module | tuple
+        the input neural network.
+        Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict)
+    neural_network_weights : str
+        Path to a file containing the state_dict of the neural_network.
     embedding_size : int
         size of the embedding within the neural network
     clustering_loss_weight : float
         weight of the clustering loss
-    reconstruction_loss_weight : float
-        weight of the reconstruction loss
+    ssl_loss_weight : float
+        weight of the self-supervised learning (ssl) loss
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
+        Can also be a tuple of strings, where the first entry is the path to a saved trainloader and the second entry the path to a saved testloader.
+        In this case the dataloaders will be loaded by torch.load(PATH).
         If None, the default dataloaders will be used
     augmentation_invariance : bool
         If True, augmented samples provided in custom_dataloaders[0] will be used to learn 
@@ -78,16 +85,17 @@ def _dcn(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_par
         The final neural network
     """
     # Get initial setting (device, dataloaders, pretrained AE and initial clustering result)
-    device, trainloader, testloader, neural_network, _, n_clusters, init_labels, init_centers, _ = get_default_deep_clustering_initialization(
-        X, n_clusters, batch_size, pretrain_optimizer_params, pretrain_epochs, optimizer_class, loss_fn, neural_network,
-        embedding_size, custom_dataloaders, initial_clustering_class, initial_clustering_params, device, random_state)
+    device, trainloader, testloader, _, neural_network, _, n_clusters, init_labels, init_centers, _ = get_default_deep_clustering_initialization(
+        X, n_clusters, batch_size, pretrain_optimizer_params, pretrain_epochs, optimizer_class, ssl_loss_fn,
+        neural_network, embedding_size, custom_dataloaders, initial_clustering_class, initial_clustering_params, device,
+        random_state, neural_network_weights=neural_network_weights)
     # Setup DCN Module
     dcn_module = _DCN_Module(init_labels, init_centers, augmentation_invariance).to_device(device)
     # Use DCN optimizer parameters (usually learning rate is reduced by a magnitude of 10)
     optimizer = optimizer_class(list(neural_network.parameters()), **clustering_optimizer_params)
     # DEC Training loop
-    dcn_module.fit(neural_network, trainloader, testloader, clustering_epochs, device, optimizer, loss_fn,
-                   clustering_loss_weight, reconstruction_loss_weight)
+    dcn_module.fit(neural_network, trainloader, testloader, clustering_epochs, device, optimizer, ssl_loss_fn,
+                   clustering_loss_weight, ssl_loss_weight)
     # Get labels
     dcn_labels = predict_batchwise(testloader, neural_network, dcn_module)
     dcn_centers = dcn_module.centers.detach().cpu().numpy()
@@ -187,7 +195,7 @@ class _DCN_Module(torch.nn.Module):
     def predict_hard(self, embedded: torch.Tensor) -> torch.Tensor:
         """
         Hard prediction of the given embedded samples. Returns the corresponding hard labels.
-        Uses the minimum squared euclidean distance to the cluster centers to get the labels.
+        Uses the minimum squared Euclidean distance to the cluster centers to get the labels.
 
         Parameters
         ----------
@@ -242,8 +250,8 @@ class _DCN_Module(torch.nn.Module):
         self.to(device)
         return self
 
-    def _loss(self, batch: list, neural_network: torch.nn.Module, loss_fn: torch.nn.modules.loss._Loss,
-              reconstruction_loss_weight: float, clustering_loss_weight: float, device: torch.device) -> torch.Tensor:
+    def _loss(self, batch: list, neural_network: torch.nn.Module, ssl_loss_fn: torch.nn.modules.loss._Loss,
+              ssl_loss_weight: float, clustering_loss_weight: float, device: torch.device) -> torch.Tensor:
         """
         Calculate the complete DCN + neural network loss.
 
@@ -253,12 +261,12 @@ class _DCN_Module(torch.nn.Module):
             the minibatch
         neural_network : torch.nn.Module
             the neural network
-        loss_fn : torch.nn.modules.loss._Loss
-            loss function for the reconstruction
+        ssl_loss_fn : torch.nn.modules.loss._Loss
+            self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
         clustering_loss_weight : float
             weight of the clustering loss
-        reconstruction_loss_weight : float
-            weight of the reconstruction loss
+        ssl_loss_weight : float
+            weight of the self-supervised learning (ssl) loss
         device : torch.device
             device to be trained on
 
@@ -267,14 +275,11 @@ class _DCN_Module(torch.nn.Module):
         loss : torch.Tensor
             the final DCN loss
         """
-        # compute reconstruction loss
+        # compute self-supervised loss
         if self.augmentation_invariance:
-            # Convention is that the augmented sample is at the first position and the original one at the second position
-            ae_loss, embedded, _ = neural_network.loss([batch[0], batch[2]], loss_fn, device)
-            ae_loss_aug, embedded_aug, _ = neural_network.loss([batch[0], batch[1]], loss_fn, device)
-            ae_loss = (ae_loss + ae_loss_aug) / 2
+            ssl_loss, embedded, _, embedded_aug, _ = neural_network.loss_augmentation(batch, ssl_loss_fn, device)
         else:
-            ae_loss, embedded, _ = neural_network.loss(batch, loss_fn, device)
+            ssl_loss, embedded, _ = neural_network.loss(batch, ssl_loss_fn, device)
 
         # compute cluster loss
         labels = self.labels[batch[0]]
@@ -285,14 +290,14 @@ class _DCN_Module(torch.nn.Module):
             cluster_loss = (cluster_loss + cluster_loss_aug) / 2
 
         # compute total loss
-        loss = reconstruction_loss_weight * ae_loss + 0.5 * clustering_loss_weight * cluster_loss
+        loss = ssl_loss_weight * ssl_loss + 0.5 * clustering_loss_weight * cluster_loss
 
         return loss
 
     def fit(self, neural_network: torch.nn.Module, trainloader: torch.utils.data.DataLoader,
             testloader: torch.utils.data.DataLoader, n_epochs: int, device: torch.device,
-            optimizer: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss, clustering_loss_weight: float,
-            reconstruction_loss_weight: float) -> '_DCN_Module':
+            optimizer: torch.optim.Optimizer, ssl_loss_fn: torch.nn.modules.loss._Loss, clustering_loss_weight: float,
+            ssl_loss_weight: float) -> '_DCN_Module':
         """
         Trains the _DCN_Module in place.
 
@@ -310,12 +315,12 @@ class _DCN_Module(torch.nn.Module):
             device to be trained on
         optimizer : torch.optim.Optimizer
             the optimizer for training
-        loss_fn : torch.nn.modules.loss._Loss
-            loss function for the reconstruction
+        ssl_loss_fn : torch.nn.modules.loss._Loss
+            self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
         clustering_loss_weight : float
             weight of the clustering loss
-        reconstruction_loss_weight : float
-            weight of the reconstruction loss
+        ssl_loss_weight : float
+            weight of the self-supervised learning (ssl) loss
 
         Returns
         -------
@@ -323,11 +328,14 @@ class _DCN_Module(torch.nn.Module):
             this instance of the _DCN_Module
         """
         # DCN training loop
-        for _ in range(n_epochs):
+        tbar = tqdm.trange(n_epochs, desc="DCN training")
+        for _ in tbar:
             # Update Network
+            total_loss = 0
             for batch in trainloader:
-                loss = self._loss(batch, neural_network, loss_fn, reconstruction_loss_weight, clustering_loss_weight,
+                loss = self._loss(batch, neural_network, ssl_loss_fn, ssl_loss_weight, clustering_loss_weight,
                                   device)
+                total_loss += loss.item()
                 # Backward pass - update weights
                 optimizer.zero_grad()
                 loss.backward()
@@ -353,6 +361,8 @@ class _DCN_Module(torch.nn.Module):
                     centers, counts = self.update_centroids(embedded.cpu(), labels_new.cpu())
                     self.centers = centers.to(device)
                     self.counts = counts
+            postfix_str = {"Loss": total_loss}
+            tbar.set_postfix(postfix_str)
         return self
 
 
@@ -379,18 +389,23 @@ class DCN(_AbstractDeepClusteringAlgo):
         number of epochs for the actual clustering procedure (default: 150)
     optimizer_class : torch.optim.Optimizer
         the optimizer class (default: torch.optim.Adam)
-    loss_fn : torch.nn.modules.loss._Loss
-         loss function for the reconstruction (default: torch.nn.MSELoss())
+    ssl_loss_fn : torch.nn.modules.loss._Loss
+         self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: torch.nn.MSELoss())
     clustering_loss_weight : float
         weight of the clustering loss (default: 0.05)
-    reconstruction_loss_weight : float
-        weight of the reconstruction loss (default: 1.0)
-    neural_network : torch.nn.Module
-        the input neural network. If None a new FeedforwardAutoencoder will be created (default: None)
+    ssl_loss_weight : float
+        weight of the self-supervised learning (ssl) loss (default: 1.0)
+    neural_network : torch.nn.Module | tuple
+        the input neural network. If None, a new FeedforwardAutoencoder will be created.
+        Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict) (default: None)
+    neural_network_weights : str
+        Path to a file containing the state_dict of the neural_network (default: None)
     embedding_size : int
         size of the embedding within the neural network (default: 10)
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
+        Can also be a tuple of strings, where the first entry is the path to a saved trainloader and the second entry the path to a saved testloader.
+        In this case the dataloaders will be loaded by torch.load(PATH).
         If None, the default dataloaders will be used (default: None)
     augmentation_invariance : bool
         If True, augmented samples provided in custom_dataloaders[0] will be used to learn 
@@ -435,12 +450,13 @@ class DCN(_AbstractDeepClusteringAlgo):
     def __init__(self, n_clusters: int, batch_size: int = 256, pretrain_optimizer_params: dict = None,
                  clustering_optimizer_params: dict = None, pretrain_epochs: int = 50,
                  clustering_epochs: int = 50, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
-                 loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), clustering_loss_weight: float = 0.05,
-                 reconstruction_loss_weight: float = 1.0, neural_network: torch.nn.Module = None,
-                 embedding_size: int = 10, custom_dataloaders: tuple = None, augmentation_invariance: bool = False,
-                 initial_clustering_class: ClusterMixin = KMeans, initial_clustering_params: dict = None,
-                 device: torch.device = None, random_state: np.random.RandomState | int = None):
-        super().__init__(batch_size, neural_network, embedding_size, device, random_state)
+                 ssl_loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), clustering_loss_weight: float = 0.05,
+                 ssl_loss_weight: float = 1.0, neural_network: torch.nn.Module | tuple = None,
+                 neural_network_weights: str = None, embedding_size: int = 10, custom_dataloaders: tuple = None,
+                 augmentation_invariance: bool = False, initial_clustering_class: ClusterMixin = KMeans,
+                 initial_clustering_params: dict = None, device: torch.device = None,
+                 random_state: np.random.RandomState | int = None):
+        super().__init__(batch_size, neural_network, neural_network_weights, embedding_size, device, random_state)
         self.n_clusters = n_clusters
         self.pretrain_optimizer_params = {
             "lr": 1e-3} if pretrain_optimizer_params is None else pretrain_optimizer_params
@@ -449,9 +465,9 @@ class DCN(_AbstractDeepClusteringAlgo):
         self.pretrain_epochs = pretrain_epochs
         self.clustering_epochs = clustering_epochs
         self.optimizer_class = optimizer_class
-        self.loss_fn = loss_fn
+        self.ssl_loss_fn = ssl_loss_fn
         self.clustering_loss_weight = clustering_loss_weight
-        self.reconstruction_loss_weight = reconstruction_loss_weight
+        self.ssl_loss_weight = ssl_loss_weight
         self.custom_dataloaders = custom_dataloaders
         self.augmentation_invariance = augmentation_invariance
         self.initial_clustering_class = initial_clustering_class
@@ -482,11 +498,12 @@ class DCN(_AbstractDeepClusteringAlgo):
                                                                                       self.pretrain_epochs,
                                                                                       self.clustering_epochs,
                                                                                       self.optimizer_class,
-                                                                                      self.loss_fn,
+                                                                                      self.ssl_loss_fn,
                                                                                       self.neural_network,
+                                                                                      self.neural_network_weights,
                                                                                       self.embedding_size,
                                                                                       self.clustering_loss_weight,
-                                                                                      self.reconstruction_loss_weight,
+                                                                                      self.ssl_loss_weight,
                                                                                       self.custom_dataloaders,
                                                                                       self.augmentation_invariance,
                                                                                       self.initial_clustering_class,
