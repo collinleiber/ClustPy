@@ -224,6 +224,24 @@ def get_dataloader(X: np.ndarray | torch.Tensor, batch_size: int, shuffle: bool 
     return dataloader
 
 
+def get_data_dim_from_dataloader(dataloader: torch.utils.data.DataLoader) -> int:
+    """
+    Get dimensionality of the data within a dataloader.
+
+    Parameters
+    ----------
+    dataloader : torch.utils.data.DataLoader
+        The specified datalaoder
+
+    Returns
+    -------
+    dim : int
+        The dimensionality of the data
+    """
+    dim = torch.numel(next(iter(dataloader))[1][0])
+    return dim
+
+
 def get_train_and_test_dataloader(X: np.ndarray | torch.Tensor, batch_size: int = 256,
                                   custom_dataloaders: tuple = None) -> (
         torch.utils.data.DataLoader, torch.utils.data.DataLoader, int):
@@ -295,7 +313,7 @@ def get_default_augmented_dataloaders(X: np.ndarray | torch.Tensor, batch_size: 
         the batch size (default: 256)
     conv_used : bool
         defines whether a convolutional network will be used afterward.
-        In this case, grayscale images will be transformed to receive three color channels (default: False)
+        In this case, grayscale images will be transformed to receive three color channels by copying the grayscale channel three times (default: False)
     flatten : bool
         defines whether the augmented images should be flatten afterward.
         Must be False if conv_used is True (default: True)

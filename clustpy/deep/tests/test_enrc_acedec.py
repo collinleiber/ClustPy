@@ -5,7 +5,7 @@ import torch
 
 def test_simple_enrc():
     torch.use_deterministic_algorithms(True)
-    X, labels = create_nr_data(1500, subspace_features=(3, 3, 50), random_state=1)
+    X, labels = create_nr_data(1000, subspace_features=(3, 3, 50), random_state=1)
     labels = labels[:, :-1]  # ignore noise space
     enrc = ENRC([3, 3], pretrain_epochs=3, clustering_epochs=3, random_state=1)
     assert not hasattr(enrc, "labels_")
@@ -30,7 +30,7 @@ def test_simple_enrc():
 
 def test_simple_acedec():
     torch.use_deterministic_algorithms(True)
-    X, labels = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    X, labels = create_subspace_data(1000, subspace_features=(3, 50), random_state=1)
     acedec = ACeDeC(3, pretrain_epochs=3, clustering_epochs=3, random_state=1)
     assert not hasattr(acedec, "labels_")
     acedec.fit(X)

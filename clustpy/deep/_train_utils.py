@@ -3,7 +3,7 @@ import torch
 import copy
 import numpy as np
 from sklearn.base import ClusterMixin
-from clustpy.deep._data_utils import get_dataloader, get_train_and_test_dataloader
+from clustpy.deep._data_utils import get_dataloader, get_train_and_test_dataloader, get_data_dim_from_dataloader
 from clustpy.deep._utils import run_initial_clustering, detect_device, encode_batchwise
 
 
@@ -34,7 +34,7 @@ def _get_neural_network(input_dim: int, embedding_size: int = 10, neural_network
     """This function returns a new neural_network.
     - If neural_network is already a torch.nn.module, nothing will happen.
     - If neural_network is None, a new neural_network will be created using the neural_network_class and the parameters from neural_network_params.
-    Optionally, the weights contained in the state_dict file referecned by neural_network_weights will be loeaded.
+    Optionally, the weights contained in the state_dict file referenced by neural_network_weights will be loaded.
 
     Parameters
     ----------
@@ -134,7 +134,7 @@ def get_trained_network(trainloader: torch.utils.data.DataLoader = None, data: n
             raise ValueError("data must be specified if trainloader is None")
         trainloader = get_dataloader(data, batch_size, True)
     # Get neural network object
-    input_dim = torch.numel(next(iter(trainloader))[1][0])
+    input_dim = get_data_dim_from_dataloader(trainloader)
     if neural_network is not None and type(neural_network) is tuple:
         assert len(
             neural_network) == 2, "If neural_network is a tuple, it has to contain two entries: the neural network class (torch.nn.Module) and the initialization parameters (dict)"

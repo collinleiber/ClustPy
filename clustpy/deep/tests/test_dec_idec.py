@@ -6,7 +6,7 @@ import torch
 
 def test_simple_dec():
     torch.use_deterministic_algorithms(True)
-    X, labels = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    X, labels = create_subspace_data(1000, subspace_features=(3, 50), random_state=1)
     dec = DEC(3, pretrain_epochs=3, clustering_epochs=3, random_state=1)
     assert not hasattr(dec, "labels_")
     dec.fit(X)
@@ -26,7 +26,7 @@ def test_simple_dec():
 
 def test_simple_idec():
     torch.use_deterministic_algorithms(True)
-    X, labels = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    X, labels = create_subspace_data(1000, subspace_features=(3, 50), random_state=1)
     idec = IDEC(3, pretrain_epochs=3, clustering_epochs=3, random_state=1)
     assert not hasattr(idec, "labels_")
     idec.fit(X)

@@ -210,6 +210,9 @@ class _AbstractAutoencoder(torch.nn.Module):
             the reconstructed augmented sample
         """
         assert type(batch) is list, "batch must come from a dataloader and therefore be of type list"
+        # First entry (batch[0]) are the indices, second entry (batch[1]) are the augmented samples, third entry (batch[2]) are the original samples
+        # If additional inputs are used in the dataloader, entries at an uneven position (batch[3], batch[5], ...) are augmented and entries at even positions (batch[4], batch[6], ...) original
+        # Considering also the additional inputs can be relevant, e.g., when using a NeighborEncoder
         batches_orig = [batch[i] for i in range(2, len(batch), 2)]
         batches_aug = [batch[i] for i in range(1, len(batch), 2)]
         loss_orig, embedded, reconstructed = self.loss([batch[0]] + batches_orig, ssl_loss_fn, device)

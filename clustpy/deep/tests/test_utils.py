@@ -53,7 +53,7 @@ def test_detect_device():
 
 def test_encode_batchwise():
     # Load dataset
-    data, _ = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    data, _ = create_subspace_data(1000, subspace_features=(3, 50), random_state=1)
     embedding_size = 5
     device = torch.device('cpu')
     dataloader = _get_test_dataloader(data, 256, False, False)
@@ -67,7 +67,7 @@ def test_encode_batchwise():
 
 def test_predict_batchwise():
     # Load dataset
-    data, _ = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    data, _ = create_subspace_data(1000, subspace_features=(3, 50), random_state=1)
     threshold = np.mean(np.sum(data, axis=1))
     embedding_size = 5
     device = torch.device('cpu')
@@ -82,7 +82,7 @@ def test_predict_batchwise():
 
 def test_decode_batchwise():
     # Load dataset
-    data, _ = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    data, _ = create_subspace_data(1000, subspace_features=(3, 50), random_state=1)
     embedding_size = 5
     device = torch.device('cpu')
     dataloader = _get_test_dataloader(data, 256, False, False)
@@ -93,7 +93,7 @@ def test_decode_batchwise():
 
 def test_encode_decode_batchwise():
     # Load dataset
-    data, _ = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    data, _ = create_subspace_data(1000, subspace_features=(3, 50), random_state=1)
     embedding_size = 5
     device = torch.device('cpu')
     dataloader = _get_test_dataloader(data, 256, False, False)

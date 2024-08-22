@@ -6,7 +6,7 @@ import numpy as np
 
 def test_simple_aec():
     torch.use_deterministic_algorithms(True)
-    X, labels = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    X, labels = create_subspace_data(1000, subspace_features=(3, 50), random_state=1)
     aec = AEC(3, pretrain_epochs=3, clustering_epochs=3, random_state=1)
     assert not hasattr(aec, "labels_")
     aec.fit(X)

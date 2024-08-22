@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 def test_simple_dipencoder():
     torch.use_deterministic_algorithms(True)
-    X, labels = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    X, labels = create_subspace_data(1000, subspace_features=(3, 50), random_state=1)
     dipencoder = DipEncoder(3, pretrain_epochs=3, clustering_epochs=3, max_cluster_size_diff_factor=2.2, random_state=1)
     assert not hasattr(dipencoder, "labels_")
     dipencoder.fit(X)
@@ -28,7 +28,7 @@ def test_simple_dipencoder():
 
 
 def test_supervised_dipencoder():
-    X, labels = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    X, labels = create_subspace_data(1000, subspace_features=(3, 50), random_state=1)
     dipencoder = DipEncoder(3, pretrain_epochs=3, clustering_epochs=3, random_state=1)
     assert not hasattr(dipencoder, "labels_")
     dipencoder.fit(X, labels)
@@ -84,7 +84,7 @@ def test_get_rec_loss_of_first_batch():
 
 @patch("matplotlib.pyplot.show")  # Used to test plots (show will not be called)
 def test_plot_dipencoder_obj(mock_fig):
-    X, _ = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    X, _ = create_subspace_data(1000, subspace_features=(3, 50), random_state=1)
     dipencoder = DipEncoder(3, pretrain_epochs=1, clustering_epochs=1, random_state=1)
     dipencoder.fit(X)
     assert None == dipencoder.plot(X)

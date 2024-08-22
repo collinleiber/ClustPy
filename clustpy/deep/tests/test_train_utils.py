@@ -21,7 +21,7 @@ def test_get_default_layers():
 
 def test_get_trained_network():
     # Load dataset
-    data, _ = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    data, _ = create_subspace_data(1000, subspace_features=(3, 50), random_state=1)
     dataloader = _get_test_dataloader(data, 256, True, False)
     # Get AE using the default AE class
     device = torch.device('cpu')
@@ -34,7 +34,7 @@ def test_get_trained_network():
 
 def test_get_trained_network_with_custom_ae_class():
     # Load dataset
-    data, _ = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    data, _ = create_subspace_data(1000, subspace_features=(3, 50), random_state=1)
     dataloader = _get_test_dataloader(data, 256, True, False)
     # Get AE using a custom AE class
     device = torch.device('cpu')
@@ -49,7 +49,7 @@ def test_get_trained_network_with_custom_ae_class():
 
 def test_get_trained_network_with_custom_ae():
     # Load dataset
-    data, _ = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    data, _ = create_subspace_data(1000, subspace_features=(3, 50), random_state=1)
     dataloader = _get_test_dataloader(data, 256, True, False)
     # Get trained version of custom AE
     device = torch.device('cpu')
@@ -70,7 +70,7 @@ def test_get_trained_network_with_custom_ae():
 
 def test_get_trained_network_with_custom_pretrained_ae():
     # Load dataset
-    data, _ = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    data, _ = create_subspace_data(1000, subspace_features=(3, 50), random_state=1)
     dataloader = _get_test_dataloader(data, 256, True, False)
     # Get same pretrained version out of get_trained_network
     device = torch.device('cpu')
@@ -104,7 +104,7 @@ def test_get_trained_network_using_saved_ae():
     path = "autoencoder.ae"
     layers = [53, 4, 2]
     # Load dataset
-    data, _ = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    data, _ = create_subspace_data(1000, subspace_features=(3, 50), random_state=1)
     dataloader = _get_test_dataloader(data, 256, True, False)
     # Get pretrained ae
     device = torch.device('cpu')

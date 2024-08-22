@@ -1,5 +1,5 @@
 from clustpy.deep._data_utils import _ClustpyDataset, get_dataloader, get_train_and_test_dataloader, \
-    get_default_augmented_dataloaders
+    get_default_augmented_dataloaders, get_data_dim_from_dataloader
 from clustpy.data import create_subspace_data, load_optdigits
 import torch
 import torchvision
@@ -9,7 +9,7 @@ import pytest
 
 
 def test_ClustpyDataset():
-    data, labels = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    data, labels = create_subspace_data(250, subspace_features=(3, 50), random_state=1)
     data_torch = torch.from_numpy(data)
     labels_torch = torch.from_numpy(labels)
     dataset = _ClustpyDataset(data_torch, labels_torch)
@@ -65,7 +65,7 @@ def test_ClustpyDataset_with_augmentation():
 
 
 def test_get_datalaoder():
-    data, labels = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    data, labels = create_subspace_data(250, subspace_features=(3, 50), random_state=1)
     data_torch = torch.from_numpy(data).float()
     labels_torch = torch.from_numpy(labels).float()
     # Numpy entry, shuffle=False and no additional input
@@ -89,6 +89,15 @@ def test_get_datalaoder():
     assert not torch.equal(entry[0], torch.arange(0, 200))
     assert entry[1].shape == (200, data.shape[1])
     assert torch.equal(entry[1], data_torch[entry[0]])
+
+
+def test_get_data_dim_from_dataloader():
+    data, labels = create_subspace_data(20, subspace_features=(3, 50), random_state=1)
+    dataloader = get_dataloader(data, shuffle=False, batch_size=10)
+    assert get_data_dim_from_dataloader(dataloader) == 53
+    data, labels = create_subspace_data(20, subspace_features=(1, 10), random_state=1)
+    dataloader = get_dataloader(data, shuffle=False, batch_size=10)
+    assert get_data_dim_from_dataloader(dataloader) == 11
 
 
 @pytest.fixture
@@ -137,6 +146,11 @@ def test_get_train_and_test_dataloader():
         entry_test2 = next(iter_testloader2)
         assert np.array_equal(entry_test1[0], entry_test2[0])
         assert np.array_equal(entry_test1[1], entry_test2[1])
+    # Change batch_size of testloader
+    testloader = get_dataloader(data, 60, False, False)
+    custom_dataloader = (trainloader, testloader)
+    trainloader2, testloader2, bs = get_train_and_test_dataloader(data, 64, custom_dataloader)
+    assert bs == 64
 
 
 def test_get_default_augmented_dataloaders():
