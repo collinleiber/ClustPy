@@ -7,6 +7,7 @@ Collin Leiber
 
 import torch
 from clustpy.deep.neural_networks.feedforward_autoencoder import FullyConnectedBlock, FeedforwardAutoencoder
+from collections.abc import Callable
 
 
 def _vae_sampling(q_mean: torch.Tensor, q_logvar: torch.Tensor) -> torch.Tensor:
@@ -137,8 +138,8 @@ class VariationalAutoencoder(FeedforwardAutoencoder):
         reconstruction = self.decode(z)
         return z, q_mean, q_logvar, reconstruction
 
-    def loss(self, batch: list, ssl_loss_fn: torch.nn.modules.loss._Loss, device: torch.device, beta: float = 1) -> (
-            torch.Tensor, torch.Tensor, torch.Tensor):
+    def loss(self, batch: list, ssl_loss_fn: torch.nn.modules.loss._Loss, device: torch.device, 
+             corruption_fn: Callable = None, beta: float = 1) -> (torch.Tensor, torch.Tensor, torch.Tensor):
         """
         Calculate the loss of a single batch of data.
 
@@ -150,6 +151,8 @@ class VariationalAutoencoder(FeedforwardAutoencoder):
             self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss
         device : torch.device
             device to be trained on
+        corruption_fn: Callable
+            Can be used to corrupt the input data, e.g., when using a denoising autoencoder (default: None)
         beta : float
             weighting of the KL loss (default: 1)
 
@@ -162,7 +165,9 @@ class VariationalAutoencoder(FeedforwardAutoencoder):
         """
         assert type(batch) is list, "batch must come from a dataloader and therefore be of type list"
         batch_data = batch[1].to(device)
-        z, q_mean, q_logvar, reconstruction = self.forward(batch_data)
+        batch_data_adj = batch_data if corruption_fn is None else corruption_fn(batch_data)
+
+        z, q_mean, q_logvar, reconstruction = self.forward(batch_data_adj)
         ssl_loss = ssl_loss_fn(reconstruction, batch_data)
 
         kl_loss = -0.5 * torch.sum(1.0 + q_logvar - q_mean.pow(2) - torch.exp(q_logvar))

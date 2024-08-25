@@ -14,6 +14,7 @@ import numpy as np
 from sklearn.mixture import GaussianMixture
 from sklearn.base import ClusterMixin
 import tqdm
+from collections.abc import Callable
 
 
 def _vade(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_params: dict,
@@ -166,7 +167,7 @@ class _VaDE_VAE(VariationalAutoencoder):
         return z, q_mean, q_logvar, reconstruction
 
     def loss(self, batch: list, ssl_loss_fn: torch.nn.modules.loss._Loss, device: torch.device,
-             beta: float = 1) -> (torch.Tensor, torch.Tensor, torch.Tensor):
+             corruption_fn: Callable = None, beta: float = 1) -> (torch.Tensor, torch.Tensor, torch.Tensor):
         """
         Calculate the loss of a single batch of data.
         Matches loss calculation from FeedforwardAutoencoder for pretraining and from VariationalAutoencoder afterwards.
@@ -180,8 +181,10 @@ class _VaDE_VAE(VariationalAutoencoder):
             self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
         device : torch.device
             device to be trained on
+        corruption_fn: Callable
+            Can be used to corrupt the input data, e.g., when using a denoising autoencoder (default: None)
         beta : float
-            Not used at the moment
+            weighting of the KL loss. Not used at the moment (default: 1)
 
         Returns
         -------
@@ -194,11 +197,12 @@ class _VaDE_VAE(VariationalAutoencoder):
         if not self.fitted:
             # While pretraining a loss similar to a regular autoencoder (FeedforwardAutoencoder) should be used
             batch_data = batch[1].to(device)
-            z, _, _, reconstruction = self.forward(batch_data)
+            batch_data_adj = batch_data if corruption_fn is None else corruption_fn(batch_data)
+            z, _, _, reconstruction = self.forward(batch_data_adj)
             loss = ssl_loss_fn(reconstruction, batch_data)
         else:
             # After pretraining the usual loss of a VAE should be used. Super() uses function from VariationalAutoencoder
-            loss = super().loss(batch, ssl_loss_fn, device, beta)
+            loss = super().loss(batch, ssl_loss_fn, device, corruption_fn, beta)
         return loss, z, reconstruction
 
 

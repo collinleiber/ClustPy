@@ -1,4 +1,4 @@
-from clustpy.deep._utils import squared_euclidean_distance, detect_device, encode_batchwise, predict_batchwise, window, \
+from clustpy.deep._utils import squared_euclidean_distance, detect_device, encode_batchwise, predict_batchwise, \
     int_to_one_hot, decode_batchwise, encode_decode_batchwise, run_initial_clustering, embedded_kmeans_prediction
 from clustpy.deep.tests._helpers_for_tests import _get_test_dataloader, _TestAutoencoder, _TestClusterModule
 from clustpy.data import create_subspace_data
@@ -104,10 +104,6 @@ def test_encode_decode_batchwise():
     desired = np.tile(desired, embedding_size)
     assert np.allclose(encoded, desired, atol=1e-5)
     assert data.shape == decoded.shape
-
-
-def test_window():
-    pass  # TODO
 
 
 def test_int_to_one_hot():

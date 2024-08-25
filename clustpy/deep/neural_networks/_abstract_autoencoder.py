@@ -10,6 +10,7 @@ from clustpy.deep._data_utils import get_dataloader
 from clustpy.deep._utils import encode_batchwise, get_device_from_module
 import os
 import tqdm
+from collections.abc import Callable
 
 
 class FullyConnectedBlock(torch.nn.Module):
@@ -80,6 +81,18 @@ class FullyConnectedBlock(torch.nn.Module):
         """
         forwarded = self.block(x)
         return forwarded
+
+    def get_linear_layers(self) -> np.ndarray:
+        """
+        Get the IDs of the layers within this FullyConnectedBlock that are of type torch.nn.Linear.
+
+        Returns
+        -------
+        is_linear : np.ndarray
+            The IDs.
+        """
+        is_linear = np.where([type(layer) is torch.nn.Linear for layer in self.block])[0]
+        return is_linear
 
 
 class _AbstractAutoencoder(torch.nn.Module):
@@ -157,7 +170,8 @@ class _AbstractAutoencoder(torch.nn.Module):
         reconstruction = self.decode(embedded)
         return reconstruction
 
-    def loss(self, batch: list, ssl_loss_fn: torch.nn.modules.loss._Loss, device: torch.device) -> (
+    def loss(self, batch: list, ssl_loss_fn: torch.nn.modules.loss._Loss, device: torch.device,
+             corruption_fn: Callable = None) -> (
             torch.Tensor, torch.Tensor, torch.Tensor):
         """
         Calculate the loss of a single batch of data.
@@ -170,6 +184,8 @@ class _AbstractAutoencoder(torch.nn.Module):
             self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss
         device : torch.device
             device to be trained on
+        corruption_fn: Callable
+            Can be used to corrupt the input data, e.g., when using a denoising autoencoder (default: None)
 
         Returns
         -------
@@ -180,12 +196,14 @@ class _AbstractAutoencoder(torch.nn.Module):
         """
         assert type(batch) is list, "batch must come from a dataloader and therefore be of type list"
         batch_data = batch[1].to(device)
-        embedded = self.encode(batch_data)
+        batch_data_adj = batch_data if corruption_fn is None else corruption_fn(batch_data)
+        embedded = self.encode(batch_data_adj)
         reconstructed = self.decode(embedded)
         loss = ssl_loss_fn(reconstructed, batch_data)
         return loss, embedded, reconstructed
 
-    def loss_augmentation(self, batch: list, ssl_loss_fn: torch.nn.modules.loss._Loss, device: torch.device) -> (
+    def loss_augmentation(self, batch: list, ssl_loss_fn: torch.nn.modules.loss._Loss, device: torch.device,
+                          corruption_fn: Callable = None) -> (
             torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor):
         """
         Calculate the loss of a single batch of data and an augmented version of the data.
@@ -199,6 +217,8 @@ class _AbstractAutoencoder(torch.nn.Module):
             self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss
         device : torch.device
             device to be trained on
+        corruption_fn: Callable
+            Can be used to corrupt the input data, e.g., when using a denoising autoencoder (default: None)
 
         Returns
         -------
@@ -215,8 +235,8 @@ class _AbstractAutoencoder(torch.nn.Module):
         # Considering also the additional inputs can be relevant, e.g., when using a NeighborEncoder
         batches_orig = [batch[i] for i in range(2, len(batch), 2)]
         batches_aug = [batch[i] for i in range(1, len(batch), 2)]
-        loss_orig, embedded, reconstructed = self.loss([batch[0]] + batches_orig, ssl_loss_fn, device)
-        loss_augmented, embedded_aug, reconstructed_aug = self.loss([batch[0]] + batches_aug, ssl_loss_fn, device)
+        loss_orig, embedded, reconstructed = self.loss([batch[0]] + batches_orig, ssl_loss_fn, device, corruption_fn)
+        loss_augmented, embedded_aug, reconstructed_aug = self.loss([batch[0]] + batches_aug, ssl_loss_fn, device, corruption_fn)
         loss_total = (loss_orig + loss_augmented) / 2
         return loss_total, embedded, reconstructed, embedded_aug, reconstructed_aug
 
@@ -254,7 +274,7 @@ class _AbstractAutoencoder(torch.nn.Module):
             optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
             ssl_loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), patience: int = 5,
             scheduler: torch.optim.lr_scheduler = None, scheduler_params: dict = {},
-            model_path: str = None) -> '_AbstractAutoencoder':
+            corruption_fn: Callable = None, model_path: str = None) -> '_AbstractAutoencoder':
         """
         Trains the autoencoder in place.
 
@@ -285,6 +305,8 @@ class _AbstractAutoencoder(torch.nn.Module):
             If torch.optim.lr_scheduler.ReduceLROnPlateau is used then the behaviour is matched by providing the validation_loss calculated based on samples from evalloader (default: None)
         scheduler_params : dict
             dictionary of the parameters of the scheduler object (default: {})
+        corruption_fn: Callable
+            Can be used to corrupt the input data, e.g., when using a denoising autoencoder (default: None)
         model_path : str
             if specified will save the trained model to the location. If evalloader is used, then only the best model w.r.t. evaluation loss is saved (default: None)
 
@@ -328,7 +350,7 @@ class _AbstractAutoencoder(torch.nn.Module):
             self.train()
             total_loss = 0
             for batch in dataloader:
-                loss, _, _ = self.loss(batch, ssl_loss_fn, device)
+                loss, _, _ = self.loss(batch, ssl_loss_fn, device, corruption_fn)
                 total_loss += loss.item()
                 optimizer.zero_grad()
                 loss.backward()

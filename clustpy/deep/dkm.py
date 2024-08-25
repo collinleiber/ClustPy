@@ -356,7 +356,7 @@ class _DKM_Module(torch.nn.Module):
         """
         tbar = tqdm.tqdm(total=n_epochs * len(self.alphas), desc="DKM training")
         for alpha in self.alphas:
-            for e in range(n_epochs):
+            for _ in range(n_epochs):
                 total_loss = 0
                 for batch in trainloader:
                     loss = self._loss(batch, alpha, neural_network, clustering_loss_weight, ssl_loss_weight,

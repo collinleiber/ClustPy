@@ -4,7 +4,7 @@ import torch
 
 
 def test_feedforward_autoencoder():
-    data, _ = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    data, _ = create_subspace_data(1000, subspace_features=(3, 50), random_state=1)
     batch_size = 256
     data_batch = torch.Tensor(data[:batch_size])
     embedding_dim = 10
