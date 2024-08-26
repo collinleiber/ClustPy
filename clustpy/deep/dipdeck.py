@@ -13,16 +13,17 @@ from clustpy.deep._data_utils import augmentation_invariance_check
 from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
 from sklearn.cluster import KMeans
 from sklearn.base import ClusterMixin
+import tqdm
 
 
 def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, clustering_loss_weight: float,
-              reconstruction_loss_weight: float, max_n_clusters: int, min_n_clusters: int, batch_size: int,
+              ssl_loss_weight: float, max_n_clusters: int, min_n_clusters: int, batch_size: int,
               pretrain_optimizer_params: dict, clustering_optimizer_params: dict, pretrain_epochs: int,
-              clustering_epochs: int, optimizer_class: torch.optim.Optimizer,
-              loss_fn: torch.nn.modules.loss._Loss, neural_network: torch.nn.Module, embedding_size: int,
+              clustering_epochs: int, optimizer_class: torch.optim.Optimizer, ssl_loss_fn: torch.nn.modules.loss._Loss,
+              neural_network: torch.nn.Module | tuple, neural_network_weights: str, embedding_size: int,
               max_cluster_size_diff_factor: float, pval_strategy: str, n_boots: int, custom_dataloaders: tuple,
               augmentation_invariance: bool, initial_clustering_class: ClusterMixin, initial_clustering_params: dict,
-              device: torch.device, random_state: np.random.RandomState, debug: bool) -> (
+              device: torch.device, random_state: np.random.RandomState) -> (
         np.ndarray, int, np.ndarray, torch.nn.Module):
     """
     Start the actual DipDECK clustering procedure on the input data set.
@@ -36,9 +37,9 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
     dip_merge_threshold : float
         threshold regarding the Dip-p-value that defines if two clusters should be merged. Must be bvetween 0 and 1
     clustering_loss_weight : float
-        weight of the clustering loss compared to the reconstruction loss
-    reconstruction_loss_weight : float
-        weight of the reconstruction loss
+        weight of the clustering loss
+    ssl_loss_weight : float
+        weight of the self-supervised learning (ssl) loss
     max_n_clusters : int
         maximum number of clusters. Must be larger than min_n_clusters. If the result has more clusters, a merge will be forced
     min_n_clusters : int
@@ -56,10 +57,13 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
         number of epochs for the actual clustering procedure. Will reset after each merge
     optimizer_class : torch.optim.Optimizer
         the optimizer class
-    loss_fn : torch.nn.modules.loss._Loss
-        loss function for the reconstruction
-    neural_network : torch.nn.Module
-        the input neural network
+    ssl_loss_fn : torch.nn.modules.loss._Loss
+         self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
+    neural_network : torch.nn.Module | tuple
+        the input neural network.
+        Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict)
+    neural_network_weights : str
+        Path to a file containing the state_dict of the neural_network.
     embedding_size : int
         size of the embedding within the neural network
     max_cluster_size_diff_factor : float
@@ -71,6 +75,8 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
         Number of bootstraps used to calculate dip-p-values. Only necessary if pval_strategy is 'bootstrap'
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
+        Can also be a tuple of strings, where the first entry is the path to a saved trainloader and the second entry the path to a saved testloader.
+        In this case the dataloaders will be loaded by torch.load(PATH).
         If None, the default dataloaders will be used
     augmentation_invariance : bool
         If True, augmented samples provided in custom_dataloaders[0] will be used to learn
@@ -83,8 +89,6 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
         The device on which to perform the computations
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution
-    debug : bool
-        If true, additional information will be printed to the console
 
     Returns
     -------
@@ -103,10 +107,10 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
     if dip_merge_threshold < 0 or dip_merge_threshold > 1:
         raise Exception("dip_merge_threshold must be between 0 and 1")
     # Get initial setting (device, dataloaders, pretrained AE and initial clustering result)
-    device, trainloader, testloader, neural_network, embedded_data, n_clusters_init, cluster_labels_cpu, init_centers, _ = get_default_deep_clustering_initialization(
-        X, n_clusters_init, batch_size, pretrain_optimizer_params, pretrain_epochs, optimizer_class, loss_fn,
+    device, trainloader, testloader, _, neural_network, embedded_data, n_clusters_init, cluster_labels_cpu, init_centers, _ = get_default_deep_clustering_initialization(
+        X, n_clusters_init, batch_size, pretrain_optimizer_params, pretrain_epochs, optimizer_class, ssl_loss_fn,
         neural_network, embedding_size, custom_dataloaders, initial_clustering_class, initial_clustering_params,
-        device, random_state)
+        device, random_state, neural_network_weights=neural_network_weights)
     if custom_dataloaders is not None:
         # Get new X from testloader (important if transformations are used within the dataloader)
         X_new = []
@@ -124,34 +128,34 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
     cluster_labels_cpu, n_clusters_current, centers_cpu, neural_network = _dip_deck_training(X, n_clusters_init,
                                                                                              dip_merge_threshold,
                                                                                              clustering_loss_weight,
-                                                                                             reconstruction_loss_weight,
+                                                                                             ssl_loss_weight,
                                                                                              centers_cpu,
                                                                                              cluster_labels_cpu,
                                                                                              dip_matrix_cpu,
                                                                                              max_n_clusters,
                                                                                              min_n_clusters,
                                                                                              clustering_epochs,
-                                                                                             optimizer, loss_fn,
+                                                                                             optimizer, ssl_loss_fn,
                                                                                              neural_network,
                                                                                              device, trainloader,
                                                                                              testloader,
                                                                                              augmentation_invariance,
                                                                                              max_cluster_size_diff_factor,
                                                                                              pval_strategy, n_boots,
-                                                                                             random_state, debug)
+                                                                                             random_state)
     # Return results
     return cluster_labels_cpu, n_clusters_current, centers_cpu, neural_network
 
 
 def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_threshold: float,
-                       clustering_loss_weight: float, reconstruction_loss_weight: float,
+                       clustering_loss_weight: float, ssl_loss_weight: float,
                        centers_cpu: np.ndarray, cluster_labels_cpu: np.ndarray,
                        dip_matrix_cpu: np.ndarray, max_n_clusters: int, min_n_clusters: int, clustering_epochs: int,
-                       optimizer: torch.optim.Optimizer, loss_fn: torch.nn.modules.loss._Loss,
+                       optimizer: torch.optim.Optimizer, ssl_loss_fn: torch.nn.modules.loss._Loss,
                        neural_network: torch.nn.Module, device: torch.device, trainloader: torch.utils.data.DataLoader,
                        testloader: torch.utils.data.DataLoader, augmentation_invariance: bool,
                        max_cluster_size_diff_factor: float, pval_strategy: str, n_boots: int,
-                       random_state: np.random.RandomState, debug: bool) -> (
+                       random_state: np.random.RandomState) -> (
         np.ndarray, int, np.ndarray, torch.nn.Module):
     """
     The training function of DipDECK. Contains most of the essential functionalities.
@@ -165,9 +169,9 @@ def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_thresho
     dip_merge_threshold : float
         threshold regarding the Dip-p-value that defines if two clusters should be merged. Must be bvetween 0 and 1
     clustering_loss_weight : float
-        weight of the clustering loss compared to the reconstruction loss
-    reconstruction_loss_weight : float
-        weight of the reconstruction loss
+        weight of the clustering loss
+    ssl_loss_weight : float
+        weight of the self-supervised learning (ssl) loss
     centers_cpu : np.ndarray
         The current cluster centers, saved as numpy array (not torch.Tensor)
         Equals the result of the initial KMeans clusters in the beginning.
@@ -186,8 +190,8 @@ def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_thresho
         number of epochs for the actual clustering procedure
     optimizer : torch.optim.Optimizer
         the optimizer object
-    loss_fn : torch.nn.modules.loss._Loss
-        loss function for the reconstruction
+    ssl_loss_fn : torch.nn.modules.loss._Loss
+         self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
     neural_network : torch.nn.Module
         the input neural network
     device : torch.device
@@ -208,8 +212,6 @@ def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_thresho
         Number of bootstraps used to calculate dip-p-values. Only necessary if pval_strategy is 'bootstrap'
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution
-    debug : bool
-        If true, additional information will be printed to the console
 
     Returns
     -------
@@ -220,6 +222,8 @@ def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_thresho
         The final neural network
     """
     i = 0
+    merges_log = []
+    tbar = tqdm.tqdm(total=clustering_epochs, desc="DipDECK training")
     while i < clustering_epochs:
         cluster_labels_torch = torch.from_numpy(cluster_labels_cpu).int().to(device)
         centers_torch = torch.from_numpy(centers_cpu).float().to(device)
@@ -228,15 +232,14 @@ def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_thresho
         dip_matrix_eye = dip_matrix_torch + torch.eye(n_clusters_current, device=device)
         dip_matrix_final = dip_matrix_eye / dip_matrix_eye.sum(1).reshape((-1, 1))
         # Iterate over batches
+        total_loss = 0
         for batch in trainloader:
             ids = batch[0]
-            # Reconstruction Loss
+            # Self-supervised Loss
             if augmentation_invariance:
-                ae_loss, embedded, _ = neural_network.loss([batch[0], batch[2]], loss_fn, device)
-                ae_loss_aug, embedded_aug, _ = neural_network.loss([batch[0], batch[1]], loss_fn, device)
-                ae_loss = (ae_loss + ae_loss_aug) / 2
+                ssl_loss, embedded, _, embedded_aug, _ = neural_network.loss_augmentation(batch, ssl_loss_fn, device)
             else:
-                ae_loss, embedded, _ = neural_network.loss(batch, loss_fn, device)
+                ssl_loss, embedded, _ = neural_network.loss(batch, ssl_loss_fn, device)
             # Encode centers
             embedded_centers_torch = neural_network.encode(centers_torch)
             # Get distances between points and centers. Get nearest center
@@ -268,7 +271,8 @@ def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_thresho
                 cluster_loss_aug = escaped_diffs_aug.sum(1).mean() * (
                         1 + masked_center_diffs_std) / sqrt_masked_center_diffs.mean()
                 cluster_loss = (cluster_loss + cluster_loss_aug) / 2
-            loss = reconstruction_loss_weight * ae_loss + clustering_loss_weight * cluster_loss
+            loss = ssl_loss_weight * ssl_loss + clustering_loss_weight * cluster_loss
+            total_loss += loss.item()
             # Backward pass
             optimizer.zero_grad()
             loss.backward()
@@ -284,25 +288,26 @@ def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_thresho
         dip_matrix_cpu = _get_dip_matrix(embedded_data, embedded_centers_cpu, cluster_labels_cpu, n_clusters_current,
                                          max_cluster_size_diff_factor, pval_strategy, n_boots, random_state)
 
-        if debug:
-            print(
-                "Iteration {0}  (n_clusters = {4}) - reconstruction loss: {1} / cluster loss: {2} / total loss: {3}".format(
-                    i, ae_loss.item(), cluster_loss.item(), loss.item(), n_clusters_current))
-            print("max dip", np.max(dip_matrix_cpu), " at ",
-                  np.unravel_index(np.argmax(dip_matrix_cpu, axis=None), dip_matrix_cpu.shape))
+        postfix_str = {"n_clusters": n_clusters_current, "Loss": total_loss, "Max dip": np.max(dip_matrix_cpu)}
+        tbar.set_postfix(postfix_str)
+        tbar.update()
+        # print(
+        #     "Iteration {0}  (n_clusters = {4}) - network loss: {1} / cluster loss: {2} / total loss: {3}".format(
+        #         i, ssl_loss.item(), cluster_loss.item(), loss.item(), n_clusters_current))
+        # print("max dip", np.max(dip_matrix_cpu), " at ",
+        #       np.unravel_index(np.argmax(dip_matrix_cpu, axis=None), dip_matrix_cpu.shape))
         # i is increased here. Else next iteration will start with i = 1 instead of 0 after a merge
         i += 1
         # Start merging procedure
         dip_argmax = np.unravel_index(np.argmax(dip_matrix_cpu, axis=None), dip_matrix_cpu.shape)
         # Is merge possible?
         while dip_matrix_cpu[dip_argmax] >= dip_merge_threshold and n_clusters_current > min_n_clusters:
-            if debug:
-                print("Start merging in iteration {0}.\nMerging clusters {1} with dip value {2}.".format(i,
-                                                                                                         dip_argmax,
-                                                                                                         dip_matrix_cpu[
-                                                                                                             dip_argmax]))
+            merges_log.append("Merge in iteration {0}. Merging clusters {1} with dip value {2}.".format(i, dip_argmax,
+                                                                                                        dip_matrix_cpu[
+                                                                                                            dip_argmax]))
             # Reset iteration and reduce number of cluster
             i = 0
+            tbar.reset()
             n_clusters_current -= 1
             cluster_labels_cpu, centers_cpu, embedded_centers_cpu, dip_matrix_cpu = \
                 _merge_by_dip_value(X, embedded_data, cluster_labels_cpu, dip_argmax, n_clusters_current, centers_cpu,
@@ -316,12 +321,12 @@ def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_thresho
             smallest_cluster_id = np.argmin(cluster_sizes)
             smallest_cluster_size = cluster_sizes[smallest_cluster_id]
             i = 0
+            tbar.reset()
             n_clusters_current -= 1
             # Is smallest cluster small enough for deletion?
             if smallest_cluster_size < 0.2 * np.mean(cluster_sizes):
-                if debug:
-                    print(
-                        "Remove smallest cluster {0} with size {1}".format(smallest_cluster_id, smallest_cluster_size))
+                merges_log.append(
+                    "Remove smallest cluster {0} with size {1}".format(smallest_cluster_id, smallest_cluster_size))
                 distances_to_clusters = cdist(embedded_centers_cpu,
                                               embedded_data[cluster_labels_cpu == smallest_cluster_id])
                 # Set dist to center which is being removed to inf
@@ -338,19 +343,19 @@ def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_thresho
                                                  n_clusters_current, max_cluster_size_diff_factor, pval_strategy,
                                                  n_boots, random_state)
             else:
-                # Else: merge clusters with hightest dip
-                if debug:
-                    print("Force merge of clusters {0} with dip value {1}".format(dip_argmax,
-                                                                                  dip_matrix_cpu[dip_argmax]))
-
+                # Else: merge clusters with highest dip
+                merges_log.append(
+                    "Force merge of clusters {0} with dip value {1}".format(dip_argmax, dip_matrix_cpu[dip_argmax]))
                 cluster_labels_cpu, centers_cpu, _, dip_matrix_cpu = \
                     _merge_by_dip_value(X, embedded_data, cluster_labels_cpu, dip_argmax, n_clusters_current,
                                         centers_cpu, embedded_centers_cpu, max_cluster_size_diff_factor, pval_strategy,
                                         n_boots, random_state)
         if n_clusters_current == 1:
-            if debug:
-                print("Only one cluster left")
+            print("Abort DipDECK: Only one cluster left")
             break
+    tbar.close()
+    for merge_message in merges_log:
+        print(merge_message)
     return cluster_labels_cpu, n_clusters_current, centers_cpu, neural_network
 
 
@@ -569,9 +574,9 @@ class DipDECK(_AbstractDeepClusteringAlgo):
     dip_merge_threshold : float
         threshold regarding the Dip-p-value that defines if two clusters should be merged. Must be bvetween 0 and 1 (default: 0.9)
     clustering_loss_weight : float
-        weight of the clustering loss compared to the reconstruction loss (default: 1.0)
-    reconstruction_loss_weight : float
-        weight of the reconstruction loss (default: 1.0)
+        weight of the clustering loss (default: 1.0)
+    ssl_loss_weight : float
+        weight of the self-supervised learning (ssl) loss (default: 1.0)
     max_n_clusters : int
         maximum number of clusters. Must be larger than min_n_clusters. If the result has more clusters, a merge will be forced (default: np.inf)
     min_n_clusters : int
@@ -589,10 +594,13 @@ class DipDECK(_AbstractDeepClusteringAlgo):
         number of epochs for the actual clustering procedure. Will reset after each merge (default: 50)
     optimizer_class : torch.optim.Optimizer
         the optimizer class (default: torch.optim.Adam)
-    loss_fn : torch.nn.modules.loss._Loss
-        loss function for the reconstruction (default: torch.nn.MSELoss())
-    neural_network : torch.nn.Module
-        the input neural network. If None a new FeedforwardAutoencoder will be created (default: None)
+    ssl_loss_fn : torch.nn.modules.loss._Loss
+         self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: torch.nn.MSELoss())
+    neural_network : torch.nn.Module | tuple
+        the input neural network. If None, a new FeedforwardAutoencoder will be created.
+        Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict) (default: None)
+    neural_network_weights : str
+        Path to a file containing the state_dict of the neural_network (default: None)
     embedding_size : int
         size of the embedding within the neural network (default: 5)
     max_cluster_size_diff_factor : float
@@ -604,6 +612,8 @@ class DipDECK(_AbstractDeepClusteringAlgo):
         Number of bootstraps used to calculate dip-p-values. Only necessary if pval_strategy is 'bootstrap' (default: 1000)
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
+        Can also be a tuple of strings, where the first entry is the path to a saved trainloader and the second entry the path to a saved testloader.
+        In this case the dataloaders will be loaded by torch.load(PATH).
         If None, the default dataloaders will be used (default: None)
     augmentation_invariance : bool
         If True, augmented samples provided in custom_dataloaders[0] will be used to learn
@@ -617,8 +627,6 @@ class DipDECK(_AbstractDeepClusteringAlgo):
     device : torch.device
         The device on which to perform the computations.
         If device is None then it will be automatically chosen: if a gpu is available the gpu with the highest amount of free memory will be chosen (default: None)
-    debug : bool
-        If true, additional information will be printed to the console (default: False)
 
     Attributes
     ----------
@@ -646,20 +654,21 @@ class DipDECK(_AbstractDeepClusteringAlgo):
     """
 
     def __init__(self, n_clusters_init: int = 35, dip_merge_threshold: float = 0.9, clustering_loss_weight: float = 1.,
-                 reconstruction_loss_weight: float = 1., max_n_clusters: int = np.inf, min_n_clusters: int = 1,
+                 ssl_loss_weight: float = 1., max_n_clusters: int = np.inf, min_n_clusters: int = 1,
                  batch_size: int = 256, pretrain_optimizer_params: dict = None,
                  clustering_optimizer_params: dict = None, pretrain_epochs: int = 100, clustering_epochs: int = 50,
                  optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
-                 loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), neural_network: torch.nn.Module = None,
+                 ssl_loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(),
+                 neural_network: torch.nn.Module | tuple = None, neural_network_weights: str = None,
                  embedding_size: int = 5, max_cluster_size_diff_factor: float = 2, pval_strategy: str = "table",
                  n_boots: int = 1000, custom_dataloaders: tuple = None, augmentation_invariance: bool = False,
                  initial_clustering_class: ClusterMixin = KMeans, initial_clustering_params: dict = None,
-                 device: torch.device = None, random_state: np.random.RandomState | int = None, debug: bool = False):
-        super().__init__(batch_size, neural_network, embedding_size, device, random_state)
+                 device: torch.device = None, random_state: np.random.RandomState | int = None):
+        super().__init__(batch_size, neural_network, neural_network_weights, embedding_size, device, random_state)
         self.n_clusters_init = n_clusters_init
         self.dip_merge_threshold = dip_merge_threshold
         self.clustering_loss_weight = clustering_loss_weight
-        self.reconstruction_loss_weight = reconstruction_loss_weight
+        self.ssl_loss_weight = ssl_loss_weight
         self.max_n_clusters = max_n_clusters
         self.min_n_clusters = min_n_clusters
         self.pretrain_optimizer_params = {
@@ -669,7 +678,7 @@ class DipDECK(_AbstractDeepClusteringAlgo):
         self.pretrain_epochs = pretrain_epochs
         self.clustering_epochs = clustering_epochs
         self.optimizer_class = optimizer_class
-        self.loss_fn = loss_fn
+        self.ssl_loss_fn = ssl_loss_fn
         self.max_cluster_size_diff_factor = max_cluster_size_diff_factor
         self.pval_strategy = pval_strategy
         self.n_boots = n_boots
@@ -677,7 +686,6 @@ class DipDECK(_AbstractDeepClusteringAlgo):
         self.augmentation_invariance = augmentation_invariance
         self.initial_clustering_class = initial_clustering_class
         self.initial_clustering_params = {} if initial_clustering_params is None else initial_clustering_params
-        self.debug = debug
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DipDECK':
         """
@@ -699,19 +707,20 @@ class DipDECK(_AbstractDeepClusteringAlgo):
         augmentation_invariance_check(self.augmentation_invariance, self.custom_dataloaders)
         labels, n_clusters, centers, neural_network = _dip_deck(X, self.n_clusters_init, self.dip_merge_threshold,
                                                                 self.clustering_loss_weight,
-                                                                self.reconstruction_loss_weight, self.max_n_clusters,
+                                                                self.ssl_loss_weight, self.max_n_clusters,
                                                                 self.min_n_clusters, self.batch_size,
                                                                 self.pretrain_optimizer_params,
                                                                 self.clustering_optimizer_params,
                                                                 self.pretrain_epochs, self.clustering_epochs,
-                                                                self.optimizer_class, self.loss_fn, self.neural_network,
+                                                                self.optimizer_class, self.ssl_loss_fn,
+                                                                self.neural_network, self.neural_network_weights,
                                                                 self.embedding_size, self.max_cluster_size_diff_factor,
                                                                 self.pval_strategy, self.n_boots,
                                                                 self.custom_dataloaders,
                                                                 self.augmentation_invariance,
                                                                 self.initial_clustering_class,
                                                                 self.initial_clustering_params, self.device,
-                                                                self.random_state, self.debug)
+                                                                self.random_state)
         self.labels_ = labels
         self.n_clusters_ = n_clusters
         self.cluster_centers_ = centers

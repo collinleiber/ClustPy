@@ -1,8 +1,7 @@
-from clustpy.deep import DipEncoder, get_dataloader, detect_device
-from clustpy.deep.dipencoder import plot_dipencoder_embedding, _get_rec_loss_of_first_batch
+from clustpy.deep import DipEncoder, get_dataloader, detect_device, get_default_augmented_dataloaders
+from clustpy.deep.dipencoder import plot_dipencoder_embedding, _get_ssl_loss_of_first_batch
 from clustpy.data import create_subspace_data, load_optdigits
-from clustpy.deep.tests._helpers_for_tests import _get_test_augmentation_dataloaders
-from clustpy.deep.autoencoders import FeedforwardAutoencoder, ConvolutionalAutoencoder
+from clustpy.deep.neural_networks import FeedforwardAutoencoder, ConvolutionalAutoencoder
 import numpy as np
 import torch
 from unittest.mock import patch
@@ -10,16 +9,15 @@ from unittest.mock import patch
 
 def test_simple_dipencoder():
     torch.use_deterministic_algorithms(True)
-    X, labels = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
-    dipencoder = DipEncoder(3, pretrain_epochs=3, clustering_epochs=3, max_cluster_size_diff_factor=2.2, random_state=1,
-                            debug=True)
+    X, labels = create_subspace_data(1000, subspace_features=(3, 50), random_state=1)
+    dipencoder = DipEncoder(3, pretrain_epochs=3, clustering_epochs=3, max_cluster_size_diff_factor=2.2, random_state=1)
     assert not hasattr(dipencoder, "labels_")
     dipencoder.fit(X)
     assert dipencoder.labels_.dtype == np.int32
     assert dipencoder.labels_.shape == labels.shape
     # Test if random state is working
     # TODO Does not work every time -> Check why
-    # dipencoder2 = DipEncoder(3, pretrain_epochs=3, clustering_epochs=3, random_state=1, debug=True)
+    # dipencoder2 = DipEncoder(3, pretrain_epochs=3, clustering_epochs=3, random_state=1)
     # dipencoder2.fit(X)
     # assert np.array_equal(dipencoder.labels_, dipencoder2.labels_)
     # assert np.allclose(dipencoder.projection_axes_, dipencoder2.projection_axes_, atol=1e-1)
@@ -30,7 +28,7 @@ def test_simple_dipencoder():
 
 
 def test_supervised_dipencoder():
-    X, labels = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    X, labels = create_subspace_data(1000, subspace_features=(3, 50), random_state=1)
     dipencoder = DipEncoder(3, pretrain_epochs=3, clustering_epochs=3, random_state=1)
     assert not hasattr(dipencoder, "labels_")
     dipencoder.fit(X, labels)
@@ -43,7 +41,7 @@ def test_dipencoder_augmentation():
     dataset = load_optdigits()
     data = dataset.images[:1000]
     labels = dataset.target[:1000]
-    aug_dl, orig_dl = _get_test_augmentation_dataloaders(data)
+    aug_dl, orig_dl = get_default_augmented_dataloaders(data)
     clusterer = DipEncoder(10, pretrain_epochs=3, clustering_epochs=3, random_state=1,
                            custom_dataloaders=[aug_dl, orig_dl], augmentation_invariance=True)
     assert not hasattr(clusterer, "labels_")
@@ -75,18 +73,18 @@ def test_get_rec_loss_of_first_batch():
     X_flat = X.reshape(512, -1)
     ff_trainloader = get_dataloader(X_flat, 32, shuffle=True)
     ff_autoencoder = FeedforwardAutoencoder([X_flat.shape[1], 32, 10])
-    ae_loss = _get_rec_loss_of_first_batch(ff_trainloader, ff_autoencoder, torch.nn.MSELoss(), device)
+    ae_loss = _get_ssl_loss_of_first_batch(ff_trainloader, ff_autoencoder, torch.nn.MSELoss(), device)
     assert ae_loss > 0
     # Test with ConvolutionalAutoencoder
     conv_trainloader = get_dataloader(X, 32, shuffle=True)
     conv_autoencoder = ConvolutionalAutoencoder(X.shape[-1], [512, 10])
-    ae_loss = _get_rec_loss_of_first_batch(conv_trainloader, conv_autoencoder, torch.nn.MSELoss(), device)
+    ae_loss = _get_ssl_loss_of_first_batch(conv_trainloader, conv_autoencoder, torch.nn.MSELoss(), device)
     assert ae_loss > 0
 
 
 @patch("matplotlib.pyplot.show")  # Used to test plots (show will not be called)
 def test_plot_dipencoder_obj(mock_fig):
-    X, _ = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    X, _ = create_subspace_data(1000, subspace_features=(3, 50), random_state=1)
     dipencoder = DipEncoder(3, pretrain_epochs=1, clustering_epochs=1, random_state=1)
     dipencoder.fit(X)
     assert None == dipencoder.plot(X)

@@ -1,5 +1,5 @@
-from clustpy.deep.autoencoders import VariationalAutoencoder
-from clustpy.deep.autoencoders.variational_autoencoder import _vae_sampling
+from clustpy.deep.neural_networks import VariationalAutoencoder
+from clustpy.deep.neural_networks.variational_autoencoder import _vae_sampling
 from clustpy.data import create_subspace_data
 import torch
 
