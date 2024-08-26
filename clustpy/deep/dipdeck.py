@@ -9,7 +9,6 @@ from clustpy.utils import dip_test, dip_pval
 import torch
 from clustpy.deep._utils import encode_batchwise, squared_euclidean_distance, int_to_one_hot, embedded_kmeans_prediction
 from clustpy.deep._train_utils import get_default_deep_clustering_initialization
-from clustpy.deep._data_utils import augmentation_invariance_check
 from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
 from sklearn.cluster import KMeans
 from sklearn.base import ClusterMixin
@@ -704,7 +703,7 @@ class DipDECK(_AbstractDeepClusteringAlgo):
         self : DipDECK
             this instance of the DipDECK algorithm
         """
-        augmentation_invariance_check(self.augmentation_invariance, self.custom_dataloaders)
+        super().fit(X, y)
         labels, n_clusters, centers, neural_network = _dip_deck(X, self.n_clusters_init, self.dip_merge_threshold,
                                                                 self.clustering_loss_weight,
                                                                 self.ssl_loss_weight, self.max_n_clusters,

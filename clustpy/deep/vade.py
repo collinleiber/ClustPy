@@ -607,6 +607,7 @@ class VaDE(_AbstractDeepClusteringAlgo):
         """
         assert type(self.ssl_loss_fn) != torch.nn.modules.loss.BCELoss or (np.min(X) >= 0 and np.max(
             X) <= 1), "Your dataset contains values that are not in the value range [0, 1]. Therefore, BCE is not a valid loss function, an alternative might be a MSE loss function."
+        super().fit(X, y)
         gmm_labels, gmm_means, gmm_covariances, gmm_weights, vade_labels, vade_centers, vade_covariances, neural_network = _vade(
             X,
             self.n_clusters,

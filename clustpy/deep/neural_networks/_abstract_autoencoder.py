@@ -11,6 +11,8 @@ from clustpy.deep._utils import encode_batchwise, get_device_from_module
 import os
 import tqdm
 from collections.abc import Callable
+from sklearn.utils import check_random_state
+from clustpy.deep._utils import set_torch_seed
 
 
 class FullyConnectedBlock(torch.nn.Module):
@@ -105,6 +107,9 @@ class _AbstractAutoencoder(torch.nn.Module):
         If set to true, deep clustering algorithms will optimize a copy of the autoencoder and not the autoencoder itself.
         Ensures that the same autoencoder can be used by multiple deep clustering algorithms.
         As copies of this object are created, the memory requirement increases (default: True)
+    random_state : np.random.RandomState | int
+        use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
+
 
     Attributes
     ----------
@@ -114,10 +119,11 @@ class _AbstractAutoencoder(torch.nn.Module):
         indicates whether deep clustering algorithms should work on a copy of the original autoencoder
     """
 
-    def __init__(self, work_on_copy: bool = True):
+    def __init__(self, work_on_copy: bool = True, random_state: np.random.RandomState | int = None):
         super(_AbstractAutoencoder, self).__init__()
         self.fitted = False
         self.work_on_copy = work_on_copy
+        self.random_state = check_random_state(random_state)
 
     def encode(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -236,7 +242,8 @@ class _AbstractAutoencoder(torch.nn.Module):
         batches_orig = [batch[i] for i in range(2, len(batch), 2)]
         batches_aug = [batch[i] for i in range(1, len(batch), 2)]
         loss_orig, embedded, reconstructed = self.loss([batch[0]] + batches_orig, ssl_loss_fn, device, corruption_fn)
-        loss_augmented, embedded_aug, reconstructed_aug = self.loss([batch[0]] + batches_aug, ssl_loss_fn, device, corruption_fn)
+        loss_augmented, embedded_aug, reconstructed_aug = self.loss([batch[0]] + batches_aug, ssl_loss_fn, device,
+                                                                    corruption_fn)
         loss_total = (loss_orig + loss_augmented) / 2
         return loss_total, embedded, reconstructed, embedded_aug, reconstructed_aug
 
@@ -320,6 +327,7 @@ class _AbstractAutoencoder(torch.nn.Module):
         ValueError: data cannot be None if dataloader is None
         ValueError: evalloader cannot be None if scheduler=torch.optim.lr_scheduler.ReduceLROnPlateau
         """
+        set_torch_seed(self.random_state)
         if dataloader is None:
             if data is None:
                 raise ValueError("data must be specified if dataloader is None")

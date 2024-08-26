@@ -3,6 +3,7 @@ from clustpy.deep.neural_networks._resnet_ae_modules import resnet18_encoder, re
     resnet50_decoder, ResNetEncoder
 from clustpy.deep.neural_networks._abstract_autoencoder import FullyConnectedBlock, _AbstractAutoencoder
 from torchvision.models._api import Weights
+import numpy as np
 
 _VALID_CONV_MODULES = {
     "resnet18": {
@@ -48,6 +49,8 @@ class ConvolutionalAutoencoder(_AbstractAutoencoder):
         If set to true, deep clustering algorithms will optimize a copy of the autoencoder and not the autoencoder itself.
         Ensures that the same autoencoder can be used by multiple deep clustering algorithms.
         As copies of this object are created, the memory requirement increases (default: True)
+    random_state : np.random.RandomState | int
+        use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
     fc_kwargs : dict
         additional parameters for FullyConnectedBlock
     
@@ -81,8 +84,8 @@ class ConvolutionalAutoencoder(_AbstractAutoencoder):
                  conv_decoder_name: str = None, activation_fn: torch.nn.Module = torch.nn.ReLU,
                  fc_decoder_layers: list = None, decoder_output_fn: torch.nn.Module = None,
                  pretrained_encoder_weights: Weights = None, pretrained_decoder_weights: Weights = None,
-                 work_on_copy: bool = True, **fc_kwargs):
-        super().__init__(work_on_copy)
+                 work_on_copy: bool = True, random_state: np.random.RandomState | int = None, **fc_kwargs):
+        super().__init__(work_on_copy, random_state)
         self.input_height = input_height
 
         # Check if layers match

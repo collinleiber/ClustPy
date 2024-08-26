@@ -10,6 +10,7 @@ from clustpy.deep._data_utils import get_dataloader
 import numpy as np
 import tqdm
 from collections.abc import Callable
+from clustpy.deep._utils import set_torch_seed
 
 
 class StackedAutoencoder(FeedforwardAutoencoder):
@@ -39,6 +40,8 @@ class StackedAutoencoder(FeedforwardAutoencoder):
         If set to true, deep clustering algorithms will optimize a copy of the autoencoder and not the autoencoder itself.
         Ensures that the same autoencoder can be used by multiple deep clustering algorithms.
         As copies of this object are created, the memory requirement increases (default: True)
+    random_state : np.random.RandomState | int
+        use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Attributes
     ----------
@@ -65,15 +68,16 @@ class StackedAutoencoder(FeedforwardAutoencoder):
 
     def __init__(self, layers: list, batch_norm: bool = False, dropout: float = None,
                  activation_fn: torch.nn.Module = torch.nn.LeakyReLU, bias: bool = True,
-                 decoder_output_fn: torch.nn.Module = None, work_on_copy: bool = True):
-        super(StackedAutoencoder, self).__init__(layers, batch_norm, dropout,
-                 activation_fn, bias, None, decoder_output_fn, work_on_copy)            
+                 decoder_output_fn: torch.nn.Module = None, work_on_copy: bool = True,
+                 random_state: np.random.RandomState | int = None):
+        super().__init__(layers, batch_norm, dropout, activation_fn, bias, None, decoder_output_fn, work_on_copy,
+                         random_state)
 
     def layerwise_training(self, n_epochs_per_layer: int = 20, optimizer_params: dict = None, batch_size: int = 128,
-            data: np.ndarray | torch.Tensor = None, dataloader: torch.utils.data.DataLoader = None,
-            optimizer_class: torch.optim.Optimizer = torch.optim.Adam, 
-            ssl_loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(),
-            corruption_fn: Callable = None) -> 'StackedAutoencoder':
+                           data: np.ndarray | torch.Tensor = None, dataloader: torch.utils.data.DataLoader = None,
+                           optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
+                           ssl_loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(),
+                           corruption_fn: Callable = None) -> 'StackedAutoencoder':
         """
         Trains the autoencoder in a greedy layer-wise fashion.
 
@@ -114,7 +118,8 @@ class StackedAutoencoder(FeedforwardAutoencoder):
         device = get_device_from_module(self)
         encoder_linear_layer_ids = self.encoder.get_linear_layers()
         decoder_linear_layer_ids = self.decoder.get_linear_layers()
-        assert len(encoder_linear_layer_ids) == len(decoder_linear_layer_ids), "The decoder must be a reversed version of the encoder"
+        assert len(encoder_linear_layer_ids) == len(
+            decoder_linear_layer_ids), "The decoder must be a reversed version of the encoder"
         # Save old weights to see if training is working correctly
         old_encoder_weights = [self.encoder.block[i].weight.clone() for i in encoder_linear_layer_ids]
         old_decoder_weights = [self.decoder.block[i].weight.clone() for i in decoder_linear_layer_ids]
@@ -132,7 +137,7 @@ class StackedAutoencoder(FeedforwardAutoencoder):
                     # Calculate loss regarding current layer
                     input_data_adj = input_data if corruption_fn is None else corruption_fn(input_data)
                     encoded = self.encoder.block[encoder_layer_to_train](input_data_adj)
-                    decoded = self.decoder.block[decoder_linear_layer_ids[-(layer_nr+1)]](encoded)
+                    decoded = self.decoder.block[decoder_linear_layer_ids[-(layer_nr + 1)]](encoded)
                     loss = ssl_loss_fn(decoded, input_data)
                     # Update network
                     total_loss += loss.item()
@@ -143,20 +148,24 @@ class StackedAutoencoder(FeedforwardAutoencoder):
                 tbar.set_postfix(postfix_str)
                 tbar.update()
             # Check if training was succesful => Only reference layer should be changed
-            encoder_success = [torch.equal(old_encoder_weights[i], self.encoder.block[encoder_linear_layer_ids[i]].weight) for i in range(len(old_encoder_weights))]
+            encoder_success = [
+                torch.equal(old_encoder_weights[i], self.encoder.block[encoder_linear_layer_ids[i]].weight) for i in
+                range(len(old_encoder_weights))]
             encoder_success[layer_nr] = not encoder_success[layer_nr]
             assert all(encoder_success)
-            decoder_success = [torch.equal(old_decoder_weights[i], self.decoder.block[decoder_linear_layer_ids[i]].weight) for i in range(len(old_decoder_weights))]
-            decoder_success[-(layer_nr+1)] = not decoder_success[-(layer_nr+1)]
+            decoder_success = [
+                torch.equal(old_decoder_weights[i], self.decoder.block[decoder_linear_layer_ids[i]].weight) for i in
+                range(len(old_decoder_weights))]
+            decoder_success[-(layer_nr + 1)] = not decoder_success[-(layer_nr + 1)]
             assert all(decoder_success)
             # Update the old weights by the updated layer
             old_encoder_weights[layer_nr] = self.encoder.block[encoder_layer_to_train].weight.clone()
-            old_decoder_weights[-(layer_nr+1)] = self.decoder.block[decoder_linear_layer_ids[-(layer_nr+1)]].weight.clone()
+            old_decoder_weights[-(layer_nr + 1)] = self.decoder.block[
+                decoder_linear_layer_ids[-(layer_nr + 1)]].weight.clone()
         return self
 
-
-    def fit(self, n_epochs_per_layer: int = 20, n_epochs: int = 100, optimizer_params: dict = None, batch_size: int = 128,
-            data: np.ndarray | torch.Tensor = None, data_eval: np.ndarray | torch.Tensor = None,
+    def fit(self, n_epochs_per_layer: int = 20, n_epochs: int = 100, optimizer_params: dict = None,
+            batch_size: int = 128, data: np.ndarray | torch.Tensor = None, data_eval: np.ndarray | torch.Tensor = None,
             dataloader: torch.utils.data.DataLoader = None, evalloader: torch.utils.data.DataLoader = None,
             optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
             ssl_loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), patience: int = 5,
@@ -215,8 +224,9 @@ class StackedAutoencoder(FeedforwardAutoencoder):
         ValueError: data cannot be None if dataloader is None
         ValueError: evalloader cannot be None if scheduler=torch.optim.lr_scheduler.ReduceLROnPlateau
         """
+        set_torch_seed(self.random_state)
         self.layerwise_training(n_epochs_per_layer, optimizer_params, batch_size, data, dataloader,
-            optimizer_class, ssl_loss_fn, corruption_fn)
+                                optimizer_class, ssl_loss_fn, corruption_fn)
         super().fit(n_epochs, optimizer_params, batch_size, data, data_eval, dataloader, evalloader,
-            optimizer_class, ssl_loss_fn, patience, scheduler, scheduler_params, corruption_fn, model_path)
+                    optimizer_class, ssl_loss_fn, patience, scheduler, scheduler_params, corruption_fn, model_path)
         return self

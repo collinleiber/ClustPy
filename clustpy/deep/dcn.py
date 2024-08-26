@@ -7,7 +7,6 @@ Dominik Mautz
 from clustpy.deep._utils import encode_batchwise, squared_euclidean_distance, predict_batchwise, int_to_one_hot, \
     embedded_kmeans_prediction
 from clustpy.deep._train_utils import get_default_deep_clustering_initialization
-from clustpy.deep._data_utils import augmentation_invariance_check
 from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
 import torch
 import numpy as np
@@ -490,7 +489,7 @@ class DCN(_AbstractDeepClusteringAlgo):
         self : DCN
             this instance of the DCN algorithm
         """
-        augmentation_invariance_check(self.augmentation_invariance, self.custom_dataloaders)
+        super().fit(X, y)
         kmeans_labels, kmeans_centers, dcn_labels, dcn_centers, neural_network = _dcn(X, self.n_clusters,
                                                                                       self.batch_size,
                                                                                       self.pretrain_optimizer_params,

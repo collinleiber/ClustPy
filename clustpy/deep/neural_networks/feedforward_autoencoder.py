@@ -5,6 +5,7 @@ Lukas Miklautz
 
 import torch
 from clustpy.deep.neural_networks._abstract_autoencoder import _AbstractAutoencoder, FullyConnectedBlock
+import numpy as np
 
 
 class FeedforwardAutoencoder(_AbstractAutoencoder):
@@ -33,6 +34,8 @@ class FeedforwardAutoencoder(_AbstractAutoencoder):
         If set to true, deep clustering algorithms will optimize a copy of the autoencoder and not the autoencoder itself.
         Ensures that the same autoencoder can be used by multiple deep clustering algorithms.
         As copies of this object are created, the memory requirement increases (default: True)
+    random_state : np.random.RandomState | int
+        use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Attributes
     ----------
@@ -58,8 +61,9 @@ class FeedforwardAutoencoder(_AbstractAutoencoder):
 
     def __init__(self, layers: list, batch_norm: bool = False, dropout: float = None,
                  activation_fn: torch.nn.Module = torch.nn.LeakyReLU, bias: bool = True, decoder_layers: list = None,
-                 decoder_output_fn: torch.nn.Module = None, work_on_copy: bool = True):
-        super(FeedforwardAutoencoder, self).__init__(work_on_copy)
+                 decoder_output_fn: torch.nn.Module = None, work_on_copy: bool = True,
+                 random_state: np.random.RandomState | int = None):
+        super().__init__(work_on_copy, random_state)
         if decoder_layers is None:
             decoder_layers = layers[::-1]
         if (layers[-1] != decoder_layers[0]):

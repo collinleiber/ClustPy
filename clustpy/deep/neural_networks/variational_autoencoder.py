@@ -8,6 +8,7 @@ Collin Leiber
 import torch
 from clustpy.deep.neural_networks.feedforward_autoencoder import FullyConnectedBlock, FeedforwardAutoencoder
 from collections.abc import Callable
+import numpy as np
 
 
 def _vae_sampling(q_mean: torch.Tensor, q_logvar: torch.Tensor) -> torch.Tensor:
@@ -40,7 +41,7 @@ class VariationalAutoencoder(FeedforwardAutoencoder):
     ----------
     layers : list
         list of the different layer sizes from input to embedding, e.g. an example architecture for MNIST [784, 512, 256, 10], where 784 is the input dimension and 10 the dimension of the mean and variance value in the central layer.
-             If decoder_layers are not specified then the decoder is symmetric and goes in the same order from embedding to input.
+        If decoder_layers are not specified then the decoder is symmetric and goes in the same order from embedding to input.
     batch_norm : bool
         set True if you want to use torch.nn.BatchNorm1d (default: False)
     dropout : float
@@ -58,6 +59,8 @@ class VariationalAutoencoder(FeedforwardAutoencoder):
         If set to true, deep clustering algorithms will optimize a copy of the autoencoder and not the autoencoder itself.
         Ensures that the same autoencoder can be used by multiple deep clustering algorithms.
         As copies of this object are created, the memory requirement increases (default: True)
+    random_state : np.random.RandomState | int
+        use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Attributes
     ----------
@@ -81,9 +84,10 @@ class VariationalAutoencoder(FeedforwardAutoencoder):
 
     def __init__(self, layers: list, batch_norm: bool = False, dropout: float = None,
                  activation_fn: torch.nn.Module = torch.nn.LeakyReLU, bias: bool = True, decoder_layers: list = None,
-                 decoder_output_fn: torch.nn.Module = torch.nn.Sigmoid, work_on_copy: bool = True):
-        super(VariationalAutoencoder, self).__init__(layers, batch_norm, dropout, activation_fn, bias,
-                                                     decoder_layers, decoder_output_fn, work_on_copy)
+                 decoder_output_fn: torch.nn.Module = torch.nn.Sigmoid, work_on_copy: bool = True,
+                 random_state: np.random.RandomState | int = None):
+        super().__init__(layers, batch_norm, dropout, activation_fn, bias, decoder_layers, decoder_output_fn,
+                         work_on_copy, random_state)
         # Get size of embedding from last dimension of layers
         embedding_size = layers[-1]
         # Overwrite encoder from FeedforwardAutoencoder, leave out the last layer
@@ -138,7 +142,7 @@ class VariationalAutoencoder(FeedforwardAutoencoder):
         reconstruction = self.decode(z)
         return z, q_mean, q_logvar, reconstruction
 
-    def loss(self, batch: list, ssl_loss_fn: torch.nn.modules.loss._Loss, device: torch.device, 
+    def loss(self, batch: list, ssl_loss_fn: torch.nn.modules.loss._Loss, device: torch.device,
              corruption_fn: Callable = None, beta: float = 1) -> (torch.Tensor, torch.Tensor, torch.Tensor):
         """
         Calculate the loss of a single batch of data.
