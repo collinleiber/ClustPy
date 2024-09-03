@@ -1,3 +1,9 @@
+"""
+@authors:
+Collin Leiber,
+Julian Schilcher
+"""
+
 import numpy as np
 import torch
 from clustpy.deep._utils import squared_euclidean_distance, encode_batchwise, predict_batchwise, \
@@ -7,7 +13,6 @@ from clustpy.deep._train_utils import get_default_deep_clustering_initialization
 from sklearn.cluster import KMeans
 from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
 from clustpy.hierarchical._cluster_tree import BinaryClusterTree, _ClusterTreeNode
-from sklearn.preprocessing import LabelEncoder
 import tqdm
 import copy
 
@@ -672,7 +677,8 @@ class DeepECT(_AbstractDeepClusteringAlgo):
 
     def flat_clustering(self, n_leaf_nodes_to_keep: int) -> np.ndarray:
         """
-        Transform the labels within this instance of DeepECT into a flat clustering result by only keeping n_leaf_nodes_to_keep leaf nodes in the tree.
+        Transform the predicted labels into a flat clustering result by only keeping n_leaf_nodes_to_keep leaf nodes in the tree.
+        Returns labels as if the clustering procedure would have stopped at the specified number of nodes.
         Note that each leaf node corresponds to a cluster.
 
         Parameters
@@ -682,11 +688,10 @@ class DeepECT(_AbstractDeepClusteringAlgo):
 
         Returns
         -------
-        labels : np.ndarray
+        labels_pruned : np.ndarray
             The new cluster labels
         """
+        assert self.labels_ is not None, "The DeepECT algorithm has not run yet. Use the fit() function first."
         tree_copy = copy.deepcopy(self.tree_)
         labels_pruned = tree_copy.prune_to_n_leaf_nodes(n_leaf_nodes_to_keep, self.labels_)
-        LE = LabelEncoder()
-        labels = LE.fit_transform(labels_pruned)
-        return labels
+        return labels_pruned

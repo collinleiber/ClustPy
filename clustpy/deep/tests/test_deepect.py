@@ -105,20 +105,26 @@ def test_DeepECT_Module():
 
 def test_simple_deepect():
     torch.use_deterministic_algorithms(True)
-    X, labels = create_subspace_data(1000, subspace_features=(3, 50), random_state=1)
+    X, labels = create_subspace_data(1000, subspace_features=(3, 10), random_state=1)
     deepect = DeepECT(pretrain_epochs=3, clustering_epochs=4, grow_interval=1, random_state=1)
     assert not hasattr(deepect, "labels_")
     deepect.fit(X)
     assert deepect.labels_.dtype == np.int32
     assert deepect.labels_.shape == labels.shape
     # Test if random state is working
-    # TODO Does not work every time -> Check why
-    # deepect2 = DeepECT(3, pretrain_epochs=3, clustering_epochs=4, grow_interval=1, random_state=1)
-    # deepect2.fit(X)
-    # assert np.array_equal(deepect.labels_, deepect2.labels_)
+    deepect2 = DeepECT(pretrain_epochs=3, clustering_epochs=4, grow_interval=1, random_state=1)
+    deepect2.fit(X)
+    assert np.array_equal(deepect.labels_, deepect2.labels_)
     # Test predict
     labels_predict = deepect.predict(X)
     assert np.array_equal(deepect.labels_, labels_predict)
+    # Test flat clustering
+    assert len(deepect.tree_.get_leaf_and_split_nodes()[0]) > 2
+    assert np.unique(deepect.labels_).shape[0] > 2
+    labels_flat = deepect.flat_clustering(2)
+    assert np.unique(labels_flat).shape[0] == 2
+    assert np.array_equal(labels_flat[(deepect.labels_ == 0) | (deepect.labels_ == 1)],
+                          deepect.labels_[(deepect.labels_ == 0) | (deepect.labels_ == 1)])
 
 
 def test_deepect_augmentation():
@@ -127,7 +133,7 @@ def test_deepect_augmentation():
     data = dataset.images[:1000]
     labels = dataset.target[:1000]
     aug_dl, orig_dl = get_default_augmented_dataloaders(data)
-    clusterer = DeepECT(10, pretrain_epochs=3, clustering_epochs=4, grow_interval=1, random_state=1,
+    clusterer = DeepECT(pretrain_epochs=3, clustering_epochs=4, grow_interval=1, random_state=1,
                         custom_dataloaders=[aug_dl, orig_dl], augmentation_invariance=True)
     assert not hasattr(clusterer, "labels_")
     clusterer.fit(data)

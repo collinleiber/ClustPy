@@ -7,6 +7,7 @@ from sklearn.base import BaseEstimator, ClusterMixin
 import numpy as np
 from scipy.spatial.distance import pdist, squareform
 from clustpy.hierarchical._cluster_tree import BinaryClusterTree
+import copy
 
 
 def _diana(X: np.ndarray, n_clusters: int, distance_threshold: float, construct_full_tree: bool, metric: str) -> (
@@ -211,22 +212,23 @@ class Diana(BaseEstimator, ClusterMixin):
         self.tree_ = tree
         return self
 
-    def prune_tree(self, n_nodes_to_keep: int):
+    def flat_clustering(self, n_leaf_nodes_to_keep: int) -> np.ndarray:
         """
-        Prune the tree at a specified cluster hierarchy level.
+        Transform the predicted labels into a flat clustering result by only keeping n_leaf_nodes_to_keep leaf nodes in the tree.
         Returns labels as if the clustering procedure would have stopped at the specified number of nodes.
-        The resulting number of clusters will be level + 1.
+        Note that each leaf node corresponds to a cluster.
 
         Parameters
         ----------
-        n_nodes_to_keep : int
-            The node_id at which the tree should be pruned. Must be larger than 0
+        n_leaf_nodes_to_keep : int
+            The number of leaf nodes to keep in the cluster tree
 
         Returns
         -------
         labels_pruned : np.ndarray
-            The pruned cluster labels
+            The new cluster labels
         """
         assert self.labels_ is not None, "The DIANA algorithm has not run yet. Use the fit() function first."
-        labels_pruned = self.tree_.prune_to_n_leaf_nodes(n_nodes_to_keep, self.labels_.copy())
+        tree_copy = copy.deepcopy(self.tree_)
+        labels_pruned = tree_copy.prune_to_n_leaf_nodes(n_leaf_nodes_to_keep, self.labels_)
         return labels_pruned

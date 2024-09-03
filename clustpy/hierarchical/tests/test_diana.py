@@ -76,10 +76,10 @@ def test_simple_Diana():
     assert diana.tree_.n_leaf_nodes_ == X.shape[0]
 
 
-def test_pruning_tree():
+def test_flat_clustering():
     X, labels = make_blobs(200, 4, centers=3, random_state=1)
     diana = Diana()
     diana.fit(X)
     assert np.array_equal(np.unique(diana.labels_), np.arange(X.shape[0]))
-    labels_pruned = diana.prune_tree(5)
-    assert np.array_equal(np.unique(labels_pruned), np.arange(5))
+    labels_flat = diana.flat_clustering(5)
+    assert np.array_equal(np.unique(labels_flat), np.arange(5))

@@ -1,4 +1,5 @@
 import numpy as np
+from sklearn.preprocessing import LabelEncoder
 
 
 class _ClusterTreeNode():
@@ -302,7 +303,9 @@ class BinaryClusterTree():
             i += 1
         self.n_leaf_nodes_ = n_leaf_nodes_to_keep
         self.n_split_nodes_ = n_leaf_nodes_to_keep - 1
-        return labels
+        LE = LabelEncoder()
+        labels_pruned = LE.fit_transform(labels)
+        return labels_pruned
 
     def get_least_common_ancestor(self, label_1: int, label_2: int) -> '_ClusterTreeNode':
         """
