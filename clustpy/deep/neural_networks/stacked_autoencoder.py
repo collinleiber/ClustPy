@@ -97,8 +97,10 @@ class StackedAutoencoder(FeedforwardAutoencoder):
             optimizer to be used (default: torch.optim.Adam)
         ssl_loss_fn : torch.nn.modules.loss._Loss
             self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss (default: torch.nn.MSELoss())
-        corruption_fn: Callable
-            Can be used to corrupt the input data, e.g., when using a denoising autoencoder (default: None)
+        corruption_fn : Callable
+            Can be used to corrupt the input data, e.g., when using a denoising autoencoder.
+            Note that the function must match the data and the data loaders.
+            For example, if the data is normalized, this may have to be taken into account in the corruption function - e.g. in case of salt and pepper noise (default: None)
 
         Returns
         -------
@@ -116,13 +118,11 @@ class StackedAutoencoder(FeedforwardAutoencoder):
         optimizer_params = {"lr": 1e-3} if optimizer_params is None else optimizer_params
         optimizer = optimizer_class(params=self.parameters(), **optimizer_params)
         device = get_device_from_module(self)
-        encoder_linear_layer_ids = self.encoder.get_linear_layers()
-        decoder_linear_layer_ids = self.decoder.get_linear_layers()
+        encoder_linear_layer_ids = self.encoder.layer_positions
+        decoder_linear_layer_ids = self.decoder.layer_positions
         assert len(encoder_linear_layer_ids) == len(
             decoder_linear_layer_ids), "The decoder must be a reversed version of the encoder"
-        # Save old weights to see if training is working correctly
-        old_encoder_weights = [self.encoder.block[i].weight.clone() for i in encoder_linear_layer_ids]
-        old_decoder_weights = [self.decoder.block[i].weight.clone() for i in decoder_linear_layer_ids]
+        # Start training
         tbar = tqdm.tqdm(total=n_epochs_per_layer * len(encoder_linear_layer_ids), desc="Stacked AE training")
         for layer_nr, encoder_layer_to_train in enumerate(encoder_linear_layer_ids):
             # Train this specific layer for a certain amount of epochs
@@ -147,21 +147,6 @@ class StackedAutoencoder(FeedforwardAutoencoder):
                 postfix_str = {"Loss": total_loss, "LayerID": layer_nr}
                 tbar.set_postfix(postfix_str)
                 tbar.update()
-            # Check if training was succesful => Only reference layer should be changed
-            encoder_success = [
-                torch.equal(old_encoder_weights[i], self.encoder.block[encoder_linear_layer_ids[i]].weight) for i in
-                range(len(old_encoder_weights))]
-            encoder_success[layer_nr] = not encoder_success[layer_nr]
-            assert all(encoder_success)
-            decoder_success = [
-                torch.equal(old_decoder_weights[i], self.decoder.block[decoder_linear_layer_ids[i]].weight) for i in
-                range(len(old_decoder_weights))]
-            decoder_success[-(layer_nr + 1)] = not decoder_success[-(layer_nr + 1)]
-            assert all(decoder_success)
-            # Update the old weights by the updated layer
-            old_encoder_weights[layer_nr] = self.encoder.block[encoder_layer_to_train].weight.clone()
-            old_decoder_weights[-(layer_nr + 1)] = self.decoder.block[
-                decoder_linear_layer_ids[-(layer_nr + 1)]].weight.clone()
         return self
 
     def fit(self, n_epochs_per_layer: int = 20, n_epochs: int = 100, optimizer_params: dict = None,
@@ -209,9 +194,11 @@ class StackedAutoencoder(FeedforwardAutoencoder):
         scheduler_params : dict
             dictionary of the parameters of the scheduler object.
             Only used for finetuning (default: {})
-        corruption_fn: Callable
-            Can be used to corrupt the input data, e.g., when using a denoising autoencoder (default: None)
-         model_path : str
+        corruption_fn : Callable
+            Can be used to corrupt the input data, e.g., when using a denoising autoencoder.
+            Note that the function must match the data and the data loaders.
+            For example, if the data is normalized, this may have to be taken into account in the corruption function - e.g. in case of salt and pepper noise (default: None)
+        model_path : str
             if specified will save the trained model to the location. If evalloader is used, then only the best model w.r.t. evaluation loss is saved (default: None)
 
         Returns

@@ -38,6 +38,8 @@ class FullyConnectedBlock(torch.nn.Module):
     ----------
     block: torch.nn.Sequential
         feed forward neural network
+    layer_positions : list
+        ids specifying at which positions the input layers are contained within block
     """
 
     def __init__(self, layers: list, batch_norm: bool = False, dropout: float = None,
@@ -50,8 +52,10 @@ class FullyConnectedBlock(torch.nn.Module):
         self.activation_fn = activation_fn
         self.output_fn = output_fn
 
+        layer_positions = []
         fc_block_list = []
         for i in range(len(layers) - 1):
+            layer_positions.append(len(fc_block_list))
             fc_block_list.append(torch.nn.Linear(layers[i], layers[i + 1], bias=self.bias))
             if self.batch_norm:
                 fc_block_list.append(torch.nn.BatchNorm1d(layers[i + 1]))
@@ -66,6 +70,7 @@ class FullyConnectedBlock(torch.nn.Module):
                         fc_block_list.append(self.output_fn())
 
         self.block = torch.nn.Sequential(*fc_block_list)
+        self.layer_positions = layer_positions
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -83,18 +88,6 @@ class FullyConnectedBlock(torch.nn.Module):
         """
         forwarded = self.block(x)
         return forwarded
-
-    def get_linear_layers(self) -> np.ndarray:
-        """
-        Get the IDs of the layers within this FullyConnectedBlock that are of type torch.nn.Linear.
-
-        Returns
-        -------
-        is_linear : np.ndarray
-            The IDs.
-        """
-        is_linear = np.where([type(layer) is torch.nn.Linear for layer in self.block])[0]
-        return is_linear
 
 
 class _AbstractAutoencoder(torch.nn.Module):
@@ -190,8 +183,10 @@ class _AbstractAutoencoder(torch.nn.Module):
             self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss
         device : torch.device
             device to be trained on
-        corruption_fn: Callable
-            Can be used to corrupt the input data, e.g., when using a denoising autoencoder (default: None)
+        corruption_fn : Callable
+            Can be used to corrupt the input data, e.g., when using a denoising autoencoder.
+            Note that the function must match the data and the data loaders.
+            For example, if the data is normalized, this may have to be taken into account in the corruption function - e.g. in case of salt and pepper noise (default: None)
 
         Returns
         -------
@@ -223,8 +218,10 @@ class _AbstractAutoencoder(torch.nn.Module):
             self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss
         device : torch.device
             device to be trained on
-        corruption_fn: Callable
-            Can be used to corrupt the input data, e.g., when using a denoising autoencoder (default: None)
+        corruption_fn : Callable
+            Can be used to corrupt the input data, e.g., when using a denoising autoencoder.
+            Note that the function must match the data and the data loaders.
+            For example, if the data is normalized, this may have to be taken into account in the corruption function - e.g. in case of salt and pepper noise (default: None)
 
         Returns
         -------
@@ -312,8 +309,10 @@ class _AbstractAutoencoder(torch.nn.Module):
             If torch.optim.lr_scheduler.ReduceLROnPlateau is used then the behaviour is matched by providing the validation_loss calculated based on samples from evalloader (default: None)
         scheduler_params : dict
             dictionary of the parameters of the scheduler object (default: {})
-        corruption_fn: Callable
-            Can be used to corrupt the input data, e.g., when using a denoising autoencoder (default: None)
+        corruption_fn : Callable
+            Can be used to corrupt the input data, e.g., when using a denoising autoencoder.
+            Note that the function must match the data and the data loaders.
+            For example, if the data is normalized, this may have to be taken into account in the corruption function - e.g. in case of salt and pepper noise (default: None)
         model_path : str
             if specified will save the trained model to the location. If evalloader is used, then only the best model w.r.t. evaluation loss is saved (default: None)
 

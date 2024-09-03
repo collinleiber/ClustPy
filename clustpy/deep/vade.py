@@ -181,8 +181,10 @@ class _VaDE_VAE(VariationalAutoencoder):
             self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
         device : torch.device
             device to be trained on
-        corruption_fn: Callable
-            Can be used to corrupt the input data, e.g., when using a denoising autoencoder (default: None)
+        corruption_fn : Callable
+            Can be used to corrupt the input data, e.g., when using a denoising autoencoder.
+            Note that the function must match the data and the data loaders.
+            For example, if the data is normalized, this may have to be taken into account in the corruption function - e.g. in case of salt and pepper noise (default: None)
         beta : float
             weighting of the KL loss. Not used at the moment (default: 1)
 
