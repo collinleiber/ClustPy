@@ -32,7 +32,7 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
     X : np.ndarray / torch.Tensor
         the given data set. Can be a np.ndarray or a torch.Tensor
     n_clusters_init : int
-        initial number of clusters. Can be None if a corresponding initial_clustering_class is given, e.g. DBSCAN
+        initial number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN
     dip_merge_threshold : float
         threshold regarding the Dip-p-value that defines if two clusters should be merged. Must be bvetween 0 and 1
     clustering_loss_weight : float
@@ -563,13 +563,13 @@ class DipDECK(_AbstractDeepClusteringAlgo):
     The Deep Embedded Clustering with k-Estimation (DipDECK) algorithm.
     First, a neural network will be trained (will be skipped if input neural network is given).
     Afterward, KMeans identifies the initial clusters using an overestimated number of clusters.
-    Last, the AE will be optimized using the DipDECK loss function.
+    Last, the network will be optimized using the DipDECK loss function.
     If any Dip-value exceeds the dip_merge_threshold, the corresponding clusters will be merged.
 
     Parameters
     ----------
     n_clusters_init : int
-        initial number of clusters. Can be None if a corresponding initial_clustering_class is given, e.g. DBSCAN (default: 35)
+        initial number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN (default: 35)
     dip_merge_threshold : float
         threshold regarding the Dip-p-value that defines if two clusters should be merged. Must be bvetween 0 and 1 (default: 0.9)
     clustering_loss_weight : float

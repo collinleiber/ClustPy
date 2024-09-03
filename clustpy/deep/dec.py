@@ -32,7 +32,7 @@ def _dec(X: np.ndarray, n_clusters: int, alpha: float, batch_size: int, pretrain
     X : np.ndarray / torch.Tensor
         the given data set. Can be a np.ndarray or a torch.Tensor
     n_clusters : int
-        number of clusters. Can be None if a corresponding initial_clustering_class is given, e.g. DBSCAN
+        number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN
     alpha : float
         alpha value for the prediction
     batch_size : int
@@ -408,12 +408,12 @@ class DEC(_AbstractDeepClusteringAlgo):
     The Deep Embedded Clustering (DEC) algorithm.
     First, a neural_network will be trained (will be skipped if input neural network is given).
     Afterward, KMeans identifies the initial clusters.
-    Last, the AE will be optimized using the DEC loss function.
+    Last, the network will be optimized using the DEC loss function.
 
     Parameters
     ----------
     n_clusters : int
-        number of clusters. Can be None if a corresponding initial_clustering_class is given, e.g. DBSCAN
+        number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN
     alpha : float
         alpha value for the prediction (default: 1.0)
     batch_size : int
@@ -577,13 +577,13 @@ class DEC(_AbstractDeepClusteringAlgo):
 class IDEC(DEC):
     """
     The Improved Deep Embedded Clustering (IDEC) algorithm.
-    Is equal to the DEC algorithm but uses the reconstruction loss also during the clustering optimization.
+    Is equal to the DEC algorithm but uses the self-supervised learning loss also during the clustering optimization.
     Further, clustering_loss_weight is set to 0.1 instead of 1 when using the default settings.
 
     Parameters
     ----------
     n_clusters : int
-        number of clusters. Can be None if a corresponding initial_clustering_class is given, e.g. DBSCAN
+        number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN
     alpha : float
         alpha value for the prediction (default: 1.0)
     batch_size : int

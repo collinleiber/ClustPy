@@ -325,6 +325,7 @@ def get_default_augmented_dataloaders(X: np.ndarray | torch.Tensor, batch_size: 
         The testloader (without augmentations)
     """
     assert not conv_used or not flatten
+    assert X.ndim > 2, "Data matrix X must have more than two dimensions. Please use a corresponding dataset (i.e., non-flatten images)"
     if type(X) is np.ndarray:
         # Convert np.ndarray to torch.Tensor
         X = torch.from_numpy(X).float()
