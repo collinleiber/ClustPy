@@ -56,30 +56,30 @@ def test_simple_Diana():
     diana.fit(X)
     assert diana.labels_.dtype == np.int32
     assert diana.labels_.shape == labels.shape
-    assert np.unique(diana.labels_).shape[0] == X.shape[0]
-    assert len(diana.tree_) == X.shape[0] - 1
+    assert np.array_equal(np.unique(diana.labels_), np.arange(X.shape[0]))
+    assert diana.tree_.n_leaf_nodes_ == X.shape[0]
     # With n_clusters specified as 3
     diana = Diana(n_clusters=3)
     assert not hasattr(diana, "labels_")
     diana.fit(X)
     assert diana.labels_.dtype == np.int32
     assert diana.labels_.shape == labels.shape
-    assert np.unique(diana.labels_).shape[0] == 3
-    assert len(diana.tree_) == 2
+    assert np.array_equal(np.unique(diana.labels_), np.arange(3))
+    assert diana.tree_.n_leaf_nodes_ == 3
     # With n_clusters specified as 3 and construct_full_tree = True
     diana = Diana(n_clusters=3, construct_full_tree=True)
     assert not hasattr(diana, "labels_")
     diana.fit(X)
     assert diana.labels_.dtype == np.int32
     assert diana.labels_.shape == labels.shape
-    assert np.unique(diana.labels_).shape[0] == 3
-    assert len(diana.tree_) == X.shape[0] - 1
+    assert np.array_equal(np.unique(diana.labels_), np.arange(3))
+    assert diana.tree_.n_leaf_nodes_ == X.shape[0]
 
 
-def test_pruning_tree():
+def test_flat_clustering():
     X, labels = make_blobs(200, 4, centers=3, random_state=1)
     diana = Diana()
     diana.fit(X)
-    assert np.unique(diana.labels_).shape[0] == X.shape[0]
-    labels_pruned = diana.prune_tree(4)
-    assert np.unique(labels_pruned).shape[0] == 5
+    assert np.array_equal(np.unique(diana.labels_), np.arange(X.shape[0]))
+    labels_flat = diana.flat_clustering(5)
+    assert np.array_equal(np.unique(labels_flat), np.arange(5))

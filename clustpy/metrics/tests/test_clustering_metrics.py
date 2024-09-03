@@ -1,6 +1,6 @@
 import numpy as np
 from clustpy.metrics import unsupervised_clustering_accuracy, variation_of_information, \
-    information_theoretic_external_cluster_validity_measure, fair_normalized_mutual_information
+    information_theoretic_external_cluster_validity_measure, fair_normalized_mutual_information, purity
 from clustpy.metrics.clustering_metrics import _check_number_of_points
 import pytest
 from sklearn.metrics import normalized_mutual_info_score as nmi
@@ -24,6 +24,8 @@ def test_unsupervised_clustering_accuracy():
     assert unsupervised_clustering_accuracy(l1, l2) == 0.5
     l2 = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
     assert unsupervised_clustering_accuracy(l1, l2) == 0.2
+    l2 = np.array([0, 0, 0, 0, 2, 2, 3, 3, 4, 1])
+    assert unsupervised_clustering_accuracy(l1, l2) == 0.7
 
 
 def test_variation_of_information():
@@ -76,3 +78,17 @@ def test_fair_normalized_mutual_information():
     fnmi4 = fair_normalized_mutual_information(l1, l2)
     assert fnmi4 < fnmi3
     assert fnmi4 == nmi(l1, l2)
+
+
+def test_purity():
+    l1 = np.array([0, 0, 1, 1, 2, 2, 3, 3, 4, 4])
+    l2 = np.array([1, 1, 2, 2, 3, 3, 4, 4, 0, 0])
+    assert purity(l1, l2) == 1.0
+    l2 = np.array([0, 0, 1, 1, 1, 2, 3, 3, 4, 4])
+    assert purity(l1, l2) == 0.9
+    l2 = np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+    assert purity(l1, l2) == 1.0
+    l2 = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    assert purity(l1, l2) == 0.2
+    l2 = np.array([0, 1, 2, 3, 4, 4, 5, 5, 5, 6])
+    assert purity(l1, l2) == 0.9
