@@ -487,7 +487,7 @@ def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size:
     X : np.ndarray / torch.Tensor
         the given data set. Can be a np.ndarray or a torch.Tensor
     n_clusters : int
-        number of clusters. Can be None if a corresponding initial_clustering_class is given, e.g. DBSCAN
+        number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN
     embedding_size : int
         size of the embedding within the neural network
     batch_size : int
@@ -663,12 +663,12 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
     Can be used either as a clustering procedure if no ground truth labels are given or as a supervised dimensionality reduction technique.
     First, a neural network will be trained (will be skipped if input neural network is given).
     Afterward, KMeans identifies the initial clusters.
-    Last, the AE will be optimized using the DipEncoder loss function.
+    Last, the network will be optimized using the DipEncoder loss function.
 
     Parameters
     ----------
     n_clusters : int
-        number of clusters. Can be None if a corresponding initial_clustering_class is given, e.g. DBSCAN
+        number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN
     batch_size : int
         size of the data batches for the actual training of the DipEncoder.
         Should be larger the more clusters we have. If it is None, it will be set to (25 x n_clusters) (default: None)

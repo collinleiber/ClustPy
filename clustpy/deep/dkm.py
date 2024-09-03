@@ -15,7 +15,7 @@ from sklearn.base import ClusterMixin
 import tqdm
 
 
-def _dkm(X: np.ndarray, n_clusters: int, alphas: list, batch_size: int, pretrain_optimizer_params: dict,
+def _dkm(X: np.ndarray, n_clusters: int, alphas: list | tuple, batch_size: int, pretrain_optimizer_params: dict,
          clustering_optimizer_params: dict, pretrain_epochs: int, clustering_epochs: int,
          optimizer_class: torch.optim.Optimizer, ssl_loss_fn: torch.nn.modules.loss._Loss,
          neural_network: torch.nn.Module | tuple, neural_network_weights: str, embedding_size: int,
@@ -31,8 +31,8 @@ def _dkm(X: np.ndarray, n_clusters: int, alphas: list, batch_size: int, pretrain
     X : np.ndarray / torch.Tensor
         the given data set. Can be a np.ndarray or a torch.Tensor
     n_clusters : int
-        number of clusters. Can be None if a corresponding initial_clustering_class is given, e.g. DBSCAN
-    alphas : list
+        number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN
+    alphas : list | tuple
         Small values close to 0 are equivalent to homogeneous assignments to all clusters. Large values simulate a clear assignment as with kMeans.
         list of different alpha values used for the prediction
     batch_size : int
@@ -377,12 +377,12 @@ class DKM(_AbstractDeepClusteringAlgo):
     The Deep k-Means (DKM) algorithm.
     First, a neural network will be trained (will be skipped if input neural network is given).
     Afterward, KMeans identifies the initial clusters.
-    Last, the AE will be optimized using the DKM loss function.
+    Last, the network will be optimized using the DKM loss function.
 
     Parameters
     ----------
     n_clusters : int
-        number of clusters. Can be None if a corresponding initial_clustering_class is given, e.g. DBSCAN
+        number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN
     alphas : tuple
         tuple of different alpha values used for the prediction.
         Small values close to 0 are equivalent to homogeneous assignments to all clusters. Large values simulate a clear assignment as with kMeans.
@@ -412,7 +412,7 @@ class DKM(_AbstractDeepClusteringAlgo):
     embedding_size : int
         size of the embedding within the neural network (default: 10)
     clustering_loss_weight : float
-        weight of the clustering loss (default: 1)
+        weight of the clustering loss (default: 1.0)
     ssl_loss_weight : float
         weight of the self-supervised learning (ssl) loss (default: 1.0)
     custom_dataloaders : tuple

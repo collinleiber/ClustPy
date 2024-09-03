@@ -30,7 +30,7 @@ def _aec(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_par
     X : np.ndarray / torch.Tensor
         the given data set. Can be a np.ndarray or a torch.Tensor
     n_clusters : int
-        number of clusters. Can be None if a corresponding initial_clustering_class is given, e.g. DBSCAN
+        number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN
     batch_size : int
         size of the data batches
     pretrain_optimizer_params : dict
@@ -212,12 +212,12 @@ class AEC(_AbstractDeepClusteringAlgo):
     The Auto-encoder Based Data Clustering (AEC) algorithm.
     First, a neural network will be trained (will be skipped if input neural network is given).
     Afterward, KMeans identifies the initial clusters.
-    Last, the AE will be optimized using the AEC loss function.
+    Last, the network will be optimized using the AEC loss function.
 
     Parameters
     ----------
     n_clusters : int
-        number of clusters. Can be None if a corresponding initial_clustering_class is given, e.g. DBSCAN
+        number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN
     batch_size : int
         size of the data batches (default: 256)
     pretrain_optimizer_params : dict

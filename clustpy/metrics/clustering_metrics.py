@@ -162,7 +162,7 @@ def information_theoretic_external_cluster_validity_measure(labels_true: np.ndar
     return Q_0
 
 
-def fair_normalized_mutual_information(labels_true: np.ndarray, labels_pred: np.ndarray):
+def fair_normalized_mutual_information(labels_true: np.ndarray, labels_pred: np.ndarray) -> float:
     """
     Evaluate the quality of predicted labels by comparing to the ground truth labels using the
     fair normalized mutual information score. Often simply called FNMI.
@@ -197,3 +197,33 @@ def fair_normalized_mutual_information(labels_true: np.ndarray, labels_pred: np.
     factor = np.exp(-abs(n_clusters_true - n_clusters_pred) / n_clusters_true)
     fnmi = factor * my_nmi
     return fnmi
+
+
+def purity(labels_true: np.ndarray, labels_pred: np.ndarray) -> float:
+    """
+    Evaluate the quality of predicted labels by comparing it to the ground truth labels using the
+    clustering purity.
+    Returns a value between 1.0 (perfect match) and 0.0 (arbitrary result).
+    Note that the purity is usually very high when the number of predicted clusters is much larger than the ground truth number of clusters.
+
+    Parameters
+    ----------
+    labels_true : np.ndarray
+        The ground truth labels of the data set
+    labels_pred : np.ndarray
+        The labels as predicted by a clustering algorithm
+
+    Returns
+    -------
+    purity : float
+        The purity between the two input label sets.
+
+    References
+    -------
+    Manning, Christopher D. An introduction to information retrieval. 2009.
+    """
+    _check_number_of_points(labels_true, labels_pred)
+    conf_matrix = ConfusionMatrix(labels_true, labels_pred).confusion_matrix
+    best_matches = np.max(conf_matrix, axis=0)
+    purity = np.sum(best_matches) / labels_true.shape[0]
+    return purity

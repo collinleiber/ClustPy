@@ -6,10 +6,11 @@ Collin Leiber
 from sklearn.base import BaseEstimator, ClusterMixin
 import numpy as np
 from scipy.spatial.distance import pdist, squareform
+from clustpy.hierarchical._cluster_tree import BinaryClusterTree
 
 
 def _diana(X: np.ndarray, n_clusters: int, distance_threshold: float, construct_full_tree: bool, metric: str) -> (
-        np.ndarray, list):
+        np.ndarray, BinaryClusterTree):
     """
     Start the actual DIANA clustering procedure on the input data set.
     
@@ -28,7 +29,7 @@ def _diana(X: np.ndarray, n_clusters: int, distance_threshold: float, construct_
 
     Returns
     -------
-    tuple : (np.ndarray, list)
+    tuple : (np.ndarray, BinaryClusterTree)
         The final cluster labels,
         The resulting tree containing the cluster hierarchy
     """
@@ -38,7 +39,7 @@ def _diana(X: np.ndarray, n_clusters: int, distance_threshold: float, construct_
     global_distance_matrix = squareform(pdist(X, metric=metric))
     # Start with a single cluster
     current_n_clusters = 1
-    tree = []
+    tree = BinaryClusterTree()
     while current_n_clusters < n_clusters or construct_full_tree:
         # Get cluster with maximum diameter (largest distance between two poinst within a cluster)
         split_cluster_id, cluster_distance_matrix = _get_cluster_with_max_diameter(
@@ -50,7 +51,7 @@ def _diana(X: np.ndarray, n_clusters: int, distance_threshold: float, construct_
             # Split cluster by updating labels and tree
             labels_new = _split_cluster(cluster_distance_matrix, split_cluster_id, current_n_clusters)
             labels[labels == split_cluster_id] = labels_new
-            tree.append((split_cluster_id, current_n_clusters))
+            tree.split_cluster(split_cluster_id)
             current_n_clusters += 1
         if current_n_clusters == n_clusters:
             # Save current labels in final labels -> relevant if n_clusters is specified and construct_full_tree is True
@@ -169,7 +170,7 @@ class Diana(BaseEstimator, ClusterMixin):
     ----------
     labels_ : np.ndarray
         The final labels
-    tree_ : list
+    tree_ : BinaryClusterTree
         The resulting cluster tree
 
     References
@@ -210,25 +211,22 @@ class Diana(BaseEstimator, ClusterMixin):
         self.tree_ = tree
         return self
 
-    def prune_tree(self, level):
+    def prune_tree(self, n_nodes_to_keep: int):
         """
         Prune the tree at a specified cluster hierarchy level.
-        Returns labels as if the clustering procedure would have stopped at the specified level.
+        Returns labels as if the clustering procedure would have stopped at the specified number of nodes.
         The resulting number of clusters will be level + 1.
 
         Parameters
         ----------
-        level : int
-            The level at which the tree should be pruned. Must be larger than 0
+        n_nodes_to_keep : int
+            The node_id at which the tree should be pruned. Must be larger than 0
 
         Returns
         -------
         labels_pruned : np.ndarray
             The pruned cluster labels
         """
-        assert level > 0, "level must be an integer larger than 0 and below the number of entities in the input dataset"
         assert self.labels_ is not None, "The DIANA algorithm has not run yet. Use the fit() function first."
-        labels_pruned = self.labels_.copy()
-        for lower_id, higher_id in reversed(self.tree_[level:]):
-            labels_pruned[labels_pruned == higher_id] = lower_id
+        labels_pruned = self.tree_.prune_to_n_leaf_nodes(n_nodes_to_keep, self.labels_.copy())
         return labels_pruned
