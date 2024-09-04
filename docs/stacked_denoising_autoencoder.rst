@@ -55,6 +55,6 @@ Finally, we can start the actual training of our stacked denoising autoencoder.
 .. code-block:: python
     SAE.fit(data=data, corruption_fn=my_corruption)
 
-[1] Vincent, Pascal, et al. "Stacked denoising autoencoders: Learning useful representations in a deep network with a local denoising criterion."
-    Journal of machine learning research 11.12 (2010).
+[1] Vincent, Pascal, et al. "Stacked denoising autoencoders: Learning useful representations in a deep network with a local denoising criterion." Journal of machine learning research 11.12 (2010).
+
 [2] LeCun, Yann, et al. "Gradient-based learning applied to document recognition." Proceedings of the IEEE 86.11 (1998): 2278-2324.
