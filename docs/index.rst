@@ -11,15 +11,7 @@ Welcome to ClustPy's documentation!
    :caption: Contents:
 
    modules
-
-Tutorials
-===================================
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Contents:
-
-   stacked_denoising_autoencoder
+   tutorials
 
 Indices and tables
 ==================
