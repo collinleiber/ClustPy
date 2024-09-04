@@ -5,6 +5,7 @@ To use a stacked denoising autoencoder [1], we first create an ordinary stacked 
 For our example we use the well-known MNIST [2] dataset.
 
 .. code-block:: python
+
     from clustpy.deep.neural_networks import StackedAutoencoder
     from clustpy.data import load_mnist
     import torch
@@ -19,6 +20,7 @@ Now we could already train the SAE using the default parameters.
 However, the data is usually normalized beforehand.
 
 .. code-block:: python
+
     data_mean = data.mean()
     data_std = data.std()
     data = (data - data_mean) / data_std
@@ -30,6 +32,7 @@ Note that because the data has been normalized, it does not lie within [0, 1] or
 Our corruption function must take this into account.
 
 .. code-block:: python
+
     data_min = data.min()
     data_max = data.max()
 
@@ -44,6 +47,7 @@ Our corruption function must take this into account.
 Now that we have a suitable corruption function, let us look at its effect regarding a sample.
 
 .. code-block:: python
+
     from clustpy.utils import plot_image
 
     sample = data[0].cpu().numpy().reshape((28, 28))
@@ -53,7 +57,8 @@ Now that we have a suitable corruption function, let us look at its effect regar
 Finally, we can start the actual training of our stacked denoising autoencoder.
 
 .. code-block:: python
-    SAE.fit(data=data, corruption_fn=my_corruption)
+
+    SAE.fit(data=data, corruption_fn=corruption_fn)
 
 [1] Vincent, Pascal, et al. "Stacked denoising autoencoders: Learning useful representations in a deep network with a local denoising criterion." Journal of machine learning research 11.12 (2010).
 
