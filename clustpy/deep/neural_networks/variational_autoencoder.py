@@ -7,6 +7,8 @@ Collin Leiber
 
 import torch
 from clustpy.deep.neural_networks.feedforward_autoencoder import FullyConnectedBlock, FeedforwardAutoencoder
+from collections.abc import Callable
+import numpy as np
 
 
 def _vae_sampling(q_mean: torch.Tensor, q_logvar: torch.Tensor) -> torch.Tensor:
@@ -39,7 +41,7 @@ class VariationalAutoencoder(FeedforwardAutoencoder):
     ----------
     layers : list
         list of the different layer sizes from input to embedding, e.g. an example architecture for MNIST [784, 512, 256, 10], where 784 is the input dimension and 10 the dimension of the mean and variance value in the central layer.
-             If decoder_layers are not specified then the decoder is symmetric and goes in the same order from embedding to input.
+        If decoder_layers are not specified then the decoder is symmetric and goes in the same order from embedding to input.
     batch_norm : bool
         set True if you want to use torch.nn.BatchNorm1d (default: False)
     dropout : float
@@ -57,6 +59,8 @@ class VariationalAutoencoder(FeedforwardAutoencoder):
         If set to true, deep clustering algorithms will optimize a copy of the autoencoder and not the autoencoder itself.
         Ensures that the same autoencoder can be used by multiple deep clustering algorithms.
         As copies of this object are created, the memory requirement increases (default: True)
+    random_state : np.random.RandomState | int
+        use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Attributes
     ----------
@@ -80,9 +84,10 @@ class VariationalAutoencoder(FeedforwardAutoencoder):
 
     def __init__(self, layers: list, batch_norm: bool = False, dropout: float = None,
                  activation_fn: torch.nn.Module = torch.nn.LeakyReLU, bias: bool = True, decoder_layers: list = None,
-                 decoder_output_fn: torch.nn.Module = torch.nn.Sigmoid, work_on_copy: bool = True):
-        super(VariationalAutoencoder, self).__init__(layers, batch_norm, dropout, activation_fn, bias,
-                                                     decoder_layers, decoder_output_fn, work_on_copy)
+                 decoder_output_fn: torch.nn.Module = torch.nn.Sigmoid, work_on_copy: bool = True,
+                 random_state: np.random.RandomState | int = None):
+        super().__init__(layers, batch_norm, dropout, activation_fn, bias, decoder_layers, decoder_output_fn,
+                         work_on_copy, random_state)
         # Get size of embedding from last dimension of layers
         embedding_size = layers[-1]
         # Overwrite encoder from FeedforwardAutoencoder, leave out the last layer
@@ -137,8 +142,8 @@ class VariationalAutoencoder(FeedforwardAutoencoder):
         reconstruction = self.decode(z)
         return z, q_mean, q_logvar, reconstruction
 
-    def loss(self, batch: list, ssl_loss_fn: torch.nn.modules.loss._Loss, device: torch.device, beta: float = 1) -> (
-            torch.Tensor, torch.Tensor, torch.Tensor):
+    def loss(self, batch: list, ssl_loss_fn: torch.nn.modules.loss._Loss, device: torch.device,
+             corruption_fn: Callable = None, beta: float = 1) -> (torch.Tensor, torch.Tensor, torch.Tensor):
         """
         Calculate the loss of a single batch of data.
 
@@ -150,6 +155,10 @@ class VariationalAutoencoder(FeedforwardAutoencoder):
             self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss
         device : torch.device
             device to be trained on
+        corruption_fn : Callable
+            Can be used to corrupt the input data, e.g., when using a denoising autoencoder.
+            Note that the function must match the data and the data loaders.
+            For example, if the data is normalized, this may have to be taken into account in the corruption function - e.g. in case of salt and pepper noise (default: None)
         beta : float
             weighting of the KL loss (default: 1)
 
@@ -162,7 +171,9 @@ class VariationalAutoencoder(FeedforwardAutoencoder):
         """
         assert type(batch) is list, "batch must come from a dataloader and therefore be of type list"
         batch_data = batch[1].to(device)
-        z, q_mean, q_logvar, reconstruction = self.forward(batch_data)
+        batch_data_adj = batch_data if corruption_fn is None else corruption_fn(batch_data)
+
+        z, q_mean, q_logvar, reconstruction = self.forward(batch_data_adj)
         ssl_loss = ssl_loss_fn(reconstruction, batch_data)
 
         kl_loss = -0.5 * torch.sum(1.0 + q_logvar - q_mean.pow(2) - torch.exp(q_logvar))

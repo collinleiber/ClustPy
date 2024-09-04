@@ -3,6 +3,7 @@ from sklearn.base import BaseEstimator, ClusterMixin
 from sklearn.utils import check_random_state
 import numpy as np
 import torch
+from clustpy.deep._data_utils import augmentation_invariance_check
 
 
 class _AbstractDeepClusteringAlgo(BaseEstimator, ClusterMixin):
@@ -34,6 +35,27 @@ class _AbstractDeepClusteringAlgo(BaseEstimator, ClusterMixin):
         self.embedding_size = embedding_size
         self.device = device
         self.random_state = check_random_state(random_state)
+
+    def fit(self, X: np.ndarray, y: np.ndarray = None) -> '_AbstractDeepClusteringAlgo':
+        """
+        Checks if augmentation invariance is correctly applied and sets the seed for the execution.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            the given data set
+        y : np.ndarray
+            the labels (can be ignored)
+
+        Returns
+        -------
+        self : _AbstractDeepClusteringAlgo
+            this instance of the _AbstractDeepClusteringAlgo
+        """
+        if hasattr(self, "augmentation_invariance"):
+            assert hasattr(self,
+                           "custom_dataloaders"), "If class uses augmentation_invariance it also requires the attribute custom_dataloaders"
+            augmentation_invariance_check(self.augmentation_invariance, self.custom_dataloaders)
         set_torch_seed(self.random_state)
 
     def transform(self, X: np.ndarray) -> np.ndarray:

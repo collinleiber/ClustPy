@@ -11,11 +11,10 @@ Welcome to ClustPy's documentation!
    :caption: Contents:
 
    modules
-
+   tutorials
 
 Indices and tables
 ==================
 
 * :ref:`genindex`
 * :ref:`modindex`
-* :ref:`search`

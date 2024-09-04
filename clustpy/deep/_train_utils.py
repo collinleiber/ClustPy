@@ -30,7 +30,8 @@ def _get_default_layers(input_dim: int, embedding_size: int) -> list:
 
 def _get_neural_network(input_dim: int, embedding_size: int = 10, neural_network: torch.nn.Module | tuple = None,
                         neural_network_class: torch.nn.Module = FeedforwardAutoencoder,
-                        neural_network_params: dict = None, neural_network_weights: str = None) -> torch.nn.Module:
+                        neural_network_params: dict = None, neural_network_weights: str = None,
+                        random_state: np.random.RandomState | int = None) -> torch.nn.Module:
     """This function returns a new neural_network.
     - If neural_network is already a torch.nn.module, nothing will happen.
     - If neural_network is None, a new neural_network will be created using the neural_network_class and the parameters from neural_network_params.
@@ -51,6 +52,8 @@ def _get_neural_network(input_dim: int, embedding_size: int = 10, neural_network
         Parameters to be used when creating a new neural network using the neural_network_class (default: None)
     neural_network_weights : str
         Path to a file containing the state_dict of the neural_network (default: None)
+    random_state : np.random.RandomState | int
+        use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Returns
     -------
@@ -67,7 +70,9 @@ def _get_neural_network(input_dim: int, embedding_size: int = 10, neural_network
             neural_network_params = dict()
         if "layers" not in neural_network_params.keys():
             layers = _get_default_layers(input_dim, embedding_size)
-            neural_network_params = {"layers": layers}
+            neural_network_params["layers"] = layers
+        if "random_state" not in neural_network_params.keys():
+            neural_network_params["random_state"] = random_state
         if neural_network_params["layers"][-1] != embedding_size:
             print(
                 "WARNING: embedding_size ({0}) in _get_neural_network does not correspond to the layers used to create the neural network. In the following an embedding size of {1} as specified in the layers will be used".format(
@@ -86,7 +91,8 @@ def get_trained_network(trainloader: torch.utils.data.DataLoader = None, data: n
                         ssl_loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), embedding_size: int = 10,
                         neural_network: torch.nn.Module | tuple = None,
                         neural_network_class: torch.nn.Module = FeedforwardAutoencoder,
-                        neural_network_params: dict = None, neural_network_weights: str = None) -> torch.nn.Module:
+                        neural_network_params: dict = None, neural_network_weights: str = None,
+                        random_state: np.random.RandomState | int = None) -> torch.nn.Module:
     """This function returns a trained neural network. The following cases are considered
        - If the neural network is initialized and trained (neural_network.fitted==True), then return input neural network without training it again.
        - If the neural network is initialized and not trained (neural_network.fitted==False), it will be fitted (neural_network.fitted will be set to True) using default parameters.
@@ -123,6 +129,8 @@ def get_trained_network(trainloader: torch.utils.data.DataLoader = None, data: n
         Parameters to be used when creating a new neural network using the neural_network_class (default: None)
     neural_network_weights : str
         Path to a file containing the state_dict of the neural_network (default: None)
+    random_state : np.random.RandomState | int
+        use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
     
     Returns
     -------
@@ -142,7 +150,7 @@ def get_trained_network(trainloader: torch.utils.data.DataLoader = None, data: n
         neural_network_params = neural_network[1]
         neural_network = None
     neural_network = _get_neural_network(input_dim, embedding_size, neural_network, neural_network_class,
-                                         neural_network_params, neural_network_weights)
+                                         neural_network_params, neural_network_weights, random_state)
     # Move neural network to device
     device = detect_device(device)
     neural_network.to(device)
@@ -238,7 +246,8 @@ def get_default_deep_clustering_initialization(X: np.ndarray | torch.Tensor, n_c
                                          device=device, ssl_loss_fn=ssl_loss_fn, embedding_size=embedding_size,
                                          neural_network=neural_network, neural_network_class=neural_network_class,
                                          neural_network_params=neural_network_params,
-                                         neural_network_weights=neural_network_weights)
+                                         neural_network_weights=neural_network_weights,
+                                         random_state=random_state)
     # Execute initial clustering in embedded space
     embedded_data = encode_batchwise(testloader, neural_network)
     n_clusters, init_labels, init_centers, init_cluster_obj = run_initial_clustering(embedded_data, n_clusters,

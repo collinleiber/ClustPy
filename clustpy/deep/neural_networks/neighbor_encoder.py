@@ -8,6 +8,7 @@ import numpy as np
 from scipy.spatial.distance import cdist
 from clustpy.deep.neural_networks.feedforward_autoencoder import FeedforwardAutoencoder
 from clustpy.deep.neural_networks._abstract_autoencoder import FullyConnectedBlock
+from collections.abc import Callable
 
 
 def get_neighbors_batchwise(X: np.ndarray, n_neighbors: int, metric: str = "sqeuclidean",
@@ -99,6 +100,8 @@ class NeighborEncoder(FeedforwardAutoencoder):
         If set to true, deep clustering algorithms will optimize a copy of the autoencoder and not the autoencoder itself.
         Ensures that the same autoencoder can be used by multiple deep clustering algorithms.
         As copies of this object are created, the memory requirement increases (default: True)
+    random_state : np.random.RandomState | int
+        use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Attributes
     ----------
@@ -139,10 +142,11 @@ class NeighborEncoder(FeedforwardAutoencoder):
 
     def __init__(self, layers: list, n_neighbors: int, decode_self: bool = False, batch_norm: bool = False,
                  dropout: float = None, activation_fn: torch.nn.Module = torch.nn.LeakyReLU, bias: bool = True,
-                 decoder_layers: list = None, decoder_output_fn: torch.nn.Module = None, work_on_copy: bool = True):
+                 decoder_layers: list = None, decoder_output_fn: torch.nn.Module = None, work_on_copy: bool = True,
+                 random_state: np.random.RandomState | int = None):
         assert n_neighbors > 0 or decode_self, "n_neighbors must be an integer larger than 0 or decode_self must be true"
-        super(NeighborEncoder, self).__init__(layers, batch_norm, dropout, activation_fn, bias,
-                                              decoder_layers, decoder_output_fn, work_on_copy)
+        super().__init__(layers, batch_norm, dropout, activation_fn, bias, decoder_layers, decoder_output_fn,
+                         work_on_copy, random_state)
         self.n_neighbors = n_neighbors
         self.decode_self = decode_self
         neighbor_decoders = torch.nn.ModuleList([FullyConnectedBlock(layers=self.decoder.layers, batch_norm=batch_norm,
@@ -176,8 +180,8 @@ class NeighborEncoder(FeedforwardAutoencoder):
             decoded_neighbors[-1] = self.decoder(embedded)
         return decoded_neighbors
 
-    def loss(self, batch: list, ssl_loss_fn: torch.nn.modules.loss._Loss, device: torch.device) -> (
-            torch.Tensor, torch.Tensor, torch.Tensor):
+    def loss(self, batch: list, ssl_loss_fn: torch.nn.modules.loss._Loss, device: torch.device,
+             corruption_fn: Callable = None) -> (torch.Tensor, torch.Tensor, torch.Tensor):
         """
         Calculate the loss of a single batch of data.
         Corresponds to the sum of losses concerning each neighbor.
@@ -191,6 +195,10 @@ class NeighborEncoder(FeedforwardAutoencoder):
             self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss
         device : torch.device
             device to be trained on
+        corruption_fn : Callable
+            Can be used to corrupt the input data, e.g., when using a denoising autoencoder.
+            Note that the function must match the data and the data loaders.
+            For example, if the data is normalized, this may have to be taken into account in the corruption function - e.g. in case of salt and pepper noise (default: None)
 
         Returns
         -------
@@ -201,7 +209,8 @@ class NeighborEncoder(FeedforwardAutoencoder):
         """
         assert type(batch) is list, "batch must come from a dataloader and therefore be of type list"
         batch_data = batch[1].to(device)
-        embedded = self.encode(batch_data)
+        batch_data_adj = batch_data if corruption_fn is None else corruption_fn(batch_data)
+        embedded = self.encode(batch_data_adj)
         decoded_neighbors = self.decode(embedded)
         loss = torch.tensor(0.)
         for i in range(self.n_neighbors):  # TODO: Maybe use functorch.vmap in the future for vectorization
@@ -216,8 +225,8 @@ class NeighborEncoder(FeedforwardAutoencoder):
             dataloader: torch.utils.data.DataLoader = None, evalloader: torch.utils.data.DataLoader = None,
             optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
             ssl_loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), patience: int = 5,
-            scheduler: torch.optim.lr_scheduler = None, scheduler_params: dict = None, model_path: str = None,
-            print_step: int = 0) -> 'NeighborEncoder':
+            scheduler: torch.optim.lr_scheduler = None, scheduler_params: dict = None,
+            corruption_fn: Callable = None, model_path: str = None) -> 'NeighborEncoder':
         """
         Trains the NeighborEncoder in place.
         Equal to fit function of the FeedforwardAutoencoder but does only work with a dataloader (not with a regular data array).
@@ -246,6 +255,10 @@ class NeighborEncoder(FeedforwardAutoencoder):
             If torch.optim.lr_scheduler.ReduceLROnPlateau is used then the behaviour is matched by providing the validation_loss calculated based on samples from evalloader (default: None)
         scheduler_params : dict
             dictionary of the parameters of the scheduler object (default: None)
+        corruption_fn : Callable
+            Can be used to corrupt the input data, e.g., when using a denoising autoencoder.
+            Note that the function must match the data and the data loaders.
+            For example, if the data is normalized, this may have to be taken into account in the corruption function - e.g. in case of salt and pepper noise (default: None)
         model_path : str
             if specified will save the trained model to the location. If evalloader is used, then only the best model w.r.t. evaluation loss is saved (default: None)
 
@@ -255,5 +268,5 @@ class NeighborEncoder(FeedforwardAutoencoder):
             this instance of the NeighborEncoder
         """
         super().fit(n_epochs, optimizer_params, batch_size, None, None, dataloader, evalloader, optimizer_class,
-                    ssl_loss_fn, patience, scheduler, scheduler_params, model_path)
+                    ssl_loss_fn, patience, scheduler, scheduler_params, corruption_fn, model_path)
         return self

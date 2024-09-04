@@ -10,7 +10,7 @@ import torch
 import numpy as np
 from clustpy.partition.skinnydip import _dip_mirrored_data
 from clustpy.deep._utils import detect_device, encode_batchwise, run_initial_clustering
-from clustpy.deep._data_utils import get_train_and_test_dataloader, augmentation_invariance_check
+from clustpy.deep._data_utils import get_train_and_test_dataloader
 from clustpy.deep._train_utils import get_trained_network
 from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
 from clustpy.deep.neural_networks._resnet_ae_modules import EncoderBlock, DecoderBlock
@@ -552,7 +552,8 @@ def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size:
     neural_network = get_trained_network(trainloader, n_epochs=pretrain_epochs,
                                          optimizer_params=pretrain_optimizer_params, optimizer_class=optimizer_class,
                                          device=device, ssl_loss_fn=ssl_loss_fn, embedding_size=embedding_size,
-                                         neural_network=neural_network, neural_network_weights=neural_network_weights)
+                                         neural_network=neural_network, neural_network_weights=neural_network_weights,
+                                         random_state=random_state)
     # Get factor for AE loss
     # rand_samples = torch.rand((batch_size, X.shape[1]))
     # data_min = np.min(X)
@@ -789,7 +790,7 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
         self : DipEncoder
             This instance of the DipEncoder
         """
-        augmentation_invariance_check(self.augmentation_invariance, self.custom_dataloaders)
+        super().fit(X, y)
         if y is not None:
             assert len(np.unique(y)) == self.n_clusters, "n_clusters must match number of unique labels in y."
         labels, projection_axes, index_dict, neural_network = _dipencoder(X, self.n_clusters, self.embedding_size,

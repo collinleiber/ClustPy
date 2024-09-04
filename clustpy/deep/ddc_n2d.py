@@ -84,7 +84,8 @@ def _manifold_based_sequential_dc(X: np.ndarray, n_clusters: int, batch_size: in
     neural_network = get_trained_network(trainloader, n_epochs=pretrain_epochs,
                                          optimizer_params=pretrain_optimizer_params, optimizer_class=optimizer_class,
                                          device=device, ssl_loss_fn=ssl_loss_fn, embedding_size=embedding_size,
-                                         neural_network=neural_network, neural_network_weights=neural_network_weights)
+                                         neural_network=neural_network, neural_network_weights=neural_network_weights,
+                                         random_state=random_state)
     # Encode data
     X_embed = encode_batchwise(testloader, neural_network)
     # Get possible input parameters of the manifold class
@@ -328,6 +329,7 @@ class DDC(_AbstractDeepClusteringAlgo):
         self : DDC
             this instance of the DDC algorithm
         """
+        super().fit(X, y)
         n_clusters, labels, _, neural_network, tsne = _manifold_based_sequential_dc(X, None, self.batch_size,
                                                                                     self.pretrain_optimizer_params,
                                                                                     self.pretrain_epochs,
@@ -445,6 +447,7 @@ class N2D(_AbstractDeepClusteringAlgo):
         self : N2D
             this instance of the N2D algorithm
         """
+        super().fit(X, y)
         n_clusters, labels, centers, neural_network, manifold = _manifold_based_sequential_dc(X, self.n_clusters,
                                                                                               self.batch_size,
                                                                                               self.pretrain_optimizer_params,

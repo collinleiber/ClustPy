@@ -8,7 +8,7 @@ from sklearn.cluster import KMeans
 import numpy as np
 from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
 from clustpy.deep._utils import int_to_one_hot, squared_euclidean_distance, encode_batchwise, detect_device
-from clustpy.deep._data_utils import get_dataloader, augmentation_invariance_check, get_train_and_test_dataloader
+from clustpy.deep._data_utils import get_dataloader, get_train_and_test_dataloader
 from clustpy.deep._train_utils import get_trained_network
 from clustpy.alternative import NrKmeans
 from sklearn.utils import check_random_state
@@ -1829,7 +1829,8 @@ def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers
     neural_network = get_trained_network(trainloader, n_epochs=pretrain_epochs,
                                          optimizer_params=pretrain_optimizer_params, optimizer_class=optimizer_class,
                                          device=device, ssl_loss_fn=ssl_loss_fn, embedding_size=embedding_size,
-                                         neural_network=neural_network, neural_network_weights=neural_network_weights)
+                                         neural_network=neural_network, neural_network_weights=neural_network_weights,
+                                         random_state=random_state)
     # Run ENRC init
     if debug:
         print("Run init: ", init)
@@ -2060,7 +2061,7 @@ class ENRC(_AbstractDeepClusteringAlgo):
         self : ENRC
             returns the ENRC object
         """
-        augmentation_invariance_check(self.augmentation_invariance, self.custom_dataloaders)
+        super().fit(X, y)
         cluster_labels, cluster_centers, V, m, betas, P, n_clusters, neural_network, cluster_labels_before_reclustering = _enrc(
             X=X,
             n_clusters=self.n_clusters,

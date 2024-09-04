@@ -5,7 +5,6 @@ Collin Leiber
 
 from clustpy.deep._utils import encode_batchwise, squared_euclidean_distance, predict_batchwise, \
     embedded_kmeans_prediction
-from clustpy.deep._data_utils import augmentation_invariance_check
 from clustpy.deep._train_utils import get_default_deep_clustering_initialization
 from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
 import torch
@@ -356,7 +355,7 @@ class _DKM_Module(torch.nn.Module):
         """
         tbar = tqdm.tqdm(total=n_epochs * len(self.alphas), desc="DKM training")
         for alpha in self.alphas:
-            for e in range(n_epochs):
+            for _ in range(n_epochs):
                 total_loss = 0
                 for batch in trainloader:
                     loss = self._loss(batch, alpha, neural_network, clustering_loss_weight, ssl_loss_weight,
@@ -512,7 +511,7 @@ class DKM(_AbstractDeepClusteringAlgo):
         self : DKM
             this instance of the DKM algorithm
         """
-        augmentation_invariance_check(self.augmentation_invariance, self.custom_dataloaders)
+        super().fit(X, y)
         kmeans_labels, kmeans_centers, dkm_labels, dkm_centers, neural_network = _dkm(X, self.n_clusters, self.alphas,
                                                                                       self.batch_size,
                                                                                       self.pretrain_optimizer_params,

@@ -5,7 +5,7 @@ import torch
 
 
 def test_abstract_autoencoder():
-    data, _ = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    data, _ = create_subspace_data(1000, subspace_features=(3, 50), random_state=1)
     batch_size = 256
     data_batch = torch.Tensor(data[:batch_size])
     autoencoder = _AbstractAutoencoder()
@@ -21,7 +21,7 @@ def test_abstract_autoencoder():
 
 
 def test_abstract_autoencoder_with_dummy_torch_parameter():
-    data, _ = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
+    data, _ = create_subspace_data(1000, subspace_features=(3, 50), random_state=1)
     batch_size = 256
     data_batch = [torch.arange(256), torch.Tensor(data[:batch_size])]
     loss_fn = torch.nn.MSELoss()

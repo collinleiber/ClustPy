@@ -8,7 +8,6 @@ import numpy as np
 import torch
 from clustpy.deep._utils import squared_euclidean_distance, encode_batchwise, predict_batchwise, \
     embedded_kmeans_prediction
-from clustpy.deep._data_utils import augmentation_invariance_check
 from clustpy.deep._train_utils import get_default_deep_clustering_initialization
 from sklearn.cluster import KMeans
 from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
@@ -638,8 +637,7 @@ class DeepECT(_AbstractDeepClusteringAlgo):
         self : DeepECT
             This instance of the DeepECT algorithm
         """
-        # super().fit(X, y) TODO: move this comment into code if PR #93 is merged
-        augmentation_invariance_check(self.augmentation_invariance, self.custom_dataloaders)
+        super().fit(X, y)
         tree, labels, neural_network = _deep_ect(X, self.max_n_leaf_nodes, self.batch_size,
                                                  self.pretrain_optimizer_params, self.clustering_optimizer_params,
                                                  self.pretrain_epochs, self.clustering_epochs, self.grow_interval,

@@ -7,7 +7,6 @@ Collin Leiber
 
 from clustpy.deep._utils import encode_batchwise, squared_euclidean_distance, predict_batchwise, \
     embedded_kmeans_prediction
-from clustpy.deep._data_utils import augmentation_invariance_check
 from clustpy.deep._train_utils import get_default_deep_clustering_initialization
 from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
 import torch
@@ -530,7 +529,7 @@ class DEC(_AbstractDeepClusteringAlgo):
         self : DEC
             this instance of the DEC algorithm
         """
-        augmentation_invariance_check(self.augmentation_invariance, self.custom_dataloaders)
+        super().fit(X, y)
         kmeans_labels, kmeans_centers, dec_labels, dec_centers, neural_network = _dec(X, self.n_clusters, self.alpha,
                                                                                       self.batch_size,
                                                                                       self.pretrain_optimizer_params,

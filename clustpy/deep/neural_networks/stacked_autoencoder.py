@@ -1,258 +1,219 @@
 """
 @authors:
-Dominik Mautz
-"""
-
-"""
-Vincent, Pascal, et al. "Stacked denoising autoencoders: Learning useful representations in a deep network with a local denoising criterion."
-Journal of machine learning research 11.12 (2010).
+Collin Leiber
 """
 
 import torch
-import torch.nn.functional as F
-from clustpy.deep._utils import window
+from clustpy.deep.neural_networks.feedforward_autoencoder import FeedforwardAutoencoder
+from clustpy.deep._utils import get_device_from_module
+from clustpy.deep._data_utils import get_dataloader
+import numpy as np
+import tqdm
+from collections.abc import Callable
+from clustpy.deep._utils import set_torch_seed
 
 
-class StackedAutoencoder(torch.nn.Module):
+class StackedAutoencoder(FeedforwardAutoencoder):
+    """
+    A stacked autoencoder.
+    Regarding its architecture, it corresponds to a standard FeedforwardAutoencoder but uses a different training strategy.
+    First, each layer is trained separately in a greedy manner, referred to as layer-wise training.
+    Afterward, all layers are trained at once to finetune the autoencoder.
 
-    def __init__(self, feature_dim, embedding_size, layer_dims=[500, 500, 2000],
-                 weight_initalizer=torch.nn.init.xavier_normal_,
-                 activation_fn=lambda x: F.relu(x), loss_fn=lambda x, y: torch.mean((x - y) ** 2),
-                 optimizer_fn=lambda parameters: torch.optim.Adam(parameters, lr=0.001),
-                 tied_weights=False, bias_init=0.0, linear_embedded=True, linear_decoder_last=True):
+    Parameters
+    ----------
+    layers : list
+        list of the different layer sizes from input to embedding, e.g. an example architecture for MNIST [784, 512, 256, 10], where 784 is the input dimension and 10 the embedding dimension.
+        Note that in case of a StackedAutoencoder the decoder requires the reversed structure of the encoder.
+    batch_norm : bool
+        Set True if you want to use torch.nn.BatchNorm1d (default: False)
+    dropout : float
+        Set the amount of dropout you want to use (default: None)
+    activation_fn : torch.nn.Module
+        activation function from torch.nn, set the activation function for the hidden layers, if None then it will be linear (default: torch.nn.LeakyReLU)
+    bias : bool
+        set False if you do not want to use a bias term in the linear layers (default: True)
+    decoder_output_fn : torch.nn.Module
+        activation function from torch.nn, set the activation function for the decoder output layer, if None then it will be linear.
+        E.g. set to torch.nn.Sigmoid if you want to scale the decoder output between 0 and 1 (default: None)
+    work_on_copy : bool
+        If set to true, deep clustering algorithms will optimize a copy of the autoencoder and not the autoencoder itself.
+        Ensures that the same autoencoder can be used by multiple deep clustering algorithms.
+        As copies of this object are created, the memory requirement increases (default: True)
+    random_state : np.random.RandomState | int
+        use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
+
+    Attributes
+    ----------
+    encoder : FullyConnectedBlock
+        encoder part of the autoencoder, responsible for embedding data points (class is FullyConnectedBlock)
+    decoder : FullyConnectedBlock
+        decoder part of the autoencoder, responsible for reconstructing data points from the embedding (class is FullyConnectedBlock)
+    fitted  : bool
+        indicates whether the autoencoder is already fitted
+    work_on_copy : bool
+        indicates whether deep clustering algorithms should work on a copy of the original autoencoder
+
+    References
+    ----------
+    E.g.:
+    Bengio, Yoshua, et al. "Greedy layer-wise training of deep networks."
+    Advances in neural information processing systems 19 (2006).
+    
+    or
+
+    Vincent, Pascal, et al. "Stacked denoising autoencoders: Learning useful representations in a deep network with a local denoising criterion."
+    Journal of machine learning research 11.12 (2010).
+    """
+
+    def __init__(self, layers: list, batch_norm: bool = False, dropout: float = None,
+                 activation_fn: torch.nn.Module = torch.nn.LeakyReLU, bias: bool = True,
+                 decoder_output_fn: torch.nn.Module = None, work_on_copy: bool = True,
+                 random_state: np.random.RandomState | int = None):
+        super().__init__(layers, batch_norm, dropout, activation_fn, bias, None, decoder_output_fn, work_on_copy,
+                         random_state)
+
+    def layerwise_training(self, n_epochs_per_layer: int = 20, optimizer_params: dict = None, batch_size: int = 128,
+                           data: np.ndarray | torch.Tensor = None, dataloader: torch.utils.data.DataLoader = None,
+                           optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
+                           ssl_loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(),
+                           corruption_fn: Callable = None) -> 'StackedAutoencoder':
         """
-        :param feature_dim:
-        :param layer_dims:
-        :param weight_initalizer: a one parameter function which given a tensor initializes it, e.g. a function from torch.nn.init
-        :param tied_weights:
-        :param loss_fn: The loss function that should be used for pretraining and fine tuning accepting as first
-        :param optimizer_fn: A function which returns an torch optimizer for the given parameters (given as parameters ;-)
-         parameter the original value and as the second the reconstruction
-        :param activation_fn:
-        :param bias_init:
-        :param linear_decoder_last: If True the last layer does not have the activation function
+        Trains the autoencoder in a greedy layer-wise fashion.
+
+        Parameters
+        ----------
+        n_epochs_per_layer : int
+            number of epochs for training each layer separately (default: 20)
+        optimizer_params : dict
+            parameters of the optimizer, includes the learning rate (default: {"lr": 1e-3})
+        batch_size : int
+            size of the data batches (default: 128)
+        data : np.ndarray | torch.Tensor
+            train data set. If data is passed then dataloader can remain empty (default: None)
+        dataloader : torch.utils.data.DataLoader
+            dataloader to be used for training (default: default=None)
+        optimizer_class : torch.optim.Optimizer
+            optimizer to be used (default: torch.optim.Adam)
+        ssl_loss_fn : torch.nn.modules.loss._Loss
+            self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss (default: torch.nn.MSELoss())
+        corruption_fn : Callable
+            Can be used to corrupt the input data, e.g., when using a denoising autoencoder.
+            Note that the function must match the data and the data loaders.
+            For example, if the data is normalized, this may have to be taken into account in the corruption function - e.g. in case of salt and pepper noise (default: None)
+
+        Returns
+        -------
+        self : StackedAutoencoder
+            this instance of the autoencoder
+
+        Raises
+        ----------
+        ValueError: data cannot be None if dataloader is None
         """
-
-        # super(Autoencoder, self).__init__()
-        super().__init__()
-        self.tied_weights = tied_weights
-        self.loss_fn = loss_fn
-        self.optimizer_fn = optimizer_fn
-
-        self.linear_decoder_last = linear_decoder_last
-        self.linear_embedded = linear_embedded
-
-        # [torch.nn.Parameter(, requires_grad=True) for
-        #                               feature_dim, node_dim in ]
-        layer_dims.append(embedding_size)
-        self.n_layers = len(layer_dims)
-
-        self.param_bias_encoder = []
-        self.param_bias_decoder = []
-        self.param_weights_encoder = []
-        if tied_weights:
-            self.param_weights_decoder = None
-        else:
-            self.param_weights_decoder = []
-
-        layer_params = list(window([feature_dim] + layer_dims, 2))
-
-        for l in range(self.n_layers):
-            feature_dim, node_dim = layer_params[l]
-            encoder_weight = torch.empty(node_dim, feature_dim)
-            weight_initalizer(encoder_weight)
-            encoder_weight = torch.nn.Parameter(encoder_weight, requires_grad=True)
-            self.register_parameter(f"encoder_weight_{l}", encoder_weight)
-            self.param_weights_encoder.append(encoder_weight)
-            encoder_bias = torch.empty(node_dim)
-            encoder_bias.fill_(bias_init)
-            encoder_bias = torch.nn.Parameter(encoder_bias, requires_grad=True)
-            self.register_parameter(f"encoder_bias_{l}", encoder_bias)
-            self.param_bias_encoder.append(encoder_bias)
-
-            if not tied_weights:
-                decoder_weight = torch.empty(feature_dim, node_dim)
-                weight_initalizer(decoder_weight)
-                decoder_weight = torch.nn.Parameter(decoder_weight, requires_grad=True)
-                self.register_parameter(f"decoder_weight_{l}", decoder_weight)
-                self.param_weights_decoder.append(decoder_weight)
-            decoder_bias = torch.empty(feature_dim)
-            decoder_bias.fill_(bias_init)
-            decoder_bias = torch.nn.Parameter(decoder_bias, requires_grad=True)
-            self.register_parameter(f"decoder_bias_{l}", decoder_bias)
-            self.param_bias_decoder.append(decoder_bias)
-        if not tied_weights:
-            self.param_weights_decoder.reverse()
-        self.param_bias_decoder.reverse()
-        self.activation_fn = activation_fn
-
-    def forward_pretrain(self, input_data, stack, use_dropout=True, dropout_rate=0.2,
-                         dropout_is_training=True):
-        encoded_data = input_data
-        if stack < 1 or stack > self.n_layers:
-            raise RuntimeError(
-                f"stack number {stack} is out or range (0,{self.n_layers})")
-        for l in range(stack):
-            weights = self.param_weights_encoder[l]
-            bias = self.param_bias_encoder[l]
-            # print(f"encoder stack: { l} weights-shape:{weights.shape} bias-shape:{bias.shape}")
-            encoded_data = F.linear(encoded_data, weights, bias)
-
-            if self.activation_fn is not None:
-                # print(f"{self.linear_embedded} is False or ({stack} < {self.n_layers} and {l} < {stack - 1})")
-                if self.linear_embedded is False or not (l == stack - 1 and stack == self.n_layers):
-                    # print("\tuse activation function")
-                    encoded_data = self.activation_fn(encoded_data)
-                else:
-                    # print("\t use linear activation")
-                    pass
-            if use_dropout:
-                if not (
-                        l == stack - 1 and stack == self.n_layers):  # The embedded space is linear and we do not want dropout
-                    # print("\tapply dropout")
-                    encoded_data = F.dropout(
-                        encoded_data, p=dropout_rate, training=dropout_is_training)
-        reconstructed_data = encoded_data
-
-        for ll in range(stack - 1, -1, -1):
-            l = self.n_layers - ll - 1
-            # print(f"decoder layer ll:{ll} l:{l}")
-            if self.tied_weights:
-                # print("\ttied weights")
-                weights = self.param_weights_encoder[self.n_layers - l - 1].t()
-            else:
-                weights = self.param_weights_decoder[l]
-            bias = self.param_bias_decoder[l]
-            # print(f"\t weight-shape: {weights.shape} bias-shape:{bias.shape}")
-            reconstructed_data = F.linear(reconstructed_data, weights, bias)
-            if self.activation_fn is not None:
-                if self.linear_decoder_last is False or self.linear_decoder_last and ll > 0:
-                    # print(f"\t apply activation function")
-                    reconstructed_data = self.activation_fn(reconstructed_data)
-            if use_dropout and ll > 0:
-                # print(f"\t apply dropout")
-                reconstructed_data = F.dropout(
-                    reconstructed_data, p=dropout_rate, )
-
-        return encoded_data, reconstructed_data
-
-    def encode(self, input_data):
-        encoded_data = input_data
-        for l in range(self.n_layers):
-            weights = self.param_weights_encoder[l]
-            bias = self.param_bias_encoder[l]
-            encoded_data = F.linear(encoded_data, weights, bias)
-            if self.activation_fn is not None and not (self.linear_embedded and l == self.n_layers - 1):
-                encoded_data = self.activation_fn(encoded_data)
-        return encoded_data
-
-    def decode(self, encoded_data):
-        reconstructed_data = encoded_data
-
-        for l in range(self.n_layers):
-            if self.tied_weights:
-                weights = self.param_weights_encoder[self.n_layers - l - 1].t()
-            else:
-                weights = self.param_weights_decoder[l]
-            bias = self.param_bias_decoder[l]
-            reconstructed_data = F.linear(reconstructed_data, weights, bias)
-            if self.activation_fn is not None and not (self.linear_decoder_last and l == self.n_layers - 1):
-                reconstructed_data = self.activation_fn(reconstructed_data)
-        return reconstructed_data
-
-    def forward(self, input_data):
-        encoded_data = self.encode(input_data)
-        reconstructed_data = self.decode(encoded_data)
-
-        return encoded_data, reconstructed_data
-
-    def parameters_pretrain(self, stack):
-        parameters = []
-        for l in range(stack):
-            parameters.append(self.param_weights_encoder[l])
-            parameters.append(self.param_bias_encoder[l])
-        for ll in range(stack - 1, -1, -1):
-            l = self.n_layers - ll - 1
-            if not self.tied_weights:
-                parameters.append(self.param_weights_decoder[l])
-            parameters.append(self.param_bias_decoder[l])
-        return parameters
-
-    def pretrain(self, dataset, device, rounds_per_layer=1000, dropout_rate=0.2, corruption_fn=None):
-        """
-        Uses Adam to pretrain the model layer by layer
-        :param rounds_per_layer:
-        :param corruption_fn: Can be used to corrupt the input data for an denoising autoencoder
-        :return:
-        """
-
-        for layer in range(1, self.n_layers + 1):
-            print(f"Pretrain layer {layer}")
-            optimizer = self.optimizer_fn(self.parameters_pretrain(layer))
-            round = 0
-            while True:  # each iteration is equal to an epoch
-                for batch in dataset:
-
-                    round += 1
-                    if round > rounds_per_layer:
-                        break
-
-                    batch_data = batch[1].to(device)  # cuda()
-                    if corruption_fn is not None:
-                        corrupted_batch = corruption_fn(batch_data)
-                        _, reconstruced_data = self.forward_pretrain(corrupted_batch, layer, use_dropout=True,
-                                                                     dropout_rate=dropout_rate,
-                                                                     dropout_is_training=True)
-                    else:
-                        _, reconstruced_data = self.forward_pretrain(batch_data, layer, use_dropout=True,
-                                                                     dropout_rate=dropout_rate,
-                                                                     dropout_is_training=True)
-                    loss = self.loss_fn(batch_data, reconstruced_data)
+        if dataloader is None:
+            if data is None:
+                raise ValueError("data must be specified if dataloader is None")
+            dataloader = get_dataloader(data, batch_size, True)
+        optimizer_params = {"lr": 1e-3} if optimizer_params is None else optimizer_params
+        optimizer = optimizer_class(params=self.parameters(), **optimizer_params)
+        device = get_device_from_module(self)
+        encoder_linear_layer_ids = self.encoder.layer_positions
+        decoder_linear_layer_ids = self.decoder.layer_positions
+        assert len(encoder_linear_layer_ids) == len(
+            decoder_linear_layer_ids), "The decoder must be a reversed version of the encoder"
+        # Start training
+        tbar = tqdm.tqdm(total=n_epochs_per_layer * len(encoder_linear_layer_ids), desc="Stacked AE training")
+        for layer_nr, encoder_layer_to_train in enumerate(encoder_linear_layer_ids):
+            # Train this specific layer for a certain amount of epochs
+            for _ in range(n_epochs_per_layer):
+                total_loss = 0
+                for batch in dataloader:
+                    input_data = batch[1].to(device)
+                    with torch.no_grad():
+                        # encode batch using already trained layers including non-linearity functions etc
+                        for encode_layer in range(encoder_layer_to_train):
+                            input_data = self.encoder.block[encode_layer](input_data)
+                    # Calculate loss regarding current layer
+                    input_data_adj = input_data if corruption_fn is None else corruption_fn(input_data)
+                    encoded = self.encoder.block[encoder_layer_to_train](input_data_adj)
+                    decoded = self.decoder.block[decoder_linear_layer_ids[-(layer_nr + 1)]](encoded)
+                    loss = ssl_loss_fn(decoded, input_data)
+                    # Update network
+                    total_loss += loss.item()
                     optimizer.zero_grad()
                     loss.backward()
                     optimizer.step()
-                    if round % 100 == 0:
-                        print(f"Round {round} current loss: {loss.item()}")
-                else:  # For else is being executed if break did not occur, we continue the while true loop otherwise we break it too
-                    continue
-                break  # Break while loop here
+                postfix_str = {"Loss": total_loss, "LayerID": layer_nr}
+                tbar.set_postfix(postfix_str)
+                tbar.update()
+        return self
 
-    def refine_training(self, dataset, rounds, device, corruption_fn=None, optimizer_fn=None):
-        print(f"Refine training")
-        if optimizer_fn is None:
-            optimizer = self.optimizer_fn(self.parameters())
-        else:
-            optimizer = optimizer_fn(self.parameters())
+    def fit(self, n_epochs_per_layer: int = 20, n_epochs: int = 100, optimizer_params: dict = None,
+            batch_size: int = 128, data: np.ndarray | torch.Tensor = None, data_eval: np.ndarray | torch.Tensor = None,
+            dataloader: torch.utils.data.DataLoader = None, evalloader: torch.utils.data.DataLoader = None,
+            optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
+            ssl_loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), patience: int = 5,
+            scheduler: torch.optim.lr_scheduler = None, scheduler_params: dict = {},
+            corruption_fn: Callable = None, model_path: str = None) -> 'StackedAutoencoder':
+        """
+        Trains the autoencoder in place.
+        First, a greedy layer-wise training is performed. Afterward, the weights are finetuned by training all layer simultaneously.
 
-        index = 0
-        while True:  # each iteration is equal to an epoch
-            for batch in dataset:
-                index += 1
-                if index > rounds:
-                    break
-                batch_data = batch[1].to(device)  # cuda()
+        Parameters
+        ----------
+        n_epochs_per_layer : int
+            number of epochs for training each layer separately (default: 20)
+        n_epochs: int
+            number of epochs for the final finetuning (default: 100)
+        optimizer_params : dict
+            parameters of the optimizer, includes the learning rate (default: {"lr": 1e-3})
+        batch_size : int
+            size of the data batches (default: 128)
+        data : np.ndarray | torch.Tensor
+            train data set. If data is passed then dataloader can remain empty (default: None)
+        data_eval : np.ndarray | torch.Tensor
+            evaluation data set. If data_eval is passed then evalloader can remain empty.
+            Only used for finetuning (default: None)
+        dataloader : torch.utils.data.DataLoader
+            dataloader to be used for training (default: default=None)
+        evalloader : torch.utils.data.DataLoader
+            dataloader to be used for evaluation, early stopping and learning rate scheduling if scheduler=torch.optim.lr_scheduler.ReduceLROnPlateau.
+            Only used for finetuning (default: None)
+        optimizer_class : torch.optim.Optimizer
+            optimizer to be used (default: torch.optim.Adam)
+        ssl_loss_fn : torch.nn.modules.loss._Loss
+            self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss (default: torch.nn.MSELoss())
+        patience : int
+            patience parameter for EarlyStopping.
+            Only used for finetuning (default: 5)
+        scheduler : torch.optim.lr_scheduler
+            learning rate scheduler that should be used.
+            If torch.optim.lr_scheduler.ReduceLROnPlateau is used then the behaviour is matched by providing the validation_loss calculated based on samples from evalloader.
+            Only used for finetuning (default: None)
+        scheduler_params : dict
+            dictionary of the parameters of the scheduler object.
+            Only used for finetuning (default: {})
+        corruption_fn : Callable
+            Can be used to corrupt the input data, e.g., when using a denoising autoencoder.
+            Note that the function must match the data and the data loaders.
+            For example, if the data is normalized, this may have to be taken into account in the corruption function - e.g. in case of salt and pepper noise (default: None)
+        model_path : str
+            if specified will save the trained model to the location. If evalloader is used, then only the best model w.r.t. evaluation loss is saved (default: None)
 
-                # Forward pass
-                if corruption_fn is not None:
-                    embeded_data, reconstruced_data = self.forward(
-                        corruption_fn(batch_data))
-                else:
-                    embeded_data, reconstruced_data = self.forward(batch_data)
+        Returns
+        -------
+        self : StackedAutoencoder
+            this instance of the autoencoder
 
-                loss = self.loss_fn(reconstruced_data, batch_data)
-
-                # Backward pass
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-                if index % 100 == 0:
-                    print(f"Round {index} current loss: {loss.item()}")
-
-            else:  # For else is being executed if break did not occur, we continue the while true loop otherwise we break it too
-                continue
-            break  # Break while loop here
-
-    def start_training(self, trainloader, device, steps_per_layer=10000, refine_training_steps=20000, dropout_rate=0.2):
-        self.pretrain(trainloader, device=device, rounds_per_layer=steps_per_layer, dropout_rate=dropout_rate)
-        self.refine_training(trainloader, rouns=refine_training_steps, device=device)
+        Raises
+        ----------
+        ValueError: data cannot be None if dataloader is None
+        ValueError: evalloader cannot be None if scheduler=torch.optim.lr_scheduler.ReduceLROnPlateau
+        """
+        set_torch_seed(self.random_state)
+        self.layerwise_training(n_epochs_per_layer, optimizer_params, batch_size, data, dataloader,
+                                optimizer_class, ssl_loss_fn, corruption_fn)
+        super().fit(n_epochs, optimizer_params, batch_size, data, data_eval, dataloader, evalloader,
+                    optimizer_class, ssl_loss_fn, patience, scheduler, scheduler_params, corruption_fn, model_path)
         return self

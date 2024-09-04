@@ -256,18 +256,6 @@ def predict_batchwise(dataloader: torch.utils.data.DataLoader, neural_network: t
     return predictions_numpy
 
 
-def window(seq, n):
-    """Returns a sliding window (of width n) over data from the following iterable:
-       s -> (s0,s1,...s[n-1]), (s1,s2,...,sn), ..."""
-    it = iter(seq)
-    result = tuple(islice(it, n))
-    if len(result) == n:
-        yield result
-    for elem in it:
-        result = result[1:] + (elem,)
-        yield result
-
-
 # def add_noise(batch):
 #     mask = torch.empty(
 #         batch.shape, device=batch.device).bernoulli_(0.8)

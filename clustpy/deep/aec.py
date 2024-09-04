@@ -5,7 +5,6 @@ Collin Leiber
 
 from clustpy.deep._utils import embedded_kmeans_prediction, encode_batchwise
 from clustpy.deep._train_utils import get_default_deep_clustering_initialization
-from clustpy.deep._data_utils import augmentation_invariance_check
 from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
 import torch
 import numpy as np
@@ -329,7 +328,7 @@ class AEC(_AbstractDeepClusteringAlgo):
         self : AEC
             this instance of the AEC algorithm
         """
-        augmentation_invariance_check(self.augmentation_invariance, self.custom_dataloaders)
+        super().fit(X, y)
         aec_labels, aec_centers, neural_network = _aec(X, self.n_clusters, self.batch_size,
                                                        self.pretrain_optimizer_params,
                                                        self.clustering_optimizer_params,
