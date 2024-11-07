@@ -101,8 +101,6 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
         raise Exception("max_n_clusters can not be smaller than min_n_clusters")
     if min_n_clusters <= 0:
         raise Exception("min_n_clusters must be greater than zero")
-    if n_clusters_init < min_n_clusters and n_clusters_init is not None:
-        raise Exception("n_clusters can not be smaller than min_n_clusters")
     if dip_merge_threshold < 0 or dip_merge_threshold > 1:
         raise Exception("dip_merge_threshold must be between 0 and 1")
     # Get initial setting (device, dataloaders, pretrained AE and initial clustering result)
@@ -110,6 +108,9 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
         X, n_clusters_init, batch_size, pretrain_optimizer_params, pretrain_epochs, optimizer_class, ssl_loss_fn,
         neural_network, embedding_size, custom_dataloaders, initial_clustering_class, initial_clustering_params,
         device, random_state, neural_network_weights=neural_network_weights)
+    if n_clusters_init < min_n_clusters:
+        raise Exception("n_clusters_init ({0}) can not be smaller than min_n_clusters ({0})".format(n_clusters_init,
+                                                                                                    min_n_clusters))
     if custom_dataloaders is not None:
         # Get new X from testloader (important if transformations are used within the dataloader)
         X_new = []

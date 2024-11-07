@@ -168,6 +168,8 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
     random_state = check_random_state(random_state)
     seeds = random_state.choice(10000, n_repetitions, replace=False)
     algo_names = [a.name for a in evaluation_algorithms]
+    assert max(
+        np.unique(algo_names, return_counts=True)[1]) == 1, "Some names of your algorithms do not seem to be unique!"
     metric_names = [] if evaluation_metrics is None else [m.name for m in evaluation_metrics]
     if X_test is not None:
         metric_names += [mn + "_TEST" for mn in metric_names]
@@ -176,6 +178,8 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
         metric_names += ["runtime"]
     if add_n_clusters:
         metric_names += ["n_clusters"]
+    assert len(metric_names) == 0 or max(np.unique(metric_names, return_counts=True)[
+                                             1]) == 1, "Some names of your metrics do not seem to be unique! Note that metrics must not be named 'runtime' or 'n_clusters'"
     header = pd.MultiIndex.from_product([algo_names, metric_names], names=["algorithm", "metric"])
     value_placeholder = np.zeros((n_repetitions, len(algo_names) * len(metric_names)))
     df = pd.DataFrame(value_placeholder, columns=header, index=range(n_repetitions))
@@ -416,6 +420,8 @@ def evaluate_multiple_datasets(evaluation_datasets: list, evaluation_algorithms:
     assert save_labels_path is None or len(
         save_labels_path.split(".")) == 2, "save_labels_path must only contain a single dot. E.g., NAME.csv"
     data_names = [d.name for d in evaluation_datasets]
+    assert max(
+        np.unique(data_names, return_counts=True)[1]) == 1, "Some names of your datasets do not seem to be unique!"
     df_list = []
     for eval_data in evaluation_datasets:
         try:
@@ -475,7 +481,7 @@ def _get_data_and_labels_from_evaluation_dataset(data_input: np.ndarray, data_lo
         The ground truth labels. Can be a np.ndarray, an int or list specifying which columns of the data contain the labels or None if no ground truth labels are present.
         If data is a callable, the ground truth labels can also be obtained by that function and labels_true can be None
     train_test_split : bool
-        Specifies if the laoded dataset should be split into a train and test set. Can be of type bool, list or np.ndarray.
+        Specifies if the loaded dataset should be split into a train and test set. Can be of type bool, list or np.ndarray.
         If train_test_split is a boolean and true, the data loader will use the parameter "subset" to load a train and test set. In that case data must be a callable.
         If train_test_split is a list/np.ndarray, the entries specify the indices of the data array that should be used for the test set
 

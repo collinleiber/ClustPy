@@ -68,6 +68,7 @@ def _get_neural_network(input_dim: int, embedding_size: int = 10, neural_network
         # Init neural network parameters
         if neural_network_params is None:
             neural_network_params = dict()
+        neural_network_params = neural_network_params.copy()
         if "layers" not in neural_network_params.keys():
             layers = _get_default_layers(input_dim, embedding_size)
             neural_network_params["layers"] = layers

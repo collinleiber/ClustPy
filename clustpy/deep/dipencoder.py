@@ -754,6 +754,7 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
                  custom_dataloaders: tuple = None, augmentation_invariance: bool = False,
                  initial_clustering_class: ClusterMixin = KMeans, initial_clustering_params: dict = None,
                  device: torch.device = None, random_state: np.random.RandomState | int = None):
+        assert batch_size is not None or n_clusters is not None, "n_clusters and batch_size can not both be None"
         super().__init__(25 * n_clusters if batch_size is None else batch_size, neural_network, neural_network_weights,
                          embedding_size, device, random_state)
         self.n_clusters = n_clusters

@@ -1,7 +1,7 @@
 try:
     from clustpy.utils.dipModule import c_diptest  # noqa - Import from C file (could be marked as unresolved)
 except:
-    print("[WARNING] Could not import c_diptest in clustpy.utils.dipModule")
+    print("[WARNING] Could not import c_diptest in clustpy.utils.dipModule. Therefore, C implementation can not be used for dip calculations which can lead to slow executions")
 import numpy as np
 import matplotlib.pyplot as plt
 from clustpy.utils.plots import plot_histogram
@@ -68,9 +68,7 @@ def dip_test(X: np.ndarray, just_dip: bool = True, is_data_sorted: bool = False,
     elif use_c:
         try:
             dip_value, modal_interval, modal_triangle, _, _, mn, mj = _dip_c_impl(X, debug)
-        except Exception as e:
-            print("[WARNING] C implementation can not be used for dip calculation.")
-            print(e)
+        except Exception:
             dip_value, modal_interval, modal_triangle, _, _, mn, mj = _dip_python_impl(X, debug)
     else:
         dip_value, modal_interval, modal_triangle, _, _, mn, mj = _dip_python_impl(X, debug)

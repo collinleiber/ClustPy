@@ -52,7 +52,8 @@ Now that we have a suitable corruption function, let us look at its effect regar
 
     sample = data[0].cpu().numpy().reshape((28, 28))
     plot_image(sample, black_and_white=True)
-    corrupted_sample = plot_image(corruption_fn(sample), black_and_white=True)
+    corrupted_sample = corruption_fn(sample)
+    plot_image(corrupted_sample, black_and_white=True)
 
 Finally, we can start the actual training of our stacked denoising autoencoder.
 

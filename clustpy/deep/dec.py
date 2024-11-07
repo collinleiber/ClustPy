@@ -20,7 +20,7 @@ def _dec(X: np.ndarray, n_clusters: int, alpha: float, batch_size: int, pretrain
          clustering_optimizer_params: dict, pretrain_epochs: int, clustering_epochs: int,
          optimizer_class: torch.optim.Optimizer, ssl_loss_fn: torch.nn.modules.loss._Loss,
          neural_network: torch.nn.Module | tuple, neural_network_weights: str, embedding_size: int,
-         ssl_loss_weight: float, clustering_loss_weight: float, custom_dataloaders: tuple,
+         clustering_loss_weight: float, ssl_loss_weight: float, custom_dataloaders: tuple,
          augmentation_invariance: bool, initial_clustering_class: ClusterMixin, initial_clustering_params: dict,
          device: torch.device, random_state: np.random.RandomState) -> (
         np.ndarray, np.ndarray, np.ndarray, np.ndarray, torch.nn.Module):
@@ -56,10 +56,10 @@ def _dec(X: np.ndarray, n_clusters: int, alpha: float, batch_size: int, pretrain
         Path to a file containing the state_dict of the neural_network.
     embedding_size : int
         size of the embedding within the neural network
-    ssl_loss_weight : float
-        weight of the self-supervised learning (ssl) loss
     clustering_loss_weight : float
         weight of the clustering loss
+    ssl_loss_weight : float
+        weight of the self-supervised learning (ssl) loss
     custom_dataloaders : tuple
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         Can also be a tuple of strings, where the first entry is the path to a saved trainloader and the second entry the path to a saved testloader.
@@ -98,7 +98,7 @@ def _dec(X: np.ndarray, n_clusters: int, alpha: float, batch_size: int, pretrain
                                 **clustering_optimizer_params)
     # DEC Training loop
     dec_module.fit(neural_network, trainloader, clustering_epochs, device, optimizer, ssl_loss_fn,
-                   ssl_loss_weight, clustering_loss_weight)
+                   clustering_loss_weight, ssl_loss_weight)
     # Get labels
     dec_labels = predict_batchwise(testloader, neural_network, dec_module)
     dec_centers = dec_module.centers.detach().cpu().numpy()
@@ -359,7 +359,7 @@ class _DEC_Module(torch.nn.Module):
 
     def fit(self, neural_network: torch.nn.Module, trainloader: torch.utils.data.DataLoader, n_epochs: int,
             device: torch.device, optimizer: torch.optim.Optimizer, ssl_loss_fn: torch.nn.modules.loss._Loss,
-            ssl_loss_weight: float, clustering_loss_weight: float) -> '_DEC_Module':
+            clustering_loss_weight: float, ssl_loss_weight: float) -> '_DEC_Module':
         """
         Trains the _DEC_Module in place.
 
@@ -377,10 +377,10 @@ class _DEC_Module(torch.nn.Module):
             the optimizer for training
         ssl_loss_fn : torch.nn.modules.loss._Loss
             self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
-        ssl_loss_weight : float
-            weight of the self-supervised learning (ssl) loss
         clustering_loss_weight : float
             weight of the clustering loss
+        ssl_loss_weight : float
+            weight of the self-supervised learning (ssl) loss
 
         Returns
         -------
@@ -541,8 +541,8 @@ class DEC(_AbstractDeepClusteringAlgo):
                                                                                       self.neural_network,
                                                                                       self.neural_network_weights,
                                                                                       self.embedding_size,
-                                                                                      self.ssl_loss_weight,
                                                                                       self.clustering_loss_weight,
+                                                                                      self.ssl_loss_weight,
                                                                                       self.custom_dataloaders,
                                                                                       self.augmentation_invariance,
                                                                                       self.initial_clustering_class,
