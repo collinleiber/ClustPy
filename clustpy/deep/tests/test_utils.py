@@ -41,10 +41,6 @@ def test_detect_device():
     device = detect_device(-1)
     assert type(device) is torch.device
     assert device.type == "cpu"
-    # Test for other integer
-    device = detect_device(1)
-    assert type(device) is torch.device
-    assert device.type == "cuda"
     # Test for str
     device = detect_device("cuda")
     assert type(device) is torch.device

@@ -82,6 +82,7 @@ def detect_device(device: torch.device | int | str = None) -> torch.device:
     device : torch.device
         device on which the prediction should take place
     """
+    assert device is None or type(device) is torch.device or type(device) is int or type(device) is str, "device must be None or of type torch.device, int or str"
     if device == -1:
         # Special case
         device = torch.device('cpu')
