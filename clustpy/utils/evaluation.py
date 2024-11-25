@@ -83,7 +83,7 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
                      aggregation_functions: tuple = (np.mean, np.std), add_runtime: bool = True,
                      add_n_clusters: bool = False, save_path: str = None, save_labels_path: str = None,
                      ignore_algorithms: tuple = (), dataset_name: str = None,
-                     random_state: np.random.RandomState | int = None) -> pd.DataFrame:
+                     random_state: np.random.RandomState | int = None, quiet: bool = False) -> pd.DataFrame:
     """
     Evaluate the clustering result of different clustering algorithms (as specified by evaluation_algorithms) on a given data set using different metrics (as specified by evaluation_metrics).
     Each algorithm will be executed n_repetitions times and all specified metrics will be used to evaluate the clustering result.
@@ -121,6 +121,8 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
         The name of the dataset; only relevant if iteration_specific_params are defined for an EvaluationAlgorithm (default: None)
     random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
+    quiet : bool
+        Do not print any output
 
     Returns
     -------
@@ -160,7 +162,7 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
         evaluation_algorithms = [evaluation_algorithms]
     if type(evaluation_metrics) is not list and evaluation_metrics is not None:
         evaluation_metrics = [evaluation_metrics]
-    if save_labels_path is not None and not "." in save_labels_path:
+    if save_labels_path is not None and "." not in save_labels_path:
         save_labels_path = save_labels_path + ".csv"
     assert save_labels_path is None or len(
         save_labels_path.split(".")) == 2, "save_labels_path must only contain a single dot. E.g., NAME.csv"
@@ -188,9 +190,11 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
         try:
             assert type(eval_algo) is EvaluationAlgorithm, "All algortihms must be of type EvaluationAlgortihm"
             if eval_algo.name in ignore_algorithms:
-                print("Ignoring algorithm {0}".format(eval_algo.name))
+                if not quiet:
+                    print("Ignoring algorithm {0}".format(eval_algo.name))
                 continue
-            print("Use algorithm {0}".format(eval_algo.name))
+            if not quiet:
+                print("Use algorithm {0}".format(eval_algo.name))
             # Add n_clusters automatically to algorithm parameters if it is None
             if "n_clusters" in eval_algo.params and eval_algo.params["n_clusters"] is None and labels_true is not None:
                 automatically_set_n_clusters = True
@@ -214,7 +218,8 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
                     X_test_processed = X_test
             # Execute the algorithm multiple times
             for rep in range(n_repetitions):
-                print("- Iteration {0}".format(rep))
+                if not quiet:
+                    print("- Iteration {0}".format(rep))
                 # set seed
                 np.random.seed(seeds[rep])
                 tmp_params = eval_algo.params.copy()
@@ -239,8 +244,9 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
                 try:
                     algo_obj.fit(X_processed)
                 except Exception as e:
-                    print("Execution of {0} raised an exception in iteration {1}".format(eval_algo.name, rep))
-                    print(e)
+                    if not quiet:
+                        print("Execution of {0} raised an exception in iteration {1}".format(eval_algo.name, rep))
+                        print(e)
                     continue
                 # Optional: Obtain labels from the predict method
                 if X_test is not None:
@@ -253,18 +259,21 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
                         else:
                             labels_predicted_test = algo_obj.predict(X_test_processed)
                     except Exception as e:
-                        print("Problem when running the predict method of {0} in iteration {1}".format(eval_algo.name,
+                        if not quiet:
+                            print("Problem when running the predict method of {0} in iteration {1}".format(eval_algo.name,
                                                                                                        rep))
-                        print(e)
+                            print(e)
                         labels_predicted_test = None
                 runtime = time.time() - start_time
                 if add_runtime:
                     df.at[rep, (eval_algo.name, "runtime")] = runtime
-                    print("-- runtime: {0}".format(runtime))
+                    if not quiet:
+                        print("-- runtime: {0}".format(runtime))
                 if add_n_clusters:
                     n_clusters = _get_n_clusters_from_algo(algo_obj)
                     df.at[rep, (eval_algo.name, "n_clusters")] = n_clusters
-                    print("-- n_clusters: {0}".format(n_clusters))
+                    if not quiet:
+                        print("-- n_clusters: {0}".format(n_clusters))
                 # Optional: Save labels
                 if save_labels_path is not None:
                     save_labels_path_algo = None if save_labels_path is None else "{0}_{1}_{2}.{3}".format(
@@ -298,13 +307,16 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
                                     result_test = eval_metric.method(X_test, labels_predicted_test,
                                                                      **eval_metric.params)
                             df.at[rep, (eval_algo.name, eval_metric.name)] = result
-                            print("-- {0}: {1}".format(eval_metric.name, result))
+                            if not quiet:
+                                print("-- {0}: {1}".format(eval_metric.name, result))
                             if X_test is not None and labels_predicted_test is not None:
                                 df.at[rep, (eval_algo.name, eval_metric.name + "_TEST")] = result_test
-                                print("-- {0} (TEST): {1}".format(eval_metric.name, result_test))
+                                if not quiet:
+                                    print("-- {0} (TEST): {1}".format(eval_metric.name, result_test))
                         except Exception as e:
-                            print("Metric {0} raised an exception and will be skipped".format(eval_metric.name))
-                            print(e)
+                            if not quiet:
+                                print("Metric {0} raised an exception and will be skipped".format(eval_metric.name))
+                                print(e)
                 if eval_algo.deterministic:
                     for element in range(1, n_repetitions):
                         if add_runtime:
@@ -321,8 +333,9 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
                                     0, (eval_algo.name, eval_metric.name + "_TEST")]
                     break
         except Exception as e:
-            print("Algorithm {0} raised an exception and will be skipped".format(eval_algo.name))
-            print(e)
+            if not quiet:
+                print("Algorithm {0} raised an exception and will be skipped".format(eval_algo.name))
+                print(e)
         # Prepare eval_algo params for next dataset
         if automatically_set_n_clusters:
             eval_algo.params["n_clusters"] = None
@@ -341,7 +354,7 @@ def evaluate_multiple_datasets(evaluation_datasets: list, evaluation_algorithms:
                                n_repetitions: int = 10, aggregation_functions: tuple = (np.mean, np.std),
                                add_runtime: bool = True, add_n_clusters: bool = False, save_path: str = None,
                                save_intermediate_results: bool = False, save_labels_path: str = None,
-                               random_state: np.random.RandomState | int = None) -> pd.DataFrame:
+                               random_state: np.random.RandomState | int = None, quiet: bool = False) -> pd.DataFrame:
     """
     Evaluate the clustering result of different clustering algorithms (as specified by evaluation_algorithms) on a set of data sets (as specified by evaluation_datasets) using different metrics (as specified by evaluation_metrics).
     Each algorithm will be executed n_repetitions times and all specified metrics will be used to evaluate the clustering result.
@@ -371,6 +384,8 @@ def evaluate_multiple_datasets(evaluation_datasets: list, evaluation_algorithms:
         The path where the clustering labels should be saved as csv. If None, the labels will not be saved (default: None)
     random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
+    quiet : bool
+        Do not print any output
 
     Returns
     -------
@@ -415,7 +430,7 @@ def evaluate_multiple_datasets(evaluation_datasets: list, evaluation_algorithms:
                                                                    "save_intermediate_results is True"
     if type(evaluation_datasets) is not list:
         evaluation_datasets = [evaluation_datasets]
-    if save_labels_path is not None and not "." in save_labels_path:
+    if save_labels_path is not None and "." not in save_labels_path:
         save_labels_path = save_labels_path + ".csv"
     assert save_labels_path is None or len(
         save_labels_path.split(".")) == 2, "save_labels_path must only contain a single dot. E.g., NAME.csv"
@@ -426,12 +441,14 @@ def evaluate_multiple_datasets(evaluation_datasets: list, evaluation_algorithms:
     for eval_data in evaluation_datasets:
         try:
             assert type(eval_data) is EvaluationDataset, "All datasets must be of type EvaluationDataset"
-            print("=== Start evaluation of {0} ===".format(eval_data.name))
+            if not quiet:
+                print("=== Start evaluation of {0} ===".format(eval_data.name))
             X, labels_true, X_test, labels_true_test = _get_data_and_labels_from_evaluation_dataset(eval_data.data,
                                                                                                     eval_data.data_loader_params,
                                                                                                     eval_data.labels_true,
                                                                                                     eval_data.train_test_split)
-            print("=== (Data shape: {0} / Ground truth shape: {1}) ===".format(X.shape,
+            if not quiet:
+                print("=== (Data shape: {0} / Ground truth shape: {1}) ===".format(X.shape,
                                                                                labels_true if labels_true is None else labels_true.shape))
             if eval_data.preprocess_methods is not None:
                 X = _preprocess_dataset(X, eval_data.preprocess_methods, eval_data.preprocess_params)
@@ -449,11 +466,12 @@ def evaluate_multiple_datasets(evaluation_datasets: list, evaluation_algorithms:
                                   add_runtime=add_runtime, add_n_clusters=add_n_clusters, save_path=inner_save_path,
                                   save_labels_path=inner_save_labels_path,
                                   ignore_algorithms=eval_data.ignore_algorithms, dataset_name=eval_data.name,
-                                  random_state=random_state)
+                                  random_state=random_state, quiet=quiet)
             df_list.append(df)
         except Exception as e:
-            print("Dataset {0} raised an exception and will be skipped".format(eval_data.name))
-            print(e)
+            if not quiet:
+                print("Dataset {0} raised an exception and will be skipped".format(eval_data.name))
+                print(e)
     all_dfs = pd.concat(df_list, keys=data_names)
     if save_path is not None:
         # Check if directory exists
