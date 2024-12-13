@@ -154,7 +154,7 @@ def _dkm_get_probs(squared_diffs: torch.Tensor, alpha: float) -> torch.Tensor:
     """
     # Shift distances for exponent with min value to avoid underflow (see original implementaion: https://github.com/MaziarMF/deep-k-means/blob/master/compgraph.py)
     shifted_squared_diffs = squared_diffs - squared_diffs.min(1)[0].reshape((-1, 1))
-    exponent = torch.exp(-alpha * (shifted_squared_diffs))
+    exponent = torch.exp(-alpha * shifted_squared_diffs)
     param_softmax = exponent / exponent.sum(1).reshape((-1, 1))
     return param_softmax
 
@@ -248,7 +248,7 @@ class _DKM_Module(torch.nn.Module):
         """
         squared_diffs = squared_euclidean_distance(embedded, self.centers)
         probs = _dkm_get_probs(squared_diffs, alpha)
-        loss = (squared_diffs.sqrt() * probs).sum(1).mean()
+        loss = (squared_diffs * probs).sum(1).mean()
         return loss
 
     def dkm_augmentation_invariance_loss(self, embedded: torch.Tensor, embedded_aug: torch.Tensor,
@@ -273,10 +273,10 @@ class _DKM_Module(torch.nn.Module):
         # Get loss of non-augmented data
         squared_diffs = squared_euclidean_distance(embedded, self.centers)
         probs = _dkm_get_probs(squared_diffs, alpha)
-        clean_loss = (squared_diffs.sqrt() * probs).sum(1).mean()
+        clean_loss = (squared_diffs * probs).sum(1).mean()
         # Get loss of augmented data
         squared_diffs_augmented = squared_euclidean_distance(embedded_aug, self.centers)
-        aug_loss = (squared_diffs_augmented.sqrt() * probs).sum(1).mean()
+        aug_loss = (squared_diffs_augmented * probs).sum(1).mean()
         # average losses
         loss = (clean_loss + aug_loss) / 2
         return loss

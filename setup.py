@@ -32,9 +32,10 @@ setup(
                       'matplotlib',
                       'torch',
                       'pandas',
-                      'tqdm'],
+                      'tqdm',
+                      'torchvision'],
     extras_require={
-        'full': ['torchvision', 'Pillow', 'nltk', 'xlrd', 'opencv-python', 'requests']
+        'full': ['Pillow', 'nltk', 'xlrd', 'opencv-python', 'requests']
     },
     ext_modules=[dip_extension]
 )
