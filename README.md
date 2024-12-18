@@ -354,4 +354,6 @@ Benchmarking Deep Clustering Algorithms With ClustPy.
 - [Application of Deep Clustering Algorithms](https://dl.acm.org/doi/abs/10.1145/3583780.3615290) (10/2023)
 - [Benchmarking Deep Clustering Algorithms With ClustPy](https://ieeexplore.ieee.org/document/10411702) (12/2023)
 - [Data with Density-Based Clusters: A Generator for Systematic Evaluation of Clustering Algorithms](https://link.springer.com/chapter/10.1007/978-3-031-70368-3_1) (08/2024)
-
+- [Breaking the Reclustering Barrier in Centroid-based Deep Clustering](https://arxiv.org/pdf/2411.02275) (11/2024)
+- [SHADE: Deep Density-based Clustering](https://arxiv.org/pdf/2410.06265) (12/2024)
+- [Dying Clusters Is All You Need - Deep Clustering With an Unknown Number of Clusters](https://arxiv.org/pdf/2410.09491) (12/2024)

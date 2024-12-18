@@ -1,7 +1,4 @@
-try:
-    import torchvision
-except:
-    print("[WARNING] Could not import torchvision in clustpy.data.real_torchvision_data. Please install torchvision by 'pip install torchvision' if necessary")
+import torchvision
 import torch
 import numpy as np
 import ssl

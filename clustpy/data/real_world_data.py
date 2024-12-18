@@ -465,7 +465,7 @@ def load_coil20(return_X_y: bool = False, downloads_path: str = None) -> Bunch:
     if not os.path.isfile(filename):
         if not os.path.isdir(directory):
             os.mkdir(directory)
-        _download_file("http://www.cs.columbia.edu/CAVE/databases/SLAM_coil-20_coil-100/coil-20/coil-20-proc.zip",
+        _download_file("https://cave.cs.columbia.edu/old/databases/SLAM_coil-20_coil-100/coil-20/coil-20-proc.zip",
                        filename)
         # Unpack zipfile
         with zipfile.ZipFile(filename, 'r') as zipf:
@@ -524,7 +524,7 @@ def load_coil100(return_X_y: bool = False, downloads_path: str = None) -> Bunch:
     if not os.path.isfile(filename):
         if not os.path.isdir(directory):
             os.mkdir(directory)
-        _download_file("http://www.cs.columbia.edu/CAVE/databases/SLAM_coil-20_coil-100/coil-100/coil-100.zip",
+        _download_file("http://cave.cs.columbia.edu/old/databases/SLAM_coil-20_coil-100/coil-100/coil-100.zip",
                        filename)
         # Unpack zipfile
         with zipfile.ZipFile(filename, 'r') as zipf:

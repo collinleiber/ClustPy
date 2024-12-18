@@ -18,8 +18,9 @@ _MIN_OBJECTS_FOR_DENS_PLOT = 3
 
 def plot_with_transformation(X: np.ndarray, labels: np.ndarray = None, centers: np.ndarray = None,
                              true_labels: np.ndarray = None, plot_dimensionality: int = 2,
-                             transformation_class: TransformerMixin = PCA, show_legend: bool = True,
-                             scattersize: float = 10, equal_axis: bool = False, show_plot: bool = True) -> None:
+                             transformation_class: TransformerMixin = PCA, show_legend: bool = True, 
+                             scattersize: float = 10, title: str = None, equal_axis: bool = False, 
+                             show_plot: bool = True) -> None:
     """
     In Data Science, it is common to work with high-dimensional data.
     These cannot be visualized without further ado.
@@ -49,6 +50,8 @@ def plot_with_transformation(X: np.ndarray, labels: np.ndarray = None, centers: 
         Defines whether a legend should be shown (default: True)
     scattersize : float
         The size of the scatters (default: 10)
+    title : str
+        Title of the plot (default: None)
     equal_axis : bool
         Defines whether the axes are to be scaled to the same value range (default: False)
     show_plot : bool
@@ -88,12 +91,14 @@ def plot_with_transformation(X: np.ndarray, labels: np.ndarray = None, centers: 
         plot_scatter_matrix(X, labels=labels, centers=centers, true_labels=true_labels, scattersize=scattersize,
                             show_legend=show_legend, equal_axis=equal_axis, max_dimensions=plot_dimensionality,
                             show_plot=False)
+    if title is not None:
+        plt.title(title)
     if show_plot:
         plt.show()
 
 
 def plot_1d_data(X: np.ndarray, labels: np.ndarray = None, centers: np.ndarray = None, true_labels: np.ndarray = None,
-                 show_legend: bool = True, show_plot: bool = True) -> None:
+                 show_legend: bool = True, title: str = None, container: plt.Axes = plt, show_plot: bool = True) -> None:
     """
     Plot a one-dimensional data set.
 
@@ -109,9 +114,15 @@ def plot_1d_data(X: np.ndarray, labels: np.ndarray = None, centers: np.ndarray =
         The ground truth labels. Specifies the symbol of the plotted objects. Can be None (default: None)
     show_legend : bool
         Defines whether a legend should be shown (default: True)
+    title : str
+        Title of the plot (default: None)
+    container : plt.Axes
+        The container to which the 1d plot is added.
+        If another container is defined, show_plot should usually be False (default: matplotlib.pyplot)
     show_plot : bool
         Defines whether the plot should directly be plotted (default: True)
     """
+    assert container is plt or title is None, "If a specific container is defined, the title has to be None"
     assert X.ndim == 1 or X.shape[1] == 1, "Data must be 1-dimensional"
     assert centers is None or centers.ndim == 1 or centers.shape[1] == 1, "Centers must be 1-dimensional"
     # Optional: Get first column of data
@@ -120,35 +131,37 @@ def plot_1d_data(X: np.ndarray, labels: np.ndarray = None, centers: np.ndarray =
     # fig, ax = plt.subplots(figsize=figsize)
     min_value = np.min(X)
     max_value = np.max(X)
-    plt.hlines(1, min_value, max_value)  # Draw a horizontal line
+    container.hlines(1, min_value, max_value)  # Draw a horizontal line
     y = np.ones(len(X))
-    plt.scatter(X, y, marker='|', s=500, c=labels)  # Plot a line at each location specified in X
+    container.scatter(X, y, marker='|', s=500, c=labels)  # Plot a line at each location specified in X
     if centers is not None:
         # Optional: Get first column of centers
         if centers.ndim == 2:
             centers = centers[:, 0]
         yc = np.ones(len(centers))
-        plt.scatter(centers, yc, s=300, color="red", marker="x")
+        container.scatter(centers, yc, s=300, color="red", marker="x")
         # plot one center text above line and next below ...
         centers_order = np.argsort(centers)
         centers_order = np.argsort(centers_order)
         for j in range(len(centers)):
             yt = 1.0005 if centers_order[j] % 2 == 0 else 0.9994
-            plt.text(centers[j], yt, str(j), weight="bold")
+            container.text(centers[j], yt, str(j), weight="bold")
     if true_labels is not None:
-        plt.hlines(1.001, min_value, max_value)
+        container.hlines(1.001, min_value, max_value)
         y_true = np.ones(len(X)) * 1.001
-        plt.scatter(X, y_true, marker='|', s=500, c=true_labels)
+        container.scatter(X, y_true, marker='|', s=500, c=true_labels)
     if show_legend and labels is not None:
         unique_labels, cmap, norm = _get_cmap_and_norm(labels)
-        _add_legend(plt, unique_labels, cmap, norm)
+        _add_legend(container, unique_labels, cmap, norm)
+    if title is not None:
+        plt.title(title)
     if show_plot:
         plt.show()
 
 
 def plot_2d_data(X: np.ndarray, labels: np.ndarray = None, centers: np.ndarray = None, true_labels: np.ndarray = None,
                  cluster_ids_font_size: float = None, centers_ids_font_size: float = 10, show_legend: bool = True,
-                 title: str = None, scattersize: float = 10, centers_scattersize: float = 15, equal_axis: bool = False,
+                 scattersize: float = 10, centers_scattersize: float = 15, title: str = None, equal_axis: bool = False,
                  container: plt.Axes = plt, show_plot: bool = True) -> None:
     """
     Plot a two-dimensional data set.
@@ -171,12 +184,12 @@ def plot_2d_data(X: np.ndarray, labels: np.ndarray = None, centers: np.ndarray =
         Can be None if no id should be shown (default: 10)
     show_legend : bool
         Defines whether a legend should be shown (default: True)
-    title : str
-        Title of the plot (default: None)
     scattersize : float
         The size of the scatters (default: 10)
     centers_scattersize : float
         The size of the red scatters of the cluster centers (default: 15)
+    title : str
+        Title of the plot (default: None)
     equal_axis : bool
         Defines whether the axes are to be scaled to the same value range (default: False)
     container : plt.Axes
@@ -185,7 +198,9 @@ def plot_2d_data(X: np.ndarray, labels: np.ndarray = None, centers: np.ndarray =
     show_plot : bool
         Defines whether the plot should directly be plotted (default: True)
     """
+    assert container is plt or title is None, "If a specific container is defined, the title has to be None"
     assert X.ndim == 2 and X.shape[1] == 2, "Data must be 2-dimensional"
+    assert centers is None or (centers.ndim == 2 and centers.shape[1] == 2), "Centers must be 2-dimensional"
     if true_labels is None:
         container.scatter(X[:, 0], X[:, 1], c=labels, s=scattersize)
     else:
@@ -200,7 +215,7 @@ def plot_2d_data(X: np.ndarray, labels: np.ndarray = None, centers: np.ndarray =
         unique_labels = np.unique(labels)
         mean_positions = [np.mean(X[labels == pred_lab], axis=0) for pred_lab in unique_labels]
         for i, mp in enumerate(mean_positions):
-            plt.text(mp[0], mp[1], unique_labels[i], fontsize=cluster_ids_font_size)
+            container.text(mp[0], mp[1], unique_labels[i], fontsize=cluster_ids_font_size)
     if centers is not None:
         container.scatter(centers[:, 0], centers[:, 1], s=centers_scattersize, color="red", marker="s")
         if centers_ids_font_size is not None:
@@ -214,11 +229,11 @@ def plot_2d_data(X: np.ndarray, labels: np.ndarray = None, centers: np.ndarray =
     if title is not None:
         plt.title(title)
     if show_plot:
-        container.show()
+        plt.show()
 
 
 def plot_3d_data(X: np.ndarray, labels: np.ndarray = None, centers: np.ndarray = None, true_labels: np.ndarray = None,
-                 show_legend: bool = True, scattersize: float = 10, show_plot: bool = True) -> None:
+                 show_legend: bool = True, scattersize: float = 10, title: str = None, show_plot: bool = True) -> None:
     """
     Plot a three-dimensional data set.
 
@@ -236,10 +251,13 @@ def plot_3d_data(X: np.ndarray, labels: np.ndarray = None, centers: np.ndarray =
         Defines whether a legend should be shown (default: True)
     scattersize : float
         The size of the scatters (default: 10)
+    title : str
+        Title of the plot (default: None)
     show_plot : bool
         Defines whether the plot should directly be plotted (default: True)
     """
-    assert X.ndim == 2 or X.shape[1] == 3, "Data must be 3-dimensional"
+    assert X.ndim == 2 and X.shape[1] == 3, "Data must be 3-dimensional"
+    assert centers is None or (centers.ndim == 2 and centers.shape[1] == 3), "Centers must be 2-dimensional"
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')  # Axes3D(fig)
     if true_labels is None:
@@ -261,13 +279,15 @@ def plot_3d_data(X: np.ndarray, labels: np.ndarray = None, centers: np.ndarray =
     if show_legend and labels is not None:
         unique_labels, cmap, norm = _get_cmap_and_norm(labels)
         _add_legend(fig, unique_labels, cmap, norm)
+    if title is not None:
+        plt.title(title)
     if show_plot:
         plt.show()
 
 
 def plot_image(img_data: np.ndarray, black_and_white: bool = False, image_shape: tuple = None,
-               is_color_channel_last: bool = False, max_value: float = None, min_value: float = None,
-               show_plot: bool = True) -> None:
+               is_color_channel_last: bool = False, max_value: float = None, min_value: float = None, 
+               title: str = None, container: plt.Axes = plt, show_plot: bool = True) -> None:
     """
     Plot an image.
     Color image should occur in the HWC representation (height, width, color channels) if is_color_channel_last is True and in the CHW if is_color_channel_last is False.
@@ -287,6 +307,11 @@ def plot_image(img_data: np.ndarray, black_and_white: bool = False, image_shape:
         maximum pixel value, used for min-max normalization. Is often 255, if None the maximum value in the data set will be used (default: None)
     min_value : float
         maximum pixel value, used for min-max normalization. Is often 0, if None the minimum value in the data set will be used (default: 255)
+    title : str
+        Title of the plot (default: None)
+    container : plt.Axes
+        The container to which the image plot is added.
+        If another container is defined, show_plot should usually be False (default: matplotlib.pyplot)
     show_plot : bool
         Defines whether the plot should directly be plotted (default: True)
 
@@ -298,6 +323,7 @@ def plot_image(img_data: np.ndarray, black_and_white: bool = False, image_shape:
     >>> X = load_optdigits().data
     >>> plot_image(X[0], True, (8, 8), None, 255, 0, show_plot=True)
     """
+    assert container is plt or title is None, "If a specific container is defined, the title has to be None"
     assert img_data.ndim <= 3, "Image data can not have more than 3 dimensions."
     # Data range must match float between [0..1] or int between [0..255] -> use min-max transform
     if max_value is None:
@@ -314,16 +340,19 @@ def plot_image(img_data: np.ndarray, black_and_white: bool = False, image_shape:
         img_data = np.transpose(img_data, (1, 2, 0))
     # Plot original image or a black-and-white version
     if black_and_white:
-        plt.imshow(img_data, cmap="Greys")
+        container.imshow(img_data, cmap="Greys")
     else:
-        plt.imshow(img_data)
-    plt.axis('off')
+        container.imshow(img_data)
+    container.axis('off')
+    if title is not None:
+        plt.title(title)
     if show_plot:
         plt.show()
 
 
 def plot_histogram(X: np.ndarray, labels: np.ndarray = None, density: bool = True, n_bins: int = 100,
-                   show_legend: bool = True, container: plt.Axes = plt, show_plot: bool = True) -> None:
+                   show_legend: bool = True, title: str = None, container: plt.Axes = plt, 
+                   show_plot: bool = True) -> None:
     """
     Plot a histogram.
 
@@ -339,13 +368,19 @@ def plot_histogram(X: np.ndarray, labels: np.ndarray = None, density: bool = Tru
         Number of bins (default: 100)
     show_legend : bool
         Defines whether the legend of the histogram should be shown (default: True)
+    title : str
+        Title of the plot (default: None)
     container : plt.Axes
         The container to which the histogram is added.
         If another container is defined, show_plot should usually be False (default: matplotlib.pyplot)
     show_plot : bool
         Defines whether the plot should directly be plotted (default: True)
     """
-    assert X.ndim == 1, "Data must be 1-dimensional"
+    assert container is plt or title is None, "If a specific container is defined, the title has to be None"
+    assert X.ndim == 1 or X.shape[1] == 1, "Data must be 1-dimensional"
+    # Optional: Get first column of data
+    if X.ndim == 2:
+        X = X[:, 0]
     # Plot histogram
     if labels is not None:
         unique_labels, cmap, norm = _get_cmap_and_norm(labels)
@@ -374,14 +409,16 @@ def plot_histogram(X: np.ndarray, labels: np.ndarray = None, density: bool = Tru
             twin_axis.plot(steps, kde(steps))
     if show_legend and labels is not None:
         _add_legend(container, unique_labels, cmap, norm)
+    if title is not None:
+        plt.title(title)
     if show_plot:
         plt.show()
 
 
 def plot_scatter_matrix(X: np.ndarray, labels: np.ndarray = None, centers: np.ndarray = None,
                         true_labels: np.ndarray = None, density: bool = True, n_bins: int = 100,
-                        show_legend: bool = True, scattersize: float = 10, equal_axis: bool = False,
-                        max_dimensions: int = 10, show_plot: bool = True) -> plt.Axes:
+                        show_legend: bool = True, scattersize: float = 10, title: str = None, 
+                        equal_axis: bool = False, max_dimensions: int = 10, show_plot: bool = True) -> plt.Axes:
     """
     Create a scatter matrix plot.
     Visualizes a 2d scatter plot for each combination of features.
@@ -405,6 +442,8 @@ def plot_scatter_matrix(X: np.ndarray, labels: np.ndarray = None, centers: np.nd
         Defines whether a legend should be shown (default: True)
     scattersize : float
         The size of the scatters (default: 10)
+    title : str
+        Title of the plot (default: None)
     equal_axis : bool
         Defines whether the axes are to be scaled to the same value range (default: False)
     max_dimensions : int
@@ -423,7 +462,7 @@ def plot_scatter_matrix(X: np.ndarray, labels: np.ndarray = None, centers: np.nd
             "[WARNING] Dimensionality of the dataset is larger than 10. Creation of scatter matrix plot will be aborted.")
     # For single dimension only plot histogram
     if X.shape[1] == 1:
-        plot_histogram(X[:, 0], labels, density, n_bins, show_legend, show_plot=show_plot)
+        plot_histogram(X[:, 0], labels, density, n_bins, show_legend, title, show_plot=show_plot)
         if not show_plot:
             return plt.gca()
     else:
@@ -458,6 +497,8 @@ def plot_scatter_matrix(X: np.ndarray, labels: np.ndarray = None, centers: np.nd
                                  equal_axis=False, container=ax, show_plot=False)
         if show_legend and labels is not None:
             _add_legend(fig, unique_labels, cmap, norm)
+        if title is not None:
+            plt.title(title)
         if show_plot:
             plt.show()
         else:

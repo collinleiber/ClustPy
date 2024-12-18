@@ -22,51 +22,51 @@ def _get_data_labels_centers():
 @patch("matplotlib.pyplot.show")  # Used to test plots (show will not be called)
 def test_plot_with_transformation(mock_fig):
     X, L, centers, L_true = _get_data_labels_centers()
-    assert None == plot_with_transformation(X, L, centers, L_true, 1, PCA, True, 11, True, show_plot=True)
-    assert None == plot_with_transformation(X, L, centers, L_true, 2, PCA, True, 11, True, show_plot=True)
-    assert None == plot_with_transformation(X, L, centers, L_true, 3, FastICA, True, 11, True, show_plot=True)
-    # Only check if error is thrown
-    plot_with_transformation(X, L, centers, L_true, 4, FastICA, True, 11, True, show_plot=True)
-    assert True
+    assert None == plot_with_transformation(X, L, centers, L_true, 1, PCA, show_legend=True, scattersize=11, equal_axis=True, title="test", show_plot=True)
+    assert None == plot_with_transformation(X, L, centers, L_true, 2, PCA, show_legend=True, scattersize=11, equal_axis=True, title="test", show_plot=True)
+    assert None == plot_with_transformation(X, L, centers, L_true, 3, FastICA, show_legend=True, scattersize=11, equal_axis=True, title="test", show_plot=True)
+    # Check if this works ('reduced' dim > data dim)
+    assert None == plot_with_transformation(X, L, centers, L_true, X.shape[1] + 1, FastICA, show_legend=True, scattersize=11, equal_axis=True, title="test", show_plot=True)
 
 
 @patch("matplotlib.pyplot.show")  # Used to test plots (show will not be called)
 def test_plot_1d_data(mock_fig):
     X, L, centers, L_true = _get_data_labels_centers()
-    assert None == plot_1d_data(X[:, 0], L, centers[:, 0], L_true, True, show_plot=True)
+    assert None == plot_1d_data(X[:, 0], L, centers[:, 0], L_true, show_legend=True, title="test", show_plot=True)
 
 
 @patch("matplotlib.pyplot.show")  # Used to test plots (show will not be called)
 def test_plot_2d_data(mock_fig):
     X, L, centers, L_true = _get_data_labels_centers()
-    assert None == plot_2d_data(X[:, :2], L, centers[:, :2], L_true, True, 11, True, show_plot=True)
+    assert None == plot_2d_data(X[:, :2], L, centers[:, :2], L_true, show_legend=True, scattersize=11, equal_axis=True, title="test", show_plot=True)
 
 
 @patch("matplotlib.pyplot.show")  # Used to test plots (show will not be called)
 def test_plot_3d_data(mock_fig):
     X, L, centers, L_true = _get_data_labels_centers()
-    assert None == plot_3d_data(X[:, :3], L, centers[:, :3], L_true, True, 11, show_plot=True)
+    assert None == plot_3d_data(X[:, :3], L, centers[:, :3], L_true, show_legend=True, scattersize=11, title="test", show_plot=True)
     plt.figure()  # Create new figure for future plots
 
 
 @patch("matplotlib.pyplot.show")  # Used to test plots (show will not be called)
 def test_plot_histogram(mock_fig):
     X, L, centers, L_true = _get_data_labels_centers()
-    assert None == plot_histogram(X[:, 0], L, True, 50, True, show_plot=True)
+    assert None == plot_histogram(X[:, 0], L, density=True, n_bins=50, show_legend=True, title="test", show_plot=True)
 
 
 @patch("matplotlib.pyplot.show")  # Used to test plots (show will not be called)
 def test_plot_image_using_optdigits_and_nrletters(mock_fig):
     X = load_optdigits().data
-    assert None == plot_image(X[0], True, (8, 8), show_plot=True)
-    X = load_nrletters().data
-    assert None == plot_image(X[0], False, (9, 7, 3), 255, 0, show_plot=True)
+    assert None == plot_image(X[0], True, (8, 8), title="test", show_plot=True)
+    dataset = load_nrletters()
+    assert None == plot_image(dataset.data[0], False, (9, 7, 3), is_color_channel_last=True, max_value=255, min_value=0, title="test", show_plot=True)
+    assert None == plot_image(dataset.images[0], False, (9, 7, 3), is_color_channel_last=False, max_value=255, min_value=0, title="test", show_plot=True)
 
 
 @patch("matplotlib.pyplot.show")  # Used to test plots (show will not be called)
 def test_plot_scatter_matrix(mock_fig):
     X, L, centers, L_true = _get_data_labels_centers()
-    plot_scatter_matrix(X, L, centers, L_true, True, 50, True, 11, True, max_dimensions=12,
-                        show_plot=True)
+    plot_scatter_matrix(X, L, centers, L_true, density=True, n_bins=50, show_legend=True, scattersize=11, equal_axis=True, max_dimensions=12,
+                        title="test", show_plot=True)
     # Only check if error is thrown
     assert True
