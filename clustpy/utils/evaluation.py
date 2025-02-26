@@ -157,7 +157,7 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
     assert evaluation_metrics is not None or add_runtime or add_n_clusters, \
         "Either evaluation metrics must be defined or add_runtime/add_n_clusters must be True"
     assert type(aggregation_functions) is list or type(
-        aggregation_functions) is tuple, "aggregation_functions must be list or tuple"
+        aggregation_functions) is tuple, "aggregation_functions must be list or tuple. Yout input is of type {0}".format(type(aggregation_functions))
     if type(evaluation_algorithms) is not list:
         evaluation_algorithms = [evaluation_algorithms]
     if type(evaluation_metrics) is not list and evaluation_metrics is not None:
@@ -166,6 +166,10 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
         save_labels_path = save_labels_path + ".csv"
     assert save_labels_path is None or len(
         save_labels_path.split(".")) == 2, "save_labels_path must only contain a single dot. E.g., NAME.csv"
+    if save_path is not None and "." not in save_path:
+        save_path = save_path + ".csv"
+    assert save_path is None or len(
+        save_path.split(".")) == 2, "save_path must only contain a single dot. E.g., NAME.csv"
     # Use same seed for each algorithm
     random_state = check_random_state(random_state)
     seeds = random_state.choice(10000, n_repetitions, replace=False)
@@ -379,7 +383,10 @@ def evaluate_multiple_datasets(evaluation_datasets: list, evaluation_algorithms:
     save_path : str
         The path where the final DataFrame should be saved as csv. If None, the DataFrame will not be saved (default: None)
     save_intermediate_results : bool
-        Defines whether the result of each data set should be separately saved. Useful if the evaluation takes a lot of time (default: False)
+        Defines whether the result of each data set should be separately saved. 
+        Useful if the evaluation takes a lot of time.
+        The files will be saved as [save_path]_[DATASET_NAME]. 
+        This implies that save_path has to be defined if save_intermediate_results is set to True (default: False)
     save_labels_path : str
         The path where the clustering labels should be saved as csv. If None, the labels will not be saved (default: None)
     random_state : np.random.RandomState | int
@@ -434,6 +441,10 @@ def evaluate_multiple_datasets(evaluation_datasets: list, evaluation_algorithms:
         save_labels_path = save_labels_path + ".csv"
     assert save_labels_path is None or len(
         save_labels_path.split(".")) == 2, "save_labels_path must only contain a single dot. E.g., NAME.csv"
+    if save_path is not None and "." not in save_path:
+        save_path = save_path + ".csv"
+    assert save_path is None or len(
+        save_path.split(".")) == 2, "save_path must only contain a single dot. E.g., NAME.csv"
     data_names = [d.name for d in evaluation_datasets]
     assert max(
         np.unique(data_names, return_counts=True)[1]) == 1, "Some names of your datasets do not seem to be unique!"
@@ -555,22 +566,25 @@ def _get_data_and_labels_from_evaluation_dataset(data_input: np.ndarray, data_lo
     return X, labels_true, X_test, labels_true_test
 
 
-def evaluation_df_to_latex_table(df: pd.DataFrame, output_path: str, use_std: bool = True, best_in_bold: bool = True,
-                                 second_best_underlined: bool = True, color_by_value: str = None,
+def evaluation_df_to_latex_table(df: pd.DataFrame, relevant_row : str | int= "mean", output_path: str = None, use_std: bool = True, 
+                                 best_in_bold: bool = True, second_best_underlined: bool = True, color_by_value: str = None,
                                  higher_is_better: list = None, in_percent: int = True,
-                                 decimal_places: int = 1) -> None:
+                                 decimal_places: int = 1) -> str:
     """
     Convert the resulting dataframe of an evaluation into a latex table.
     Note that the latex package booktabs is required, so usepackage{booktabs} must be included in the latex file.
-    This method will only consider the mean values. Therefore, note that "mean" must be included in the aggregations!
+    This method will only consider the values contained in the row with the name relevant_row.
+    The default relevant_row is "mean", which implies that the mean was used as an aggregation function when creating the dataframe.
     If "std" is also contained in the dataframe (and use_std is True) this value will also be added by using plusminus.
 
     Parameters
     ----------
     df : pd.DataFrame
         The pandas dataframe. Can also be a string that contains the path to the saved dataframe
+    relevant_row : str | int
+        The name of the row in the df that is used to create the latex table (default: "mean")
     output_path : std
-        The path were the resulting latex table text file will be stored
+        The path were the resulting latex table text file will be stored (default: None)
     use_std : bool
         Defines if the standard deviation (std) should also be added to the latex table (default: True)
     best_in_bold : bool
@@ -590,6 +604,11 @@ def evaluation_df_to_latex_table(df: pd.DataFrame, output_path: str, use_std: bo
         If true, all values, except n_clusters and runtime, will be converted to percentages -> all values will be multiplied by 100 (default: True)
     decimal_places : int
         Number of decimal places that should be used in the latex table (default: 1)
+
+    Returns
+    -------
+    output : str
+        The created latex string
     """
     # Load dataframe
     assert type(df) == pd.DataFrame or type(df) == str, "Type of df must be pandas DataFrame or string (path to file)"
@@ -611,83 +630,86 @@ def evaluation_df_to_latex_table(df: pd.DataFrame, output_path: str, use_std: bo
     assert higher_is_better is None or len(higher_is_better) == len(
         metrics), "Length of higher_is_better and the number of metrics does not match. higher_is_better = {0} (length {1}), metrics = {2} (length {3})".format(
         higher_is_better, len(higher_is_better), metrics, len(metrics))
-    # Write output
-    with open(output_path, "w") as f:
-        # Write standard table
-        f.write(
-            "\\begin{table}\n\\centering\n\\caption{TODO}\n\\resizebox{1\\textwidth}{!}{\n\\begin{tabular}{l|")
-        if multiple_datasets:
-            f.write("l|" + "c" * len(algorithms) + "}\n\\toprule\n\\textbf{Dataset} & ")
-        else:
-            f.write("c" * len(algorithms) + "}\n\\toprule\n")
-        f.write("\\textbf{Metric} & " + " & ".join([a.replace("_", "\\_") for a in algorithms]) + "\\\\\n\\midrule\n")
-        # Write values into table
-        for j, d in enumerate(datasets):
-            for i, m in enumerate(metrics):
-                # Check if a higher value is better for this metric
-                metric_is_higher_better = (m != "runtime") if higher_is_better is None else higher_is_better[i]
-                # Escape underscore that could be contained in metric name
-                m_write = m.replace("_", "\\_")
-                # Write name of dataset and metric
-                if multiple_datasets:
-                    if i == 0:
-                        # Escape underscore that could be contained in dataset name
-                        to_write = d.replace("_", "\\_") + " & " + m_write
-                    else:
-                        to_write = "& " + m_write
+    # Create string
+    output = ""
+    # Create string for standard table
+    output += "\\begin{table}\n\\centering\n\\caption{TODO}\n\\resizebox{1\\textwidth}{!}{\n\\begin{tabular}{l|"
+    if multiple_datasets:
+        output += "l|" + "c" * len(algorithms) + "}\n\\toprule\n\\textbf{Dataset} & "
+    else:
+        output += "c" * len(algorithms) + "}\n\\toprule\n"
+    output += "\\textbf{Metric} & " + " & ".join([a.replace("_", "\\_") for a in algorithms]) + "\\\\\n\\midrule\n"
+    # Write values into table
+    for j, d in enumerate(datasets):
+        for i, m in enumerate(metrics):
+            # Check if a higher value is better for this metric
+            metric_is_higher_better = (m != "runtime") if higher_is_better is None else higher_is_better[i]
+            # Escape underscore that could be contained in metric name
+            m_write = m.replace("_", "\\_")
+            # Write name of dataset and metric
+            if multiple_datasets:
+                if i == 0:
+                    # Escape underscore that could be contained in dataset name
+                    to_write = d.replace("_", "\\_") + " & " + m_write
                 else:
-                    to_write = m_write
-                # Get all values from the experiments (are stored separately to calculated min values)
-                all_values = []
-                for a in algorithms:
-                    if multiple_datasets:
-                        mean_value = df[a, m][d, "mean"]
-                    else:
-                        mean_value = df[a, m]["mean"]
-                    if in_percent and m not in ["n_clusters", "runtime"]:
-                        mean_value *= 100
-                    mean_value = round(mean_value, decimal_places)
-                    all_values.append(mean_value)
-                all_values_sorted = np.unique(all_values)  # automatically sorted
-                for k, a in enumerate(algorithms):
-                    mean_value = all_values[k]
-                    # If standard deviation is contained in the dataframe, information will be added
-                    if use_std and std_contained:
-                        if multiple_datasets:
-                            std_value = df[a, m][d, "std"]
-                        else:
-                            std_value = df[a, m]["std"]
-                        if in_percent and m not in ["n_clusters", "runtime"]:
-                            std_value *= 100
-                        std_value = round(std_value, decimal_places)
-                        value_write = "$" + str(mean_value) + " \\pm " + str(std_value) + "$"
-                    else:
-                        value_write = "$" + str(mean_value) + "$"
-                    # Optional: Write best value in bold and second best underlined
-                    if best_in_bold and ((mean_value == all_values_sorted[-1] and metric_is_higher_better) or (
-                            mean_value == all_values_sorted[0] and not metric_is_higher_better)):
-                        value_write = "\\bm{" + value_write + "}"
-                    elif second_best_underlined and (
-                            (mean_value == all_values_sorted[-2] and metric_is_higher_better) or (
-                            mean_value == all_values_sorted[1] and not metric_is_higher_better)):
-                        value_write = "\\underline{" + value_write + "}"
-                    # Optional: Color cells by value difference
-                    if color_by_value is not None:
-                        if all_values_sorted[-1] != all_values_sorted[0]:
-                            color_saturation = round((mean_value - all_values_sorted[0]) / (
-                                    all_values_sorted[-1] - all_values_sorted[0]) * 65) + 5  # value between 5 and 70
-                        else:
-                            color_saturation = 0
-                        assert type(color_saturation) is int, "color_saturation must be an int but is {0}".format(
-                            type(color_saturation))
-                        value_write = "\\cellcolor{" + color_by_value + "!" + str(color_saturation) + "}" + value_write
-                    to_write += " & " + value_write
-                to_write += "\\\\\n"
-                f.write(to_write)
-            if j != len(datasets) - 1:
-                f.write("\\midrule\n")
+                    to_write = "& " + m_write
             else:
-                f.write("\\bottomrule\n\\end{tabular}}\n\\end{table}")
+                to_write = m_write
+            # Get all values from the experiments (are stored separately to calculated min values)
+            all_values = []
+            for a in algorithms:
+                if multiple_datasets:
+                    relevant_value = df[a, m][d, relevant_row]
+                else:
+                    relevant_value = df[a, m][relevant_row]
+                if in_percent and m not in ["n_clusters", "runtime"]:
+                    relevant_value *= 100
+                relevant_value = round(relevant_value, decimal_places)
+                all_values.append(relevant_value)
+            all_values_sorted = np.unique(all_values)  # automatically sorted
+            for k, a in enumerate(algorithms):
+                relevant_value = all_values[k]
+                # If standard deviation is contained in the dataframe, information will be added
+                if use_std and std_contained:
+                    if multiple_datasets:
+                        std_value = df[a, m][d, "std"]
+                    else:
+                        std_value = df[a, m]["std"]
+                    if in_percent and m not in ["n_clusters", "runtime"]:
+                        std_value *= 100
+                    std_value = round(std_value, decimal_places)
+                    value_write = "$" + str(relevant_value) + " \\pm " + str(std_value) + "$"
+                else:
+                    value_write = "$" + str(relevant_value) + "$"
+                # Optional: Write best value in bold and second best underlined
+                if best_in_bold and ((relevant_value == all_values_sorted[-1] and metric_is_higher_better) or (
+                        relevant_value == all_values_sorted[0] and not metric_is_higher_better)):
+                    value_write = "\\bm{" + value_write + "}"
+                elif second_best_underlined and (
+                        (relevant_value == all_values_sorted[-2] and metric_is_higher_better) or (
+                        relevant_value == all_values_sorted[1] and not metric_is_higher_better)):
+                    value_write = "\\underline{" + value_write + "}"
+                # Optional: Color cells by value difference
+                if color_by_value is not None:
+                    if all_values_sorted[-1] != all_values_sorted[0]:
+                        color_saturation = round((relevant_value - all_values_sorted[0]) / (
+                                all_values_sorted[-1] - all_values_sorted[0]) * 65) + 5  # value between 5 and 70
+                    else:
+                        color_saturation = 0
+                    assert type(color_saturation) is int, "color_saturation must be an int but is {0}".format(
+                        type(color_saturation))
+                    value_write = "\\cellcolor{" + color_by_value + "!" + str(color_saturation) + "}" + value_write
+                to_write += " & " + value_write
+            to_write += "\\\\\n"
+            output += to_write
+        if j != len(datasets) - 1:
+            output += "\\midrule\n"
+        else:
+            output += "\\bottomrule\n\\end{tabular}}\n\\end{table}"
+    if output_path != None:
+        with open(output_path, "w") as f:
+            f.write(output)
+    return output
 
 
 class EvaluationDataset():

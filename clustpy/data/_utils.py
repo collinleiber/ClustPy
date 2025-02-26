@@ -2,12 +2,20 @@ try:
     import requests
 except:
     print("[WARNING] Could not import requests in clustpy.data._utils. Please install requests by 'pip install requests' if necessary")
+try:
+    from nltk.stem import SnowballStemmer
+except:
+    print(
+        "[WARNING] Could not import nltk in clustpy.data.real_world_data to use the SnowballStemmer. Please install nltk by 'pip install nltk' if necessary")
 import numpy as np
 import urllib.request
 import os
 from pathlib import Path
 import ssl
 from PIL import Image
+from sklearn.feature_extraction.text import TfidfTransformer, CountVectorizer
+from sklearn.feature_selection import VarianceThreshold
+
 
 DEFAULT_DOWNLOAD_PATH = str(Path.home() / "Downloads/clustpy_datafiles")
 
@@ -193,6 +201,89 @@ def _load_image_data(image: str, image_size: tuple, color_image: bool) -> np.nda
         image_size[0], image_size[1], 3), "Size of image is not correct. Should be {0} but is {1}".format(image_size,
                                                                                                           image_data.shape)
     return image_data
+
+
+class _StemmedCountVectorizer(CountVectorizer):
+    """
+    Helper class to apply the stemming when counting words in a corpus. Combines the sklearn CountVectorizer with the nltk SnowballStemmer.
+    See: https://stackoverflow.com/questions/36182502/add-stemming-support-to-countvectorizer-sklearn
+    """
+
+    def build_analyzer(self):
+        """
+        Custom build_analyzer method. Calls the build_analyzer of the CountVectorizer parent class and then applies
+        SnowballStemmer('english')
+
+        Returns
+        -------
+        stemmed_words : Generator
+            the stemmed words in the document
+        """
+        stemmer = SnowballStemmer('english')
+        analyzer = super(_StemmedCountVectorizer, self).build_analyzer()
+        stemmed_words = lambda doc: (stemmer.stem(word) for word in analyzer(doc))
+        return stemmed_words
+
+
+def _transform_text_data(data: np.ndarray, use_tfidf: bool, use_stemming: bool, use_stop_words: bool, max_df: float | int, 
+                         min_df: float | int, max_features: int, min_variance : float, sublinear_tf: bool, 
+                         data_all: np.ndarray = None) -> np.ndarray:
+    """
+    Transform a set of texts into a data matrix.
+    Result can be either a raw count matrix or the result of tf-idf.
+    The pipeline is: creation of the count matrix -> (optional) remove words/features with low variance -> (optional) apply tf-idf
+
+    Parameters
+    ----------
+    data : np.ndarray
+        The given data set containing the raw texts
+    use_tfidf : bool
+        If true, tf-idf will be applied as the last step of the pipeline
+    use_stemming : bool
+        If true, the SnowballStemmer from nltk will be used when creating the count matrix
+    use_stop_words : bool
+        If true, the list of English stopwords from sklearn CountVectorizer will be used
+    max_df : float | int
+        Ignore words that have a document frequency strictly higher than max_df. 
+        If float, the parameter represents a proportion of documents, integer corresponds to absolute counts (see sklearn CountVectorizer)
+    min_df : float | int
+        Ignore words that have a document frequency strictly lower than min_df.
+        If float, the parameter represents a proportion of documents, integer corresponds to absolute counts (see sklearn CountVectorizer)
+    max_features : int
+        If not None, the resulting count matric will ony contain the top max_features ordered by term frequency across the corpus (see sklearn CountVectorizer).
+        Note that this value could be further reduced if min_variance is smaller than one
+    min_variance : float
+        Features with a variance lower than min_variance will be removed (see sklearn VarianceThreshold). 
+        The default is to keep all features with non-zero variance, i.e. remove only the features that have the same value in all samples 
+    sublinear_tf : bool
+        Apply sublinear term frequency scaling, i.e. replace tf with 1 + log(tf) (see sklearn TfidfTransformer)
+
+    Returns
+    -------
+    data : np.ndarray
+        The resulting data array
+    """
+    if data_all is None:
+        data_all = data
+    # Create count matrix
+    if use_stemming:
+        vectorizer = _StemmedCountVectorizer(dtype=np.float64, stop_words="english" if use_stop_words else None, min_df=min_df, max_df=max_df, max_features=max_features)
+    else:
+        vectorizer = CountVectorizer(dtype=np.float64, stop_words="english" if use_stop_words else None, min_df=min_df, max_df=max_df, max_features=max_features)
+    vectorizer.fit(data_all)
+    data_sparse = vectorizer.transform(data)
+    # (Optional) Check for variance threshold
+    if min_variance != 0:
+        selector = VarianceThreshold(min_variance)
+        selector.fit(data_all)
+        data_sparse = selector.transform(data_sparse)
+    # (Optional) Apply tf-idf
+    if use_tfidf:
+        tfidf = TfidfTransformer(sublinear_tf=sublinear_tf)
+        tfidf.fit(data_all)
+        data_sparse = tfidf.transform(data_sparse)
+    data = np.asarray(data_sparse.todense())
+    return data
 
 
 def flatten_images(data: np.ndarray, format: str) -> np.ndarray:

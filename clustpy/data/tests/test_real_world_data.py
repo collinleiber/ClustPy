@@ -1,5 +1,5 @@
 from clustpy.data.tests._helpers_for_tests import _helper_test_data_loader
-from clustpy.data import load_iris, load_wine, load_breast_cancer, load_olivetti_faces, load_newsgroups, load_reuters, \
+from clustpy.data import load_iris, load_wine, load_breast_cancer, load_olivetti_faces, load_newsgroups, load_rcv1, \
     load_imagenet_dog, load_imagenet10, load_coil20, load_coil100, load_webkb
 from pathlib import Path
 import os
@@ -55,13 +55,13 @@ def test_load_newsgroups():
 
 @pytest.mark.data
 @pytest.mark.largedata
-def test_load_reuters():
+def test_load_rcv1():
     # Full data set
-    _helper_test_data_loader(load_reuters, 685071, 2000, 4, dataloader_params={"subset": "all"})
+    _helper_test_data_loader(load_rcv1, 685071, 2000, 4, dataloader_params={"subset": "all"})
     # Train data set
-    _helper_test_data_loader(load_reuters, 19806, 2000, 4, dataloader_params={"subset": "train"})
+    _helper_test_data_loader(load_rcv1, 19806, 2000, 4, dataloader_params={"subset": "train"})
     # Test data set and different number of features
-    _helper_test_data_loader(load_reuters, 665265, 500, 4, dataloader_params={"subset": "test", "n_features": 500})
+    _helper_test_data_loader(load_rcv1, 665265, 500, 4, dataloader_params={"subset": "test", "n_features": 500})
 
 
 @pytest.mark.data
@@ -135,3 +135,4 @@ def test_load_coil100():
 @pytest.mark.data
 def test_load_webkb():
     _helper_test_data_loader(load_webkb, 1041, 323, [4, 4], dataloader_params={"downloads_path": TEST_DOWNLOAD_PATH})
+    _helper_test_data_loader(load_webkb, 1041, 323, [4, 4], dataloader_params={"downloads_path": TEST_DOWNLOAD_PATH, "use_categories": None, "use_universities": None})

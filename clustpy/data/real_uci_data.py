@@ -1189,3 +1189,157 @@ def load_cmu_faces(return_X_y: bool = False, downloads_path: str = None) -> Bunc
     else:
         return Bunch(dataset_name="CMUFace", data=data_flatten, target=labels, images=data_image, image_format="HW",
                      classes=[names, positions, expressions, eyes])
+
+
+def load_gene_expression_cancer_rna_seq(return_X_y: bool = False, downloads_path: str = None):
+    """
+    Load the Gene Expression Cancer RNA-SEQ data set. It consists of 801 samples belonging to one of 5 classes.
+    N=801, d=20531, k=5.
+
+    Parameters
+    ----------
+    return_X_y : bool
+        If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
+
+    Returns
+    -------
+    bunch : Bunch
+        A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
+        Alternatively, if return_X_y is True two arrays will be returned:
+        the data numpy array (801 x 20531), the labels numpy array (801)
+
+    References
+    -------
+    https://archive.ics.uci.edu/dataset/401/gene+expression+cancer+rna+seq
+    """
+    directory = _get_download_dir(downloads_path) + "/GeneExpressionRNASEQ/"
+    filename = directory + "gene+expression+cancer+rna+seq.zip"
+    if not os.path.isfile(filename):
+        if not os.path.isdir(directory):
+            os.mkdir(directory)
+        _download_file("https://archive.ics.uci.edu/static/public/401/gene+expression+cancer+rna+seq.zip",
+                       filename)
+        # Unpack zipfile
+        with zipfile.ZipFile(filename, 'r') as zipf:
+            zipf.extractall(directory)
+        with tarfile.open(directory + "TCGA-PANCAN-HiSeq-801x20531.tar.gz", "r:gz") as tar:
+            tar.extractall(directory)
+    # Load data and labels
+    data = np.genfromtxt(directory + "TCGA-PANCAN-HiSeq-801x20531/data.csv", delimiter=",")[1:,1:]
+    labels_raw = np.genfromtxt(directory + "TCGA-PANCAN-HiSeq-801x20531/labels.csv", delimiter=",", dtype=str)[1:,1]
+    LE = LabelEncoder()
+    labels = LE.fit_transform(labels_raw)
+    # Return values
+    if return_X_y:
+        return data, labels
+    else:
+        return Bunch(dataset_name="GeneExpressionCancerRNA-SEQ", data=data, target=labels)
+
+
+def load_sport_articles(return_X_y: bool = False, downloads_path: str = None):
+    """
+    Load the Sport Articles data set. It consists of 1000 samples belonging to one of 2 classes (objective or subjective).
+    We only consider features that correspond to specific frequencies and, therefore, ignore the attributes 
+    totalWordsCount, sentence1st, sentencelast and txtcomplexity.
+    N=1000, d=55, k=2.
+
+    Parameters
+    ----------
+    return_X_y : bool
+        If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
+
+    Returns
+    -------
+    bunch : Bunch
+        A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
+        Alternatively, if return_X_y is True two arrays will be returned:
+        the data numpy array (1000 x 55), the labels numpy array (1000)
+
+    References
+    -------
+    https://archive.ics.uci.edu/dataset/450/sports+articles+for+objectivity+analysis
+    """
+    directory = _get_download_dir(downloads_path) + "/SportArticles/"
+    filename = directory + "sports+articles+for+objectivity+analysis.zip"
+    if not os.path.isfile(filename):
+        if not os.path.isdir(directory):
+            os.mkdir(directory)
+        _download_file("https://archive.ics.uci.edu/static/public/450/sports+articles+for+objectivity+analysis.zip",
+                       filename)
+        # Unpack zipfile
+        with zipfile.ZipFile(filename, 'r') as zipf:
+            zipf.extractall(directory)
+    # Parse excel file (can not be read by Pandas)
+    data = np.zeros((1000, 55), dtype=int)
+    labels = np.zeros(1000, dtype=np.int32)
+    row = -2 # first row is the header and should be skipped
+    column = 0
+    with open(directory + "features.xls", "r") as f:
+        for _, line in enumerate(f.readlines()):
+            if "</Table>" in line:
+                # Next table is not relevant for the data
+                break
+            if "<Row ss" in line:
+                # Next row starts
+                column = 0
+                row += 1
+            if row >= 0 and "<Cell>" in line:
+                if column == 2:
+                    assert "objective" in line or "subjective" in line
+                    labels[row] = 0 if "objective" in line else 1
+                if column > 3 and column < 59:
+                    data[row, column - 4] = int(line.split('"Number">')[1].split('</Data>')[0])
+                column += 1
+    # Return values
+    if return_X_y:
+        return data, labels
+    else:
+        return Bunch(dataset_name="SportArticles", data=data, target=labels)
+
+
+def load_wholesale_customers(return_X_y: bool = False, downloads_path: str = None):
+    """
+    Load the Wholesale Customers data set. It consists of 440 samples and can be grouped in two different ways:
+    Either two classes based on the channel (Horeca or Retail) or three classes based on the region (Lisbon, Oporto or Other region).
+    N=440, d=6, k=[2, 3].
+
+    Parameters
+    ----------
+    return_X_y : bool
+        If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
+
+    Returns
+    -------
+    bunch : Bunch
+        A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
+        Alternatively, if return_X_y is True two arrays will be returned:
+        the data numpy array (440 x 6), the labels numpy array (440 x 2)
+
+    References
+    -------
+    https://archive.ics.uci.edu/dataset/292/wholesale+customers
+    """
+    directory = _get_download_dir(downloads_path) + "/WholeCustomers/"
+    filename = directory + "wholesale+customers.zip"
+    if not os.path.isfile(filename):
+        if not os.path.isdir(directory):
+            os.mkdir(directory)
+        _download_file("https://archive.ics.uci.edu/static/public/292/wholesale+customers.zip",
+                       filename)
+        # Unpack zipfile
+        with zipfile.ZipFile(filename, 'r') as zipf:
+            zipf.extractall(directory)
+    wholesale = np.genfromtxt(directory + "Wholesale customers data.csv", delimiter=",", skip_header=True)
+    labels = wholesale[:,:2] - 1
+    data = wholesale[:,2:]
+    # Return values
+    if return_X_y:
+        return data, labels
+    else:
+        return Bunch(dataset_name="WholesaleCustomers", data=data, target=labels)

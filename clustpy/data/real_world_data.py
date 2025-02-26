@@ -1,15 +1,5 @@
-try:
-    from nltk.stem import SnowballStemmer
-except:
-    print(
-        "[WARNING] Could not import nltk in clustpy.data.real_world_data. Please install nltk by 'pip install nltk' if necessary")
-try:
-    from PIL import Image
-except:
-    print(
-        "[WARNING] Could not import PIL in clustpy.data.real_world_data. Please install PIL by 'pip install Pillow' if necessary")
 from clustpy.data._utils import _download_file, _get_download_dir, _download_file_from_google_drive, _load_image_data, \
-    flatten_images
+    flatten_images, _transform_text_data
 import os
 import numpy as np
 import zipfile
@@ -19,8 +9,6 @@ from sklearn.datasets import fetch_20newsgroups, fetch_rcv1, load_iris as sk_loa
     load_breast_cancer as sk_load_breast_cancer, fetch_olivetti_faces
 from scipy.io import loadmat
 import re
-from sklearn.feature_extraction.text import TfidfTransformer, CountVectorizer, TfidfVectorizer
-from sklearn.feature_selection import VarianceThreshold
 from sklearn.datasets._base import Bunch
 
 # More datasets https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/multiclass.html#usps
@@ -149,10 +137,12 @@ def load_olivetti_faces(return_X_y: bool = False) -> Bunch:
         return dataset
 
 
-def load_newsgroups(subset: str = "all", n_features: int = 2000, return_X_y: bool = False) -> Bunch:
+def load_newsgroups(subset: str = "all", use_tfidf: bool = True, use_stemming: bool = True, use_stop_words: bool = True, 
+                    max_df: float | int = 1., min_df: float | int = 1, max_features: int = 2000, min_variance : float = 0., 
+                    sublinear_tf: bool = False, return_X_y: bool = False) -> Bunch:
     """
     Load the 20 newsgroups data set. It consists of a collection of 18846 newsgroup documents, partitioned
-    (nearly) evenly across 20 different newsgroups. The documents are converted into feature vectors using TF-IDF.
+    (nearly) evenly across 20 different newsgroups. The documents are usually converted into feature vectors using tf-idf.
     The data set is composed of 11314 training and 7532 test documents.
     N=18846, d=2000, k=20 using the default settings.
 
@@ -160,8 +150,26 @@ def load_newsgroups(subset: str = "all", n_features: int = 2000, return_X_y: boo
     ----------
     subset : str
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
-    n_features : int
-        number of features used by TF-IDF (default: 2000)
+    use_tfidf : bool
+        If true, tf-idf will be applied as the last step of the pipeline (default: True)
+    use_stemming : bool
+        If true, the SnowballStemmer from nltk will be used when creating the count matrix (default: True)
+    use_stop_words : bool
+        If true, the list of English stopwords from sklearn CountVectorizer will be used (default: True)
+    max_df : float | int
+        Ignore words that have a document frequency strictly higher than max_df. 
+        If float, the parameter represents a proportion of documents, integer corresponds to absolute counts (see sklearn CountVectorizer) (default: 1.0)
+    min_df : float | int
+        Ignore words that have a document frequency strictly lower than min_df.
+        If float, the parameter represents a proportion of documents, integer corresponds to absolute counts (see sklearn CountVectorizer) (default: 1)
+    max_features : int
+        If not None, the resulting count matric will ony contain the top max_features ordered by term frequency across the corpus (see sklearn CountVectorizer).
+        Note that this value could be further reduced if min_variance is smaller than one (default: 2000)
+    min_variance : float
+        Features with a variance lower than min_variance will be removed (see sklearn VarianceThreshold). 
+        The default is to keep all features with non-zero variance, i.e. remove only the features that have the same value in all samples (default: 0.)
+    sublinear_tf : bool
+        Apply sublinear term frequency scaling, i.e. replace tf with 1 + log(tf) (see sklearn TfidfTransformer) (default: False)
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
 
@@ -178,22 +186,24 @@ def load_newsgroups(subset: str = "all", n_features: int = 2000, return_X_y: boo
     http://qwone.com/~jason/20Newsgroups/
     """
     newsgroups = fetch_20newsgroups(subset=subset, remove=('headers', 'footers', 'quotes'))
-    vectorizer = TfidfVectorizer(max_features=n_features, dtype=np.float64, sublinear_tf=True)
-    data_sparse = vectorizer.fit_transform(newsgroups.data)
-    data = np.asarray(data_sparse.todense())
+    data_raw = newsgroups.data
+    # Get all data so that transformations can be applied to all possible subsets
+    data_all = fetch_20newsgroups(subset="all", remove=('headers', 'footers', 'quotes')).data if subset != "all" else data_raw
+    data = _transform_text_data(data_raw, use_tfidf, use_stemming, use_stop_words, max_df, min_df, max_features, min_variance, 
+                                sublinear_tf, data_all)
     if return_X_y:
         return data, newsgroups.target
     else:
         return Bunch(dataset_name="20Newsgroups", data=data, target=newsgroups.target)
 
 
-def load_reuters(subset: str = "all", n_features: int = 2000, categories: tuple = ("CCAT", "GCAT", "MCAT", "ECAT"),
+def load_rcv1(subset: str = "all", n_features: int = 2000, categories: tuple = ("CCAT", "GCAT", "MCAT", "ECAT"),
                  return_X_y: bool = False) -> Bunch:
     """
-    Load the Reuters data set. It consists of over 800000 manually categorized newswire stories made available by Reuters,
-    Ltd. Usually only a subset of the categories is used. Those categories are defined by the attribute 'categories'.
-    We use only those articles that belong to a single category. Further, we only use the n_features most frequent
-    features.
+    Load the RCV1 data set. It consists of over 800000 manually categorized newswire stories made available by rcv1,
+    Ltd. The non-zero values in the data array correspond to cosine-normalized, log tf-idf vectors.
+    Usually only a subset of the categories is used. Those categories are defined by the attribute 'categories'.
+    We use only those articles that belong to a single category. Further, we only use the n_features features with the largest sum.
     The data set is composed of 19806 training and 665265 test documents using the default settings.
     N=685071, d=2000, k=4 using the default settings.
 
@@ -224,28 +234,43 @@ def load_reuters(subset: str = "all", n_features: int = 2000, categories: tuple 
     Lewis, David D., et al. "Rcv1: A new benchmark collection for text categorization research." Journal of machine
     learning research 5.Apr (2004): 361-397.
     """
-    reuters = fetch_rcv1(subset=subset)
+    def _get_single_label_documents(data, labels, relevant_cats):
+        filtered_labels = labels[:, relevant_cats]
+        sum_of_labelings = np.sum(filtered_labels, axis=1)
+        single_doc_ids = np.where(sum_of_labelings == 1)[0]
+        # Get category of these documents
+        labels = np.argmax(filtered_labels[single_doc_ids], axis=1)
+        labels = np.asarray(labels)[:, 0]
+        for i, cat in enumerate(relevant_cats):
+            labels[labels == cat] = i
+        data = data[single_doc_ids]
+        return data, labels
+    
+    def _get_columns_with_biggest_sum(data, n_features):
+        frequencies = np.asarray(np.sum(data, axis=0))[0]
+        sorted_frequencies = np.argsort(frequencies)[::-1]
+        selected_features = sorted_frequencies[:n_features]
+        return selected_features
+
+    rcv1 = fetch_rcv1(subset=subset)
+    assert all([cat in rcv1.target_names for cat in categories]), "Some of the specified categories are not contained in the RCV1 dataset."
     # Get samples with relevant main categories
-    relevant_cats = [i for i, tn in enumerate(reuters.target_names) if tn in categories]
-    filtered_labels = reuters.target[:, relevant_cats]
+    relevant_cats = [i for i, tn in enumerate(rcv1.target_names) if tn in categories]
     # Only get documents with single category
-    sum_of_labelings = np.sum(filtered_labels, axis=1)
-    single_doc_ids = np.where(sum_of_labelings == 1)[0]
-    # Get category of these documents
-    labels = np.argmax(filtered_labels[single_doc_ids], axis=1)
-    labels = np.asarray(labels)[:, 0]
-    for i, cat in enumerate(relevant_cats):
-        labels[labels == cat] = i
+    data, labels = _get_single_label_documents(rcv1.data, rcv1.target, relevant_cats)
     # Get most frequent columns
-    reuters_data = reuters.data[single_doc_ids]
-    frequencies = np.asarray(np.sum(reuters_data, axis=0))[0]
-    sorted_frequencies = np.argsort(frequencies)[::-1]
-    selected_features = sorted_frequencies[:n_features]
-    data = np.asarray(reuters_data[:, selected_features].todense())
+    if subset == "all":
+        selected_features = _get_columns_with_biggest_sum(data, n_features)
+    else:
+        rcv1_all = fetch_rcv1(subset="all")
+        data_all, _ = _get_single_label_documents(rcv1_all.data, rcv1_all.target, relevant_cats)
+        selected_features = _get_columns_with_biggest_sum(data_all, n_features)
+    # Final data array
+    data = np.asarray(data[:, selected_features].todense())
     if return_X_y:
         return data, labels
     else:
-        return Bunch(dataset_name="Reuters", data=data, target=labels)
+        return Bunch(dataset_name="RCV1", data=data, target=labels)
 
 
 """
@@ -560,29 +585,47 @@ Load WebKB
 
 
 def load_webkb(use_universities: tuple = ("cornell", "texas", "washington", "wisconsin"),
-               use_categories: tuple = ("course", "faculty", "project", "student"), remove_headers: bool = True,
-               min_doc_frequency: float = 0.01, min_variance: float = 0.25, return_X_y: bool = False,
+               use_categories: tuple = ("course", "faculty", "project", "student"), use_tfidf: bool = True, 
+               use_stemming: bool = True, use_stop_words: bool = True, max_df: float | int = 1., 
+               min_df: float | int = 0.01, max_features: int = None, min_variance : float = 0.25, 
+               sublinear_tf: bool = False, remove_headers: bool = True, return_X_y: bool = False, 
                downloads_path: str = None) -> Bunch:
     """
     Load the WebKB data set. It consists of 1041 Html documents from different universities (default: "cornell", "texas",
     "washington" and "wisconsin"). These web pages have a specified category (default: "course", "faculty", "project",
     "student"). For more information see the references website.
-    The data is preprocessed by using stemming and removing stop words. Furthermore, words with a document frequency
-    smaller than min_doc_frequency or with a variance smaller than min_variance will be removed.
+    The data is usually preprocessed by using stemming and removing stop words. Furthermore, words with a document frequency
+    smaller than min_df or with a variance smaller than min_variance are usually removed and tf-idf is applied.
     N=1041, d=323, k=[4,4] using the default settings.
 
     Parameters
     ----------
     use_universities : tuple
-        specify the universities (default: ("cornell", "texas", "washington", "wisconsin"))
+        specify the universities. Can be None if all universities should be used (default: ("cornell", "texas", "washington", "wisconsin"))
     use_categories : tuple
-        specify the categories (default: ("course", "faculty", "project", "student"))
-    remove_headers : bool
-        should the headers of the Html files be removed? (default: True)
-    min_doc_frequency : float
-        minimum document frequency of the words (default: 0.01)
+        specify the categories. Can be None if all categories should be used (default: ("course", "faculty", "project", "student"))
+    use_tfidf : bool
+        If true, tf-idf will be applied as the last step of the pipeline (default: True)
+    use_stemming : bool
+        If true, the SnowballStemmer from nltk will be used when creating the count matrix (default: True)
+    use_stop_words : bool
+        If true, the list of English stopwords from sklearn CountVectorizer will be used (default: True)
+    max_df : float | int
+        Ignore words that have a document frequency strictly higher than max_df. 
+        If float, the parameter represents a proportion of documents, integer corresponds to absolute counts (see sklearn CountVectorizer) (default: 1.0)
+    min_df : float | int
+        Ignore words that have a document frequency strictly lower than min_df.
+        If float, the parameter represents a proportion of documents, integer corresponds to absolute counts (see sklearn CountVectorizer) (default: 1)
+    max_features : int
+        If not None, the resulting count matric will ony contain the top max_features ordered by term frequency across the corpus (see sklearn CountVectorizer).
+        Note that this value could be further reduced if min_variance is smaller than one (default: None)
     min_variance : float
-        minimum variance of the words (default: 0.25)
+        Features with a variance lower than min_variance will be removed (see sklearn VarianceThreshold). 
+        The default is to keep all features with non-zero variance, i.e. remove only the features that have the same value in all samples (default: 0.25)
+    sublinear_tf : bool
+        Apply sublinear term frequency scaling, i.e. replace tf with 1 + log(tf) (see sklearn TfidfTransformer) (default: False)
+    remove_headers : bool
+        Specifies if the headers of the Html files should be removed (default: True)
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
     downloads_path : str
@@ -599,6 +642,15 @@ def load_webkb(use_universities: tuple = ("cornell", "texas", "washington", "wis
     -------
     http://www.cs.cmu.edu/~webkb/
     """
+    possible_universities = ["misc", "wisconsin", "washington", "texas", "cornell"]
+    possible_categories = ["student", "staff", "project", "other", "faculty", "department", "course"]
+    if use_universities is None:
+        use_universities = possible_universities.copy()
+    assert all([uni in possible_universities for uni in use_universities])
+    if use_categories is None:
+        use_categories = possible_categories.copy()
+    assert all([cat in possible_categories for cat in use_categories])
+    # Check if data is already downloaded
     directory = _get_download_dir(downloads_path) + "/WebKB/"
     filename = directory + "webkb-data.gtar.gz"
     if not os.path.isfile(filename):
@@ -644,38 +696,11 @@ def load_webkb(use_universities: tuple = ("cornell", "texas", "washington", "wis
                     lines = number_tags.sub('', lines)
                     texts.append(lines)
                     labels = np.r_[labels, [[i, j]]]
-    # Execute TF-IDF, remove stop-words and use the snowball stemmer
-    vectorizer = _StemmedCountVectorizer(dtype=np.float64, stop_words="english", min_df=min_doc_frequency)
-    data_sparse = vectorizer.fit_transform(texts)
-    selector = VarianceThreshold(min_variance)
-    data_sparse = selector.fit_transform(data_sparse)
-    tfidf = TfidfTransformer(sublinear_tf=True)
-    data_sparse = tfidf.fit_transform(data_sparse)
-    data = np.asarray(data_sparse.todense())
+    # Transform raw data
+    data = _transform_text_data(texts, use_tfidf, use_stemming, use_stop_words, max_df, min_df, max_features, min_variance, 
+                                sublinear_tf)
     # Return values
     if return_X_y:
         return data, labels
     else:
         return Bunch(dataset_name="WebKB", data=data, target=labels, classes=[use_categories, use_universities])
-
-
-class _StemmedCountVectorizer(CountVectorizer):
-    """
-    Helper class for load_webkb(). Combines the CountVectorizer with the SnowballStemmer.
-    See: https://stackoverflow.com/questions/36182502/add-stemming-support-to-countvectorizer-sklearn
-    """
-
-    def build_analyzer(self):
-        """
-        Custom build_analyzer method. Calls the build_analyzer of the CountVectorizer parent class and then applies
-        SnowballStemmer('english')
-
-        Returns
-        -------
-        stemmed_words : Generator
-            the stemmed words in the document
-        """
-        stemmer = SnowballStemmer('english')
-        analyzer = super(_StemmedCountVectorizer, self).build_analyzer()
-        stemmed_words = lambda doc: (stemmer.stem(word) for word in analyzer(doc))
-        return stemmed_words
