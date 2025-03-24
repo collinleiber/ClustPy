@@ -298,17 +298,23 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
                         try:
                             assert type(eval_metric) is EvaluationMetric, "All metrics must be of type EvaluationMetric"
                             # Check if metric uses ground truth (e.g. NMI, ACC, ...)
-                            if eval_metric.use_gt:
-                                assert labels_true is not None, "Ground truth can not be None if it is used for the chosen metric"
+                            if eval_metric.metric_type == "external":
+                                assert labels_true is not None, "Ground truth can not be None if an external metric is used"
                                 result = eval_metric.method(labels_true, algo_obj.labels_, **eval_metric.params)
                                 if X_test is not None and labels_predicted_test is not None:
                                     result_test = eval_metric.method(labels_true_test, labels_predicted_test,
                                                                      **eval_metric.params)
-                            else:
+                            elif eval_metric.metric_type == "internal":
                                 # Metric does not use ground truth (e.g. Silhouette, ...)
                                 result = eval_metric.method(X, algo_obj.labels_, **eval_metric.params)
                                 if X_test is not None and labels_predicted_test is not None:
                                     result_test = eval_metric.method(X_test, labels_predicted_test,
+                                                                     **eval_metric.params)
+                            else:
+                                # A custom metric is used
+                                result = eval_metric.method(X, labels_true, algo_obj.labels_, algo_obj, **eval_metric.params)
+                                if X_test is not None and labels_predicted_test is not None:
+                                    result_test = eval_metric.method(X_test, labels_true_test, labels_predicted_test, algo_obj,
                                                                      **eval_metric.params)
                             df.at[rep, (eval_algo.name, eval_metric.name)] = result
                             if not quiet:
@@ -566,16 +572,16 @@ def _get_data_and_labels_from_evaluation_dataset(data_input: np.ndarray, data_lo
     return X, labels_true, X_test, labels_true_test
 
 
-def evaluation_df_to_latex_table(df: pd.DataFrame, relevant_row : str | int= "mean", output_path: str = None, use_std: bool = True, 
-                                 best_in_bold: bool = True, second_best_underlined: bool = True, color_by_value: str = None,
-                                 higher_is_better: list = None, in_percent: int = True,
+def evaluation_df_to_latex_table(df: pd.DataFrame, relevant_row : str | int= "mean", output_path: str = None, pm_row: str | int | None = "std", 
+                                 bracket_row: str | int | None = None, best_in_bold: bool = True, second_best_underlined: bool = True, 
+                                 color_by_value: str = None, higher_is_better: list = None, multiplier: int | float | list | None = 100,
                                  decimal_places: int = 1) -> str:
     """
     Convert the resulting dataframe of an evaluation into a latex table.
     Note that the latex package booktabs is required, so usepackage{booktabs} must be included in the latex file.
     This method will only consider the values contained in the row with the name relevant_row.
     The default relevant_row is "mean", which implies that the mean was used as an aggregation function when creating the dataframe.
-    If "std" is also contained in the dataframe (and use_std is True) this value will also be added by using plusminus.
+    Other values can be added to the latex table either after plus-minus by specifying pm_row or in brackets by specifying bracket_row.
 
     Parameters
     ----------
@@ -583,10 +589,12 @@ def evaluation_df_to_latex_table(df: pd.DataFrame, relevant_row : str | int= "me
         The pandas dataframe. Can also be a string that contains the path to the saved dataframe
     relevant_row : str | int
         The name of the row in the df that is used to create the latex table (default: "mean")
-    output_path : std
+    output_path : str
         The path were the resulting latex table text file will be stored (default: None)
-    use_std : bool
-        Defines if the standard deviation (std) should also be added to the latex table (default: True)
+    pm_row : str | int
+        The name of the row in the df that should be added to the latex table after the value from relevant_row separated by plus-minus (default: "std")
+    bracket_row : str | int
+        The name of the row in the df that should be added to the latex table in brackets after the value from relevant_row and, if stated, the value from pm_row (default: None)
     best_in_bold : bool
         Print best value for each combination of dataset and metric in bold.
         Note, that the latex package bm is used, so usepackage{bm} must be included in the latex file (default: True)
@@ -599,9 +607,12 @@ def evaluation_df_to_latex_table(df: pd.DataFrame, relevant_row : str | int= "me
     higher_is_better : list
         List with booleans. Each value indicates if a high value for a certain metric is better than a low value.
         The length of the list must be equal to the number of different metrics.
-        If None, it is always assumed that a higher value is better, except for the runtime (default: None)
-    in_percent : bool
-        If true, all values, except n_clusters and runtime, will be converted to percentages -> all values will be multiplied by 100 (default: True)
+        Entries can also be None if neither higher nor lower is better.
+        If None, it is always assumed that a higher value is better, except for the runtime and for n_clusters (default: None)
+    multiplier : int | float | list | None
+        If defined, all values, except n_clusters and runtime, will be multiplied by this value, e.g. to receive values in percent they will be multiplied by 100.
+        Can also be a list containing a different value for each metric. 
+        If it is None, the original values will be used (default: 100)
     decimal_places : int
         Number of decimal places that should be used in the latex table (default: 1)
 
@@ -621,12 +632,19 @@ def evaluation_df_to_latex_table(df: pd.DataFrame, relevant_row : str | int= "me
     # Get main information from dataframe
     if multiple_datasets:
         datasets = list(dict.fromkeys([s[0] for s in df.index]))
-        std_contained = "std" in [s[1] for s in df.index]
+        pm_row_contained = pm_row in [s[1] for s in df.index]
+        bracket_row_contained = bracket_row in [s[1] for s in df.index]
     else:
         datasets = [None]
-        std_contained = "std" in [s for s in df.index]
+        pm_row_contained = pm_row in [s for s in df.index]
+        bracket_row_contained = bracket_row in [s for s in df.index]
     algorithms = list(dict.fromkeys([s[0] for s in df.keys()]))
     metrics = list(dict.fromkeys([s[1] for s in df.keys()]))
+    if multiplier is None or type(multiplier) is int or type(multiplier) is float:
+        multiplier = [multiplier] * len(metrics)
+    assert len(multiplier) == len(
+        metrics), "multiplier must be float/int or the length of multiplier must match the number of metrics. multiplier = {0} (length {1}), metrics = {2} (length {3})".format(
+        multiplier, len(multiplier), metrics, len(metrics))
     assert higher_is_better is None or len(higher_is_better) == len(
         metrics), "Length of higher_is_better and the number of metrics does not match. higher_is_better = {0} (length {1}), metrics = {2} (length {3})".format(
         higher_is_better, len(higher_is_better), metrics, len(metrics))
@@ -643,7 +661,13 @@ def evaluation_df_to_latex_table(df: pd.DataFrame, relevant_row : str | int= "me
     for j, d in enumerate(datasets):
         for i, m in enumerate(metrics):
             # Check if a higher value is better for this metric
-            metric_is_higher_better = (m != "runtime") if higher_is_better is None else higher_is_better[i]
+            if higher_is_better is None:
+                if m == "n_clusters":
+                    metric_is_higher_better = None
+                else:
+                    metric_is_higher_better = (m != "runtime")
+            else:
+                metric_is_higher_better = higher_is_better[i]
             # Escape underscore that could be contained in metric name
             m_write = m.replace("_", "\\_")
             # Write name of dataset and metric
@@ -662,43 +686,63 @@ def evaluation_df_to_latex_table(df: pd.DataFrame, relevant_row : str | int= "me
                     relevant_value = df[a, m][d, relevant_row]
                 else:
                     relevant_value = df[a, m][relevant_row]
-                if in_percent and m not in ["n_clusters", "runtime"]:
-                    relevant_value *= 100
-                relevant_value = round(relevant_value, decimal_places)
+                if relevant_value is not None and not np.isnan(relevant_value):
+                    if multiplier[i] is not None and m not in ["n_clusters", "runtime"]:
+                        relevant_value *= multiplier[i]
+                    relevant_value = round(relevant_value, decimal_places)
                 all_values.append(relevant_value)
             all_values_sorted = np.unique(all_values)  # automatically sorted
+            all_values_sorted = all_values_sorted[~np.isnan(all_values_sorted)]
             for k, a in enumerate(algorithms):
                 relevant_value = all_values[k]
-                # If standard deviation is contained in the dataframe, information will be added
-                if use_std and std_contained:
+                value_write = "$" + str(relevant_value)
+                # If pm_row is specified and contained in the dataframe, information will be added
+                if pm_row is not None and pm_row_contained:
                     if multiple_datasets:
-                        std_value = df[a, m][d, "std"]
+                        pm_value = df[a, m][d, pm_row]
                     else:
-                        std_value = df[a, m]["std"]
-                    if in_percent and m not in ["n_clusters", "runtime"]:
-                        std_value *= 100
-                    std_value = round(std_value, decimal_places)
-                    value_write = "$" + str(relevant_value) + " \\pm " + str(std_value) + "$"
-                else:
-                    value_write = "$" + str(relevant_value) + "$"
-                # Optional: Write best value in bold and second best underlined
-                if best_in_bold and ((relevant_value == all_values_sorted[-1] and metric_is_higher_better) or (
-                        relevant_value == all_values_sorted[0] and not metric_is_higher_better)):
-                    value_write = "\\bm{" + value_write + "}"
-                elif second_best_underlined and (
-                        (relevant_value == all_values_sorted[-2] and metric_is_higher_better) or (
-                        relevant_value == all_values_sorted[1] and not metric_is_higher_better)):
-                    value_write = "\\underline{" + value_write + "}"
-                # Optional: Color cells by value difference
-                if color_by_value is not None:
-                    if all_values_sorted[-1] != all_values_sorted[0]:
-                        color_saturation = round((relevant_value - all_values_sorted[0]) / (
-                                all_values_sorted[-1] - all_values_sorted[0]) * 65) + 5  # value between 5 and 70
+                        pm_value = df[a, m][pm_row]
+                    if pm_value is not None and not np.isnan(pm_value):
+                        if multiplier[i] is not None and m not in ["n_clusters", "runtime"]:
+                            pm_value *= multiplier[i]
+                        pm_value = round(pm_value, decimal_places)
+                    value_write = value_write + " \\pm " + str(pm_value)
+                # If bracket_row is specified and contained in the dataframe, information will be added
+                if bracket_row is not None and bracket_row_contained:
+                    if multiple_datasets:
+                        bracket_value = df[a, m][d, bracket_row]
                     else:
-                        color_saturation = 0
-                    assert type(color_saturation) is int, "color_saturation must be an int but is {0}".format(
-                        type(color_saturation))
-                    value_write = "\\cellcolor{" + color_by_value + "!" + str(color_saturation) + "}" + value_write
+                        bracket_value = df[a, m][bracket_row]
+                    if bracket_value is not None and not np.isnan(bracket_value):
+                        if multiplier[i] is not None and m not in ["n_clusters", "runtime"]:
+                            bracket_value *= multiplier[i]
+                        bracket_value = round(bracket_value, decimal_places)
+                    value_write = value_write + " (" + str(bracket_value) +")"
+                value_write = value_write + "$"
+                if relevant_value is not None and not np.isnan(relevant_value):
+                    # Optional: Write best value in bold and second best underlined
+                    if best_in_bold and metric_is_higher_better is not None and (
+                            (relevant_value == all_values_sorted[-1] and metric_is_higher_better) or (
+                            relevant_value == all_values_sorted[0] and not metric_is_higher_better)):
+                        value_write = "\\bm{" + value_write + "}"
+                    elif second_best_underlined and metric_is_higher_better is not None and (
+                            (relevant_value == all_values_sorted[-2] and metric_is_higher_better) or (
+                            relevant_value == all_values_sorted[1] and not metric_is_higher_better)):
+                        value_write = "\\underline{" + value_write + "}"
+                    # Optional: Color cells by value difference
+                    if color_by_value is not None and metric_is_higher_better is not None:
+                        if all_values_sorted[-1] != all_values_sorted[0]:
+                            if metric_is_higher_better:
+                                color_saturation = round((relevant_value - all_values_sorted[0]) / (
+                                        all_values_sorted[-1] - all_values_sorted[0]) * 65) + 5  # value between 5 and 70
+                            else:
+                                color_saturation = round((all_values_sorted[-1] - relevant_value) / (
+                                        all_values_sorted[-1] - all_values_sorted[0]) * 65) + 5  # value between 5 and 70
+                        else:
+                            color_saturation = 0
+                        assert type(color_saturation) is int, "color_saturation must be an int but is {0}".format(
+                            type(color_saturation))
+                        value_write = "\\cellcolor{" + color_by_value + "!" + str(color_saturation) + "}" + value_write
                 to_write += " & " + value_write
             to_write += "\\\\\n"
             output += to_write
@@ -797,28 +841,30 @@ class EvaluationMetric():
         The actual metric function
     params : dict
         Parameters given to the metric function (default: {})
-    use_gt : bool
-        If true, the input to the metric will be the ground truth labels and the predicted labels (e.g. normalized mutual information).
-        If false, the input will be the data and the predicted labels (e.g. silhouette score) (default: True)
+    metric_type : str
+        The type of an EvaluationMetric can be either 'external', 'internal' or 'custom'.
+        If 'external', the metric (e.g. normalized mutual information) compares the predicted labels with ground truth labels, i.e., it is built as metric(labels_true, labels_pred, **params).
+        If 'internal', the metric (e.g. silhouette score) compares the predicted labels with patterns in the data, i.e., it is built as metric(X, labels_pred, **params).
+        If 'custom', a custom metric is used that can use the data, ground truth labels, predicted labels and other attributes from the algorithm, i.e., it is built as metric(X, labels_true, labels_pred, algorithm_obj, **params) (default: "external")
 
     Examples
     ----------
     See evaluate_multiple_datasets()
 
     >>> from sklearn.metrics import normalized_mutual_info_score as nmi, silhouette_score as silhouette
-    >>> em1 = EvaluationMetric(name="nmi", metric=nmi, params={"average_method": "geometric"}, use_gt=True),
-    >>> em2 = EvaluationMetric(name="silhouette", metric=silhouette, use_gt=False)
+    >>> em1 = EvaluationMetric(name="nmi", metric=nmi, params={"average_method": "geometric"}, metric_type="external"),
+    >>> em2 = EvaluationMetric(name="silhouette", metric=silhouette, metric_type="internal")
     """
 
-    def __init__(self, name: str, metric: Callable, params: dict = None, use_gt: bool = True):
+    def __init__(self, name: str, metric: Callable, params: dict = None, metric_type: str = "external"):
         assert type(name) is str, "name must be a string"
         self.name = name
         assert callable(metric), "method must be a method"
         self.method = metric
         assert params is None or type(params) is dict, "params must be a dict"
         self.params = {} if params is None else params
-        assert type(use_gt) is bool, "use_gt must be bool"
-        self.use_gt = use_gt
+        assert type(metric_type) is str and metric_type in ["external", "internal", "custom"], "metric_type must be str. Options are 'external', 'internal' and 'custom'"
+        self.metric_type = metric_type
 
 
 class EvaluationAlgorithm():

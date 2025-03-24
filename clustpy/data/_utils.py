@@ -270,17 +270,17 @@ def _transform_text_data(data: np.ndarray, use_tfidf: bool, use_stemming: bool, 
         vectorizer = _StemmedCountVectorizer(dtype=np.float64, stop_words="english" if use_stop_words else None, min_df=min_df, max_df=max_df, max_features=max_features)
     else:
         vectorizer = CountVectorizer(dtype=np.float64, stop_words="english" if use_stop_words else None, min_df=min_df, max_df=max_df, max_features=max_features)
-    vectorizer.fit(data_all)
+    data_sparse_all = vectorizer.fit_transform(data_all)
     data_sparse = vectorizer.transform(data)
     # (Optional) Check for variance threshold
     if min_variance != 0:
         selector = VarianceThreshold(min_variance)
-        selector.fit(data_all)
+        data_sparse_all = selector.fit(data_sparse_all)
         data_sparse = selector.transform(data_sparse)
     # (Optional) Apply tf-idf
     if use_tfidf:
         tfidf = TfidfTransformer(sublinear_tf=sublinear_tf)
-        tfidf.fit(data_all)
+        tfidf.fit(data_sparse_all)
         data_sparse = tfidf.transform(data_sparse)
     data = np.asarray(data_sparse.todense())
     return data
