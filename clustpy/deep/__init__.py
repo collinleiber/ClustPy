@@ -8,10 +8,11 @@ from .dkm import DKM
 from .ddc_n2d import DDC, N2D
 from .aec import AEC
 from .deepect import DeepECT
+from .den import DEN
 from ._data_utils import get_dataloader, get_default_augmented_dataloaders
-from ._train_utils import get_trained_network
+from ._train_utils import get_trained_network, get_neural_network
 from ._utils import encode_batchwise, decode_batchwise, encode_decode_batchwise, predict_batchwise, detect_device, \
-    get_device_from_module, set_torch_seed
+    get_device_from_module, set_torch_seed, mean_squared_error
 
 __all__ = ['DEC',
            'DKM',
@@ -26,8 +27,10 @@ __all__ = ['DEC',
            'ACeDeC',
            'DipEncoder',
            'DeepECT',
+           'DEN',
            'get_dataloader',
            'get_default_augmented_dataloaders',
+           'get_neural_network'
            'get_trained_network',
            'encode_batchwise',
            'decode_batchwise',
@@ -35,4 +38,5 @@ __all__ = ['DEC',
            'predict_batchwise',
            'detect_device',
            'get_device_from_module',
-           'set_torch_seed']
+           'set_torch_seed',
+           'mean_squared_error']

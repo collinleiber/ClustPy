@@ -28,9 +28,9 @@ def _get_default_layers(input_dim: int, embedding_size: int) -> list:
     return layers
 
 
-def _get_neural_network(input_dim: int, embedding_size: int = 10, neural_network: torch.nn.Module | tuple = None,
+def get_neural_network(input_dim: int, embedding_size: int = 10, neural_network: torch.nn.Module | tuple = None,
                         neural_network_class: torch.nn.Module = FeedforwardAutoencoder,
-                        neural_network_params: dict = None, neural_network_weights: str = None,
+                        neural_network_params: dict = None, neural_network_weights: str = None, device : torch.device = None,
                         random_state: np.random.RandomState | int = None) -> torch.nn.Module:
     """This function returns a new neural_network.
     - If neural_network is already a torch.nn.module, nothing will happen.
@@ -45,6 +45,7 @@ def _get_neural_network(input_dim: int, embedding_size: int = 10, neural_network
         dimension of the innermost layer of the neural network (default: 10)
     neural_network : torch.nn.Module | tuple
         the neural network used for the computations.
+        If it is a tuple, it has to consist of the neural network class (torch.nn.Module) and the initialization parameters (dict).
         Can also be None. In this case a new neural network will be created using neural_network_class and neural_network_params (default: None)
     neural_network_class : torch.nn.Module
         The neural network class that should be used (default: FeedforwardAutoencoder)
@@ -52,6 +53,9 @@ def _get_neural_network(input_dim: int, embedding_size: int = 10, neural_network
         Parameters to be used when creating a new neural network using the neural_network_class (default: None)
     neural_network_weights : str
         Path to a file containing the state_dict of the neural_network (default: None)
+    device : torch.device
+        The device on which to perform the computations.
+        If device is None then it will be automatically chosen: if a gpu is available the gpu with the highest amount of free memory will be chosen (default: None)
     random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
@@ -60,6 +64,14 @@ def _get_neural_network(input_dim: int, embedding_size: int = 10, neural_network
     neural_network : torch.nn.Module
         The created neural network
     """
+    # Optionally extract neural network parameters from tuple
+    if neural_network is not None and type(neural_network) is tuple:
+        assert len(
+            neural_network) == 2, "If neural_network is a tuple, it has to contain two entries: the neural network class (torch.nn.Module) and the initialization parameters (dict)"
+        neural_network_class = neural_network[0]
+        neural_network_params = neural_network[1]
+        neural_network = None
+    # Create actual neural network
     if neural_network is None:
         if embedding_size > input_dim:
             print(
@@ -83,6 +95,9 @@ def _get_neural_network(input_dim: int, embedding_size: int = 10, neural_network
                    "fitted"), "Neural network has no attribute 'fitted' and is therefore not compatible. Check documentation of fitted, e.g., at clustpy.deep.neural_networks._abstract_autoencoder._AbstractAutoencoder"
     if neural_network_weights is not None:
         neural_network.load_parameters(neural_network_weights)
+    # Move neural network to device
+    device = detect_device(device)
+    neural_network.to(device)
     return neural_network
 
 
@@ -144,17 +159,9 @@ def get_trained_network(trainloader: torch.utils.data.DataLoader = None, data: n
         trainloader = get_dataloader(data, batch_size, True)
     # Get neural network object
     input_dim = get_data_dim_from_dataloader(trainloader)
-    if neural_network is not None and type(neural_network) is tuple:
-        assert len(
-            neural_network) == 2, "If neural_network is a tuple, it has to contain two entries: the neural network class (torch.nn.Module) and the initialization parameters (dict)"
-        neural_network_class = neural_network[0]
-        neural_network_params = neural_network[1]
-        neural_network = None
-    neural_network = _get_neural_network(input_dim, embedding_size, neural_network, neural_network_class,
-                                         neural_network_params, neural_network_weights, random_state)
-    # Move neural network to device
-    device = detect_device(device)
-    neural_network.to(device)
+    neural_network = get_neural_network(input_dim, embedding_size, neural_network, neural_network_class,
+                                         neural_network_params, neural_network_weights, device, random_state)
+    # Start training
     if not neural_network.fitted:
         print("Neural network is not fitted yet, will be pretrained.")
         # Pretrain neural network

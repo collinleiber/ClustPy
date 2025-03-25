@@ -121,7 +121,7 @@ def get_dataloader(X: np.ndarray | torch.Tensor, batch_size: int, shuffle: bool 
     drop_last : bool
         boolean that defines if the last batch should be ignored (default: False)
     additional_inputs : list | np.ndarray | torch.Tensor
-        additional inputs for the dataloader, e.g. labels. Can be None, np.ndarray, torch.Tensor or a list containing np.ndarrays/torch.Tensors (default: None)
+        additional inputs for the dataloader, e.g. labels or neighbors. Can be None, np.ndarray, torch.Tensor or a list containing np.ndarrays/torch.Tensors (default: None)
     dataset_class : torch.utils.data.Dataset
         defines the class of the tensor dataset that is contained in the dataloader (default: _ClustpyDataset)
     ds_kwargs : dict
@@ -243,7 +243,9 @@ def get_data_dim_from_dataloader(dataloader: torch.utils.data.DataLoader) -> int
 
 
 def get_train_and_test_dataloader(X: np.ndarray | torch.Tensor, batch_size: int = 256,
-                                  custom_dataloaders: tuple = None) -> (
+                                  custom_dataloaders: tuple = None, 
+                                  additional_inputs_trainloader: list | np.ndarray | torch.Tensor = None,
+                                  additional_inputs_testloader: list | np.ndarray | torch.Tensor = None) -> (
         torch.utils.data.DataLoader, torch.utils.data.DataLoader, int):
     """
     Get the train- and testloader for deep clustering algorithms.
@@ -263,6 +265,10 @@ def get_train_and_test_dataloader(X: np.ndarray | torch.Tensor, batch_size: int 
         Can also be a tuple of strings, where the first entry is the path to a saved trainloader and the second entry the path to a saved testloader.
         In this case the dataloaders will be loaded by torch.load(PATH).
         If None, the default dataloaders will be used (default: None)
+    additional_inputs_trainloader : list | np.ndarray | torch.Tensor
+        additional inputs for the trainloader, e.g. labels or neighbors. Can be None, np.ndarray, torch.Tensor or a list containing np.ndarrays/torch.Tensors (default: None)
+    additional_inputs_testloader : list | np.ndarray | torch.Tensor
+        additional inputs for the testloader, e.g. labels or neighbors. Can be None, np.ndarray, torch.Tensor or a list containing np.ndarrays/torch.Tensors (default: None)
 
     Returns
     -------
@@ -273,8 +279,8 @@ def get_train_and_test_dataloader(X: np.ndarray | torch.Tensor, batch_size: int 
     """
     # sample random mini-batches from the data -> shuffle = True
     if custom_dataloaders is None:
-        trainloader = get_dataloader(X, batch_size, True, False)
-        testloader = get_dataloader(X, batch_size, False, False)
+        trainloader = get_dataloader(X, batch_size, True, False, additional_inputs_trainloader)
+        testloader = get_dataloader(X, batch_size, False, False, additional_inputs_testloader)
     else:
         trainloader, testloader = custom_dataloaders
         # If train-/testloader is string, it can be loaded from a file

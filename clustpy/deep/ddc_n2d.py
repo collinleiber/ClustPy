@@ -285,7 +285,7 @@ class DDC(_AbstractDeepClusteringAlgo):
     >>> from clustpy.data import create_subspace_data
     >>> from clustpy.deep import DDC
     >>> data, labels = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
-    >>> ddc = DDC(pretrain_epochs=3, clustering_epochs=3)
+    >>> ddc = DDC(pretrain_epochs=3)
     >>> ddc.fit(data)
 
     References
