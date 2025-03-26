@@ -2,6 +2,12 @@ import numpy as np
 from clustpy.partition import SpecialK
 from clustpy.partition.specialk import _get_neighborhood_adjacency_matrix
 from sklearn.datasets import make_blobs
+from sklearn.utils.estimator_checks import check_estimator
+
+
+def test_specialk_estimator():
+    check_estimator(SpecialK(), 
+                    {"check_complex_data": "this check is expected to fail because complex values are not supported"})
 
 """
 Tests regarding the SpecialK object

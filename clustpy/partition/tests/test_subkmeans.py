@@ -5,6 +5,12 @@ from clustpy.partition.subkmeans import _transform_subkmeans_P_to_nrkmeans_P, \
     _transform_subkmeans_m_to_nrkmeans_m
 from clustpy.data import create_subspace_data
 from unittest.mock import patch
+from sklearn.utils.estimator_checks import check_estimator
+
+
+def test_subkmeans_estimator():
+    check_estimator(SubKmeans(3), 
+                    {"check_complex_data": "this check is expected to fail because complex values are not supported"})
 
 
 def test_transform_subkmeans_scatters_to_nrkmeans_scatters():

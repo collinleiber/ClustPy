@@ -3,6 +3,12 @@ from clustpy.deep.dcn import _compute_centroids
 from clustpy.data import create_subspace_data, load_optdigits
 import torch
 import numpy as np
+from sklearn.utils.estimator_checks import check_estimator
+
+
+def test_dcn_estimator():
+    check_estimator(DCN(3, pretrain_epochs=3, clustering_epochs=3), 
+                    {"check_complex_data": "this check is expected to fail because complex values are not supported"})
 
 
 def test_simple_dcn():

@@ -3,6 +3,12 @@ from clustpy.partition import GMeans
 from clustpy.partition.gmeans import _anderson_darling_statistic_to_prob
 from sklearn.datasets import make_blobs
 from scipy.stats import anderson
+from sklearn.utils.estimator_checks import check_estimator
+
+
+def test_gmeans_estimator():
+    check_estimator(GMeans(), 
+                    {"check_complex_data": "this check is expected to fail because complex values are not supported"})
 
 
 def test_anderson_darling_statistic_to_prob():

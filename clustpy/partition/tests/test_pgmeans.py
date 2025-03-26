@@ -3,6 +3,12 @@ from clustpy.partition import PGMeans
 from clustpy.partition.pgmeans import _initial_gmm_clusters, _update_gmm_with_new_center, _project_model
 from sklearn.datasets import make_blobs
 from sklearn.mixture import GaussianMixture as GMM
+from sklearn.utils.estimator_checks import check_estimator
+
+
+def test_pgmeans_estimator():
+    check_estimator(PGMeans(), 
+                    {"check_complex_data": "this check is expected to fail because complex values are not supported"})
 
 
 def test_project_model():

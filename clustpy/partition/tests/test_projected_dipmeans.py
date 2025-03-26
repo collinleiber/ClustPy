@@ -2,6 +2,12 @@ import numpy as np
 from clustpy.partition import ProjectedDipMeans
 from clustpy.partition.projected_dipmeans import _get_projected_data
 from sklearn.datasets import make_blobs
+from sklearn.utils.estimator_checks import check_estimator
+
+
+def test_projected_dipmeans_estimator():
+    check_estimator(ProjectedDipMeans(), 
+                    {"check_complex_data": "this check is expected to fail because complex values are not supported"})
 
 
 def test_get_projected_data():

@@ -2,6 +2,12 @@ from clustpy.density import MultiDensityDBSCAN
 from clustpy.density.multi_density_dbscan import _sort_neighbors_by_densities, _add_neighbors_to_neighbor_list
 from sklearn.datasets import make_blobs
 import numpy as np
+from sklearn.utils.estimator_checks import check_estimator
+
+
+def test_multi_density_dbscan_estimator():
+    check_estimator(MultiDensityDBSCAN(), 
+                    {"check_complex_data": "this check is expected to fail because complex values are not supported"})
 
 
 def test_add_neighbors_to_neighbor_list():

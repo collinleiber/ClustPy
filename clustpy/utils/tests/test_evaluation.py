@@ -1,7 +1,7 @@
 import torch
 from clustpy.utils import evaluate_multiple_datasets, evaluate_dataset, EvaluationAlgorithm, EvaluationDataset, \
     EvaluationMetric, evaluation_df_to_latex_table
-from clustpy.utils.evaluation import _preprocess_dataset, _get_n_clusters_from_algo
+from clustpy.utils.evaluation import _preprocess_dataset, _get_n_clusters_from_algo, _get_fixed_seed_for_each_run
 import numpy as np
 from clustpy.deep.neural_networks import FeedforwardAutoencoder
 from clustpy.data import create_subspace_data
@@ -69,6 +69,18 @@ def test_get_n_clusters_from_algo():
     assert _get_n_clusters_from_algo(a1) == 3
     assert _get_n_clusters_from_algo(a2) == 3
     assert _get_n_clusters_from_algo(a3) == 3
+
+
+def test_get_fixed_seed_for_each_run():
+    seeds = _get_fixed_seed_for_each_run(10, 3)
+    assert len(seeds) == 10
+    assert all([isinstance(s, (int, np.integer)) for s in seeds])
+    seeds = _get_fixed_seed_for_each_run(10, np.random.RandomState(3))
+    assert len(seeds) == 10
+    assert all([isinstance(s, (int, np.integer)) for s in seeds])
+    seeds_input = [1,2,3,4,5,6,7,8,9]
+    seeds = _get_fixed_seed_for_each_run(9, seeds_input)
+    assert seeds == seeds_input
 
 
 def test_evaluate_dataset():

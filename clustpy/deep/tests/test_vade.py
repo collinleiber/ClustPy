@@ -2,6 +2,12 @@ from clustpy.deep import VaDE
 from clustpy.data import create_subspace_data
 import numpy as np
 import torch
+from sklearn.utils.estimator_checks import check_estimator
+
+
+def test_vade_estimator():
+    check_estimator(VaDE(3, pretrain_epochs=3, clustering_epochs=3), 
+                    {"check_complex_data": "this check is expected to fail because complex values are not supported"})
 
 
 def test_simple_vade():

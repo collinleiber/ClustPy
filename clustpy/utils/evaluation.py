@@ -77,13 +77,44 @@ def _get_n_clusters_from_algo(algo_obj: ClusterMixin) -> int:
     return n_clusters
 
 
+def _get_fixed_seed_for_each_run(n_repetitions: int, 
+                                 random_state: np.random.RandomState | int | list) -> list:
+    """
+    Get the same seed for each run of an algorithm and data set.
+
+    Parameters
+    ----------
+    n_repetitions : int
+        Number of times that the clustering procedure should be executed on the same data set
+    random_state : np.random.RandomState | int | list
+        use a fixed random state to get a repeatable solution. Can also be of type int. 
+        Furthermore, if can be a list containing an int for each repetition
+
+    Returns
+    -------
+    seeds : list
+        List of seeds (integers), one for earch repetition
+    """
+    if random_state is None or isinstance(random_state, (int, np.integer)) or isinstance(random_state, np.random.RandomState):
+        random_state = check_random_state(random_state)
+        seeds = random_state.choice(10000, n_repetitions, replace=False)
+    elif type(random_state) is list or type(random_state) is tuple or type(random_state) is np.ndarray:
+        seeds = random_state
+    else:
+        raise Exception("random_state must be of type int, np.random.RandomState or list")
+    assert len(seeds) == n_repetitions, "If random_state is a list, its length must be equal to the number of repetitions"
+    assert all([isinstance(entry, (int, np.integer)) for entry in seeds]), "If random_state is a list, all entries must be integers"
+    assert np.unique(seeds).shape[0] == n_repetitions, "Each seed must be unique, however duplicates were found in the seeds/random_state"
+    return seeds
+
+
 def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metrics: list = None,
                      labels_true: np.ndarray = None, n_repetitions: int = 10,
                      X_test: np.ndarray = None, labels_true_test: np.ndarray = None,
                      aggregation_functions: tuple = (np.mean, np.std), add_runtime: bool = True,
                      add_n_clusters: bool = False, save_path: str = None, save_labels_path: str = None,
                      ignore_algorithms: tuple = (), dataset_name: str = None,
-                     random_state: np.random.RandomState | int = None, quiet: bool = False) -> pd.DataFrame:
+                     random_state: np.random.RandomState | int | list = None, quiet: bool = False) -> pd.DataFrame:
     """
     Evaluate the clustering result of different clustering algorithms (as specified by evaluation_algorithms) on a given data set using different metrics (as specified by evaluation_metrics).
     Each algorithm will be executed n_repetitions times and all specified metrics will be used to evaluate the clustering result.
@@ -119,8 +150,9 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
         List of algorithm names (as specified in the EvaluationAlgorithm object) that should be ignored for this specific data set (default: [])
     dataset_name : str
         The name of the dataset; only relevant if iteration_specific_params are defined for an EvaluationAlgorithm (default: None)
-    random_state : np.random.RandomState | int
-        use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
+    random_state : np.random.RandomState | int | list
+        use a fixed random state to get a repeatable solution. Can also be of type int. 
+        Furthermore, if can be a list containing an int for each repetition (default: None)
     quiet : bool
         Do not print any output
 
@@ -170,9 +202,7 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
         save_path = save_path + ".csv"
     assert save_path is None or len(
         save_path.split(".")) == 2, "save_path must only contain a single dot. E.g., NAME.csv"
-    # Use same seed for each algorithm
-    random_state = check_random_state(random_state)
-    seeds = random_state.choice(10000, n_repetitions, replace=False)
+    seeds = _get_fixed_seed_for_each_run(n_repetitions, random_state)
     algo_names = [a.name for a in evaluation_algorithms]
     assert max(
         np.unique(algo_names, return_counts=True)[1]) == 1, "Some names of your algorithms do not seem to be unique!"
@@ -242,6 +272,10 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
                         elif iteration_params_key[0] == dataset_name:
                             tmp_params[iteration_params_key[1]] = \
                                 eval_algo.iteration_specific_params[iteration_params_key][rep]
+                # Add random state to algorithm
+                algo_input_params = inspect.getfullargspec(eval_algo.algorithm).args + inspect.getfullargspec(eval_algo.algorithm).kwonlyargs
+                if "random_state" in algo_input_params and "random_state" not in tmp_params.keys():
+                    tmp_params["random_state"] = seeds[rep]
                 # Execute algorithm
                 start_time = time.time()
                 algo_obj = eval_algo.algorithm(**tmp_params)
@@ -364,7 +398,7 @@ def evaluate_multiple_datasets(evaluation_datasets: list, evaluation_algorithms:
                                n_repetitions: int = 10, aggregation_functions: tuple = (np.mean, np.std),
                                add_runtime: bool = True, add_n_clusters: bool = False, save_path: str = None,
                                save_intermediate_results: bool = False, save_labels_path: str = None,
-                               random_state: np.random.RandomState | int = None, quiet: bool = False) -> pd.DataFrame:
+                               random_state: np.random.RandomState | int | list = None, quiet: bool = False) -> pd.DataFrame:
     """
     Evaluate the clustering result of different clustering algorithms (as specified by evaluation_algorithms) on a set of data sets (as specified by evaluation_datasets) using different metrics (as specified by evaluation_metrics).
     Each algorithm will be executed n_repetitions times and all specified metrics will be used to evaluate the clustering result.
@@ -395,8 +429,9 @@ def evaluate_multiple_datasets(evaluation_datasets: list, evaluation_algorithms:
         This implies that save_path has to be defined if save_intermediate_results is set to True (default: False)
     save_labels_path : str
         The path where the clustering labels should be saved as csv. If None, the labels will not be saved (default: None)
-    random_state : np.random.RandomState | int
-        use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
+    random_state : np.random.RandomState | int | list
+        use a fixed random state to get a repeatable solution. Can also be of type int.
+        Furthermore, if can be a list containing an int for each repetition (default: None)
     quiet : bool
         Do not print any output
 
@@ -454,6 +489,7 @@ def evaluate_multiple_datasets(evaluation_datasets: list, evaluation_algorithms:
     data_names = [d.name for d in evaluation_datasets]
     assert max(
         np.unique(data_names, return_counts=True)[1]) == 1, "Some names of your datasets do not seem to be unique!"
+    seeds = _get_fixed_seed_for_each_run(n_repetitions, random_state)
     df_list = []
     for eval_data in evaluation_datasets:
         try:
@@ -483,7 +519,7 @@ def evaluate_multiple_datasets(evaluation_datasets: list, evaluation_algorithms:
                                   add_runtime=add_runtime, add_n_clusters=add_n_clusters, save_path=inner_save_path,
                                   save_labels_path=inner_save_labels_path,
                                   ignore_algorithms=eval_data.ignore_algorithms, dataset_name=eval_data.name,
-                                  random_state=random_state, quiet=quiet)
+                                  random_state=seeds, quiet=quiet)
             df_list.append(df)
         except Exception as e:
             if not quiet:
@@ -572,10 +608,10 @@ def _get_data_and_labels_from_evaluation_dataset(data_input: np.ndarray, data_lo
     return X, labels_true, X_test, labels_true_test
 
 
-def evaluation_df_to_latex_table(df: pd.DataFrame, relevant_row : str | int= "mean", output_path: str = None, pm_row: str | int | None = "std", 
+def evaluation_df_to_latex_table(df: pd.DataFrame, relevant_row : str | int = "mean", output_path: str = None, pm_row: str | int | None = "std", 
                                  bracket_row: str | int | None = None, best_in_bold: bool = True, second_best_underlined: bool = True, 
                                  color_by_value: str = None, higher_is_better: list = None, multiplier: int | float | list | None = 100,
-                                 decimal_places: int = 1) -> str:
+                                 decimal_places: int = 1, color_min_max: tuple = (5, 70)) -> str:
     """
     Convert the resulting dataframe of an evaluation into a latex table.
     Note that the latex package booktabs is required, so usepackage{booktabs} must be included in the latex file.
@@ -615,6 +651,8 @@ def evaluation_df_to_latex_table(df: pd.DataFrame, relevant_row : str | int= "me
         If it is None, the original values will be used (default: 100)
     decimal_places : int
         Number of decimal places that should be used in the latex table (default: 1)
+    color_min_max : tuple
+        Range of the color saturation used if color_by_value is defined. First entry is min (>= 0) and second entry is max (<= 100) (default: (5, 70))
 
     Returns
     -------
@@ -648,6 +686,11 @@ def evaluation_df_to_latex_table(df: pd.DataFrame, relevant_row : str | int= "me
     assert higher_is_better is None or len(higher_is_better) == len(
         metrics), "Length of higher_is_better and the number of metrics does not match. higher_is_better = {0} (length {1}), metrics = {2} (length {3})".format(
         higher_is_better, len(higher_is_better), metrics, len(metrics))
+    # Check color range
+    assert (type(color_min_max) is tuple or type(color_min_max) is list) and len(color_min_max) == 2 and color_min_max[0] <= color_min_max[
+        1] and color_min_max[0] >= 0 and color_min_max[1] <= 100, "color_min_max must be a tuple containing two values within [0, 100], where the first value is smaller than the second"
+    c_min, c_max = color_min_max
+    c_max_adj = c_max - c_min
     # Create string
     output = ""
     # Create string for standard table
@@ -717,7 +760,7 @@ def evaluation_df_to_latex_table(df: pd.DataFrame, relevant_row : str | int= "me
                         if multiplier[i] is not None and m not in ["n_clusters", "runtime"]:
                             bracket_value *= multiplier[i]
                         bracket_value = round(bracket_value, decimal_places)
-                    value_write = value_write + " (" + str(bracket_value) +")"
+                    value_write = value_write + "~(" + str(bracket_value) +")"
                 value_write = value_write + "$"
                 if relevant_value is not None and not np.isnan(relevant_value):
                     # Optional: Write best value in bold and second best underlined
@@ -734,10 +777,10 @@ def evaluation_df_to_latex_table(df: pd.DataFrame, relevant_row : str | int= "me
                         if all_values_sorted[-1] != all_values_sorted[0]:
                             if metric_is_higher_better:
                                 color_saturation = round((relevant_value - all_values_sorted[0]) / (
-                                        all_values_sorted[-1] - all_values_sorted[0]) * 65) + 5  # value between 5 and 70
+                                        all_values_sorted[-1] - all_values_sorted[0]) * c_max_adj) + c_min  # value between c_min and c_max
                             else:
                                 color_saturation = round((all_values_sorted[-1] - relevant_value) / (
-                                        all_values_sorted[-1] - all_values_sorted[0]) * 65) + 5  # value between 5 and 70
+                                        all_values_sorted[-1] - all_values_sorted[0]) * c_max_adj) + c_min  # value between c_min and c_max
                         else:
                             color_saturation = 0
                         assert type(color_saturation) is int, "color_saturation must be an int but is {0}".format(
@@ -821,7 +864,7 @@ class EvaluationDataset():
             preprocess_methods) is list or preprocess_methods is None, "preprocess_methods must be a method, a list of methods or None"
         self.preprocess_methods = preprocess_methods
         assert preprocess_params is None or type(preprocess_params) is dict or type(
-            preprocess_methods) is list, "preprocess_params must be a dict or a list of dicts"
+            preprocess_params) is list, "preprocess_params must be a dict or a list of dicts"
         self.preprocess_params = {} if preprocess_params is None else preprocess_params
         assert type(ignore_algorithms) is list or type(
             ignore_algorithms) is tuple, "ignore_algorithms must be a tuple or a list"
@@ -843,9 +886,9 @@ class EvaluationMetric():
         Parameters given to the metric function (default: {})
     metric_type : str
         The type of an EvaluationMetric can be either 'external', 'internal' or 'custom'.
-        If 'external', the metric (e.g. normalized mutual information) compares the predicted labels with ground truth labels, i.e., it is built as metric(labels_true, labels_pred, **params).
-        If 'internal', the metric (e.g. silhouette score) compares the predicted labels with patterns in the data, i.e., it is built as metric(X, labels_pred, **params).
-        If 'custom', a custom metric is used that can use the data, ground truth labels, predicted labels and other attributes from the algorithm, i.e., it is built as metric(X, labels_true, labels_pred, algorithm_obj, **params) (default: "external")
+        If 'external', the metric (e.g. normalized mutual information) compares the predicted labels with ground truth labels, i.e., it is defined as metric(labels_true, labels_pred, **params).
+        If 'internal', the metric (e.g. silhouette score) compares the predicted labels with patterns in the data, i.e., it is defined as metric(X, labels_pred, **params).
+        If 'custom', a custom metric is used that can use the data, ground truth labels, predicted labels and other attributes from the algorithm, i.e., it is defined as metric(X, labels_true, labels_pred, algorithm_obj, **params) (default: "external")
 
     Examples
     ----------
@@ -931,5 +974,5 @@ class EvaluationAlgorithm():
             preprocess_methods) is list or preprocess_methods is None, "preprocess_methods must be a method, a list of methods or None"
         self.preprocess_methods = preprocess_methods
         assert preprocess_params is None or type(preprocess_params) is dict or type(
-            preprocess_methods) is list, "preprocess_params must be a dict or a list of dicts"
+            preprocess_params) is list, "preprocess_params must be a dict or a list of dicts"
         self.preprocess_params = {} if preprocess_params is None else preprocess_params

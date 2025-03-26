@@ -3,6 +3,12 @@ from clustpy.alternative import AutoNR
 from clustpy.alternative.autonr import _find_two_closest_centers, _merge_nearest_centers, _split_largest_cluster
 from clustpy.data import create_nr_data
 from unittest.mock import patch
+from sklearn.utils.estimator_checks import check_estimator
+
+
+def test_autonr_estimator():
+    check_estimator(AutoNR(), 
+                    {"check_complex_data": "this check is expected to fail because complex values are not supported"})
 
 
 def test_find_clostest_centers():

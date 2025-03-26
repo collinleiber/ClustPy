@@ -3,6 +3,17 @@ from clustpy.partition import DipExt, DipInit
 from clustpy.partition.dipext import _dip_scaling, _n_starting_vectors_default, _angle, \
     _ambiguous_modal_triangle_random, _get_ambiguous_modal_triangle_possibilities, _ambiguous_modal_triangle_all
 from clustpy.data import create_subspace_data
+from sklearn.utils.estimator_checks import check_estimator
+
+
+def test_dipext_estimator():
+    check_estimator(DipExt(), 
+                    {"check_complex_data": "this check is expected to fail because complex values are not supported"})
+
+
+def test_dipinit_estimator():
+    check_estimator(DipInit(3), 
+                    {"check_complex_data": "this check is expected to fail because complex values are not supported"})
 
 
 def test_angle():

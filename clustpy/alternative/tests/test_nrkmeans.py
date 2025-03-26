@@ -5,6 +5,12 @@ from clustpy.alternative.nrkmeans import _assign_labels, _are_labels_equal, _is_
     _get_cost_function_of_subspace, _get_total_cost_function, _remove_empty_subspace, _get_precision
 from clustpy.data import create_nr_data
 from unittest.mock import patch
+from sklearn.utils.estimator_checks import check_estimator
+
+
+def test_nrkmeans_estimator():
+    check_estimator(NrKmeans([3, 3]), 
+                    {"check_complex_data": "this check is expected to fail because complex values are not supported"})
 
 
 def test_update_centers_and_scatter_matrices():

@@ -6,6 +6,12 @@ from clustpy.deep._data_utils import get_dataloader
 import numpy as np
 import torch
 from clustpy.data import create_subspace_data, load_optdigits
+from sklearn.utils.estimator_checks import check_estimator
+
+
+def test_deepect_estimator():
+    check_estimator(DeepECT(pretrain_epochs=3, clustering_epochs=3), 
+                    {"check_complex_data": "this check is expected to fail because complex values are not supported"})
 
 
 def test_DeepECT_ClusterTreeNode():

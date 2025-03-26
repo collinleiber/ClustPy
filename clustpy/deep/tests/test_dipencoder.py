@@ -5,6 +5,12 @@ from clustpy.deep.neural_networks import FeedforwardAutoencoder, ConvolutionalAu
 import numpy as np
 import torch
 from unittest.mock import patch
+from sklearn.utils.estimator_checks import check_estimator
+
+
+def test_dipencoder_estimator():
+    check_estimator(DipEncoder(3, pretrain_epochs=3, clustering_epochs=3), 
+                    {"check_complex_data": "this check is expected to fail because complex values are not supported"})
 
 
 def test_simple_dipencoder():

@@ -2,6 +2,17 @@ from clustpy.deep import DEC, IDEC, get_default_augmented_dataloaders
 from clustpy.data import create_subspace_data, load_optdigits
 import numpy as np
 import torch
+from sklearn.utils.estimator_checks import check_estimator
+
+
+def test_dec_estimator():
+    check_estimator(DEC(3, pretrain_epochs=3, clustering_epochs=3), 
+                    {"check_complex_data": "this check is expected to fail because complex values are not supported"})
+
+
+def test_idec_estimator():
+    check_estimator(IDEC(3, pretrain_epochs=3, clustering_epochs=3), 
+                    {"check_complex_data": "this check is expected to fail because complex values are not supported"})
 
 
 def test_simple_dec():

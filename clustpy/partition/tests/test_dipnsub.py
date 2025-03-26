@@ -1,6 +1,12 @@
 import numpy as np
 from clustpy.partition import DipNSub
 from clustpy.data import create_subspace_data
+from sklearn.utils.estimator_checks import check_estimator
+
+
+def test_dipnsub_estimator():
+    check_estimator(DipNSub(), 
+                    {"check_complex_data": "this check is expected to fail because complex values are not supported"})
 
 """
 Tests regarding the DipNSub object

@@ -3,6 +3,12 @@ from clustpy.partition import GapStatistic
 from clustpy.partition.gapstatistic import _execute_kmeans, _generate_random_data
 from sklearn.datasets import make_blobs
 from unittest.mock import patch
+from sklearn.utils.estimator_checks import check_estimator
+
+
+def test_gapstatistic_estimator():
+    check_estimator(GapStatistic(), 
+                    {"check_complex_data": "this check is expected to fail because complex values are not supported"})
 
 
 def test_execute_kmeans():

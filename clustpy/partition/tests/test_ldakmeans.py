@@ -1,6 +1,12 @@
 import numpy as np
 from clustpy.partition import LDAKmeans
 from clustpy.data import create_subspace_data
+from sklearn.utils.estimator_checks import check_estimator
+
+
+def test_ldakmeans_estimator():
+    check_estimator(LDAKmeans(3), 
+                    {"check_complex_data": "this check is expected to fail because complex values are not supported"})
 
 """
 Tests regarding the LDAKmeans object

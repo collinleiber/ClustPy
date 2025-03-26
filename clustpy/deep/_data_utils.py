@@ -189,12 +189,12 @@ def get_dataloader(X: np.ndarray | torch.Tensor, batch_size: int, shuffle: bool 
     dataloader : torch.utils.data.DataLoader
         The final dataloader
     """
-    assert type(X) in [np.ndarray, torch.Tensor], "X must be of type np.ndarray or torch.Tensor."
+    assert type(X) in [np.ndarray, torch.Tensor, np.memmap], "X must be of type np.ndarray or torch.Tensor. Your type: {0}".format(type(X))
     assert additional_inputs is None or type(additional_inputs) in [np.ndarray, torch.Tensor,
                                                                     list], "additional_input must be None or of type np.ndarray, torch.Tensor or list."
     ds_kwargs = {} if ds_kwargs is None else ds_kwargs
     dl_kwargs = {} if dl_kwargs is None else dl_kwargs
-    if type(X) is np.ndarray:
+    if type(X) in [np.ndarray, np.memmap]:
         # Convert np.ndarray to torch.Tensor
         X = torch.from_numpy(X).float()
     dataset_input = [X]

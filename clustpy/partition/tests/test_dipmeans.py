@@ -1,6 +1,12 @@
 import numpy as np
 from clustpy.partition import DipMeans
 from sklearn.datasets import make_blobs
+from sklearn.utils.estimator_checks import check_estimator
+
+
+def test_dipmeans_estimator():
+    check_estimator(DipMeans(), 
+                    {"check_complex_data": "this check is expected to fail because complex values are not supported"})
 
 """
 Tests regarding the DipMeans object
