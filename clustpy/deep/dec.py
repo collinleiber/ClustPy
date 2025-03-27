@@ -6,7 +6,7 @@ Collin Leiber
 """
 
 from clustpy.deep._utils import encode_batchwise, squared_euclidean_distance, predict_batchwise, \
-    embedded_kmeans_prediction
+    embedded_kmeans_prediction, mean_squared_error
 from clustpy.deep._train_utils import get_default_deep_clustering_initialization
 from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
 import torch
@@ -14,11 +14,12 @@ import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.base import ClusterMixin
 import tqdm
+from collections.abc import Callable#
 
 
 def _dec(X: np.ndarray, n_clusters: int, alpha: float, batch_size: int, pretrain_optimizer_params: dict,
          clustering_optimizer_params: dict, pretrain_epochs: int, clustering_epochs: int,
-         optimizer_class: torch.optim.Optimizer, ssl_loss_fn: torch.nn.modules.loss._Loss,
+         optimizer_class: torch.optim.Optimizer, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss,
          neural_network: torch.nn.Module | tuple, neural_network_weights: str, embedding_size: int,
          clustering_loss_weight: float, ssl_loss_weight: float, custom_dataloaders: tuple,
          augmentation_invariance: bool, initial_clustering_class: ClusterMixin, initial_clustering_params: dict,
@@ -47,7 +48,7 @@ def _dec(X: np.ndarray, n_clusters: int, alpha: float, batch_size: int, pretrain
         number of epochs for the actual clustering procedure
     optimizer_class : torch.optim.Optimizer
         the optimizer
-    ssl_loss_fn : torch.nn.modules.loss._Loss
+    ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
          self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
     neural_network : torch.nn.Module | tuple
         the input neural network.
@@ -306,7 +307,7 @@ class _DEC_Module(torch.nn.Module):
         return loss
 
     def _loss(self, batch: list, neural_network: torch.nn.Module, clustering_loss_weight: float,
-              ssl_loss_weight: float, ssl_loss_fn: torch.nn.modules.loss._Loss, device: torch.device) -> torch.Tensor:
+              ssl_loss_weight: float, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss, device: torch.device) -> torch.Tensor:
         """
         Calculate the complete DEC + optional neural network loss.
 
@@ -320,7 +321,7 @@ class _DEC_Module(torch.nn.Module):
             weight of the clustering loss
         ssl_loss_weight : float
             weight of the clustering loss
-        ssl_loss_fn : torch.nn.modules.loss._Loss
+        ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
             loss function for the reconstruction
         device : torch.device
             device to be trained on
@@ -358,7 +359,7 @@ class _DEC_Module(torch.nn.Module):
         return loss
 
     def fit(self, neural_network: torch.nn.Module, trainloader: torch.utils.data.DataLoader, n_epochs: int,
-            device: torch.device, optimizer: torch.optim.Optimizer, ssl_loss_fn: torch.nn.modules.loss._Loss,
+            device: torch.device, optimizer: torch.optim.Optimizer, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss,
             clustering_loss_weight: float, ssl_loss_weight: float) -> '_DEC_Module':
         """
         Trains the _DEC_Module in place.
@@ -375,7 +376,7 @@ class _DEC_Module(torch.nn.Module):
             device to be trained on
         optimizer : torch.optim.Optimizer
             the optimizer for training
-        ssl_loss_fn : torch.nn.modules.loss._Loss
+        ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
             self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
         clustering_loss_weight : float
             weight of the clustering loss
@@ -428,8 +429,8 @@ class DEC(_AbstractDeepClusteringAlgo):
         number of epochs for the actual clustering procedure (default: 150)
     optimizer_class : torch.optim.Optimizer
         the optimizer class (default: torch.optim.Adam)
-    ssl_loss_fn : torch.nn.modules.loss._Loss
-         self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: torch.nn.MSELoss())
+    ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
+         self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: mean_squared_error)
     neural_network : torch.nn.Module | tuple
         the input neural network. If None, a new FeedforwardAutoencoder will be created.
         Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict) (default: None)
@@ -488,7 +489,7 @@ class DEC(_AbstractDeepClusteringAlgo):
                  pretrain_optimizer_params: dict = None, clustering_optimizer_params: dict = None,
                  pretrain_epochs: int = 100, clustering_epochs: int = 150,
                  optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
-                 ssl_loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(),
+                 ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error,
                  neural_network: torch.nn.Module | tuple = None, neural_network_weights: str = None,
                  embedding_size: int = 10, clustering_loss_weight: float = 1., custom_dataloaders: tuple = None,
                  augmentation_invariance: bool = False, initial_clustering_class: ClusterMixin = KMeans,
@@ -598,8 +599,8 @@ class IDEC(DEC):
         number of epochs for the actual clustering procedure (default: 150)
     optimizer_class : torch.optim.Optimizer
         the optimizer class (default: torch.optim.Adam)
-    ssl_loss_fn : torch.nn.modules.loss._Loss
-         self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: torch.nn.MSELoss())
+    ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
+         self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: mean_squared_error)
     neural_network : torch.nn.Module | tuple
         the input neural network. If None, a new FeedforwardAutoencoder will be created.
         Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict) (default: None)
@@ -659,7 +660,7 @@ class IDEC(DEC):
                  pretrain_optimizer_params: dict = None,
                  clustering_optimizer_params: dict = None, pretrain_epochs: int = 100,
                  clustering_epochs: int = 150, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
-                 ssl_loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(),
+                 ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error,
                  neural_network: torch.nn.Module | tuple = None, neural_network_weights: str = None,
                  embedding_size: int = 10, clustering_loss_weight: float = 0.1, ssl_loss_weight: float = 1.0,
                  custom_dataloaders: tuple = None, augmentation_invariance: bool = False,

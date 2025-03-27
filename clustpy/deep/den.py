@@ -5,7 +5,7 @@ Collin Leiber
 
 import torch
 import numpy as np
-from clustpy.deep._utils import detect_device, encode_batchwise, embedded_kmeans_prediction
+from clustpy.deep._utils import detect_device, encode_batchwise, embedded_kmeans_prediction, mean_squared_error
 from clustpy.deep._data_utils import get_train_and_test_dataloader
 from clustpy.deep._train_utils import get_neural_network
 from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
@@ -13,6 +13,7 @@ from sklearn.mixture import GaussianMixture as GMM
 import tqdm
 from sklearn.neighbors import NearestNeighbors
 from sklearn.cluster import KMeans
+from collections.abc import Callable
 
 
 class DEN(_AbstractDeepClusteringAlgo):
@@ -47,8 +48,8 @@ class DEN(_AbstractDeepClusteringAlgo):
         number of epochs for the pretraining of the neural network (default: 100)
     optimizer_class : torch.optim.Optimizer
         the optimizer class (default: torch.optim.Adam)
-    ssl_loss_fn : torch.nn.modules.loss._Loss
-         self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: torch.nn.MSELoss())
+    ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
+         self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: mean_squared_error)
     neural_network : torch.nn.Module | tuple
         the input neural network. If None, a new FeedforwardAutoencoder will be created.
         Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict) (default: None)
@@ -94,7 +95,7 @@ class DEN(_AbstractDeepClusteringAlgo):
                  weight_sparsity_constraint: float = 1., heat_kernel_t_parameter: float = 1., group_lasso_lambda_parameter: float = 1.,
                  batch_size: int = 256, pretrain_optimizer_params: dict = None,
                  pretrain_epochs: int = 100, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
-                 ssl_loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(),
+                 ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error,
                  neural_network: torch.nn.Module | tuple = None, neural_network_weights: str = None,
                  embedding_size: int | None = None, custom_dataloaders: tuple = None,
                  device: torch.device = None, random_state: np.random.RandomState | int = None):
@@ -110,6 +111,7 @@ class DEN(_AbstractDeepClusteringAlgo):
             assert embedding_size >= n_clusters, "embedding_size can not be smaller than n_clusters"
             group_size = np.array([embedding_size // n_clusters] * n_clusters)
             group_size[: embedding_size % n_clusters] += 1
+        assert len(group_size) == n_clusters, "group_size must have n_clusters entries"
         self.n_clusters = n_clusters
         self.group_size = group_size
         self.n_neighbors = n_neighbors

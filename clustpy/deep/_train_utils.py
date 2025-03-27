@@ -4,7 +4,8 @@ import copy
 import numpy as np
 from sklearn.base import ClusterMixin
 from clustpy.deep._data_utils import get_dataloader, get_train_and_test_dataloader, get_data_dim_from_dataloader
-from clustpy.deep._utils import run_initial_clustering, detect_device, encode_batchwise
+from clustpy.deep._utils import run_initial_clustering, detect_device, encode_batchwise, mean_squared_error
+from collections.abc import Callable
 
 
 def _get_default_layers(input_dim: int, embedding_size: int) -> list:
@@ -104,7 +105,7 @@ def get_neural_network(input_dim: int, embedding_size: int = 10, neural_network:
 def get_trained_network(trainloader: torch.utils.data.DataLoader = None, data: np.ndarray = None,
                         n_epochs: int = 100, batch_size: int = 128, optimizer_params: dict = None,
                         optimizer_class: torch.optim.Optimizer = torch.optim.Adam, device=None,
-                        ssl_loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), embedding_size: int = 10,
+                        ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error, embedding_size: int = 10,
                         neural_network: torch.nn.Module | tuple = None,
                         neural_network_class: torch.nn.Module = FeedforwardAutoencoder,
                         neural_network_params: dict = None, neural_network_weights: str = None,
@@ -132,8 +133,8 @@ def get_trained_network(trainloader: torch.utils.data.DataLoader = None, data: n
     device : torch.device
         The device on which to perform the computations.
         If device is None then it will be automatically chosen: if a gpu is available the gpu with the highest amount of free memory will be chosen (default: None)
-    ssl_loss_fn : torch.nn.modules.loss._Loss
-        self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: torch.nn.MSELoss())
+    ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
+        self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: mean_squared_error)
     embedding_size : int
         dimension of the innermost layer of the neural network (default: 10)
     neural_network : torch.nn.Module | tuple
@@ -177,7 +178,7 @@ def get_trained_network(trainloader: torch.utils.data.DataLoader = None, data: n
 def get_default_deep_clustering_initialization(X: np.ndarray | torch.Tensor, n_clusters: int, batch_size: int,
                                                pretrain_optimizer_params: dict, pretrain_epochs: int,
                                                optimizer_class: torch.optim.Optimizer,
-                                               ssl_loss_fn: torch.nn.modules.loss._Loss,
+                                               ssl_loss_fn: Callable | torch.nn.modules.loss._Loss,
                                                neural_network: torch.nn.Module | tuple, embedding_size: int,
                                                custom_dataloaders: tuple, initial_clustering_class: ClusterMixin,
                                                initial_clustering_params: dict, device: torch.device,
@@ -205,7 +206,7 @@ def get_default_deep_clustering_initialization(X: np.ndarray | torch.Tensor, n_c
         number of epochs for the pretraining of the neural network
     optimizer_class : torch.optim.Optimizer
         the optimizer
-    ssl_loss_fn : torch.nn.modules.loss._Loss
+    ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
         self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
     neural_network : torch.nn.Module | tuple
         the input neural network. If None, a new FeedforwardAutoencoder will be created.

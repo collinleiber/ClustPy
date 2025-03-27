@@ -7,12 +7,13 @@ import torch
 import numpy as np
 from clustpy.deep._early_stopping import EarlyStopping
 from clustpy.deep._data_utils import get_dataloader
-from clustpy.deep._utils import encode_batchwise, get_device_from_module
+from clustpy.deep._utils import encode_batchwise, get_device_from_module, mean_squared_error
 import os
 import tqdm
 from collections.abc import Callable
 from sklearn.utils import check_random_state
 from clustpy.deep._utils import set_torch_seed
+from collections.abc import Callable
 
 
 class FullyConnectedBlock(torch.nn.Module):
@@ -169,7 +170,7 @@ class _AbstractAutoencoder(torch.nn.Module):
         reconstruction = self.decode(embedded)
         return reconstruction
 
-    def loss(self, batch: list, ssl_loss_fn: torch.nn.modules.loss._Loss, device: torch.device,
+    def loss(self, batch: list, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss, device: torch.device,
              corruption_fn: Callable = None) -> (
             torch.Tensor, torch.Tensor, torch.Tensor):
         """
@@ -179,7 +180,7 @@ class _AbstractAutoencoder(torch.nn.Module):
         ----------
         batch : list
             the different parts of a dataloader (id, samples, ...)
-        ssl_loss_fn : torch.nn.modules.loss._Loss
+        ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
             self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss
         device : torch.device
             device to be trained on
@@ -203,7 +204,7 @@ class _AbstractAutoencoder(torch.nn.Module):
         loss = ssl_loss_fn(reconstructed, batch_data)
         return loss, embedded, reconstructed
 
-    def loss_augmentation(self, batch: list, ssl_loss_fn: torch.nn.modules.loss._Loss, device: torch.device,
+    def loss_augmentation(self, batch: list, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss, device: torch.device,
                           corruption_fn: Callable = None) -> (
             torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor):
         """
@@ -214,7 +215,7 @@ class _AbstractAutoencoder(torch.nn.Module):
         ----------
         batch : list
             the different parts of a dataloader (id, augmented samples, original samples, ...)
-        ssl_loss_fn : torch.nn.modules.loss._Loss
+        ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
             self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss
         device : torch.device
             device to be trained on
@@ -244,7 +245,7 @@ class _AbstractAutoencoder(torch.nn.Module):
         loss_total = (loss_orig + loss_augmented) / 2
         return loss_total, embedded, reconstructed, embedded_aug, reconstructed_aug
 
-    def evaluate(self, dataloader: torch.utils.data.DataLoader, ssl_loss_fn: torch.nn.modules.loss._Loss,
+    def evaluate(self, dataloader: torch.utils.data.DataLoader, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss,
                  device: torch.device) -> torch.Tensor:
         """
         Evaluates the autoencoder.
@@ -253,7 +254,7 @@ class _AbstractAutoencoder(torch.nn.Module):
         ----------
         dataloader : torch.utils.data.DataLoader
             dataloader to be used for training
-        ssl_loss_fn : torch.nn.modules.loss._Loss
+        ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
             self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss
         device : torch.device
             device to be trained on
@@ -276,7 +277,7 @@ class _AbstractAutoencoder(torch.nn.Module):
             data: np.ndarray | torch.Tensor = None, data_eval: np.ndarray | torch.Tensor = None,
             dataloader: torch.utils.data.DataLoader = None, evalloader: torch.utils.data.DataLoader = None,
             optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
-            ssl_loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), patience: int = 5,
+            ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error, patience: int = 5,
             scheduler: torch.optim.lr_scheduler = None, scheduler_params: dict = {},
             corruption_fn: Callable = None, model_path: str = None) -> '_AbstractAutoencoder':
         """
@@ -300,8 +301,8 @@ class _AbstractAutoencoder(torch.nn.Module):
             dataloader to be used for evaluation, early stopping and learning rate scheduling if scheduler=torch.optim.lr_scheduler.ReduceLROnPlateau (default: None)
         optimizer_class : torch.optim.Optimizer
             optimizer to be used (default: torch.optim.Adam)
-        ssl_loss_fn : torch.nn.modules.loss._Loss
-            self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss (default: torch.nn.MSELoss())
+        ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
+            self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss (default: mean_squared_error)
         patience : int
             patience parameter for EarlyStopping (default: 5)
         scheduler : torch.optim.lr_scheduler

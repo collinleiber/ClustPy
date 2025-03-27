@@ -19,7 +19,7 @@ from collections.abc import Callable
 
 def _vade(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_params: dict,
           clustering_optimizer_params: dict, pretrain_epochs: int, clustering_epochs: int,
-          optimizer_class: torch.optim.Optimizer, ssl_loss_fn: torch.nn.modules.loss._Loss,
+          optimizer_class: torch.optim.Optimizer, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss,
           neural_network: torch.nn.Module | tuple, neural_network_weights: str,
           embedding_size: int, clustering_loss_weight: float, ssl_loss_weight: float,
           custom_dataloaders: tuple, initial_clustering_class: ClusterMixin, initial_clustering_params: dict,
@@ -46,7 +46,7 @@ def _vade(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_pa
         number of epochs for the actual clustering procedure
     optimizer_class : torch.optim.Optimizer
         the optimizer class
-    ssl_loss_fn : torch.nn.modules.loss._Loss
+    ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
          self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
     neural_network : torch.nn.Module | tuple
         the input neural network.
@@ -166,7 +166,7 @@ class _VaDE_VAE(VariationalAutoencoder):
             z, q_mean, q_logvar, reconstruction = super().forward(x)
         return z, q_mean, q_logvar, reconstruction
 
-    def loss(self, batch: list, ssl_loss_fn: torch.nn.modules.loss._Loss, device: torch.device,
+    def loss(self, batch: list, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss, device: torch.device,
              corruption_fn: Callable = None, beta: float = 1) -> (torch.Tensor, torch.Tensor, torch.Tensor):
         """
         Calculate the loss of a single batch of data.
@@ -177,7 +177,7 @@ class _VaDE_VAE(VariationalAutoencoder):
         ----------
         batch: list
             the different parts of a dataloader (id, samples, ...)
-        ssl_loss_fn : torch.nn.modules.loss._Loss
+        ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
             self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
         device : torch.device
             device to be trained on
@@ -279,7 +279,7 @@ class _VaDE_Module(torch.nn.Module):
         return pred
 
     def vade_loss(self, neural_network: VariationalAutoencoder, batch_data: torch.Tensor,
-                  ssl_loss_fn: torch.nn.modules.loss._Loss, clustering_loss_weight: float,
+                  ssl_loss_fn: Callable | torch.nn.modules.loss._Loss, clustering_loss_weight: float,
                   ssl_loss_weight: float) -> torch.Tensor:
         """
         Calculate the VaDE loss of given samples.
@@ -290,7 +290,7 @@ class _VaDE_Module(torch.nn.Module):
             the VariationalAutoencoder
         batch_data : torch.Tensor
             the samples
-        ssl_loss_fn : torch.nn.modules.loss._Loss
+        ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
             self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
         clustering_loss_weight : float
             weight of the clustering loss
@@ -311,7 +311,7 @@ class _VaDE_Module(torch.nn.Module):
 
     def fit(self, neural_network: VariationalAutoencoder, testloader: torch.utils.data.DataLoader,
             trainloader: torch.utils.data.DataLoader, n_epochs: int, device: torch.device,
-            optimizer: torch.optim.Optimizer, ssl_loss_fn: torch.nn.modules.loss._Loss, clustering_loss_weight: float,
+            optimizer: torch.optim.Optimizer, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss, clustering_loss_weight: float,
             ssl_loss_weight: float) -> '_VaDE_Module':
         """
         Trains the _VaDE_Module in place.
@@ -330,7 +330,7 @@ class _VaDE_Module(torch.nn.Module):
             device to be trained on
         optimizer : torch.optim.Optimizer
             the optimizer
-        ssl_loss_fn : torch.nn.modules.loss._Loss
+        ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
             self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
         clustering_loss_weight : float
             weight of the clustering loss
@@ -427,7 +427,7 @@ def _get_gamma(pi: torch.Tensor, p_mean: torch.Tensor, p_log_var: torch.Tensor, 
 
 def _compute_vade_loss(pi: torch.Tensor, p_mean: torch.Tensor, p_log_var: torch.Tensor, q_mean: torch.Tensor,
                        q_log_var: torch.Tensor, batch_data: torch.Tensor, p_c_z: torch.Tensor,
-                       reconstruction: torch.Tensor, ssl_loss_fn: torch.nn.modules.loss._Loss,
+                       reconstruction: torch.Tensor, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss,
                        clustering_loss_weight: float, ssl_loss_weight: float) -> torch.Tensor:
     """
     Calculate the final loss of the input samples for the VaDE algorithm.
@@ -450,7 +450,7 @@ def _compute_vade_loss(pi: torch.Tensor, p_mean: torch.Tensor, p_log_var: torch.
         result of the _get_gamma function
     reconstruction : torch.Tensor
         the reconstructed version of the input samples
-    ssl_loss_fn : torch.nn.modules.loss._Loss
+    ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
         self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
     clustering_loss_weight : float
         weight of the clustering loss
@@ -504,7 +504,7 @@ class VaDE(_AbstractDeepClusteringAlgo):
         number of epochs for the actual clustering procedure (default: 150)
     optimizer_class : torch.optim.Optimizer
         the optimizer class (default: torch.optim.Adam)
-    ssl_loss_fn : torch.nn.modules.loss._Loss
+    ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
          self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: torch.nn.BCELoss(reduction='sum'))
     clustering_loss_weight : float
         weight of the clustering loss (default: 1.0)
@@ -567,7 +567,7 @@ class VaDE(_AbstractDeepClusteringAlgo):
     def __init__(self, n_clusters: int, batch_size: int = 256, pretrain_optimizer_params: dict = None,
                  clustering_optimizer_params: dict = None, pretrain_epochs: int = 10,
                  clustering_epochs: int = 150, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
-                 ssl_loss_fn: torch.nn.modules.loss._Loss = torch.nn.BCELoss(reduction='sum'),
+                 ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = torch.nn.BCELoss(reduction='sum'),
                  clustering_loss_weight: float = 1.0, ssl_loss_weight: float = 1.0,
                  neural_network: torch.nn.Module | tuple = None, neural_network_weights: str = None,
                  embedding_size: int = 10, custom_dataloaders: tuple = None,
