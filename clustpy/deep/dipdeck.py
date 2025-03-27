@@ -22,7 +22,7 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
               neural_network: torch.nn.Module | tuple, neural_network_weights: str, embedding_size: int,
               max_cluster_size_diff_factor: float, pval_strategy: str, n_boots: int, custom_dataloaders: tuple,
               augmentation_invariance: bool, initial_clustering_class: ClusterMixin, initial_clustering_params: dict,
-              device: torch.device, random_state: np.random.RandomState) -> (
+              device: torch.device, random_state: np.random.RandomState, debug: bool) -> (
         np.ndarray, int, np.ndarray, torch.nn.Module):
     """
     Start the actual DipDECK clustering procedure on the input data set.
@@ -88,6 +88,9 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
         The device on which to perform the computations
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution
+    debug : bool
+        If true, additional information will be printed to the console
+
 
     Returns
     -------
@@ -142,7 +145,7 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
                                                                                              augmentation_invariance,
                                                                                              max_cluster_size_diff_factor,
                                                                                              pval_strategy, n_boots,
-                                                                                             random_state)
+                                                                                             random_state, debug)
     # Return results
     return cluster_labels_cpu, n_clusters_current, centers_cpu, neural_network
 
@@ -155,7 +158,7 @@ def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_thresho
                        neural_network: torch.nn.Module, device: torch.device, trainloader: torch.utils.data.DataLoader,
                        testloader: torch.utils.data.DataLoader, augmentation_invariance: bool,
                        max_cluster_size_diff_factor: float, pval_strategy: str, n_boots: int,
-                       random_state: np.random.RandomState) -> (
+                       random_state: np.random.RandomState, debug: bool) -> (
         np.ndarray, int, np.ndarray, torch.nn.Module):
     """
     The training function of DipDECK. Contains most of the essential functionalities.
@@ -212,6 +215,8 @@ def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_thresho
         Number of bootstraps used to calculate dip-p-values. Only necessary if pval_strategy is 'bootstrap'
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution
+    debug : bool
+        If true, additional information will be printed to the console
 
     Returns
     -------
@@ -354,8 +359,9 @@ def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_thresho
             print("Abort DipDECK: Only one cluster left")
             break
     tbar.close()
-    for merge_message in merges_log:
-        print(merge_message)
+    if debug:
+        for merge_message in merges_log:
+            print(merge_message)
     return cluster_labels_cpu, n_clusters_current, centers_cpu, neural_network
 
 
@@ -622,11 +628,14 @@ class DipDECK(_AbstractDeepClusteringAlgo):
         clustering class to obtain the initial cluster labels after the pretraining (default: KMeans)
     initial_clustering_params : dict
         parameters for the initial clustering class (default: {})
-    random_state : np.random.RandomState | int
-        use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
     device : torch.device
         The device on which to perform the computations.
         If device is None then it will be automatically chosen: if a gpu is available the gpu with the highest amount of free memory will be chosen (default: None)
+    random_state : np.random.RandomState | int
+        use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
+    debug : bool
+        If true, additional information will be printed to the console (default: False)
+
 
     Attributes
     ----------
@@ -663,7 +672,7 @@ class DipDECK(_AbstractDeepClusteringAlgo):
                  embedding_size: int = 5, max_cluster_size_diff_factor: float = 2, pval_strategy: str = "table",
                  n_boots: int = 1000, custom_dataloaders: tuple = None, augmentation_invariance: bool = False,
                  initial_clustering_class: ClusterMixin = KMeans, initial_clustering_params: dict = None,
-                 device: torch.device = None, random_state: np.random.RandomState | int = None):
+                 device: torch.device = None, random_state: np.random.RandomState | int = None, debug: bool = False):
         super().__init__(batch_size, neural_network, neural_network_weights, embedding_size, device, random_state)
         self.n_clusters_init = n_clusters_init
         self.dip_merge_threshold = dip_merge_threshold
@@ -686,6 +695,7 @@ class DipDECK(_AbstractDeepClusteringAlgo):
         self.augmentation_invariance = augmentation_invariance
         self.initial_clustering_class = initial_clustering_class
         self.initial_clustering_params = {} if initial_clustering_params is None else initial_clustering_params
+        self.debug = debug
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DipDECK':
         """
@@ -720,7 +730,7 @@ class DipDECK(_AbstractDeepClusteringAlgo):
                                                                 self.augmentation_invariance,
                                                                 self.initial_clustering_class,
                                                                 self.initial_clustering_params, self.device,
-                                                                self.random_state)
+                                                                self.random_state, self.debug)
         self.labels_ = labels
         self.n_clusters_ = n_clusters
         self.cluster_centers_ = centers

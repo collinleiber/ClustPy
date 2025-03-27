@@ -289,13 +289,7 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
                 # Optional: Obtain labels from the predict method
                 if X_test is not None:
                     try:
-                        predict_params = inspect.getfullargspec(algo_obj.predict).args
-                        # Normally, there should not be X_train and X_test as input
-                        if "X_train" in predict_params and "X_test" in predict_params:
-                            labels_predicted_test = algo_obj.predict(X_train=X_processed,
-                                                                     X_test=X_test_processed)  # TODO Remove special case for DipEncoder
-                        else:
-                            labels_predicted_test = algo_obj.predict(X_test_processed)
+                        labels_predicted_test = algo_obj.predict(X_test_processed)
                     except Exception as e:
                         if not quiet:
                             print("Problem when running the predict method of {0} in iteration {1}".format(eval_algo.name,
