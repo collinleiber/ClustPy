@@ -6,7 +6,7 @@ Collin Leiber
 import torch
 import numpy as np
 from scipy.spatial.distance import cdist
-from clustpy.deep import mean_squared_error
+from clustpy.deep._utils import mean_squared_error
 from clustpy.deep.neural_networks.feedforward_autoencoder import FeedforwardAutoencoder
 from clustpy.deep.neural_networks._abstract_autoencoder import FullyConnectedBlock
 from collections.abc import Callable
