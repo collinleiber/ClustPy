@@ -239,7 +239,8 @@ class DEN(_AbstractDeepClusteringAlgo):
             nearest_neighbors_ids = neighbors.kneighbors(n_neighbors=self.n_neighbors - 1, return_distance=False)
             for i in range(self.n_neighbors - 1):
                 nearest_neigbors.append(X[nearest_neighbors_ids[:, i]])
-        trainloader, testloader, _ = get_train_and_test_dataloader(X, self.batch_size, self.custom_dataloaders, additional_inputs_trainloader=nearest_neigbors)
+        trainloader, testloader, _ = get_train_and_test_dataloader(X, self.batch_size, self.custom_dataloaders, 
+                                                                   additional_inputs_trainloader=nearest_neigbors if self.custom_dataloaders is None else None)
         assert len(next(iter(trainloader))) >= self.n_neighbors + 1, "Trainloader does not appear to include any neighbors."
         # Get AE
         neural_network = get_neural_network(input_dim=X.shape[1], embedding_size=self.embedding_size, 
