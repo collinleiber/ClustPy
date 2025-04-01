@@ -4,6 +4,7 @@ import numpy as np
 import torch
 from clustpy.deep._data_utils import augmentation_invariance_check
 from clustpy.utils.checks import check_parameters
+from sklearn.utils.validation import check_is_fitted
 
 
 class _AbstractDeepClusteringAlgo(BaseEstimator, ClusterMixin, TransformerMixin):
@@ -92,9 +93,28 @@ class _AbstractDeepClusteringAlgo(BaseEstimator, ClusterMixin, TransformerMixin)
         X_embed : np.ndarray
             The embedded data set
         """
+        check_is_fitted(self, ["labels_", "neural_network_trained_"])
         X, _, _ = check_parameters(X)
         X_embed = self.neural_network_trained_.transform(X, self.batch_size)
         return X_embed.astype(X.dtype)
+
+    def fit(self, X: np.ndarray, y: np.ndarray = None) -> '_AbstractDeepClusteringAlgo':
+        """
+        Placeholder for the fit function of deep clustering algorithms.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            the given data set
+        y : np.ndarray
+            the labels (can be ignored)
+
+        Returns
+        -------
+        self : _AbstractDeepClusteringAlgo
+            this instance of the _AbstractDeepClusteringAlgo
+        """
+        return self
 
     def fit_transform(self, X: np.ndarray, y: np.ndarray=None):
         """
