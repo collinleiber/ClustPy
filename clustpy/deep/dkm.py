@@ -443,8 +443,10 @@ class DKM(_AbstractDeepClusteringAlgo):
         The final DKM labels
     dkm_cluster_centers_ : np.ndarray
         The final DKM cluster centers
-    neural_network : torch.nn.Module
+    neural_network_trained_ : torch.nn.Module
         The final neural network
+    n_features_in_ : int
+        the number of features used for the fitting
 
     Examples
     ----------
@@ -480,10 +482,8 @@ class DKM(_AbstractDeepClusteringAlgo):
             alphas = [alphas]
         assert type(alphas) is tuple or type(alphas) is list, "alphas must be a list, int or tuple"
         self.alphas = alphas
-        self.pretrain_optimizer_params = {
-            "lr": 1e-3} if pretrain_optimizer_params is None else pretrain_optimizer_params
-        self.clustering_optimizer_params = {
-            "lr": 1e-4} if clustering_optimizer_params is None else clustering_optimizer_params
+        self.pretrain_optimizer_params = pretrain_optimizer_params
+        self.clustering_optimizer_params = clustering_optimizer_params
         self.pretrain_epochs = pretrain_epochs
         self.clustering_epochs = clustering_epochs
         self.optimizer_class = optimizer_class
@@ -493,7 +493,7 @@ class DKM(_AbstractDeepClusteringAlgo):
         self.custom_dataloaders = custom_dataloaders
         self.augmentation_invariance = augmentation_invariance
         self.initial_clustering_class = initial_clustering_class
-        self.initial_clustering_params = {} if initial_clustering_params is None else initial_clustering_params
+        self.initial_clustering_params = initial_clustering_params
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DKM':
         """
@@ -512,11 +512,11 @@ class DKM(_AbstractDeepClusteringAlgo):
         self : DKM
             this instance of the DKM algorithm
         """
-        super().fit(X, y)
+        X, _, random_state, pretrain_optimizer_params, clustering_optimizer_params, initial_clustering_params = self._check_parameters(X, y=y)
         kmeans_labels, kmeans_centers, dkm_labels, dkm_centers, neural_network = _dkm(X, self.n_clusters, self.alphas,
                                                                                       self.batch_size,
-                                                                                      self.pretrain_optimizer_params,
-                                                                                      self.clustering_optimizer_params,
+                                                                                      pretrain_optimizer_params,
+                                                                                      clustering_optimizer_params,
                                                                                       self.pretrain_epochs,
                                                                                       self.clustering_epochs,
                                                                                       self.optimizer_class,
@@ -529,14 +529,15 @@ class DKM(_AbstractDeepClusteringAlgo):
                                                                                       self.custom_dataloaders,
                                                                                       self.augmentation_invariance,
                                                                                       self.initial_clustering_class,
-                                                                                      self.initial_clustering_params,
+                                                                                      initial_clustering_params,
                                                                                       self.device,
-                                                                                      self.random_state)
+                                                                                      random_state)
         self.labels_ = kmeans_labels
         self.cluster_centers_ = kmeans_centers
         self.dkm_labels_ = dkm_labels
         self.dkm_cluster_centers_ = dkm_centers
-        self.neural_network = neural_network
+        self.neural_network_trained_ = neural_network
+        self.n_features_in_ = X.shape[1]
         return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:

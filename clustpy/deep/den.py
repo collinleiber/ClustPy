@@ -9,11 +9,11 @@ from clustpy.deep._utils import detect_device, encode_batchwise, embedded_kmeans
 from clustpy.deep._data_utils import get_train_and_test_dataloader
 from clustpy.deep._train_utils import get_neural_network
 from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
-from sklearn.mixture import GaussianMixture as GMM
 import tqdm
 from sklearn.neighbors import NearestNeighbors
 from sklearn.cluster import KMeans
 from collections.abc import Callable
+from clustpy.utils.checks import check_parameters
 
 
 class DEN(_AbstractDeepClusteringAlgo):
@@ -26,7 +26,7 @@ class DEN(_AbstractDeepClusteringAlgo):
     Parameters
     ----------
     n_clusters : int
-        number of clusters
+        number of clusters (default: 8)
     group_size : int | list
         the number of features in each group. Can also be a list, specifying the size of each group separately. Can be None if embedding_size is specified (default: 2)
     n_neighbors : int
@@ -70,12 +70,14 @@ class DEN(_AbstractDeepClusteringAlgo):
 
     Attributes
     ----------
-    n_clusters_ : int
-        The final number of clusters
     labels_ : np.ndarray
-        The final labels (obtained by a variant of Density Peak Clustering)
-    neural_network : torch.nn.Module
+        The final labels (obtained by KMeans)
+    cluster_centers_ : np.ndarray
+        The final cluster centers (obtained by KMeans)
+    neural_network_trained_ : torch.nn.Module
         The final neural network
+    n_features_in_ : int
+        the number of features used for the fitting
 
     Examples
     ----------
@@ -91,7 +93,7 @@ class DEN(_AbstractDeepClusteringAlgo):
     2014 22nd International conference on pattern recognition. IEEE, 2014.
     """
 
-    def __init__(self, n_clusters: int, group_size : int | list | None = 2, n_neighbors: int = 3, weight_locality_constraint: float = 0.5, 
+    def __init__(self, n_clusters: int = 8, group_size : int | list | None = 2, n_neighbors: int = 3, weight_locality_constraint: float = 0.5, 
                  weight_sparsity_constraint: float = 1., heat_kernel_t_parameter: float = 1., group_lasso_lambda_parameter: float = 1.,
                  batch_size: int = 256, pretrain_optimizer_params: dict = None,
                  pretrain_epochs: int = 100, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
@@ -101,17 +103,7 @@ class DEN(_AbstractDeepClusteringAlgo):
                  device: torch.device = None, random_state: np.random.RandomState | int = None):
         super().__init__(batch_size, neural_network, neural_network_weights, embedding_size, device, random_state)
         assert n_neighbors > 0, "n_neigbors must be larger than 0"
-        assert (group_size is None and embedding_size is not None) or (embedding_size is None and group_size is not None), "Either group_size or embedding_size must be None and the other parameter must be defined"
-        if embedding_size is None:
-            if type(group_size) is int:
-                group_size = [group_size] * n_clusters
-            assert type(group_size) is list, "group_size must be of type int or list. Your input: {0} / type: {1}".format(group_size, type(group_size))
-            self.embedding_size = np.sum(group_size)
-        else:
-            assert embedding_size >= n_clusters, "embedding_size can not be smaller than n_clusters"
-            group_size = np.array([embedding_size // n_clusters] * n_clusters)
-            group_size[: embedding_size % n_clusters] += 1
-        assert len(group_size) == n_clusters, "group_size must have n_clusters entries"
+        assert (type(group_size) is list and np.sum(group_size) == embedding_size) or (type(group_size) is int and group_size * n_clusters == embedding_size) or (group_size is None and embedding_size is not None) or (embedding_size is None and group_size is not None), "Either group_size or embedding_size must be None and the other parameter must be defined. You set group_size = {0} and embedding_size = {1}".format(group_size, embedding_size)
         self.n_clusters = n_clusters
         self.group_size = group_size
         self.n_neighbors = n_neighbors
@@ -119,12 +111,36 @@ class DEN(_AbstractDeepClusteringAlgo):
         self.weight_sparsity_constraint = weight_sparsity_constraint
         self.heat_kernel_t_parameter = heat_kernel_t_parameter
         self.group_lasso_lambda_parameter = group_lasso_lambda_parameter
-        self.pretrain_optimizer_params = {
-            "lr": 1e-3} if pretrain_optimizer_params is None else pretrain_optimizer_params
+        self.pretrain_optimizer_params = pretrain_optimizer_params
         self.pretrain_epochs = pretrain_epochs
         self.optimizer_class = optimizer_class
         self.ssl_loss_fn = ssl_loss_fn
         self.custom_dataloaders = custom_dataloaders
+
+
+    def _check_group_size_and_embedding_size(self) -> (list, int):
+        """
+        Check if the values for group_size and embedding_size match.
+
+        Returns
+        -------
+        tuple : (list, int)
+            the size of each group,
+            the embedding size
+        """
+        if self.embedding_size is None:
+            group_size = self.group_size
+            if type(group_size) is int:
+                group_size = [group_size] * self.n_clusters
+            assert type(group_size) is list, "group_size must be of type int or list. Your input: {0} / type: {1}".format(group_size, type(group_size))
+            embedding_size = np.sum(group_size)
+        else:
+            assert self.embedding_size >= self.n_clusters, "embedding_size can not be smaller than n_clusters"
+            embedding_size = self.embedding_size
+            group_size = np.array([embedding_size // self.n_clusters] * self.n_clusters)
+            group_size[: embedding_size % self.n_clusters] += 1
+        assert len(group_size) == self.n_clusters, "group_size must have n_clusters entries"
+        return group_size, embedding_size
 
 
     def _locality_preserving_loss(self, batch: list, embedded: torch.Tensor, neural_network: torch.nn.Module, device: torch.device) -> torch.Tensor:
@@ -159,7 +175,7 @@ class DEN(_AbstractDeepClusteringAlgo):
         return locality_preserving_loss / embedded.shape[0]
 
 
-    def _group_sparsity_loss(self, embedded: torch.Tensor) -> torch.Tensor:
+    def _group_sparsity_loss(self, embedded: torch.Tensor, group_size: list) -> torch.Tensor:
         """
         Calculate the DEN group sparsity loss of given embedded samples.
 
@@ -167,6 +183,8 @@ class DEN(_AbstractDeepClusteringAlgo):
         ----------
         embedded : torch.Tensor
             the embedded samples
+        group_size : list
+            the size of each group
 
         Returns
         -------
@@ -176,16 +194,16 @@ class DEN(_AbstractDeepClusteringAlgo):
         group_sparsity_loss = torch.tensor(0.)
         group_index = 0
         for g in range(self.n_clusters):
-            group_units = embedded[:, group_index:group_index+self.group_size[g]]
+            group_units = embedded[:, group_index:group_index+group_size[g]]
             group_units_length = (group_units.pow(2) + 1e-10).sum(1).sqrt()
-            group_lasso_loss = self.group_lasso_lambda_parameter * torch.sqrt(torch.tensor(self.group_size[g])) * group_units_length
+            group_lasso_loss = self.group_lasso_lambda_parameter * torch.sqrt(torch.tensor(group_size[g])) * group_units_length
             group_sparsity_loss = group_sparsity_loss + group_lasso_loss.sum()
             # raise group index
-            group_index += self.group_size[g]
+            group_index += group_size[g]
         return group_sparsity_loss / embedded.shape[0]
     
 
-    def _loss(self, batch: list, neural_network: torch.nn.Module, device: torch.device):
+    def _loss(self, batch: list, group_size: list, neural_network: torch.nn.Module, device: torch.device):
         """
         Calculate the complete DEN + neural network loss.
 
@@ -193,6 +211,8 @@ class DEN(_AbstractDeepClusteringAlgo):
         ----------
         batch : list
             the minibatch
+        group_size : list
+            the size of each group
         neural_network : torch.nn.Module
             the neural network
         device : torch.device
@@ -208,7 +228,7 @@ class DEN(_AbstractDeepClusteringAlgo):
         # Calculate locality-preserving constraint
         locality_preserving_loss = self._locality_preserving_loss(batch, embedded, neural_network, device)
         # Calculate group sparsity constraint
-        group_sparsity_loss = self._group_sparsity_loss(embedded)
+        group_sparsity_loss = self._group_sparsity_loss(embedded, group_size)
         loss = ssl_loss + self.weight_locality_constraint * locality_preserving_loss + self.weight_sparsity_constraint * group_sparsity_loss
         return loss
 
@@ -230,7 +250,8 @@ class DEN(_AbstractDeepClusteringAlgo):
         self : DEN
             this instance of the DEN algorithm
         """
-        super().fit(X, y)
+        X, _, random_state, pretrain_optimizer_params, _, _ = self._check_parameters(X, y=y)
+        group_size, embedding_size = self._check_group_size_and_embedding_size()
         # Get the device to train on and the dataloaders
         device = detect_device(self.device)
         if self.custom_dataloaders is None:
@@ -245,17 +266,17 @@ class DEN(_AbstractDeepClusteringAlgo):
                                                                    additional_inputs_trainloader=nearest_neigbors if self.custom_dataloaders is None else None)
         assert len(next(iter(trainloader))) >= self.n_neighbors + 1, "Trainloader does not appear to include any neighbors."
         # Get AE
-        neural_network = get_neural_network(input_dim=X.shape[1], embedding_size=self.embedding_size, 
+        neural_network = get_neural_network(input_dim=X.shape[1], embedding_size=embedding_size, 
                                             neural_network=self.neural_network, neural_network_weights=self.neural_network_weights, 
-                                            device=device, random_state=self.random_state)
-        optimizer = self.optimizer_class(neural_network.parameters(), **self.pretrain_optimizer_params)
+                                            device=device, random_state=random_state)
+        optimizer = self.optimizer_class(neural_network.parameters(), **pretrain_optimizer_params)
         # DEN training loop
         tbar = tqdm.trange(self.pretrain_epochs, desc="DEN training")
         for _ in tbar:
             # Update Network
             total_loss = 0
             for batch in trainloader:
-                loss = self._loss(batch, neural_network, device)
+                loss = self._loss(batch, group_size, neural_network, device)
                 total_loss += loss.item()
                 # Backward pass - update weights
                 optimizer.zero_grad()
@@ -265,12 +286,13 @@ class DEN(_AbstractDeepClusteringAlgo):
             tbar.set_postfix(postfix_str)
         # Execute clustering with Kmeans
         embedded_data = encode_batchwise(testloader, neural_network)
-        kmeans = KMeans(n_clusters=self.n_clusters, random_state=self.random_state)
+        kmeans = KMeans(n_clusters=self.n_clusters, random_state=random_state)
         kmeans.fit(embedded_data)
         # Save parameters
         self.labels_ = kmeans.labels_
         self.cluster_centers_ = kmeans.cluster_centers_
-        self.neural_network = neural_network
+        self.neural_network_trained_ = neural_network
+        self.n_features_in_ = X.shape[1]
         return self
 
 
@@ -288,6 +310,7 @@ class DEN(_AbstractDeepClusteringAlgo):
         predicted_labels : np.ndarray
             The predicted labels
         """
+        X, _, _  = check_parameters(X)
         X_embed = self.transform(X)
         predicted_labels = embedded_kmeans_prediction(X_embed, self.cluster_centers_)
         return predicted_labels

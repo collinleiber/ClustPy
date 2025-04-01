@@ -548,8 +548,10 @@ class VaDE(_AbstractDeepClusteringAlgo):
         The cluster centers as identified by VaDE after the training terminated
     vade_covariances_ : np.ndarray
         The covariance matrices as identified by VaDE after the training terminated
-    neural_network : torch.nn.Module
+    neural_network_trained_ : torch.nn.Module
         The final neural network
+    n_features_in_ : int
+        the number of features used for the fitting
 
     Examples
     ----------
@@ -575,10 +577,8 @@ class VaDE(_AbstractDeepClusteringAlgo):
                  device: torch.device = None, random_state: np.random.RandomState | int = None):
         super().__init__(batch_size, neural_network, neural_network_weights, embedding_size, device, random_state)
         self.n_clusters = n_clusters
-        self.pretrain_optimizer_params = {
-            "lr": 1e-3} if pretrain_optimizer_params is None else pretrain_optimizer_params
-        self.clustering_optimizer_params = {
-            "lr": 1e-4} if clustering_optimizer_params is None else clustering_optimizer_params
+        self.pretrain_optimizer_params = pretrain_optimizer_params
+        self.clustering_optimizer_params = clustering_optimizer_params
         self.pretrain_epochs = pretrain_epochs
         self.clustering_epochs = clustering_epochs
         self.optimizer_class = optimizer_class
@@ -587,8 +587,7 @@ class VaDE(_AbstractDeepClusteringAlgo):
         self.ssl_loss_weight = ssl_loss_weight
         self.custom_dataloaders = custom_dataloaders
         self.initial_clustering_class = initial_clustering_class
-        self.initial_clustering_params = {"n_init": 10,
-                                          "covariance_type": "diag"} if initial_clustering_params is None else initial_clustering_params
+        self.initial_clustering_params = initial_clustering_params
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'VaDE':
         """
@@ -609,13 +608,15 @@ class VaDE(_AbstractDeepClusteringAlgo):
         """
         assert type(self.ssl_loss_fn) != torch.nn.modules.loss.BCELoss or (np.min(X) >= 0 and np.max(
             X) <= 1), "Your dataset contains values that are not in the value range [0, 1]. Therefore, BCE is not a valid loss function, an alternative might be a MSE loss function."
-        super().fit(X, y)
+        X, _, random_state, pretrain_optimizer_params, clustering_optimizer_params, _ = self._check_parameters(X, y=y)
+        initial_clustering_params = {"n_init": 10,
+                                          "covariance_type": "diag"} if self.initial_clustering_params is None else self.initial_clustering_params
         gmm_labels, gmm_means, gmm_covariances, gmm_weights, vade_labels, vade_centers, vade_covariances, neural_network = _vade(
             X,
             self.n_clusters,
             self.batch_size,
-            self.pretrain_optimizer_params,
-            self.clustering_optimizer_params,
+            pretrain_optimizer_params,
+            clustering_optimizer_params,
             self.pretrain_epochs,
             self.clustering_epochs,
             self.optimizer_class,
@@ -627,9 +628,9 @@ class VaDE(_AbstractDeepClusteringAlgo):
             self.ssl_loss_weight,
             self.custom_dataloaders,
             self.initial_clustering_class,
-            self.initial_clustering_params,
+            initial_clustering_params,
             self.device,
-            self.random_state)
+            random_state)
         self.labels_ = gmm_labels
         self.cluster_centers_ = gmm_means
         self.covariances_ = gmm_covariances
@@ -637,7 +638,8 @@ class VaDE(_AbstractDeepClusteringAlgo):
         self.vade_labels_ = vade_labels
         self.vade_cluster_centers_ = vade_centers
         self.vade_covariances_ = vade_covariances
-        self.neural_network = neural_network
+        self.neural_network_trained_ = neural_network
+        self.n_features_in_ = X.shape[1]
         return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:

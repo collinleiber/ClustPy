@@ -13,6 +13,8 @@ def test_simple_dcn():
     dcn.fit(X)
     assert dcn.labels_.dtype == np.int32
     assert dcn.labels_.shape == labels.shape
+    X_embed = dcn.transform(X)
+    assert X_embed.shape == (X.shape[0], dcn.embedding_size)
     # Test if random state is working
     dcn2 = DCN(3, pretrain_epochs=3, clustering_epochs=3, random_state=1)
     dcn2.fit(X)

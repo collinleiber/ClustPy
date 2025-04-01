@@ -638,8 +638,10 @@ class DipDECK(_AbstractDeepClusteringAlgo):
         The final number of clusters
     cluster_centers_ : np.ndarray
         The final cluster centers
-    neural_network : torch.nn.Module
+    neural_network_trained_ : torch.nn.Module
         The final neural network
+    n_features_in_ : int
+        the number of features used for the fitting
 
     Examples
     ----------
@@ -673,10 +675,8 @@ class DipDECK(_AbstractDeepClusteringAlgo):
         self.ssl_loss_weight = ssl_loss_weight
         self.max_n_clusters = max_n_clusters
         self.min_n_clusters = min_n_clusters
-        self.pretrain_optimizer_params = {
-            "lr": 1e-3} if pretrain_optimizer_params is None else pretrain_optimizer_params
-        self.clustering_optimizer_params = {
-            "lr": 1e-4} if clustering_optimizer_params is None else clustering_optimizer_params
+        self.pretrain_optimizer_params = pretrain_optimizer_params
+        self.clustering_optimizer_params = clustering_optimizer_params
         self.pretrain_epochs = pretrain_epochs
         self.clustering_epochs = clustering_epochs
         self.optimizer_class = optimizer_class
@@ -687,7 +687,7 @@ class DipDECK(_AbstractDeepClusteringAlgo):
         self.custom_dataloaders = custom_dataloaders
         self.augmentation_invariance = augmentation_invariance
         self.initial_clustering_class = initial_clustering_class
-        self.initial_clustering_params = {} if initial_clustering_params is None else initial_clustering_params
+        self.initial_clustering_params = initial_clustering_params
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DipDECK':
         """
@@ -706,13 +706,13 @@ class DipDECK(_AbstractDeepClusteringAlgo):
         self : DipDECK
             this instance of the DipDECK algorithm
         """
-        super().fit(X, y)
+        X, _, random_state, pretrain_optimizer_params, clustering_optimizer_params, initial_clustering_params = self._check_parameters(X, y=y)
         labels, n_clusters, centers, neural_network = _dip_deck(X, self.n_clusters_init, self.dip_merge_threshold,
                                                                 self.clustering_loss_weight,
                                                                 self.ssl_loss_weight, self.max_n_clusters,
                                                                 self.min_n_clusters, self.batch_size,
-                                                                self.pretrain_optimizer_params,
-                                                                self.clustering_optimizer_params,
+                                                                pretrain_optimizer_params,
+                                                                clustering_optimizer_params,
                                                                 self.pretrain_epochs, self.clustering_epochs,
                                                                 self.optimizer_class, self.ssl_loss_fn,
                                                                 self.neural_network, self.neural_network_weights,
@@ -721,12 +721,13 @@ class DipDECK(_AbstractDeepClusteringAlgo):
                                                                 self.custom_dataloaders,
                                                                 self.augmentation_invariance,
                                                                 self.initial_clustering_class,
-                                                                self.initial_clustering_params, self.device,
-                                                                self.random_state)
+                                                                initial_clustering_params, self.device,
+                                                                random_state)
         self.labels_ = labels
         self.n_clusters_ = n_clusters
         self.cluster_centers_ = centers
-        self.neural_network = neural_network
+        self.neural_network_trained_ = neural_network
+        self.n_features_in_ = X.shape[1]
         return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:

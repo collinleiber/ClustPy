@@ -591,8 +591,15 @@ class DeepECT(_AbstractDeepClusteringAlgo):
         The final labels (obtained by a final KMeans execution)
     tree_ : PredictionClusterTree
         The prediction cluster tree after training
-    neural_network : torch.nn.Module
+    neural_network_trained_ : torch.nn.Module
         The final neural network
+    n_features_in_ : int
+        the number of features used for the fitting
+
+    References
+    ----------
+    Mautz, Dominik, Claudia Plant, and Christian Böhm.
+    "Deep embedded cluster tree." 2019 IEEE International Conference on Data Mining (ICDM). IEEE, 2019.
     """
 
     def __init__(self, max_n_leaf_nodes: int = 20, batch_size: int = 256, pretrain_optimizer_params: dict = None,
@@ -606,10 +613,8 @@ class DeepECT(_AbstractDeepClusteringAlgo):
                  device: torch.device = None, random_state: np.random.RandomState | int = None):
         super().__init__(batch_size, neural_network, neural_network_weights, embedding_size, device, random_state)
         self.max_n_leaf_nodes = max_n_leaf_nodes
-        self.pretrain_optimizer_params = {
-            "lr": 1e-3} if pretrain_optimizer_params is None else pretrain_optimizer_params
-        self.clustering_optimizer_params = {
-            "lr": 1e-4} if clustering_optimizer_params is None else clustering_optimizer_params
+        self.pretrain_optimizer_params = pretrain_optimizer_params
+        self.clustering_optimizer_params = clustering_optimizer_params
         self.pretrain_epochs = pretrain_epochs
         self.clustering_epochs = clustering_epochs
         self.grow_interval = grow_interval
@@ -638,18 +643,19 @@ class DeepECT(_AbstractDeepClusteringAlgo):
         self : DeepECT
             This instance of the DeepECT algorithm
         """
-        super().fit(X, y)
+        X, _, random_state, pretrain_optimizer_params, clustering_optimizer_params, _ = self._check_parameters(X, y=y)
         tree, labels, neural_network = _deep_ect(X, self.max_n_leaf_nodes, self.batch_size,
-                                                 self.pretrain_optimizer_params, self.clustering_optimizer_params,
+                                                 pretrain_optimizer_params, clustering_optimizer_params,
                                                  self.pretrain_epochs, self.clustering_epochs, self.grow_interval,
                                                  self.pruning_threshold, self.optimizer_class, self.ssl_loss_fn,
                                                  self.neural_network, self.neural_network_weights, self.embedding_size,
                                                  self.clustering_loss_weight, self.ssl_loss_weight,
                                                  self.custom_dataloaders, self.augmentation_invariance, self.device,
-                                                 self.random_state)
+                                                 random_state)
         self.tree_ = tree
         self.labels_ = labels
-        self.neural_network = neural_network
+        self.neural_network_trained_ = neural_network
+        self.n_features_in_ = X.shape[1]
         return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:

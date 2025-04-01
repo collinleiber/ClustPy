@@ -276,10 +276,12 @@ class DDC(_AbstractDeepClusteringAlgo):
         The final number of clusters
     labels_ : np.ndarray
         The final labels (obtained by a variant of Density Peak Clustering)
-    neural_network : torch.nn.Module
+    neural_network_trained_ : torch.nn.Module
         The final neural network
     tsne_ : TSNE
         The t-SNE object
+    n_features_in_ : int
+        the number of features used for the fitting
 
     Examples
     ----------
@@ -305,13 +307,12 @@ class DDC(_AbstractDeepClusteringAlgo):
         self.ratio = ratio
         if ratio > 1:
             print("[WARNING] ratio for DDC algorithm has been set to a value > 1 which can cause poor results")
-        self.pretrain_optimizer_params = {
-            "lr": 1e-3} if pretrain_optimizer_params is None else pretrain_optimizer_params
+        self.pretrain_optimizer_params = pretrain_optimizer_params
         self.pretrain_epochs = pretrain_epochs
         self.optimizer_class = optimizer_class
         self.ssl_loss_fn = ssl_loss_fn
         self.custom_dataloaders = custom_dataloaders
-        self.tsne_params = {"n_components": 2} if tsne_params is None else tsne_params
+        self.tsne_params = tsne_params
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DDC':
         """
@@ -330,9 +331,10 @@ class DDC(_AbstractDeepClusteringAlgo):
         self : DDC
             this instance of the DDC algorithm
         """
-        super().fit(X, y)
+        X, _, random_state, pretrain_optimizer_params, _, _ = self._check_parameters(X, y=y)
+        tsne_params = {"n_components": 2} if self.tsne_params is None else self.tsne_params
         n_clusters, labels, _, neural_network, tsne = _manifold_based_sequential_dc(X, None, self.batch_size,
-                                                                                    self.pretrain_optimizer_params,
+                                                                                    pretrain_optimizer_params,
                                                                                     self.pretrain_epochs,
                                                                                     self.optimizer_class,
                                                                                     self.ssl_loss_fn,
@@ -340,14 +342,15 @@ class DDC(_AbstractDeepClusteringAlgo):
                                                                                     self.neural_network_weights,
                                                                                     self.embedding_size,
                                                                                     self.custom_dataloaders, TSNE,
-                                                                                    self.tsne_params,
+                                                                                    tsne_params,
                                                                                     DDC_density_peak_clustering,
                                                                                     {"ratio": self.ratio}, self.device,
-                                                                                    self.random_state)
+                                                                                    random_state)
         self.labels_ = labels
         self.n_clusters_ = n_clusters
-        self.neural_network = neural_network
+        self.neural_network_trained_ = neural_network
         self.tsne_ = tsne
+        self.n_features_in_ = X.shape[1]
         return self
 
 
@@ -396,16 +399,16 @@ class N2D(_AbstractDeepClusteringAlgo):
 
     Attributes
     ----------
-    n_clusters : int
-        The final number of clusters
     labels_ : np.ndarray
         The final labels
     cluster_centers_ : np.ndarray
         The final cluster centers
-    neural_network : torch.nn.Module
+    neural_network_trained_ : torch.nn.Module
         The final neural network
     manifold_ : TransformerMixin
         The manifold object
+    n_features_in_ : int
+        the number of features used for the fitting
 
     References
     ----------
@@ -422,14 +425,13 @@ class N2D(_AbstractDeepClusteringAlgo):
                  random_state: np.random.RandomState | int = None):
         super().__init__(batch_size, neural_network, neural_network_weights, embedding_size, device, random_state)
         self.n_clusters = n_clusters
-        self.pretrain_optimizer_params = {
-            "lr": 1e-3} if pretrain_optimizer_params is None else pretrain_optimizer_params
+        self.pretrain_optimizer_params = pretrain_optimizer_params
         self.pretrain_epochs = pretrain_epochs
         self.optimizer_class = optimizer_class
         self.ssl_loss_fn = ssl_loss_fn
         self.custom_dataloaders = custom_dataloaders
         self.manifold_class = manifold_class
-        self.manifold_params = {"n_components": 2} if manifold_params is None else manifold_params
+        self.manifold_params = manifold_params
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'N2D':
         """
@@ -448,10 +450,11 @@ class N2D(_AbstractDeepClusteringAlgo):
         self : N2D
             this instance of the N2D algorithm
         """
-        super().fit(X, y)
-        n_clusters, labels, centers, neural_network, manifold = _manifold_based_sequential_dc(X, self.n_clusters,
+        X, _, random_state, pretrain_optimizer_params, _, _ = self._check_parameters(X, y=y)
+        manifold_params = {"n_components": 2} if self.manifold_params is None else self.manifold_params
+        _, labels, centers, neural_network, manifold = _manifold_based_sequential_dc(X, self.n_clusters,
                                                                                               self.batch_size,
-                                                                                              self.pretrain_optimizer_params,
+                                                                                              pretrain_optimizer_params,
                                                                                               self.pretrain_epochs,
                                                                                               self.optimizer_class,
                                                                                               self.ssl_loss_fn,
@@ -460,11 +463,12 @@ class N2D(_AbstractDeepClusteringAlgo):
                                                                                               self.embedding_size,
                                                                                               self.custom_dataloaders,
                                                                                               self.manifold_class,
-                                                                                              self.manifold_params,
+                                                                                              manifold_params,
                                                                                               GMM, {}, self.device,
-                                                                                              self.random_state)
+                                                                                              random_state)
         self.labels_ = labels.astype(np.int32)
         self.cluster_centers_ = centers
-        self.neural_network = neural_network
+        self.neural_network_trained_ = neural_network
         self.manifold_ = manifold
+        self.n_features_in_ = X.shape[1]
         return self

@@ -1986,8 +1986,10 @@ class ENRC(_AbstractDeepClusteringAlgo):
         The final labels
     cluster_centers_ : np.ndarray
         The final cluster centers
-    neural_network : torch.nn.Module
+    neural_network_trained_ : torch.nn.Module
         The final neural network
+    n_features_in_ : int
+        the number of features used for the fitting
 
     Raises
     ----------
@@ -2013,10 +2015,8 @@ class ENRC(_AbstractDeepClusteringAlgo):
                  augmentation_invariance: bool = False, final_reclustering: bool = True, debug: bool = False):
         super().__init__(batch_size, neural_network, neural_network_weights, embedding_size, device, random_state)
         self.n_clusters = n_clusters.copy()
-        self.pretrain_optimizer_params = {
-            "lr": 1e-3} if pretrain_optimizer_params is None else pretrain_optimizer_params
-        self.clustering_optimizer_params = {
-            "lr": 1e-4} if clustering_optimizer_params is None else clustering_optimizer_params
+        self.pretrain_optimizer_params = pretrain_optimizer_params
+        self.clustering_optimizer_params = clustering_optimizer_params
         self.pretrain_epochs = pretrain_epochs
         self.clustering_epochs = clustering_epochs
         self.tolerance_threshold = tolerance_threshold
@@ -2063,7 +2063,7 @@ class ENRC(_AbstractDeepClusteringAlgo):
         self : ENRC
             returns the ENRC object
         """
-        super().fit(X, y)
+        X, _, random_state, pretrain_optimizer_params, clustering_optimizer_params, _ = self._check_parameters(X, y=y)
         cluster_labels, cluster_centers, V, m, betas, P, n_clusters, neural_network, cluster_labels_before_reclustering = _enrc(
             X=X,
             n_clusters=self.n_clusters,
@@ -2071,8 +2071,8 @@ class ENRC(_AbstractDeepClusteringAlgo):
             P=self.P,
             input_centers=self.input_centers,
             batch_size=self.batch_size,
-            pretrain_optimizer_params=self.pretrain_optimizer_params,
-            clustering_optimizer_params=self.clustering_optimizer_params,
+            pretrain_optimizer_params=pretrain_optimizer_params,
+            clustering_optimizer_params=clustering_optimizer_params,
             pretrain_epochs=self.pretrain_epochs,
             clustering_epochs=self.clustering_epochs,
             tolerance_threshold=self.tolerance_threshold,
@@ -2084,7 +2084,7 @@ class ENRC(_AbstractDeepClusteringAlgo):
             neural_network_weights=self.neural_network_weights,
             embedding_size=self.embedding_size,
             init=self.init,
-            random_state=self.random_state,
+            random_state=random_state,
             device=self.device,
             scheduler=self.scheduler,
             scheduler_params=self.scheduler_params,
@@ -2103,7 +2103,8 @@ class ENRC(_AbstractDeepClusteringAlgo):
         self.P = P
         self.betas = betas
         self.n_clusters = n_clusters
-        self.neural_network = neural_network
+        self.neural_network_trained_ = neural_network
+        self.n_features_in_ = X.shape[1]
         return self
 
     def predict(self, X: np.ndarray = None, use_P: bool = True,
@@ -2128,12 +2129,12 @@ class ENRC(_AbstractDeepClusteringAlgo):
         if dataloader is None:
             dataloader = get_dataloader(X, batch_size=self.batch_size, shuffle=False, drop_last=False)
 
-        self.neural_network.to(self.device)
+        self.neural_network_trained_.to(self.device)
         predicted_labels = enrc_predict_batchwise(V=torch.from_numpy(self.V).float().to(self.device),
                                                   centers=[torch.from_numpy(c).float().to(self.device) for c in
                                                            self.cluster_centers_],
                                                   subspace_betas=torch.from_numpy(self.betas).float().to(self.device),
-                                                  model=self.neural_network,
+                                                  model=self.neural_network_trained_,
                                                   dataloader=dataloader,
                                                   device=self.device,
                                                   use_P=use_P)
@@ -2142,6 +2143,7 @@ class ENRC(_AbstractDeepClusteringAlgo):
     def transform_full_space(self, X: np.ndarray, embedded=False) -> np.ndarray:
         """
         Embedds the input dataset with the neural network and the matrix V from the ENRC object.
+
         Parameters
         ----------
         X : np.ndarray
@@ -2156,7 +2158,7 @@ class ENRC(_AbstractDeepClusteringAlgo):
         """
         if not embedded:
             dataloader = get_dataloader(X, batch_size=self.batch_size, shuffle=False, drop_last=False)
-            emb = encode_batchwise(dataloader=dataloader, neural_network=self.neural_network)
+            emb = encode_batchwise(dataloader=dataloader, neural_network=self.neural_network_trained_)
         else:
             emb = X
         rotated = np.matmul(emb, self.V)
@@ -2182,7 +2184,7 @@ class ENRC(_AbstractDeepClusteringAlgo):
         """
         if not embedded:
             dataloader = get_dataloader(X, batch_size=self.batch_size, shuffle=False, drop_last=False)
-            emb = encode_batchwise(dataloader=dataloader, neural_network=self.neural_network)
+            emb = encode_batchwise(dataloader=dataloader, neural_network=self.neural_network_trained_)
         else:
             emb = X
         cluster_space_V = self.V[:, self.P[subspace_index]]
@@ -2240,7 +2242,7 @@ class ENRC(_AbstractDeepClusteringAlgo):
         cluster_space_centers = self.cluster_centers_[subspace_index]
         # rotate back as centers are in the V-rotated space
         centers_rot_back = np.matmul(cluster_space_centers, self.V.transpose())
-        centers_rec = self.neural_network.decode(torch.from_numpy(centers_rot_back).float().to(self.device))
+        centers_rec = self.neural_network_trained_.decode(torch.from_numpy(centers_rot_back).float().to(self.device))
         return centers_rec.detach().cpu().numpy()
 
 
@@ -2322,8 +2324,10 @@ class ACeDeC(ENRC):
         The final labels
     cluster_centers_ : np.ndarray
         The final cluster centers
-    neural_network : torch.nn.Module
+    neural_networ_trained_ : torch.nn.Module
         The final neural_network
+    n_features_in_ : int
+        the number of features used for the fitting
 
     Raises
     ----------

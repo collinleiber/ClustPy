@@ -468,8 +468,10 @@ class DEC(_AbstractDeepClusteringAlgo):
         The final DEC labels
     dec_cluster_centers_ : np.ndarray
         The final DEC cluster centers
-    neural_network : torch.nn.Module
+    neural_network_trained_ : torch.nn.Module
         The final neural network
+    n_features_in_ : int
+        the number of features used for the fitting
 
     Examples
     ----------
@@ -498,10 +500,8 @@ class DEC(_AbstractDeepClusteringAlgo):
         super().__init__(batch_size, neural_network, neural_network_weights, embedding_size, device, random_state)
         self.n_clusters = n_clusters
         self.alpha = alpha
-        self.pretrain_optimizer_params = {
-            "lr": 1e-3} if pretrain_optimizer_params is None else pretrain_optimizer_params
-        self.clustering_optimizer_params = {
-            "lr": 1e-4} if clustering_optimizer_params is None else clustering_optimizer_params
+        self.pretrain_optimizer_params = pretrain_optimizer_params
+        self.clustering_optimizer_params = clustering_optimizer_params
         self.pretrain_epochs = pretrain_epochs
         self.clustering_epochs = clustering_epochs
         self.optimizer_class = optimizer_class
@@ -510,7 +510,7 @@ class DEC(_AbstractDeepClusteringAlgo):
         self.custom_dataloaders = custom_dataloaders
         self.augmentation_invariance = augmentation_invariance
         self.initial_clustering_class = initial_clustering_class
-        self.initial_clustering_params = {} if initial_clustering_params is None else initial_clustering_params
+        self.initial_clustering_params = initial_clustering_params
         self.ssl_loss_weight = 0  # DEC does not use ssl loss when clustering
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DEC':
@@ -530,11 +530,11 @@ class DEC(_AbstractDeepClusteringAlgo):
         self : DEC
             this instance of the DEC algorithm
         """
-        super().fit(X, y)
+        X, _, random_state, pretrain_optimizer_params, clustering_optimizer_params, initial_clustering_params = self._check_parameters(X, y=y)
         kmeans_labels, kmeans_centers, dec_labels, dec_centers, neural_network = _dec(X, self.n_clusters, self.alpha,
                                                                                       self.batch_size,
-                                                                                      self.pretrain_optimizer_params,
-                                                                                      self.clustering_optimizer_params,
+                                                                                      pretrain_optimizer_params,
+                                                                                      clustering_optimizer_params,
                                                                                       self.pretrain_epochs,
                                                                                       self.clustering_epochs,
                                                                                       self.optimizer_class,
@@ -547,13 +547,14 @@ class DEC(_AbstractDeepClusteringAlgo):
                                                                                       self.custom_dataloaders,
                                                                                       self.augmentation_invariance,
                                                                                       self.initial_clustering_class,
-                                                                                      self.initial_clustering_params,
-                                                                                      self.device, self.random_state)
+                                                                                      initial_clustering_params,
+                                                                                      self.device, random_state)
         self.labels_ = kmeans_labels
         self.cluster_centers_ = kmeans_centers
         self.dec_labels_ = dec_labels
         self.dec_cluster_centers_ = dec_centers
-        self.neural_network = neural_network
+        self.neural_network_trained_ = neural_network
+        self.n_features_in_ = X.shape[1]
         return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:
@@ -640,8 +641,10 @@ class IDEC(DEC):
         The final DEC labels
     dec_cluster_centers_ : np.ndarray
         The final DEC cluster centers
-    neural_network : torch.nn.Module
+    neural_network_trained_ : torch.nn.Module
         The final neural network
+    n_features_in_ : int
+        the number of features used for the fitting
 
     Examples
     ----------

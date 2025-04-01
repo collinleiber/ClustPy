@@ -3,24 +3,25 @@ from clustpy.data import create_subspace_data
 import torch
 import numpy as np
 from scipy.spatial.distance import pdist, squareform
-from sklearn.utils.estimator_checks import check_estimator
+from clustpy.utils.checks import check_estimator_wo_complex_data
 
 
 def test_den_estimator():
-    check_estimator(DEN(3, pretrain_epochs=3), 
-                    {"check_complex_data": "this check is expected to fail because complex values are not supported"})
+    check_estimator_wo_complex_data(DEN(n_clusters=3, pretrain_epochs=3))
 
 
 def test_simple_den():
     torch.use_deterministic_algorithms(True)
     X, labels = create_subspace_data(1000, subspace_features=(3, 50), random_state=1)
-    den = DEN(3, pretrain_epochs=3, random_state=1)
+    den = DEN(3, pretrain_epochs=3, random_state=1, embedding_size=6)
     assert not hasattr(den, "labels_")
     den.fit(X)
     assert den.labels_.dtype == np.int32
     assert den.labels_.shape == labels.shape
+    X_embed = den.transform(X)
+    assert X_embed.shape == (X.shape[0], den.embedding_size)
     # Test if random state is working
-    den2 = DEN(3, pretrain_epochs=3, random_state=1)
+    den2 = DEN(3, group_size=[2, 2, 2], pretrain_epochs=3, random_state=1)
     den2.fit(X)
     assert np.array_equal(den2.labels_, den2.labels_)
 

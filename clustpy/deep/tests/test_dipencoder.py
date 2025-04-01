@@ -15,6 +15,8 @@ def test_simple_dipencoder():
     dipencoder.fit(X)
     assert dipencoder.labels_.dtype == np.int32
     assert dipencoder.labels_.shape == labels.shape
+    X_embed = dipencoder.transform(X)
+    assert X_embed.shape == (X.shape[0], dipencoder.embedding_size)
     # Test if random state is working
     # TODO Does not work every time -> Check why
     # dipencoder2 = DipEncoder(3, pretrain_epochs=3, clustering_epochs=3, random_state=1)

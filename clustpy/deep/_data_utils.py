@@ -189,25 +189,28 @@ def get_dataloader(X: np.ndarray | torch.Tensor, batch_size: int, shuffle: bool 
     dataloader : torch.utils.data.DataLoader
         The final dataloader
     """
-    assert type(X) in [np.ndarray, torch.Tensor], "X must be of type np.ndarray or torch.Tensor."
+    assert type(X) in [np.ndarray, torch.Tensor, np.memmap], "X must be of type np.ndarray or torch.Tensor. Your type: {0}".format(type(X))
     assert additional_inputs is None or type(additional_inputs) in [np.ndarray, torch.Tensor,
                                                                     list], "additional_input must be None or of type np.ndarray, torch.Tensor or list."
     ds_kwargs = {} if ds_kwargs is None else ds_kwargs
     dl_kwargs = {} if dl_kwargs is None else dl_kwargs
-    if type(X) is np.ndarray:
+    if type(X) in [np.ndarray, np.memmap]:
         # Convert np.ndarray to torch.Tensor
+        X = X.astype(float)
         X = torch.from_numpy(X).float()
     dataset_input = [X]
     if additional_inputs is not None:
         # Check type of additional_inputs
-        if type(additional_inputs) is np.ndarray:
-            dataset_input.append(torch.from_numpy(additional_inputs).float())
+        if type(additional_inputs) in [np.ndarray, np.memmap]:
+            ad_input = additional_inputs.astype(float)
+            dataset_input.append(torch.from_numpy(ad_input).float())
         elif type(additional_inputs) is torch.Tensor:
             dataset_input.append(additional_inputs)
         else:
             for input in additional_inputs:
-                if type(input) is np.ndarray:
-                    input = torch.from_numpy(input).float()
+                if type(input) in [np.ndarray, np.memmap]:
+                    ad_input = input.astype(float)
+                    input = torch.from_numpy(ad_input).float()
                 elif type(input) is not torch.Tensor:
                     raise Exception(
                         "inputs of additional_inputs must be of type np.ndarray or torch.Tensor. Your input type: {0}".format(
@@ -285,9 +288,9 @@ def get_train_and_test_dataloader(X: np.ndarray | torch.Tensor, batch_size: int 
         trainloader, testloader = custom_dataloaders
         # If train-/testloader is string, it can be loaded from a file
         if type(trainloader) is str:
-            trainloader = torch.load(trainloader)
+            trainloader = torch.load(trainloader, weights_only=False)
         if type(testloader) is str:
-            testloader = torch.load(testloader)
+            testloader = torch.load(testloader, weights_only=False)
         if trainloader.batch_size != testloader.batch_size:
             print(
                 "INFO: Batch size of trainloader and testloader do not match: trainloader = {0}, testloader = {1}".format(
