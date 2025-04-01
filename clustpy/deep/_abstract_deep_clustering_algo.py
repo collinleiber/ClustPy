@@ -7,7 +7,7 @@ from clustpy.utils.checks import check_parameters
 from sklearn.utils.validation import check_is_fitted
 
 
-class _AbstractDeepClusteringAlgo(BaseEstimator, ClusterMixin, TransformerMixin):
+class _AbstractDeepClusteringAlgo(ClusterMixin, TransformerMixin, BaseEstimator):
     """
     An abstract deep clustering algorithm class that can be used by other deep clustering implementations.
 
@@ -93,8 +93,13 @@ class _AbstractDeepClusteringAlgo(BaseEstimator, ClusterMixin, TransformerMixin)
         X_embed : np.ndarray
             The embedded data set
         """
-        check_is_fitted(self, ["labels_", "neural_network_trained_"])
+        check_is_fitted(self, ["labels_", "neural_network_trained_", "n_features_in_"])
         X, _, _ = check_parameters(X)
+        if X.shape[1] != self.n_features_in_:
+            raise ValueError(
+            f"X has {X.shape[1]} features, but {self.__class__.__name__} "
+            f"is expecting {self.n_features_in_} features as input."
+        )
         X_embed = self.neural_network_trained_.transform(X, self.batch_size)
         return X_embed.astype(X.dtype)
 

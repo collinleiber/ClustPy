@@ -102,8 +102,6 @@ class DEN(_AbstractDeepClusteringAlgo):
                  embedding_size: int | None = None, custom_dataloaders: tuple = None,
                  device: torch.device = None, random_state: np.random.RandomState | int = None):
         super().__init__(batch_size, neural_network, neural_network_weights, embedding_size, device, random_state)
-        assert n_neighbors > 0, "n_neigbors must be larger than 0"
-        assert (type(group_size) is list and np.sum(group_size) == embedding_size) or (type(group_size) is int and group_size * n_clusters == embedding_size) or (group_size is None and embedding_size is not None) or (embedding_size is None and group_size is not None), "Either group_size or embedding_size must be None and the other parameter must be defined. You set group_size = {0} and embedding_size = {1}".format(group_size, embedding_size)
         self.n_clusters = n_clusters
         self.group_size = group_size
         self.n_neighbors = n_neighbors
@@ -128,6 +126,7 @@ class DEN(_AbstractDeepClusteringAlgo):
             the size of each group,
             the embedding size
         """
+        assert (type(self.group_size) is list and np.sum(self.group_size) == self.embedding_size) or (type(self.group_size) is int and self.group_size * self.n_clusters == self.embedding_size) or (self.group_size is None and self.embedding_size is not None) or (self.embedding_size is None and self.group_size is not None), "Either group_size or embedding_size must be None and the other parameter must be defined. You set group_size = {0} and embedding_size = {1}".format(self.group_size, self.embedding_size)
         if self.embedding_size is None:
             group_size = self.group_size
             if type(group_size) is int:
@@ -250,6 +249,7 @@ class DEN(_AbstractDeepClusteringAlgo):
         self : DEN
             this instance of the DEN algorithm
         """
+        assert self.n_neighbors > 0, "n_neigbors must be larger than 0"
         X, _, random_state, pretrain_optimizer_params, _, _ = self._check_parameters(X, y=y)
         group_size, embedding_size = self._check_group_size_and_embedding_size()
         # Get the device to train on and the dataloaders
