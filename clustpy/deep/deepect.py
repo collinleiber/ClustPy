@@ -7,13 +7,14 @@ Julian Schilcher
 import numpy as np
 import torch
 from clustpy.deep._utils import squared_euclidean_distance, encode_batchwise, predict_batchwise, \
-    embedded_kmeans_prediction
+    embedded_kmeans_prediction, mean_squared_error
 from clustpy.deep._train_utils import get_default_deep_clustering_initialization
 from sklearn.cluster import KMeans
 from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
 from clustpy.hierarchical._cluster_tree import BinaryClusterTree, _ClusterTreeNode
 import tqdm
 import copy
+from collections.abc import Callable
 
 
 class _DeepECT_ClusterTreeNode(_ClusterTreeNode):
@@ -328,7 +329,7 @@ class _DeepECT_Module(torch.nn.Module):
             dc_loss /= 2
         return dc_loss
 
-    def _loss(self, batch: list, neural_network: torch.nn.Module, ssl_loss_fn: torch.nn.modules.loss._Loss,
+    def _loss(self, batch: list, neural_network: torch.nn.Module, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss,
               clustering_loss_weight: float, ssl_loss_weight: float, leaf_nodes: list, split_nodes: list,
               device: torch.device) -> (torch.Tensor, torch.Tensor):
         """
@@ -340,7 +341,7 @@ class _DeepECT_Module(torch.nn.Module):
             the minibatch
         neural_network : torch.nn.Module
             the neural network
-        ssl_loss_fn : torch.nn.modules.loss._Loss
+        ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
             self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
         clustering_loss_weight : float
             weight of the clustering loss
@@ -375,7 +376,7 @@ class _DeepECT_Module(torch.nn.Module):
 
     def fit(self, neural_network: torch.nn.Module, trainloader: torch.utils.data.DataLoader,
             testloader: torch.utils.data.DataLoader, n_epochs: int, device: torch.device,
-            optimizer: torch.optim.Optimizer, ssl_loss_fn: torch.nn.modules.loss._Loss, clustering_loss_weight: float,
+            optimizer: torch.optim.Optimizer, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss, clustering_loss_weight: float,
             ssl_loss_weight: float, random_state: np.random.RandomState) -> "_DeepECT_Module":
         """
         Trains the _DeepECT_Module in place.
@@ -394,7 +395,7 @@ class _DeepECT_Module(torch.nn.Module):
             device to be trained on
         optimizer : torch.optim.Optimizer
             Optimizer for training
-        ssl_loss_fn : torch.nn.modules.loss._Loss
+        ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
             self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
         clustering_loss_weight : float
             weight of the clustering loss
@@ -445,7 +446,7 @@ class _DeepECT_Module(torch.nn.Module):
 def _deep_ect(X: np.ndarray, max_n_leaf_nodes: int, batch_size: int, pretrain_optimizer_params: dict,
               clustering_optimizer_params: dict, pretrain_epochs: int, clustering_epochs: int, grow_interval: int,
               pruning_threshold: float, optimizer_class: torch.optim.Optimizer,
-              ssl_loss_fn: torch.nn.modules.loss._Loss, neural_network: torch.nn.Module | tuple,
+              ssl_loss_fn: Callable | torch.nn.modules.loss._Loss, neural_network: torch.nn.Module | tuple,
               neural_network_weights: str, embedding_size: int, clustering_loss_weight: float, ssl_loss_weight: float,
               custom_dataloaders: tuple, augmentation_invariance: bool, device: torch.device,
               random_state: np.random.RandomState) -> (np.ndarray, np.ndarray, torch.nn.Module):
@@ -474,7 +475,7 @@ def _deep_ect(X: np.ndarray, max_n_leaf_nodes: int, batch_size: int, pretrain_op
         The threshold for pruning the tree
     optimizer_class : torch.optim.Optimizer
         The optimizer class
-    ssl_loss_fn : torch.nn.modules.loss._Loss
+    ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
          self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
     neural_network : torch.nn.Module | tuple
         the input neural network.
@@ -558,8 +559,8 @@ class DeepECT(_AbstractDeepClusteringAlgo):
         The threshold for pruning the tree (default: 0.1)
     optimizer_class : torch.optim.Optimizer
         The optimizer class (default: torch.optim.Adam)
-    ssl_loss_fn : torch.nn.modules.loss._Loss
-         self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: torch.nn.MSELoss())
+    ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
+         self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: mean_squared_error)
     neural_network : torch.nn.Module | tuple
         the input neural network. If None, a new FeedforwardAutoencoder will be created.
         Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict) (default: None)
@@ -590,25 +591,30 @@ class DeepECT(_AbstractDeepClusteringAlgo):
         The final labels (obtained by a final KMeans execution)
     tree_ : PredictionClusterTree
         The prediction cluster tree after training
-    neural_network : torch.nn.Module
+    neural_network_trained_ : torch.nn.Module
         The final neural network
+    n_features_in_ : int
+        the number of features used for the fitting
+
+    References
+    ----------
+    Mautz, Dominik, Claudia Plant, and Christian Böhm.
+    "Deep embedded cluster tree." 2019 IEEE International Conference on Data Mining (ICDM). IEEE, 2019.
     """
 
     def __init__(self, max_n_leaf_nodes: int = 20, batch_size: int = 256, pretrain_optimizer_params: dict = None,
                  clustering_optimizer_params: dict = None, pretrain_epochs: int = 50, clustering_epochs: int = 200,
                  grow_interval: int = 2, pruning_threshold: float = 0.1,
                  optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
-                 ssl_loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(),
+                 ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error,
                  neural_network: torch.nn.Module | tuple = None, neural_network_weights: str = None,
                  embedding_size: int = 10, clustering_loss_weight: float = 1., ssl_loss_weight: float = 1.,
                  custom_dataloaders: tuple = None, augmentation_invariance: bool = False,
                  device: torch.device = None, random_state: np.random.RandomState | int = None):
         super().__init__(batch_size, neural_network, neural_network_weights, embedding_size, device, random_state)
         self.max_n_leaf_nodes = max_n_leaf_nodes
-        self.pretrain_optimizer_params = {
-            "lr": 1e-3} if pretrain_optimizer_params is None else pretrain_optimizer_params
-        self.clustering_optimizer_params = {
-            "lr": 1e-4} if clustering_optimizer_params is None else clustering_optimizer_params
+        self.pretrain_optimizer_params = pretrain_optimizer_params
+        self.clustering_optimizer_params = clustering_optimizer_params
         self.pretrain_epochs = pretrain_epochs
         self.clustering_epochs = clustering_epochs
         self.grow_interval = grow_interval
@@ -637,18 +643,19 @@ class DeepECT(_AbstractDeepClusteringAlgo):
         self : DeepECT
             This instance of the DeepECT algorithm
         """
-        super().fit(X, y)
+        X, _, random_state, pretrain_optimizer_params, clustering_optimizer_params, _ = self._check_parameters(X, y=y)
         tree, labels, neural_network = _deep_ect(X, self.max_n_leaf_nodes, self.batch_size,
-                                                 self.pretrain_optimizer_params, self.clustering_optimizer_params,
+                                                 pretrain_optimizer_params, clustering_optimizer_params,
                                                  self.pretrain_epochs, self.clustering_epochs, self.grow_interval,
                                                  self.pruning_threshold, self.optimizer_class, self.ssl_loss_fn,
                                                  self.neural_network, self.neural_network_weights, self.embedding_size,
                                                  self.clustering_loss_weight, self.ssl_loss_weight,
                                                  self.custom_dataloaders, self.augmentation_invariance, self.device,
-                                                 self.random_state)
+                                                 random_state)
         self.tree_ = tree
         self.labels_ = labels
-        self.neural_network = neural_network
+        self.neural_network_trained_ = neural_network
+        self.n_features_in_ = X.shape[1]
         return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:

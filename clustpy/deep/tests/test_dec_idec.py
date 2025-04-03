@@ -12,6 +12,8 @@ def test_simple_dec():
     dec.fit(X)
     assert dec.labels_.dtype == np.int32
     assert dec.labels_.shape == labels.shape
+    X_embed = dec.transform(X)
+    assert X_embed.shape == (X.shape[0], dec.embedding_size)
     # Test if random state is working
     dec2 = DEC(3, pretrain_epochs=3, clustering_epochs=3, random_state=1)
     dec2.fit(X)
@@ -32,6 +34,8 @@ def test_simple_idec():
     idec.fit(X)
     assert idec.labels_.dtype == np.int32
     assert idec.labels_.shape == labels.shape
+    X_embed = idec.transform(X)
+    assert X_embed.shape == (X.shape[0], idec.embedding_size)
     # Test if random state is working
     # TODO Does not work every time -> Check why
     # idec2 = IDEC(3, pretrain_epochs=3, clustering_epochs=3, random_state=1)

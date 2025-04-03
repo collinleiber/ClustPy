@@ -12,6 +12,8 @@ def test_simple_enrc():
     enrc.fit(X)
     assert enrc.labels_.dtype == np.int32
     assert enrc.labels_.shape == labels.shape
+    X_embed = enrc.transform(X)
+    assert X_embed.shape == (X.shape[0], enrc.embedding_size)
     # Test if random state is working
     enrc2 = ENRC([3, 3], pretrain_epochs=3, clustering_epochs=3, random_state=1, debug=True)
     enrc2.fit(X)
@@ -36,6 +38,8 @@ def test_simple_acedec():
     acedec.fit(X)
     assert acedec.labels_.dtype == np.int32
     assert acedec.labels_.shape == labels.shape
+    X_embed = acedec.transform(X)
+    assert X_embed.shape == (X.shape[0], acedec.embedding_size)
     # Test if random state is working
     # TODO Does not work every time -> Check why
     # acedec2 = ACeDeC(3, pretrain_epochs=3, clustering_epochs=3, random_state=1)

@@ -31,6 +31,36 @@ def set_torch_seed(random_state: np.random.RandomState | int) -> None:
     random.seed(seed)
 
 
+def mean_squared_error(tensor1: torch.Tensor, tensor2: torch.Tensor, weights: torch.Tensor = None) -> torch.Tensor:
+    """
+    Calculate the mean squared error between two tensors.
+    Each row in the tensors is interpreted as a separate object, while each column represents its features.
+    Optionally, features can be individually weighted.
+    The default behavior is that all features are weighted by 1.
+
+    Parameters
+    ----------
+    tensor1 : torch.Tensor
+        the first tensor
+    tensor2 : torch.Tensor
+        the second tensor
+    weights : torch.Tensor
+        tensor containing the weights of the features (default: None)
+
+    Returns
+    -------
+    mse : torch.Tensor
+        the mean squared error
+    """
+    assert tensor1.shape == tensor2.shape, "The two input tensors must have the same shape."
+    diffs = tensor1 - tensor2
+    if weights is not None:
+        assert tensor1.shape[1] == weights.shape[0], "The weight tensor must have one entry for each feature"
+        diffs = diffs * weights
+    mse = diffs.pow(2).sum() / tensor1.shape[0]
+    return mse
+
+
 def squared_euclidean_distance(tensor1: torch.Tensor, tensor2: torch.Tensor,
                                weights: torch.Tensor = None) -> torch.Tensor:
     """
@@ -59,7 +89,7 @@ def squared_euclidean_distance(tensor1: torch.Tensor, tensor2: torch.Tensor,
     tb = tensor2.unsqueeze(0)
     squared_diffs = (ta - tb)
     if weights is not None:
-        assert tensor1.shape[1] == weights.shape[0]
+        assert tensor1.shape[1] == weights.shape[0], "The weight tensor must have one entry for each feature"
         weights_unsqueezed = weights.unsqueeze(0).unsqueeze(1)
         squared_diffs = squared_diffs * weights_unsqueezed
     squared_diffs = squared_diffs.pow(2).sum(2)
