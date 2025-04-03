@@ -422,7 +422,7 @@ class _AbstractAutoencoder(torch.nn.Module):
         self : _AbstractAutoencoder
             this instance of the autoencoder
         """
-        self.load_state_dict(torch.load(path, weights_only=True))
+        self.load_state_dict(torch.load(path, weights_only=True, map_location=get_device_from_module(self)))
         self.fitted = True
         return self
 

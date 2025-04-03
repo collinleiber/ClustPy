@@ -20,7 +20,7 @@ class DEN(_AbstractDeepClusteringAlgo):
     """
     The Deep Embedding Network (DEN) algorithm.
     It trains a neural network by optimizing a loss functions consisting of three components.
-    These are (1) the standrad loss function of the neural netork (e.g. construction loss for autoencoders), (2) the locality-preserving constraint and (3) the group sparsity constraint.
+    These are (1) the standrad loss function of the neural netork (e.g. reconstruction loss for autoencoders), (2) the locality-preserving constraint and (3) the group sparsity constraint.
     Finally, k-Means is excuted in the resulting embedding.
 
     Parameters
@@ -31,7 +31,8 @@ class DEN(_AbstractDeepClusteringAlgo):
         the number of features in each group. Can also be a list, specifying the size of each group separately. Can be None if embedding_size is specified (default: 2)
     n_neighbors : int
         the number of nearest-neighbors (including itself) for the locality-preserving constraint. Nearest-neighbors will be calculated by using the Euclidean distance.
-        If another distance should be used to define the nearest-neighbors, the neighbors can be included in the custom_dataloader as additional_inputs (default: 3)
+        If another distance should be used to define the nearest-neighbors, the neighbors can be included in the custom_dataloader as additional_inputs.
+        In this case, it is expected that the trainloader is composed of: (sample_ids, original_samples, 1st-NNs, 2nd-NNs, ..., (n_neighbors-1)-NNs) (default: 5)
     weight_locality_constraint : float
         weight alpha for the locality-preserving constraint (default: 0.5)
     weight_sparsity_constraint : float
@@ -93,7 +94,7 @@ class DEN(_AbstractDeepClusteringAlgo):
     2014 22nd International conference on pattern recognition. IEEE, 2014.
     """
 
-    def __init__(self, n_clusters: int = 8, group_size : int | list | None = 2, n_neighbors: int = 3, weight_locality_constraint: float = 0.5, 
+    def __init__(self, n_clusters: int = 8, group_size : int | list | None = 2, n_neighbors: int = 5, weight_locality_constraint: float = 0.5, 
                  weight_sparsity_constraint: float = 1., heat_kernel_t_parameter: float = 1., group_lasso_lambda_parameter: float = 1.,
                  batch_size: int = 256, pretrain_optimizer_params: dict = None,
                  pretrain_epochs: int = 100, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
@@ -232,6 +233,30 @@ class DEN(_AbstractDeepClusteringAlgo):
         return loss
 
 
+    def _get_nearest_neighbors(self, X: np.ndarray) -> list:
+        """
+        Get a list containing the nearest neighbors of each entry in X.
+        The list contains the actual data points, not the data indices.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            the given data set
+
+        Returns
+        -------
+        nearest_neigbors : list
+            list containing the nearest neighbors of each entry in X
+        """
+        nearest_neigbors = []
+        neighbors = NearestNeighbors(n_neighbors=self.n_neighbors)
+        neighbors.fit(X)
+        nearest_neighbors_ids = neighbors.kneighbors(n_neighbors=self.n_neighbors - 1, return_distance=False)
+        for i in range(self.n_neighbors - 1):
+            nearest_neigbors.append(X[nearest_neighbors_ids[:, i]])
+        return nearest_neigbors
+
+
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DEN':
         """
         Initiate the actual clustering process on the input data set.
@@ -255,15 +280,10 @@ class DEN(_AbstractDeepClusteringAlgo):
         # Get the device to train on and the dataloaders
         device = detect_device(self.device)
         if self.custom_dataloaders is None:
-            # Get nearest neighbors
-            nearest_neigbors = []
-            neighbors = NearestNeighbors(n_neighbors=self.n_neighbors)
-            neighbors.fit(X)
-            nearest_neighbors_ids = neighbors.kneighbors(n_neighbors=self.n_neighbors - 1, return_distance=False)
-            for i in range(self.n_neighbors - 1):
-                nearest_neigbors.append(X[nearest_neighbors_ids[:, i]])
+            nearest_neighbors = self._get_nearest_neighbors(X)
         trainloader, testloader, _ = get_train_and_test_dataloader(X, self.batch_size, self.custom_dataloaders, 
-                                                                   additional_inputs_trainloader=nearest_neigbors if self.custom_dataloaders is None else None)
+                                                                   additional_inputs_trainloader=nearest_neighbors if self.custom_dataloaders is None else None)
+        # Check that the trainloader includes neighbors -> must contain n_neighbors + 1 (the ids) entries
         assert len(next(iter(trainloader))) >= self.n_neighbors + 1, "Trainloader does not appear to include any neighbors."
         # Get AE
         neural_network = get_neural_network(input_dim=X.shape[1], embedding_size=embedding_size, 

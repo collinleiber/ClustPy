@@ -98,7 +98,7 @@ class _ClustpyDataset(torch.utils.data.Dataset):
         return dataset_size
 
 
-def get_dataloader(X: np.ndarray | torch.Tensor, batch_size: int, shuffle: bool = True, drop_last: bool = False,
+def get_dataloader(X: np.ndarray | torch.Tensor, batch_size: int = 256, shuffle: bool = True, drop_last: bool = False,
                    additional_inputs: list | np.ndarray | torch.Tensor = None,
                    dataset_class: torch.utils.data.Dataset = _ClustpyDataset, ds_kwargs: dict = None,
                    dl_kwargs: dict = None) -> torch.utils.data.DataLoader:
@@ -115,7 +115,7 @@ def get_dataloader(X: np.ndarray | torch.Tensor, batch_size: int, shuffle: bool 
     X : np.ndarray | torch.Tensor
         the actual data set (can be np.ndarray or torch.Tensor)
     batch_size : int
-        the batch size
+        the batch size (default: 256)
     shuffle : bool
         boolean that defines if the data set should be shuffled (default: True)
     drop_last : bool
