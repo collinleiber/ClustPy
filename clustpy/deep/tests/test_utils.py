@@ -1,5 +1,6 @@
 from clustpy.deep._utils import squared_euclidean_distance, detect_device, encode_batchwise, predict_batchwise, \
-    int_to_one_hot, decode_batchwise, encode_decode_batchwise, run_initial_clustering, embedded_kmeans_prediction
+    int_to_one_hot, decode_batchwise, encode_decode_batchwise, run_initial_clustering, embedded_kmeans_prediction, \
+    mean_squared_error
 from clustpy.deep.tests._helpers_for_tests import _get_test_dataloader, _TestAutoencoder, _TestClusterModule
 from clustpy.data import create_subspace_data
 import torch
@@ -8,6 +9,19 @@ from sklearn.datasets import make_blobs
 from sklearn.cluster import KMeans, DBSCAN
 from sklearn.mixture import GaussianMixture
 from clustpy.partition import XMeans
+
+
+def test_mean_squared_error():
+    tensor1 = torch.tensor([[1., 1., 1.], [2., 2., 2.], [3., 3., 3.]])
+    tensor2 = torch.tensor([[1., 2., 3.], [2., 3., 4.], [3., 4., 5.]])
+    mse = mean_squared_error(tensor1, tensor2)
+    mse_loss_obj = torch.nn.MSELoss(reduction="sum")
+    mse_torch = mse_loss_obj(tensor1, tensor2) / 3
+    assert torch.equal(mse, mse_torch)
+    assert torch.equal(mse, torch.tensor(5.))
+    weights = torch.tensor([0., 1., 0.5])
+    mse = mean_squared_error(tensor1, tensor2, weights)
+    assert torch.equal(mse, torch.tensor(2))
 
 
 def test_squared_euclidean_distance():

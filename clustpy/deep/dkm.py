@@ -4,7 +4,7 @@ Collin Leiber
 """
 
 from clustpy.deep._utils import encode_batchwise, squared_euclidean_distance, predict_batchwise, \
-    embedded_kmeans_prediction
+    embedded_kmeans_prediction, mean_squared_error
 from clustpy.deep._train_utils import get_default_deep_clustering_initialization
 from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
 import torch
@@ -12,11 +12,12 @@ import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.base import ClusterMixin
 import tqdm
+from collections.abc import Callable
 
 
 def _dkm(X: np.ndarray, n_clusters: int, alphas: list | tuple, batch_size: int, pretrain_optimizer_params: dict,
          clustering_optimizer_params: dict, pretrain_epochs: int, clustering_epochs: int,
-         optimizer_class: torch.optim.Optimizer, ssl_loss_fn: torch.nn.modules.loss._Loss,
+         optimizer_class: torch.optim.Optimizer, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss,
          neural_network: torch.nn.Module | tuple, neural_network_weights: str, embedding_size: int,
          clustering_loss_weight: float, ssl_loss_weight: float, custom_dataloaders: tuple,
          augmentation_invariance: bool, initial_clustering_class: ClusterMixin,
@@ -47,7 +48,7 @@ def _dkm(X: np.ndarray, n_clusters: int, alphas: list | tuple, batch_size: int, 
         The total number of clustering epochs therefore corresponds to: len(alphas)*clustering_epochs
     optimizer_class : torch.optim.Optimizer
         the optimizer
-    ssl_loss_fn : torch.nn.modules.loss._Loss
+    ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
          self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
     neural_network : torch.nn.Module | tuple
         the input neural network.
@@ -282,7 +283,7 @@ class _DKM_Module(torch.nn.Module):
         return loss
 
     def _loss(self, batch: list, alpha: float, neural_network: torch.nn.Module, clustering_loss_weight: float,
-              ssl_loss_weight: float, ssl_loss_fn: torch.nn.modules.loss._Loss, device: torch.device) -> torch.Tensor:
+              ssl_loss_weight: float, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss, device: torch.device) -> torch.Tensor:
         """
         Calculate the complete DKM + neural network loss.
 
@@ -298,7 +299,7 @@ class _DKM_Module(torch.nn.Module):
             weight of the clustering loss
         ssl_loss_weight : float
             weight of the self-supervised learning (ssl) loss
-        ssl_loss_fn : torch.nn.modules.loss._Loss
+        ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
             self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
         device : torch.device
             device to be trained on
@@ -323,7 +324,7 @@ class _DKM_Module(torch.nn.Module):
         return loss
 
     def fit(self, neural_network: torch.nn.Module, trainloader: torch.utils.data.DataLoader, n_epochs: int,
-            device: torch.device, optimizer: torch.optim.Optimizer, ssl_loss_fn: torch.nn.modules.loss._Loss,
+            device: torch.device, optimizer: torch.optim.Optimizer, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss,
             clustering_loss_weight: float, ssl_loss_weight: float) -> '_DKM_Module':
         """
         Trains the _DKM_Module in place.
@@ -341,7 +342,7 @@ class _DKM_Module(torch.nn.Module):
             device to be trained on
         optimizer : torch.optim.Optimizer
             the optimizer for training
-        ssl_loss_fn : torch.nn.modules.loss._Loss
+        ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
             self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
         clustering_loss_weight : float
             weight of the clustering loss
@@ -401,8 +402,8 @@ class DKM(_AbstractDeepClusteringAlgo):
         The total number of clustering epochs therefore corresponds to: len(alphas)*clustering_epochs (default: 100)
     optimizer_class : torch.optim.Optimizer
         the optimizer class (default: torch.optim.Adam)
-    ssl_loss_fn : torch.nn.modules.loss._Loss
-         self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: torch.nn.MSELoss())
+    ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
+         self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: mean_squared_error)
     neural_network : torch.nn.Module | tuple
         the input neural network. If None, a new FeedforwardAutoencoder will be created.
         Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict) (default: None)
@@ -442,8 +443,10 @@ class DKM(_AbstractDeepClusteringAlgo):
         The final DKM labels
     dkm_cluster_centers_ : np.ndarray
         The final DKM cluster centers
-    neural_network : torch.nn.Module
+    neural_network_trained_ : torch.nn.Module
         The final neural network
+    n_features_in_ : int
+        the number of features used for the fitting
 
     Examples
     ----------
@@ -463,7 +466,7 @@ class DKM(_AbstractDeepClusteringAlgo):
                  pretrain_optimizer_params: dict = None, clustering_optimizer_params: dict = None,
                  pretrain_epochs: int = 50, clustering_epochs: int = 100,
                  optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
-                 ssl_loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(),
+                 ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error,
                  neural_network: torch.nn.Module | tuple = None, neural_network_weights: str = None,
                  embedding_size: int = 10, clustering_loss_weight: float = 1., ssl_loss_weight: float = 1.,
                  custom_dataloaders: tuple = None, augmentation_invariance: bool = False,
@@ -479,10 +482,8 @@ class DKM(_AbstractDeepClusteringAlgo):
             alphas = [alphas]
         assert type(alphas) is tuple or type(alphas) is list, "alphas must be a list, int or tuple"
         self.alphas = alphas
-        self.pretrain_optimizer_params = {
-            "lr": 1e-3} if pretrain_optimizer_params is None else pretrain_optimizer_params
-        self.clustering_optimizer_params = {
-            "lr": 1e-4} if clustering_optimizer_params is None else clustering_optimizer_params
+        self.pretrain_optimizer_params = pretrain_optimizer_params
+        self.clustering_optimizer_params = clustering_optimizer_params
         self.pretrain_epochs = pretrain_epochs
         self.clustering_epochs = clustering_epochs
         self.optimizer_class = optimizer_class
@@ -492,7 +493,7 @@ class DKM(_AbstractDeepClusteringAlgo):
         self.custom_dataloaders = custom_dataloaders
         self.augmentation_invariance = augmentation_invariance
         self.initial_clustering_class = initial_clustering_class
-        self.initial_clustering_params = {} if initial_clustering_params is None else initial_clustering_params
+        self.initial_clustering_params = initial_clustering_params
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DKM':
         """
@@ -511,11 +512,11 @@ class DKM(_AbstractDeepClusteringAlgo):
         self : DKM
             this instance of the DKM algorithm
         """
-        super().fit(X, y)
+        X, _, random_state, pretrain_optimizer_params, clustering_optimizer_params, initial_clustering_params = self._check_parameters(X, y=y)
         kmeans_labels, kmeans_centers, dkm_labels, dkm_centers, neural_network = _dkm(X, self.n_clusters, self.alphas,
                                                                                       self.batch_size,
-                                                                                      self.pretrain_optimizer_params,
-                                                                                      self.clustering_optimizer_params,
+                                                                                      pretrain_optimizer_params,
+                                                                                      clustering_optimizer_params,
                                                                                       self.pretrain_epochs,
                                                                                       self.clustering_epochs,
                                                                                       self.optimizer_class,
@@ -528,14 +529,15 @@ class DKM(_AbstractDeepClusteringAlgo):
                                                                                       self.custom_dataloaders,
                                                                                       self.augmentation_invariance,
                                                                                       self.initial_clustering_class,
-                                                                                      self.initial_clustering_params,
+                                                                                      initial_clustering_params,
                                                                                       self.device,
-                                                                                      self.random_state)
+                                                                                      random_state)
         self.labels_ = kmeans_labels
         self.cluster_centers_ = kmeans_centers
         self.dkm_labels_ = dkm_labels
         self.dkm_cluster_centers_ = dkm_centers
-        self.neural_network = neural_network
+        self.neural_network_trained_ = neural_network
+        self.n_features_in_ = X.shape[1]
         return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:

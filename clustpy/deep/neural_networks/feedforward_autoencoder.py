@@ -95,9 +95,9 @@ class FeedforwardAutoencoder(_AbstractAutoencoder):
         embedded : torch.Tensor
             the embedded data point with dimensionality embedding_size
         """
-        assert x.shape[1] == self.encoder.layers[
-            0], "Input layer of the encoder ({0}) does not match input sample ({1})".format(self.encoder.layers[0],
-                                                                                            x.shape[1])
+        if x.shape[1] != self.encoder.layers[0]:
+            raise ValueError("Input layer of the encoder ({0}) does not match input sample ({1})".format(self.encoder.layers[0],
+                                                                                            x.shape[1]))
         embedded = self.encoder(x)
         return embedded
 
@@ -115,6 +115,7 @@ class FeedforwardAutoencoder(_AbstractAutoencoder):
         decoded : torch.Tensor
             returns the reconstruction of embedded
         """
-        assert embedded.shape[1] == self.decoder.layers[0], "Input layer of the decoder does not match input sample"
+        if embedded.shape[1] != self.decoder.layers[0]:
+            raise ValueError("Input layer of the decoder does not match input sample")
         decoded = self.decoder(embedded)
         return decoded

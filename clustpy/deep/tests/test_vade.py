@@ -20,6 +20,8 @@ def test_simple_vade():
     vade.fit(X)
     assert vade.labels_.dtype == np.int32
     assert vade.labels_.shape == labels.shape
+    X_embed = vade.transform(X)
+    assert X_embed.shape == (X.shape[0], vade.embedding_size)
     # Test if random state is working
     vade2 = VaDE(3, pretrain_epochs=3, clustering_epochs=3,
                  initial_clustering_params={"n_init": 1, "covariance_type": "diag"}, random_state=1)

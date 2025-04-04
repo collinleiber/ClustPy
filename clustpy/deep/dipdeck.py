@@ -7,18 +7,20 @@ from scipy.spatial.distance import cdist
 import numpy as np
 from clustpy.utils import dip_test, dip_pval
 import torch
-from clustpy.deep._utils import encode_batchwise, squared_euclidean_distance, int_to_one_hot, embedded_kmeans_prediction
+from clustpy.deep._utils import encode_batchwise, squared_euclidean_distance, int_to_one_hot, \
+    embedded_kmeans_prediction, mean_squared_error
 from clustpy.deep._train_utils import get_default_deep_clustering_initialization
 from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
 from sklearn.cluster import KMeans
 from sklearn.base import ClusterMixin
 import tqdm
+from collections.abc import Callable
 
 
 def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, clustering_loss_weight: float,
               ssl_loss_weight: float, max_n_clusters: int, min_n_clusters: int, batch_size: int,
               pretrain_optimizer_params: dict, clustering_optimizer_params: dict, pretrain_epochs: int,
-              clustering_epochs: int, optimizer_class: torch.optim.Optimizer, ssl_loss_fn: torch.nn.modules.loss._Loss,
+              clustering_epochs: int, optimizer_class: torch.optim.Optimizer, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss,
               neural_network: torch.nn.Module | tuple, neural_network_weights: str, embedding_size: int,
               max_cluster_size_diff_factor: float, pval_strategy: str, n_boots: int, custom_dataloaders: tuple,
               augmentation_invariance: bool, initial_clustering_class: ClusterMixin, initial_clustering_params: dict,
@@ -56,7 +58,7 @@ def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, c
         number of epochs for the actual clustering procedure. Will reset after each merge
     optimizer_class : torch.optim.Optimizer
         the optimizer class
-    ssl_loss_fn : torch.nn.modules.loss._Loss
+    ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
          self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
     neural_network : torch.nn.Module | tuple
         the input neural network.
@@ -154,7 +156,7 @@ def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_thresho
                        clustering_loss_weight: float, ssl_loss_weight: float,
                        centers_cpu: np.ndarray, cluster_labels_cpu: np.ndarray,
                        dip_matrix_cpu: np.ndarray, max_n_clusters: int, min_n_clusters: int, clustering_epochs: int,
-                       optimizer: torch.optim.Optimizer, ssl_loss_fn: torch.nn.modules.loss._Loss,
+                       optimizer: torch.optim.Optimizer, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss,
                        neural_network: torch.nn.Module, device: torch.device, trainloader: torch.utils.data.DataLoader,
                        testloader: torch.utils.data.DataLoader, augmentation_invariance: bool,
                        max_cluster_size_diff_factor: float, pval_strategy: str, n_boots: int,
@@ -193,7 +195,7 @@ def _dip_deck_training(X: np.ndarray, n_clusters_current: int, dip_merge_thresho
         number of epochs for the actual clustering procedure
     optimizer : torch.optim.Optimizer
         the optimizer object
-    ssl_loss_fn : torch.nn.modules.loss._Loss
+    ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
          self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
     neural_network : torch.nn.Module
         the input neural network
@@ -600,8 +602,8 @@ class DipDECK(_AbstractDeepClusteringAlgo):
         number of epochs for the actual clustering procedure. Will reset after each merge (default: 50)
     optimizer_class : torch.optim.Optimizer
         the optimizer class (default: torch.optim.Adam)
-    ssl_loss_fn : torch.nn.modules.loss._Loss
-         self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: torch.nn.MSELoss())
+    ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
+         self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: mean_squared_error)
     neural_network : torch.nn.Module | tuple
         the input neural network. If None, a new FeedforwardAutoencoder will be created.
         Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict) (default: None)
@@ -645,8 +647,10 @@ class DipDECK(_AbstractDeepClusteringAlgo):
         The final number of clusters
     cluster_centers_ : np.ndarray
         The final cluster centers
-    neural_network : torch.nn.Module
+    neural_network_trained_ : torch.nn.Module
         The final neural network
+    n_features_in_ : int
+        the number of features used for the fitting
 
     Examples
     ----------
@@ -667,7 +671,7 @@ class DipDECK(_AbstractDeepClusteringAlgo):
                  batch_size: int = 256, pretrain_optimizer_params: dict = None,
                  clustering_optimizer_params: dict = None, pretrain_epochs: int = 100, clustering_epochs: int = 50,
                  optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
-                 ssl_loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(),
+                 ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error,
                  neural_network: torch.nn.Module | tuple = None, neural_network_weights: str = None,
                  embedding_size: int = 5, max_cluster_size_diff_factor: float = 2, pval_strategy: str = "table",
                  n_boots: int = 1000, custom_dataloaders: tuple = None, augmentation_invariance: bool = False,
@@ -680,10 +684,8 @@ class DipDECK(_AbstractDeepClusteringAlgo):
         self.ssl_loss_weight = ssl_loss_weight
         self.max_n_clusters = max_n_clusters
         self.min_n_clusters = min_n_clusters
-        self.pretrain_optimizer_params = {
-            "lr": 1e-3} if pretrain_optimizer_params is None else pretrain_optimizer_params
-        self.clustering_optimizer_params = {
-            "lr": 1e-4} if clustering_optimizer_params is None else clustering_optimizer_params
+        self.pretrain_optimizer_params = pretrain_optimizer_params
+        self.clustering_optimizer_params = clustering_optimizer_params
         self.pretrain_epochs = pretrain_epochs
         self.clustering_epochs = clustering_epochs
         self.optimizer_class = optimizer_class
@@ -694,7 +696,7 @@ class DipDECK(_AbstractDeepClusteringAlgo):
         self.custom_dataloaders = custom_dataloaders
         self.augmentation_invariance = augmentation_invariance
         self.initial_clustering_class = initial_clustering_class
-        self.initial_clustering_params = {} if initial_clustering_params is None else initial_clustering_params
+        self.initial_clustering_params = initial_clustering_params
         self.debug = debug
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DipDECK':
@@ -714,13 +716,13 @@ class DipDECK(_AbstractDeepClusteringAlgo):
         self : DipDECK
             this instance of the DipDECK algorithm
         """
-        super().fit(X, y)
+        X, _, random_state, pretrain_optimizer_params, clustering_optimizer_params, initial_clustering_params = self._check_parameters(X, y=y)
         labels, n_clusters, centers, neural_network = _dip_deck(X, self.n_clusters_init, self.dip_merge_threshold,
                                                                 self.clustering_loss_weight,
                                                                 self.ssl_loss_weight, self.max_n_clusters,
                                                                 self.min_n_clusters, self.batch_size,
-                                                                self.pretrain_optimizer_params,
-                                                                self.clustering_optimizer_params,
+                                                                pretrain_optimizer_params,
+                                                                clustering_optimizer_params,
                                                                 self.pretrain_epochs, self.clustering_epochs,
                                                                 self.optimizer_class, self.ssl_loss_fn,
                                                                 self.neural_network, self.neural_network_weights,
@@ -729,12 +731,13 @@ class DipDECK(_AbstractDeepClusteringAlgo):
                                                                 self.custom_dataloaders,
                                                                 self.augmentation_invariance,
                                                                 self.initial_clustering_class,
-                                                                self.initial_clustering_params, self.device,
-                                                                self.random_state, self.debug)
+                                                                initial_clustering_params, self.device,
+                                                                random_state, self.debug)
         self.labels_ = labels
         self.n_clusters_ = n_clusters
         self.cluster_centers_ = centers
-        self.neural_network = neural_network
+        self.neural_network_trained_ = neural_network
+        self.n_features_in_ = X.shape[1]
         return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:

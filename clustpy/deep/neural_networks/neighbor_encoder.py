@@ -6,6 +6,7 @@ Collin Leiber
 import torch
 import numpy as np
 from scipy.spatial.distance import cdist
+from clustpy.deep._utils import mean_squared_error
 from clustpy.deep.neural_networks.feedforward_autoencoder import FeedforwardAutoencoder
 from clustpy.deep.neural_networks._abstract_autoencoder import FullyConnectedBlock
 from collections.abc import Callable
@@ -180,7 +181,7 @@ class NeighborEncoder(FeedforwardAutoencoder):
             decoded_neighbors[-1] = self.decoder(embedded)
         return decoded_neighbors
 
-    def loss(self, batch: list, ssl_loss_fn: torch.nn.modules.loss._Loss, device: torch.device,
+    def loss(self, batch: list, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss, device: torch.device,
              corruption_fn: Callable = None) -> (torch.Tensor, torch.Tensor, torch.Tensor):
         """
         Calculate the loss of a single batch of data.
@@ -191,7 +192,7 @@ class NeighborEncoder(FeedforwardAutoencoder):
         ----------
         batch: list
             the different parts of a dataloader (id, samples, 1-nearest-neighbor, 2-nearest-neighbor, ...)
-        ssl_loss_fn : torch.nn.modules.loss._Loss
+        ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
             self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss
         device : torch.device
             device to be trained on
@@ -224,7 +225,7 @@ class NeighborEncoder(FeedforwardAutoencoder):
     def fit(self, n_epochs: int, optimizer_params: dict, batch_size: int = 128,
             dataloader: torch.utils.data.DataLoader = None, evalloader: torch.utils.data.DataLoader = None,
             optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
-            ssl_loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), patience: int = 5,
+            ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error, patience: int = 5,
             scheduler: torch.optim.lr_scheduler = None, scheduler_params: dict = None,
             corruption_fn: Callable = None, model_path: str = None) -> 'NeighborEncoder':
         """
@@ -246,8 +247,8 @@ class NeighborEncoder(FeedforwardAutoencoder):
             dataloader to be used for evaluation, early stopping and learning rate scheduling if scheduler=torch.optim.lr_scheduler.ReduceLROnPlateau (default: None)
         optimizer_class : torch.optim.Optimizer
             optimizer to be used (default: torch.optim.Adam)
-        ssl_loss_fn : torch.nn.modules.loss._Loss
-            self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss (default: torch.nn.MSELoss())
+        ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
+            self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss (default: mean_squared_error)
         patience : int
             patience parameter for EarlyStopping (default: 5)
         scheduler : torch.optim.lr_scheduler

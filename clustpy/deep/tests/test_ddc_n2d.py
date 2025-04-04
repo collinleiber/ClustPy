@@ -39,6 +39,8 @@ def test_simple_ddc():
     ddc.fit(X)
     assert ddc.labels_.dtype == np.int32
     assert ddc.labels_.shape == labels.shape
+    X_embed = ddc.transform(X)
+    assert X_embed.shape == (X.shape[0], ddc.embedding_size)
     # Test if random state is working
     ddc2 = DDC(pretrain_epochs=3, random_state=1, ratio=999)
     ddc2.ratio = 0.1
@@ -54,6 +56,8 @@ def test_simple_n2d():
     n2d.fit(X)
     assert n2d.labels_.dtype == np.int32
     assert n2d.labels_.shape == labels.shape
+    X_embed = n2d.transform(X)
+    assert X_embed.shape == (X.shape[0], n2d.embedding_size)
     # Test if random state is working
     n2d2 = N2D(n_clusters=3, pretrain_epochs=3, random_state=1)
     n2d2.fit(X)

@@ -117,6 +117,8 @@ def test_simple_deepect():
     deepect.fit(X)
     assert deepect.labels_.dtype == np.int32
     assert deepect.labels_.shape == labels.shape
+    X_embed = deepect.transform(X)
+    assert X_embed.shape == (X.shape[0], deepect.embedding_size)
     # Test if random state is working
     deepect2 = DeepECT(pretrain_epochs=3, clustering_epochs=4, grow_interval=1, random_state=1)
     deepect2.fit(X)

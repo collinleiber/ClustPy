@@ -18,6 +18,8 @@ def test_simple_aec():
     aec.fit(X)
     assert aec.labels_.dtype == np.int32
     assert aec.labels_.shape == labels.shape
+    X_embed = aec.transform(X)
+    assert X_embed.shape == (X.shape[0], aec.embedding_size)
     # Test if random state is working
     aec2 = AEC(3, pretrain_epochs=3, clustering_epochs=3, random_state=1)
     aec2.fit(X)

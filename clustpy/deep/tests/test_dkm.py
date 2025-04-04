@@ -19,6 +19,8 @@ def test_simple_dkm():
     dkm.fit(X)
     assert dkm.labels_.dtype == np.int32
     assert dkm.labels_.shape == labels.shape
+    X_embed = dkm.transform(X)
+    assert X_embed.shape == (X.shape[0], dkm.embedding_size)
     # Test if random state is working
     dkm2 = DKM(3, pretrain_epochs=3, alphas=(None, 0.1, 1), clustering_epochs=3, random_state=1)
     dkm2.fit(X)

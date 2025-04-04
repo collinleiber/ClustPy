@@ -5,7 +5,7 @@ Collin Leiber
 
 import torch
 from clustpy.deep.neural_networks.feedforward_autoencoder import FeedforwardAutoencoder
-from clustpy.deep._utils import get_device_from_module
+from clustpy.deep._utils import get_device_from_module, mean_squared_error
 from clustpy.deep._data_utils import get_dataloader
 import numpy as np
 import tqdm
@@ -76,7 +76,7 @@ class StackedAutoencoder(FeedforwardAutoencoder):
     def layerwise_training(self, n_epochs_per_layer: int = 20, optimizer_params: dict = None, batch_size: int = 128,
                            data: np.ndarray | torch.Tensor = None, dataloader: torch.utils.data.DataLoader = None,
                            optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
-                           ssl_loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(),
+                           ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error,
                            corruption_fn: Callable = None) -> 'StackedAutoencoder':
         """
         Trains the autoencoder in a greedy layer-wise fashion.
@@ -95,8 +95,8 @@ class StackedAutoencoder(FeedforwardAutoencoder):
             dataloader to be used for training (default: default=None)
         optimizer_class : torch.optim.Optimizer
             optimizer to be used (default: torch.optim.Adam)
-        ssl_loss_fn : torch.nn.modules.loss._Loss
-            self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss (default: torch.nn.MSELoss())
+        ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
+            self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss (default: mean_squared_error)
         corruption_fn : Callable
             Can be used to corrupt the input data, e.g., when using a denoising autoencoder.
             Note that the function must match the data and the data loaders.
@@ -153,7 +153,7 @@ class StackedAutoencoder(FeedforwardAutoencoder):
             batch_size: int = 128, data: np.ndarray | torch.Tensor = None, data_eval: np.ndarray | torch.Tensor = None,
             dataloader: torch.utils.data.DataLoader = None, evalloader: torch.utils.data.DataLoader = None,
             optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
-            ssl_loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(), patience: int = 5,
+            ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error, patience: int = 5,
             scheduler: torch.optim.lr_scheduler = None, scheduler_params: dict = {},
             corruption_fn: Callable = None, model_path: str = None) -> 'StackedAutoencoder':
         """
@@ -182,8 +182,8 @@ class StackedAutoencoder(FeedforwardAutoencoder):
             Only used for finetuning (default: None)
         optimizer_class : torch.optim.Optimizer
             optimizer to be used (default: torch.optim.Adam)
-        ssl_loss_fn : torch.nn.modules.loss._Loss
-            self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss (default: torch.nn.MSELoss())
+        ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
+            self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss (default: mean_squared_error)
         patience : int
             patience parameter for EarlyStopping.
             Only used for finetuning (default: 5)

@@ -9,13 +9,14 @@ from clustpy.utils import dip_test
 import torch
 import numpy as np
 from clustpy.partition.skinnydip import _dip_mirrored_data
-from clustpy.deep._utils import detect_device, encode_batchwise
+from clustpy.deep._utils import detect_device, encode_batchwise, mean_squared_error
 from clustpy.deep._train_utils import get_default_deep_clustering_initialization
 from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
 from clustpy.deep.neural_networks._resnet_ae_modules import EncoderBlock, DecoderBlock
 import matplotlib.pyplot as plt
 from clustpy.utils import plot_scatter_matrix
 import tqdm
+from collections.abc import Callable
 
 """
 Dip module - holds backward functions
@@ -284,7 +285,7 @@ def plot_dipencoder_embedding(X_embed: np.ndarray, n_clusters: int, labels: np.n
 
 
 def _get_ssl_loss_of_first_batch(trainloader: torch.utils.data.DataLoader, neural_network: torch.nn.Module,
-                                 ssl_loss_fn: torch.nn.modules.loss._Loss, device: torch.device) -> torch.Tensor:
+                                 ssl_loss_fn: Callable | torch.nn.modules.loss._Loss, device: torch.device) -> torch.Tensor:
     """
     Calculate the ssl loss of the first batch of data.
     Therefore, a new instance of the neural network will be created using the same architecture.
@@ -295,7 +296,7 @@ def _get_ssl_loss_of_first_batch(trainloader: torch.utils.data.DataLoader, neura
         dataloader to be used for training
     neural network : torch.nn.Module
         the neural_network
-    ssl_loss_fn : torch.nn.modules.loss._Loss
+    ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
          self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
     device : torch.device
         device to be trained on
@@ -539,7 +540,7 @@ class _DipEncoder_Module(torch.nn.Module):
         return dip_loss_new
 
     def _loss(self, batch: list, labels_torch: torch.Tensor, neural_network: torch.nn.Module, 
-              ssl_loss_fn: torch.nn.modules.loss._Loss, ssl_loss_weight: float, 
+              ssl_loss_fn: Callable | torch.nn.modules.loss._Loss, ssl_loss_weight: float, 
               clustering_loss_weight: float, device: torch.device) -> torch.Tensor:
         """
         Calculate the complete DipEncoder + neural network loss.
@@ -552,7 +553,7 @@ class _DipEncoder_Module(torch.nn.Module):
             the current cluster labels as torch tensor
         neural_network : torch.nn.Module
             the neural network
-        ssl_loss_fn : torch.nn.modules.loss._Loss
+        ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
             self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
         ssl_loss_weight : float
             weight of the self-supervised learning (ssl) loss
@@ -600,7 +601,7 @@ class _DipEncoder_Module(torch.nn.Module):
 
     def fit(self, neural_network: torch.nn.Module, trainloader: torch.utils.data.DataLoader, 
             testloader: torch.utils.data.DataLoader, n_epochs: int,
-            device: torch.device, optimizer: torch.optim.Optimizer, ssl_loss_fn: torch.nn.modules.loss._Loss,
+            device: torch.device, optimizer: torch.optim.Optimizer, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss,
             clustering_loss_weight: float, ssl_loss_weight: float) -> '_DipEncoder_Module':
         """
         Trains the _DipEncoder_Module in place.
@@ -619,7 +620,7 @@ class _DipEncoder_Module(torch.nn.Module):
             device to be trained on
         optimizer : torch.optim.Optimizer
             the optimizer for training
-        ssl_loss_fn : torch.nn.modules.loss._Loss
+        ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
             self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
         clustering_loss_weight : float
             weight of the clustering loss
@@ -680,17 +681,17 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
         size of the data batches for the actual training of the DipEncoder.
         Should be larger the more clusters we have. If it is None, it will be set to (25 x n_clusters) (default: None)
     pretrain_optimizer_params : dict
-        parameters of the optimizer for the pretraining of the neural network, includes the learning rate (default: {"lr": 1e-3})
+        parameters of the optimizer for the pretraining of the neural network, includes the learning rate. If None, it will be set to {"lr": 1e-3} (default: None)
     clustering_optimizer_params : dict
-        parameters of the optimizer for the actual clustering procedure, includes the learning rate (default: {"lr": 1e-4})
+        parameters of the optimizer for the actual clustering procedure, includes the learning rate. If None, it will be set to {"lr": 1e-4} (default: None)
     pretrain_epochs : int
         number of epochs for the pretraining of the neural network (default: 100)
     clustering_epochs : int
         number of epochs for the actual clustering procedure (default: 100)
     optimizer_class : torch.optim.Optimizer
         the optimizer class (default: torch.optim.Adam)
-    ssl_loss_fn : torch.nn.modules.loss._Loss
-         self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: torch.nn.MSELoss())
+    ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
+         self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: mean_squared_error)
     neural_network : torch.nn.Module | tuple
         the input neural network. If None, a new FeedforwardAutoencoder will be created.
         Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict) (default: None)
@@ -717,7 +718,7 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
     initial_clustering_class : ClusterMixin
         clustering class to obtain the initial cluster labels after the pretraining (default: KMeans)
     initial_clustering_params : dict
-        parameters for the initial clustering class (default: {})
+        parameters for the initial clustering class. If None, it will be set to {} (default: None)
     device : torch.device
         The device on which to perform the computations.
         If device is None then it will be automatically chosen: if a gpu is available the gpu with the highest amount of free memory will be chosen (default: None)
@@ -734,8 +735,10 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
         A dictionary to match the indices of two clusters to a projection axis
     projection_thresholds_ : list
         A list containing the thresholds for each projection axis and a tuple indicating which cluster is left and right of the threshold
-    neural_network : torch.nn.Module
+    neural_network_trained_ : torch.nn.Module
         The final neural network
+    n_features_in_ : int
+        the number of features used for the fitting
 
     Examples
     ----------
@@ -755,21 +758,17 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
     def __init__(self, n_clusters: int, batch_size: int = None, pretrain_optimizer_params: dict = None,
                  clustering_optimizer_params: dict = None, pretrain_epochs: int = 100,
                  clustering_epochs: int = 100, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
-                 ssl_loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(),
+                 ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error,
                  neural_network: torch.nn.Module | tuple = None, neural_network_weights: str = None,
                  embedding_size: int = 10, max_cluster_size_diff_factor: float = 3,
                  clustering_loss_weight: float = 1., ssl_loss_weight: float = None,
                  custom_dataloaders: tuple = None, augmentation_invariance: bool = False,
                  initial_clustering_class: ClusterMixin = KMeans, initial_clustering_params: dict = None,
                  device: torch.device = None, random_state: np.random.RandomState | int = None):
-        assert batch_size is not None or n_clusters is not None, "n_clusters and batch_size can not both be None"
-        super().__init__(25 * n_clusters if batch_size is None else batch_size, neural_network, neural_network_weights,
-                         embedding_size, device, random_state)
+        super().__init__(batch_size, neural_network, neural_network_weights, embedding_size, device, random_state)
         self.n_clusters = n_clusters
-        self.pretrain_optimizer_params = {
-            "lr": 1e-3} if pretrain_optimizer_params is None else pretrain_optimizer_params
-        self.clustering_optimizer_params = {
-            "lr": 1e-4} if clustering_optimizer_params is None else clustering_optimizer_params
+        self.pretrain_optimizer_params = pretrain_optimizer_params
+        self.clustering_optimizer_params = clustering_optimizer_params
         self.pretrain_epochs = pretrain_epochs
         self.clustering_epochs = clustering_epochs
         self.optimizer_class = optimizer_class
@@ -780,7 +779,7 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
         self.custom_dataloaders = custom_dataloaders
         self.augmentation_invariance = augmentation_invariance
         self.initial_clustering_class = initial_clustering_class
-        self.initial_clustering_params = {} if initial_clustering_params is None else initial_clustering_params
+        self.initial_clustering_params = initial_clustering_params
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DipEncoder':
         """
@@ -799,13 +798,15 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
         self : DipEncoder
             This instance of the DipEncoder
         """
-        super().fit(X, y)
+        X, y, random_state, pretrain_optimizer_params, clustering_optimizer_params, initial_clustering_params = self._check_parameters(X, y=y)
         assert y is None or len(np.unique(y)) == self.n_clusters, "If y is specified, n_clusters must match number of unique labels in y."
+        assert self.batch_size is not None or self.n_clusters is not None, "n_clusters and batch_size can not both be None"
+        batch_size = 25 * self.n_clusters if self.batch_size is None else self.batch_size
         # Get initial setting (device, dataloaders, pretrained AE and initial clustering result)
         device, trainloader, testloader, _, neural_network, X_embed, n_clusters, init_labels, init_centers, _ = get_default_deep_clustering_initialization(
-            X, self.n_clusters, self.batch_size, self.pretrain_optimizer_params, self.pretrain_epochs, self.optimizer_class, self.ssl_loss_fn,
+            X, self.n_clusters, batch_size, pretrain_optimizer_params, self.pretrain_epochs, self.optimizer_class, self.ssl_loss_fn,
             self.neural_network, self.embedding_size, self.custom_dataloaders, self.initial_clustering_class if y is None else None, 
-            self.initial_clustering_params, self.device, self.random_state, neural_network_weights=self.neural_network_weights)
+            initial_clustering_params, self.device, random_state, neural_network_weights=self.neural_network_weights)
         if y is not None:
             # If y is give, overwrite labels and centers
             init_labels = y
@@ -836,7 +837,7 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
         dip_module = _Dip_Module(projections).to(device)
         # Create SGD Optimizer
         optimizer = self.optimizer_class(list(neural_network.parameters()) + list(dip_module.parameters()),
-                                    **self.clustering_optimizer_params)
+                                    **clustering_optimizer_params)
         dipencoder_module = _DipEncoder_Module(n_clusters, index_dict, dip_module, init_labels, self.max_cluster_size_diff_factor, self.augmentation_invariance, y is not None)
         dipencoder_module.fit(neural_network, trainloader, testloader, self.clustering_epochs, device, optimizer, self.ssl_loss_fn, 
                               self.clustering_loss_weight, self.ssl_loss_weight)
@@ -845,7 +846,8 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
         self.projection_axes_ = dip_module.projection_axes.detach().cpu().numpy()
         self.projection_thresholds_ = dipencoder_module.projection_thresholds_
         self.index_dict_ = index_dict
-        self.neural_network = neural_network
+        self.neural_network_trained_ = neural_network
+        self.n_features_in_ = X.shape[1]
         return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:

@@ -7,7 +7,8 @@ import torch
 from sklearn.cluster import KMeans
 import numpy as np
 from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
-from clustpy.deep._utils import int_to_one_hot, squared_euclidean_distance, encode_batchwise, detect_device
+from clustpy.deep._utils import int_to_one_hot, squared_euclidean_distance, encode_batchwise, \
+    detect_device, mean_squared_error
 from clustpy.deep._data_utils import get_dataloader, get_train_and_test_dataloader
 from clustpy.deep._train_utils import get_trained_network
 from clustpy.alternative import NrKmeans
@@ -16,6 +17,7 @@ from sklearn.metrics import normalized_mutual_info_score
 from clustpy.utils.plots import plot_scatter_matrix
 from clustpy.alternative.nrkmeans import _get_total_cost_function
 import tqdm
+from collections.abc import Callable
 
 
 class _ENRC_Module(torch.nn.Module):
@@ -399,7 +401,7 @@ class _ENRC_Module(torch.nn.Module):
 
     def fit(self, trainloader: torch.utils.data.DataLoader, evalloader: torch.utils.data.DataLoader,
             optimizer: torch.optim.Optimizer, max_epochs: int, model: torch.nn.Module,
-            batch_size: int, ssl_loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(),
+            batch_size: int, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error,
             device: torch.device = torch.device("cpu"), debug: bool = True,
             scheduler: torch.optim.lr_scheduler = None, fix_rec_error: bool = False,
             tolerance_threshold: float = None, data: torch.Tensor | np.ndarray = None) -> (
@@ -421,8 +423,8 @@ class _ENRC_Module(torch.nn.Module):
             The underlying neural network
         batch_size: int
             batch size for dataloader
-        ssl_loss_fn : torch.nn.modules.loss._Loss
-            self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: torch.nn.MSELoss())
+        ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
+            self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: mean_squared_error)
         device : torch.device
             device to be trained on (default: torch.device('cpu'))
         debug : bool
@@ -772,7 +774,7 @@ def enrc_predict_batchwise(V: torch.Tensor, centers: list, subspace_betas: torch
 def enrc_encode_decode_batchwise_with_loss(V: torch.Tensor, centers: list, model: torch.nn.Module,
                                            dataloader: torch.utils.data.DataLoader,
                                            device: torch.device = torch.device("cpu"),
-                                           ssl_loss_fn: torch.nn.modules.loss._Loss = None) -> np.ndarray:
+                                           ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = None) -> np.ndarray:
     """
     Encode and Decode input data of a dataloader in a mini-batch manner with ENRC.
 
@@ -788,7 +790,7 @@ def enrc_encode_decode_batchwise_with_loss(V: torch.Tensor, centers: list, model
         dataloader to be used for prediction
     device : torch.device
         device to be predicted on (default: torch.device('cpu'))
-    ssl_loss_fn : torch.nn.modules.loss._Loss
+    ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
          self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: None)
 
     Returns
@@ -1107,7 +1109,7 @@ def random_nrkmeans_init(data: np.ndarray, n_clusters: list, rounds: int = 10, i
 
 
 def _determine_sgd_init_costs(enrc: _ENRC_Module, dataloader: torch.utils.data.DataLoader,
-                              ssl_loss_fn: torch.nn.modules.loss._Loss, device: torch.device,
+                              ssl_loss_fn: Callable | torch.nn.modules.loss._Loss, device: torch.device,
                               return_rot: bool = False) -> float:
     """
     Determine the initial sgd costs.
@@ -1118,7 +1120,7 @@ def _determine_sgd_init_costs(enrc: _ENRC_Module, dataloader: torch.utils.data.D
         The ENRC module
     dataloader : torch.utils.data.DataLoader
         dataloader to be used for the calculation of the costs
-    ssl_loss_fn : torch.nn.modules.loss._Loss
+    ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
          self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
     device : torch.device
         device to be trained on
@@ -1154,7 +1156,7 @@ def sgd_init(data: np.ndarray, n_clusters: list, optimizer_params: dict, batch_s
         list, list, np.ndarray, np.ndarray):
     """
     Initialization strategy based on optimizing ENRC's parameters V and beta in isolation from the neural network using a mini-batch gradient descent optimizer.
-    This initialization strategy scales better to large data sets than the nrkmeans_init and only constraints V using the reconstruction error (torch.nn.MSELoss),
+    This initialization strategy scales better to large data sets than the nrkmeans_init and only constraints V using the reconstruction error (mean_squared_error),
     which can be more flexible than the orthogonality constraint of NrKmeans. A problem of the sgd_init strategy is that it can be less stable for small data sets.
 
     Parameters
@@ -1224,13 +1226,13 @@ def sgd_init(data: np.ndarray, n_clusters: list, optimizer_params: dict, batch_s
                         optimizer=optimizer,
                         max_epochs=epochs,
                         model=_IdentityAutoencoder(),
-                        ssl_loss_fn=torch.nn.MSELoss(),
+                        ssl_loss_fn=mean_squared_error,
                         batch_size=batch_size,
                         device=device,
                         debug=False,
                         fix_rec_error=True)
 
-        cost = _determine_sgd_init_costs(enrc=enrc_module, dataloader=dataloader, ssl_loss_fn=torch.nn.MSELoss(),
+        cost = _determine_sgd_init_costs(enrc=enrc_module, dataloader=dataloader, ssl_loss_fn=mean_squared_error,
                                          device=device)
         if lowest > cost:
             best = [enrc_module.centers, enrc_module.P, enrc_module.V, enrc_module.beta_weights]
@@ -1253,7 +1255,7 @@ def acedec_init(data: np.ndarray, n_clusters: list, optimizer_params: dict, batc
         list, list, np.ndarray, np.ndarray):
     """
     Initialization strategy based on optimizing ACeDeC's parameters V and beta in isolation from the neural network using a mini-batch gradient descent optimizer.
-    This initialization strategy scales better to large data sets than the nrkmeans_init and only constraints V using the reconstruction error (torch.nn.MSELoss),
+    This initialization strategy scales better to large data sets than the nrkmeans_init and only constraints V using the reconstruction error (mean_squared_error),
     which can be more flexible than the orthogonality constraint of NrKmeans. A problem of the sgd_init strategy is that it can be less stable for small data sets.
 
     Parameters
@@ -1340,13 +1342,13 @@ def acedec_init(data: np.ndarray, n_clusters: list, optimizer_params: dict, batc
                         optimizer=optimizer,
                         max_epochs=max_epochs,
                         model=_IdentityAutoencoder(),
-                        ssl_loss_fn=torch.nn.MSELoss(),
+                        ssl_loss_fn=mean_squared_error,
                         batch_size=batch_size,
                         device=device,
                         debug=debug,
                         fix_rec_error=True)
 
-        cost, z_rot = _determine_sgd_init_costs(enrc=enrc_module, dataloader=dataloader, ssl_loss_fn=torch.nn.MSELoss(),
+        cost, z_rot = _determine_sgd_init_costs(enrc=enrc_module, dataloader=dataloader, ssl_loss_fn=mean_squared_error,
                                                 device=device, return_rot=True)
 
         # Recluster with KMeans to get better centroid estimate
@@ -1395,7 +1397,7 @@ def enrc_init(data: np.ndarray, n_clusters: list, init: str = "auto", rounds: in
         'random' : Same as 'nrkmeans', but max_iter is set to 10, so the performance is faster, but also less optimized, thus more random.
 
         'sgd' : Initialization strategy based on optimizing ENRC's parameters V and beta in isolation from the neural network using a mini-batch gradient descent optimizer.
-        This initialization strategy scales better to large data sets than the 'nrkmeans' option and only constraints V using the reconstruction error (torch.nn.MSELoss),
+        This initialization strategy scales better to large data sets than the 'nrkmeans' option and only constraints V using the reconstruction error (mean_squared_error),
         which can be more flexible than the orthogonality constraint of NrKmeans. A problem of the 'sgd' strategy is that it can be less stable for small data sets.
 
         'auto' : Selects 'sgd' init if data.shape[0] > 100,000 or data.shape[1] > 1,000. For smaller data sets 'nrkmeans' init is used.
@@ -1718,7 +1720,7 @@ def _are_labels_equal(labels_new: np.ndarray, labels_old: np.ndarray, threshold:
 
 def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers: list, batch_size: int,
           pretrain_optimizer_params: dict, clustering_optimizer_params: dict, pretrain_epochs: int,
-          clustering_epochs: int, optimizer_class: torch.optim.Optimizer, ssl_loss_fn: torch.nn.modules.loss._Loss,
+          clustering_epochs: int, optimizer_class: torch.optim.Optimizer, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss,
           clustering_loss_weight: float, ssl_loss_weight: float, neural_network: torch.nn.Module | tuple,
           neural_network_weights: str, embedding_size: int, init: str, random_state: np.random.RandomState,
           device: torch.device, scheduler: torch.optim.lr_scheduler, scheduler_params: dict, tolerance_threshold: float,
@@ -1752,7 +1754,7 @@ def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers
         maximum number of epochs for the actual clustering procedure
     optimizer_class : torch.optim.Optimizer
         optimizer for pretraining and training
-    ssl_loss_fn : torch.nn.modules.loss._Loss
+    ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
          self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
     clustering_loss_weight : float
         weight of the cluster loss term. The higher it is set the more the embedded space will be shaped to the assumed cluster structure
@@ -1937,8 +1939,8 @@ class ENRC(_AbstractDeepClusteringAlgo):
         will train as long as the labels are not changing anymore (default: None)
     optimizer_class : torch.optim.Optimizer
         optimizer for pretraining and training (default: torch.optim.Adam)
-    ssl_loss_fn : torch.nn.modules.loss._Loss
-         self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: torch.nn.MSELoss())
+    ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
+         self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: mean_squared_error)
     clustering_loss_weight : float
         weight of the cluster loss term. The higher it is set the more the embedded space will be shaped to the assumed cluster structure (default: 1.0)
     ssl_loss_weight : float
@@ -1984,8 +1986,10 @@ class ENRC(_AbstractDeepClusteringAlgo):
         The final labels
     cluster_centers_ : np.ndarray
         The final cluster centers
-    neural_network : torch.nn.Module
+    neural_network_trained_ : torch.nn.Module
         The final neural network
+    n_features_in_ : int
+        the number of features used for the fitting
 
     Raises
     ----------
@@ -2001,7 +2005,7 @@ class ENRC(_AbstractDeepClusteringAlgo):
                  batch_size: int = 128, pretrain_optimizer_params: dict = None,
                  clustering_optimizer_params: dict = None, pretrain_epochs: int = 100, clustering_epochs: int = 150,
                  tolerance_threshold: float = None, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
-                 ssl_loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(),
+                 ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error,
                  clustering_loss_weight: float = 1.0, ssl_loss_weight: float = 1.0,
                  neural_network: torch.nn.Module | tuple = None, neural_network_weights: str = None,
                  embedding_size: int = 20, init: str = "nrkmeans",
@@ -2011,10 +2015,8 @@ class ENRC(_AbstractDeepClusteringAlgo):
                  augmentation_invariance: bool = False, final_reclustering: bool = True, debug: bool = False):
         super().__init__(batch_size, neural_network, neural_network_weights, embedding_size, device, random_state)
         self.n_clusters = n_clusters.copy()
-        self.pretrain_optimizer_params = {
-            "lr": 1e-3} if pretrain_optimizer_params is None else pretrain_optimizer_params
-        self.clustering_optimizer_params = {
-            "lr": 1e-4} if clustering_optimizer_params is None else clustering_optimizer_params
+        self.pretrain_optimizer_params = pretrain_optimizer_params
+        self.clustering_optimizer_params = clustering_optimizer_params
         self.pretrain_epochs = pretrain_epochs
         self.clustering_epochs = clustering_epochs
         self.tolerance_threshold = tolerance_threshold
@@ -2061,7 +2063,7 @@ class ENRC(_AbstractDeepClusteringAlgo):
         self : ENRC
             returns the ENRC object
         """
-        super().fit(X, y)
+        X, _, random_state, pretrain_optimizer_params, clustering_optimizer_params, _ = self._check_parameters(X, y=y)
         cluster_labels, cluster_centers, V, m, betas, P, n_clusters, neural_network, cluster_labels_before_reclustering = _enrc(
             X=X,
             n_clusters=self.n_clusters,
@@ -2069,8 +2071,8 @@ class ENRC(_AbstractDeepClusteringAlgo):
             P=self.P,
             input_centers=self.input_centers,
             batch_size=self.batch_size,
-            pretrain_optimizer_params=self.pretrain_optimizer_params,
-            clustering_optimizer_params=self.clustering_optimizer_params,
+            pretrain_optimizer_params=pretrain_optimizer_params,
+            clustering_optimizer_params=clustering_optimizer_params,
             pretrain_epochs=self.pretrain_epochs,
             clustering_epochs=self.clustering_epochs,
             tolerance_threshold=self.tolerance_threshold,
@@ -2082,7 +2084,7 @@ class ENRC(_AbstractDeepClusteringAlgo):
             neural_network_weights=self.neural_network_weights,
             embedding_size=self.embedding_size,
             init=self.init,
-            random_state=self.random_state,
+            random_state=random_state,
             device=self.device,
             scheduler=self.scheduler,
             scheduler_params=self.scheduler_params,
@@ -2101,7 +2103,8 @@ class ENRC(_AbstractDeepClusteringAlgo):
         self.P = P
         self.betas = betas
         self.n_clusters = n_clusters
-        self.neural_network = neural_network
+        self.neural_network_trained_ = neural_network
+        self.n_features_in_ = X.shape[1]
         return self
 
     def predict(self, X: np.ndarray = None, use_P: bool = True,
@@ -2126,12 +2129,12 @@ class ENRC(_AbstractDeepClusteringAlgo):
         if dataloader is None:
             dataloader = get_dataloader(X, batch_size=self.batch_size, shuffle=False, drop_last=False)
 
-        self.neural_network.to(self.device)
+        self.neural_network_trained_.to(self.device)
         predicted_labels = enrc_predict_batchwise(V=torch.from_numpy(self.V).float().to(self.device),
                                                   centers=[torch.from_numpy(c).float().to(self.device) for c in
                                                            self.cluster_centers_],
                                                   subspace_betas=torch.from_numpy(self.betas).float().to(self.device),
-                                                  model=self.neural_network,
+                                                  model=self.neural_network_trained_,
                                                   dataloader=dataloader,
                                                   device=self.device,
                                                   use_P=use_P)
@@ -2140,6 +2143,7 @@ class ENRC(_AbstractDeepClusteringAlgo):
     def transform_full_space(self, X: np.ndarray, embedded=False) -> np.ndarray:
         """
         Embedds the input dataset with the neural network and the matrix V from the ENRC object.
+
         Parameters
         ----------
         X : np.ndarray
@@ -2154,7 +2158,7 @@ class ENRC(_AbstractDeepClusteringAlgo):
         """
         if not embedded:
             dataloader = get_dataloader(X, batch_size=self.batch_size, shuffle=False, drop_last=False)
-            emb = encode_batchwise(dataloader=dataloader, neural_network=self.neural_network)
+            emb = encode_batchwise(dataloader=dataloader, neural_network=self.neural_network_trained_)
         else:
             emb = X
         rotated = np.matmul(emb, self.V)
@@ -2180,7 +2184,7 @@ class ENRC(_AbstractDeepClusteringAlgo):
         """
         if not embedded:
             dataloader = get_dataloader(X, batch_size=self.batch_size, shuffle=False, drop_last=False)
-            emb = encode_batchwise(dataloader=dataloader, neural_network=self.neural_network)
+            emb = encode_batchwise(dataloader=dataloader, neural_network=self.neural_network_trained_)
         else:
             emb = X
         cluster_space_V = self.V[:, self.P[subspace_index]]
@@ -2238,7 +2242,7 @@ class ENRC(_AbstractDeepClusteringAlgo):
         cluster_space_centers = self.cluster_centers_[subspace_index]
         # rotate back as centers are in the V-rotated space
         centers_rot_back = np.matmul(cluster_space_centers, self.V.transpose())
-        centers_rec = self.neural_network.decode(torch.from_numpy(centers_rot_back).float().to(self.device))
+        centers_rec = self.neural_network_trained_.decode(torch.from_numpy(centers_rot_back).float().to(self.device))
         return centers_rec.detach().cpu().numpy()
 
 
@@ -2273,8 +2277,8 @@ class ACeDeC(ENRC):
         will train as long as the labels are not changing anymore (default: None)
     optimizer_class : torch.optim.Optimizer
         optimizer for pretraining and training (default: torch.optim.Adam)
-    ssl_loss_fn : torch.nn.modules.loss._Loss
-         self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: torch.nn.MSELoss())
+    ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
+         self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: mean_squared_error)
     clustering_loss_weight : float
         weight of the cluster loss term. The higher it is set the more the embedded space will be shaped to the assumed cluster structure (default: 1.0)
     ssl_loss_weight : float
@@ -2320,8 +2324,10 @@ class ACeDeC(ENRC):
         The final labels
     cluster_centers_ : np.ndarray
         The final cluster centers
-    neural_network : torch.nn.Module
+    neural_networ_trained_ : torch.nn.Module
         The final neural_network
+    n_features_in_ : int
+        the number of features used for the fitting
 
     Raises
     ----------
@@ -2337,7 +2343,7 @@ class ACeDeC(ENRC):
                  batch_size: int = 128, pretrain_optimizer_params: dict = None,
                  clustering_optimizer_params: dict = None, pretrain_epochs: int = 100, clustering_epochs: int = 150,
                  tolerance_threshold: float = None, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
-                 ssl_loss_fn: torch.nn.modules.loss._Loss = torch.nn.MSELoss(),
+                 ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error,
                  clustering_loss_weight: float = 1.0, ssl_loss_weight: float = 1.0,
                  neural_network: torch.nn.Module | tuple = None, neural_network_weights: str = None,
                  embedding_size: int = 20, init: str = "acedec",

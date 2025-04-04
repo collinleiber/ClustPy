@@ -19,6 +19,8 @@ def test_simple_dipdeck():
     dipdeck.fit(X)
     assert dipdeck.labels_.dtype == np.int32
     assert dipdeck.labels_.shape == labels.shape
+    X_embed = dipdeck.transform(X)
+    assert X_embed.shape == (X.shape[0], dipdeck.embedding_size)
     # Test if random state is working
     dipdeck2 = DipDECK(pretrain_epochs=3, clustering_epochs=3, random_state=1)
     dipdeck2.fit(X)

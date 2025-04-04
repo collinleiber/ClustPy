@@ -142,7 +142,7 @@ class VariationalAutoencoder(FeedforwardAutoencoder):
         reconstruction = self.decode(z)
         return z, q_mean, q_logvar, reconstruction
 
-    def loss(self, batch: list, ssl_loss_fn: torch.nn.modules.loss._Loss, device: torch.device,
+    def loss(self, batch: list, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss, device: torch.device,
              corruption_fn: Callable = None, beta: float = 1) -> (torch.Tensor, torch.Tensor, torch.Tensor):
         """
         Calculate the loss of a single batch of data.
@@ -151,7 +151,7 @@ class VariationalAutoencoder(FeedforwardAutoencoder):
         ----------
         batch: list
             the different parts of a dataloader (id, samples, ...)
-        ssl_loss_fn : torch.nn.modules.loss._Loss
+        ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
             self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss
         device : torch.device
             device to be trained on

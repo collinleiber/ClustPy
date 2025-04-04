@@ -123,6 +123,7 @@ Remove clustpy via pip to avoid ambiguities during development, e.g., when chang
 | DDC        | [Deep density-based image clustering](https://www.sciencedirect.com/science/article/pii/S0950705120302112) | Knowledge-Based Systems 2020     | [Link](https://github.com/Yazhou-Ren/DDC/tree/master) (Python + Keras)        | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.deep.html#clustpy.deep.ddc_n2d.DDC)           | 
 | DEC        | [Unsupervised deep embedding for clustering analysis](https://dl.acm.org/doi/abs/10.5555/3045390.3045442) | ICML 2016                        | [Link](https://github.com/piiswrong/dec) (Python + Caffe)                     | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.deep.html#clustpy.deep.dec.DEC)               |
 | DeepECT    | [Deep embedded cluster tree](https://ieeexplore.ieee.org/abstract/document/8970987) | ICDM 2019                        | [Link](https://dmm.dbs.ifi.lmu.de/downloads) (Python + PyTorch)               | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.deep.html#clustpy.deep.deepect.DeepECT)       |
+| DEN        | [Deep Embedding Network for Clustering](https://ieeexplore.ieee.org/document/6976982) | ICPR 2014                         | -               | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.deep.html#clustpy.deep.den.DEN)       |
 | DipDECK    | [Dip-based Deep Embedded Clustering with k-Estimation](https://dl.acm.org/doi/10.1145/3447548.3467316) | KDD 2021                         | [Link](https://dmm.dbs.ifi.lmu.de/downloads) (Python + PyTorch)               | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.deep.html#clustpy.deep.dipdeck.DipDECK)       |
 | DipEncoder | [The DipEncoder: Enforcing Multimodality in Autoencoders](https://dl.acm.org/doi/10.1145/3534678.3539407) | KDD 2022                         | [Link](https://dmm.dbs.ifi.lmu.de/downloads) (Python + PyTorch)               | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.deep.html#clustpy.deep.dipencoder.DipEncoder) |
 | DKM        | [Deep k-Means: Jointly clustering with k-Means and learning representations](https://www.sciencedirect.com/science/article/abs/pii/S0167865520302749) | Pattern Recognition Letters 2020 | [Link](https://github.com/MaziarMF/deep-k-means) (Python + Tensorflow)        | [Link](https://clustpy.readthedocs.io/en/latest/clustpy.deep.html#clustpy.deep.dkm.DKM)               |
@@ -351,9 +352,10 @@ Benchmarking Deep Clustering Algorithms With ClustPy.
 
 # Publications using ClustPy
 
-- [Application of Deep Clustering Algorithms](https://dl.acm.org/doi/abs/10.1145/3583780.3615290) (10/2023)
-- [Benchmarking Deep Clustering Algorithms With ClustPy](https://ieeexplore.ieee.org/document/10411702) (12/2023)
-- [Data with Density-Based Clusters: A Generator for Systematic Evaluation of Clustering Algorithms](https://link.springer.com/chapter/10.1007/978-3-031-70368-3_1) (08/2024)
-- [Breaking the Reclustering Barrier in Centroid-based Deep Clustering](https://arxiv.org/pdf/2411.02275) (11/2024)
-- [SHADE: Deep Density-based Clustering](https://arxiv.org/pdf/2410.06265) (12/2024)
-- [Dying Clusters Is All You Need - Deep Clustering With an Unknown Number of Clusters](https://arxiv.org/pdf/2410.09491) (12/2024)
+- [Application of Deep Clustering Algorithms](https://dl.acm.org/doi/abs/10.1145/3583780.3615290) (CIKM 10/2023)
+- [Benchmarking Deep Clustering Algorithms With ClustPy](https://ieeexplore.ieee.org/document/10411702) (ICDMW 12/2023)
+- [Data with Density-Based Clusters: A Generator for Systematic Evaluation of Clustering Algorithms](https://link.springer.com/chapter/10.1007/978-3-031-70368-3_1) (ECML-PKDD 08/2024)
+- [Statistical Modeling of Univariate Multimodal Data](https://arxiv.org/abs/2412.15894) (arXiv 12/2024)
+- [SHADE: Deep Density-based Clustering](https://arxiv.org/pdf/2410.06265) (ICDM 12/2024)
+- [Dying Clusters Is All You Need - Deep Clustering With an Unknown Number of Clusters](https://ieeexplore.ieee.org/document/10917902) (ICDMW 12/2024)
+- [Breaking the Reclustering Barrier in Centroid-based Deep Clustering](https://openreview.net/forum?id=r01fcKhzT5) (ICLR 04/2025)
