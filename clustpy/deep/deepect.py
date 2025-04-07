@@ -6,8 +6,7 @@ Julian Schilcher
 
 import numpy as np
 import torch
-from clustpy.deep._utils import squared_euclidean_distance, encode_batchwise, predict_batchwise, \
-    embedded_kmeans_prediction, mean_squared_error
+from clustpy.deep._utils import squared_euclidean_distance, encode_batchwise, predict_batchwise, mean_squared_error
 from clustpy.deep._train_utils import get_default_deep_clustering_initialization
 from sklearn.cluster import KMeans
 from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
@@ -546,9 +545,9 @@ class DeepECT(_AbstractDeepClusteringAlgo):
     batch_size : int
         Size of the data batches (default: 256)
     pretrain_optimizer_params : dict
-        parameters of the optimizer for the pretraining of the neural network, includes the learning rate (default: {"lr": 1e-3})
+        parameters of the optimizer for the pretraining of the neural network, includes the learning rate. If None, it will be set to {"lr": 1e-3} (default: None)
     clustering_optimizer_params : dict
-        parameters of the optimizer for the actual clustering procedure, includes the learning rate (default: {"lr": 1e-4})
+        parameters of the optimizer for the actual clustering procedure, includes the learning rate. If None, it will be set to {"lr": 1e-4} (default: None)
     pretrain_epochs : int
         number of epochs for the pretraining of the neural network (default: 50)
     clustering_epochs : int
@@ -672,11 +671,10 @@ class DeepECT(_AbstractDeepClusteringAlgo):
         predicted_labels : np.ndarray
             The predicted labels
         """
-        X_embed = self.transform(X)
         leaf_nodes, _ = self.tree_.get_leaf_and_split_nodes()
         leaf_centers = np.array([leaf.center.data.detach().cpu().numpy() for leaf in leaf_nodes])
         leaf_labels = np.array([leaf.labels[0] for leaf in leaf_nodes])
-        cluster_center_assignments = embedded_kmeans_prediction(X_embed, leaf_centers)
+        cluster_center_assignments = super().predict(X, leaf_centers)
         predicted_labels = leaf_labels[cluster_center_assignments]
         return predicted_labels
 

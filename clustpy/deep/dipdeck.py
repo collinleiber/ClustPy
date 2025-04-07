@@ -7,8 +7,7 @@ from scipy.spatial.distance import cdist
 import numpy as np
 from clustpy.utils import dip_test, dip_pval
 import torch
-from clustpy.deep._utils import encode_batchwise, squared_euclidean_distance, int_to_one_hot, \
-    embedded_kmeans_prediction, mean_squared_error
+from clustpy.deep._utils import encode_batchwise, squared_euclidean_distance, int_to_one_hot, mean_squared_error
 from clustpy.deep._train_utils import get_default_deep_clustering_initialization
 from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
 from sklearn.cluster import KMeans
@@ -593,9 +592,9 @@ class DipDECK(_AbstractDeepClusteringAlgo):
     batch_size : int
         size of the data batches (default: 256)
     pretrain_optimizer_params : dict
-        parameters of the optimizer for the pretraining of the neural network, includes the learning rate (default: {"lr": 1e-3})
+        parameters of the optimizer for the pretraining of the neural network, includes the learning rate. If None, it will be set to {"lr": 1e-3} (default: None)
     clustering_optimizer_params : dict
-        parameters of the optimizer for the actual clustering procedure, includes the learning rate (default: {"lr": 1e-4})
+        parameters of the optimizer for the actual clustering procedure, includes the learning rate. If None, it will be set to {"lr": 1e-4} (default: None)
     pretrain_epochs : int
         number of epochs for the pretraining of the neural network (default: 100)
     clustering_epochs : int
@@ -629,7 +628,7 @@ class DipDECK(_AbstractDeepClusteringAlgo):
     initial_clustering_class : ClusterMixin
         clustering class to obtain the initial cluster labels after the pretraining (default: KMeans)
     initial_clustering_params : dict
-        parameters for the initial clustering class (default: {})
+        parameters for the initial clustering class. If None, it will be set to {} (default: None)
     device : torch.device
         The device on which to perform the computations.
         If device is None then it will be automatically chosen: if a gpu is available the gpu with the highest amount of free memory will be chosen (default: None)
@@ -756,7 +755,5 @@ class DipDECK(_AbstractDeepClusteringAlgo):
         """
         # Get embedded centers
         embedded_centers = self.transform(self.cluster_centers_)
-        # Get labels
-        X_embed = self.transform(X)
-        predicted_labels = embedded_kmeans_prediction(X_embed, embedded_centers)
+        predicted_labels = super().predict(X, embedded_centers)
         return predicted_labels

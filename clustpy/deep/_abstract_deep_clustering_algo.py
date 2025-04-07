@@ -5,6 +5,7 @@ import torch
 from clustpy.deep._data_utils import augmentation_invariance_check
 from clustpy.utils.checks import check_parameters
 from sklearn.utils.validation import check_is_fitted
+from sklearn.metrics.pairwise import pairwise_distances_argmin_min
 
 
 class _AbstractDeepClusteringAlgo(ClusterMixin, TransformerMixin, BaseEstimator):
@@ -100,7 +101,7 @@ class _AbstractDeepClusteringAlgo(ClusterMixin, TransformerMixin, BaseEstimator)
             f"X has {X.shape[1]} features, but {self.__class__.__name__} "
             f"is expecting {self.n_features_in_} features as input."
         )
-        X_embed = self.neural_network_trained_.transform(X, self.batch_size)
+        X_embed = self.neural_network_trained_.transform(X)
         return X_embed.astype(X.dtype)
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> '_AbstractDeepClusteringAlgo':
@@ -140,3 +141,32 @@ class _AbstractDeepClusteringAlgo(ClusterMixin, TransformerMixin, BaseEstimator)
         self.fit(X, y)
         X_embed = self.transform(X)
         return X_embed
+
+    def predict(self, X: np.ndarray, cluster_centers: np.ndarray = None) -> np.ndarray:
+        """
+        Predicts the labels of the input data.
+        The labels will be equal to the id of the closest cluster center in the embedding of the autoencoder.
+        Therefore, cluster_centers must be give as input parameter or cluster_centers_ must be defined as an attribute.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            input data
+        cluster_centers : np.ndarray
+            the cluster centers. It is expected that the cluster centers lie within the embedded feature space, not in the original.
+            Can be None if attibute cluster_centers_ is defined
+
+        Returns
+        -------
+        predicted_labels : np.ndarray
+            The predicted labels
+        """
+        X, _, _  = check_parameters(X)
+        X_embed = self.transform(X)
+        if cluster_centers is None:
+            assert hasattr(self, "cluster_centers_"), "predict method of AbstractDeepClusteringAlgo can only be used if cluster_centers are give as input parameter or cluster_centers_ are defined as attribute"
+            cluster_centers = self.cluster_centers_
+        predicted_labels, _ = pairwise_distances_argmin_min(X=X_embed, Y=cluster_centers, metric='euclidean',
+                                                        metric_kwargs={'squared': True})
+        predicted_labels = predicted_labels.astype(np.int32)
+        return predicted_labels

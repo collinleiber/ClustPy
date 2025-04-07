@@ -4,8 +4,7 @@ Lukas Miklautz,
 Dominik Mautz
 """
 
-from clustpy.deep._utils import encode_batchwise, squared_euclidean_distance, predict_batchwise, mean_squared_error, \
-    embedded_kmeans_prediction
+from clustpy.deep._utils import encode_batchwise, squared_euclidean_distance, predict_batchwise, mean_squared_error
 from clustpy.deep._train_utils import get_default_deep_clustering_initialization
 from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
 import torch
@@ -380,9 +379,9 @@ class DCN(_AbstractDeepClusteringAlgo):
     batch_size : int
         size of the data batches (default: 256)
     pretrain_optimizer_params : dict
-        parameters of the optimizer for the pretraining of the neural network, includes the learning rate (default: {"lr": 1e-3})
+        parameters of the optimizer for the pretraining of the neural network, includes the learning rate. If None, it will be set to {"lr": 1e-3} (default: None)
     clustering_optimizer_params : dict
-        parameters of the optimizer for the actual clustering procedure, includes the learning rate (default: {"lr": 1e-4})
+        parameters of the optimizer for the actual clustering procedure, includes the learning rate. If None, it will be set to {"lr": 1e-4} (default: None)
     pretrain_epochs : int
         number of epochs for the pretraining of the neural network (default: 100)
     clustering_epochs : int
@@ -413,7 +412,7 @@ class DCN(_AbstractDeepClusteringAlgo):
     initial_clustering_class : ClusterMixin
         clustering class to obtain the initial cluster labels after the pretraining (default: KMeans)
     initial_clustering_params : dict
-        parameters for the initial clustering class (default: {})
+        parameters for the initial clustering class. If None, it will be set to {} (default: None)
     device : torch.device
         The device on which to perform the computations.
         If device is None then it will be automatically chosen: if a gpu is available the gpu with the highest amount of free memory will be chosen (default: None)
@@ -518,21 +517,3 @@ class DCN(_AbstractDeepClusteringAlgo):
         self.neural_network_trained_ = neural_network
         self.n_features_in_ = X.shape[1]
         return self
-
-    def predict(self, X: np.ndarray) -> np.ndarray:
-        """
-        Predicts the labels of the input data.
-
-        Parameters
-        ----------
-        X : np.ndarray
-            input data
-
-        Returns
-        -------
-        predicted_labels : np.ndarray
-            The predicted labels
-        """
-        X_embed = self.transform(X)
-        predicted_labels = embedded_kmeans_prediction(X_embed, self.cluster_centers_)
-        return predicted_labels

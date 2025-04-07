@@ -676,7 +676,7 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
     Parameters
     ----------
     n_clusters : int
-        number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN
+        number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN (default: 8)
     batch_size : int
         size of the data batches for the actual training of the DipEncoder.
         Should be larger the more clusters we have. If it is None, it will be set to (25 x n_clusters) (default: None)
@@ -755,7 +755,7 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
     Proceedings of the 28th ACM SIGKDD Conference on Knowledge Discovery & Data Mining. 2022.
     """
 
-    def __init__(self, n_clusters: int, batch_size: int = None, pretrain_optimizer_params: dict = None,
+    def __init__(self, n_clusters: int = 8, batch_size: int = None, pretrain_optimizer_params: dict = None,
                  clustering_optimizer_params: dict = None, pretrain_epochs: int = 100,
                  clustering_epochs: int = 100, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error,
@@ -799,7 +799,6 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
             This instance of the DipEncoder
         """
         X, y, random_state, pretrain_optimizer_params, clustering_optimizer_params, initial_clustering_params = self._check_parameters(X, y=y)
-        assert y is None or len(np.unique(y)) == self.n_clusters, "If y is specified, n_clusters must match number of unique labels in y."
         assert self.batch_size is not None or self.n_clusters is not None, "n_clusters and batch_size can not both be None"
         batch_size = 25 * self.n_clusters if self.batch_size is None else self.batch_size
         # Get initial setting (device, dataloaders, pretrained AE and initial clustering result)
@@ -808,8 +807,12 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
             self.neural_network, self.embedding_size, self.custom_dataloaders, self.initial_clustering_class if y is None else None, 
             initial_clustering_params, self.device, random_state, neural_network_weights=self.neural_network_weights)
         if y is not None:
+            class_labels = np.unique(y)
+            if len(class_labels) != self.n_clusters:
+                print("WARNING: If y is specified, the number of labels must match n_clusters. Therefore, n_clusters was changed from {0} to {1}".format(self.n_clusters, len(class_labels)))
+                n_clusters = len(class_labels)
             # If y is give, overwrite labels and centers
-            init_labels = y
+            init_labels = y.astype(int)
             init_centers = np.array([np.mean(X_embed[y == i], axis=0) for i in range(n_clusters)])
         n_cluster_combinations = int((n_clusters - 1) * n_clusters / 2)
         # Get factor for AE loss
@@ -821,8 +824,10 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
         # reconstruction_loss_weight = loss_fn(rand_samples_reconstruction, rand_samples_resized).detach()
         if self.ssl_loss_weight is None:
             ssl_loss_weight = _get_ssl_loss_of_first_batch(trainloader, neural_network, self.ssl_loss_fn, device)
-            self.ssl_loss_weight = 1 / (4 * ssl_loss_weight)
-            print("Setting ssl_loss_weight automatically; set to", ssl_loss_weight)
+            ssl_loss_weight = 1 / (4 * ssl_loss_weight)
+            print("INFO: Setting ssl_loss_weight automatically; set to", ssl_loss_weight)
+        else:
+            ssl_loss_weight = self.ssl_loss_weight
         # Create initial projections vectors by using difference between cluster centers
         index_dict = {}
         projections = np.zeros((n_cluster_combinations, self.embedding_size))
@@ -840,7 +845,7 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
                                     **clustering_optimizer_params)
         dipencoder_module = _DipEncoder_Module(n_clusters, index_dict, dip_module, init_labels, self.max_cluster_size_diff_factor, self.augmentation_invariance, y is not None)
         dipencoder_module.fit(neural_network, trainloader, testloader, self.clustering_epochs, device, optimizer, self.ssl_loss_fn, 
-                              self.clustering_loss_weight, self.ssl_loss_weight)
+                              self.clustering_loss_weight, ssl_loss_weight)
         # Save values
         self.labels_ = dipencoder_module.labels
         self.projection_axes_ = dip_module.projection_axes.detach().cpu().numpy()

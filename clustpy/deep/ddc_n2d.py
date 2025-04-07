@@ -242,7 +242,7 @@ class DDC(_AbstractDeepClusteringAlgo):
     batch_size : int
         size of the data batches (default: 256)
     pretrain_optimizer_params : dict
-        parameters of the optimizer for the pretraining of the neural network, includes the learning rate (default: {"lr": 1e-3})
+        parameters of the optimizer for the pretraining of the neural network, includes the learning rate. If None, it will be set to {"lr": 1e-3} (default: None)
     pretrain_epochs : int
         number of epochs for the pretraining of the neural network (default: 100)
     optimizer_class : torch.optim.Optimizer
@@ -263,7 +263,7 @@ class DDC(_AbstractDeepClusteringAlgo):
         If None, the default dataloaders will be used (default: None)
     tsne_params : dict
         Parameters for the t-SNE execution. For example, perplexity can be changed by setting tsne_params to {"n_components": 2, "perplexity": 25}.
-        Check out sklearn.manifold.TSNE for more information (default: {"n_components": 2})
+        Check out sklearn.manifold.TSNE for more information. If None, it will be set to {"n_components": 2} (default: None)
     device : torch.device
         The device on which to perform the computations.
         If device is None then it will be automatically chosen: if a gpu is available the gpu with the highest amount of free memory will be chosen (default: None)
@@ -352,6 +352,23 @@ class DDC(_AbstractDeepClusteringAlgo):
         self.tsne_ = tsne
         self.n_features_in_ = X.shape[1]
         return self
+    
+    def predict(self, X: np.ndarray,) -> np.ndarray:
+        """
+        Predicts the labels of the input data.
+        Can not be used as tsne does not learn a function f() to map the data into the final embedding.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            input data
+
+        Returns
+        -------
+        predicted_labels : np.ndarray
+            The predicted labels
+        """
+        raise Exception("predict can not be used as tsne does not learn a function f() to map the data into the final embedding")
 
 
 class N2D(_AbstractDeepClusteringAlgo):
@@ -367,7 +384,7 @@ class N2D(_AbstractDeepClusteringAlgo):
     batch_size : int
         size of the data batches (default: 256)
     pretrain_optimizer_params : dict
-        parameters of the optimizer for the pretraining of the neural network, includes the learning rate (default: {"lr": 1e-3})
+        parameters of the optimizer for the pretraining of the neural network, includes the learning rate. If None, it will be set to {"lr": 1e-3} (default: None)
     pretrain_epochs : int
         number of epochs for the pretraining of the neural network (default: 100)
     optimizer_class : torch.optim.Optimizer
@@ -390,7 +407,7 @@ class N2D(_AbstractDeepClusteringAlgo):
         the manifold technique class (default: TSNE)
     manifold_params : dict
         Parameters for the manifold execution. For example, perplexity can be changed for TSNE by setting manifold_params to {"n_components": 2, "perplexity": 25}.
-        Check out e.g. sklearn.manifold.TSNE for more information (default: {"n_components": 2})
+        Check out e.g. sklearn.manifold.TSNE for more information. If None, it will be set to {"n_components": 2} (default: None)
     device : torch.device
         The device on which to perform the computations.
         If device is None then it will be automatically chosen: if a gpu is available the gpu with the highest amount of free memory will be chosen (default: None)
@@ -472,3 +489,20 @@ class N2D(_AbstractDeepClusteringAlgo):
         self.manifold_ = manifold
         self.n_features_in_ = X.shape[1]
         return self
+    
+    def predict(self, X: np.ndarray,) -> np.ndarray:
+        """
+        Predicts the labels of the input data.
+        Can not be used as the manifold does not learn a function f() to map the data into the final embedding.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            input data
+
+        Returns
+        -------
+        predicted_labels : np.ndarray
+            The predicted labels
+        """
+        raise Exception("predict can not be used as the manifold does not learn a function f() to map the data into the final embedding")

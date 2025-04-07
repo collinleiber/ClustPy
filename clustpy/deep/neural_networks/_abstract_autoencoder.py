@@ -7,13 +7,14 @@ import torch
 import numpy as np
 from clustpy.deep._early_stopping import EarlyStopping
 from clustpy.deep._data_utils import get_dataloader
-from clustpy.deep._utils import encode_batchwise, get_device_from_module, mean_squared_error
+from clustpy.deep._utils import get_device_from_module, mean_squared_error
 import os
 import tqdm
 from collections.abc import Callable
 from sklearn.utils import check_random_state
 from clustpy.deep._utils import set_torch_seed
 from collections.abc import Callable
+from sklearn.base import TransformerMixin, BaseEstimator
 
 
 class FullyConnectedBlock(torch.nn.Module):
@@ -91,7 +92,7 @@ class FullyConnectedBlock(torch.nn.Module):
         return forwarded
 
 
-class _AbstractAutoencoder(torch.nn.Module):
+class _AbstractAutoencoder(torch.nn.Module, TransformerMixin, BaseEstimator):
     """
     An abstract autoencoder class that can be used by other autoencoder implementations.
 
@@ -426,7 +427,7 @@ class _AbstractAutoencoder(torch.nn.Module):
         self.fitted = True
         return self
 
-    def transform(self, X: np.ndarray, batch_size: int) -> np.ndarray:
+    def transform(self, X: np.ndarray) -> np.ndarray:
         """
         Embed the given data set using the trained autoencoder.
 
@@ -434,14 +435,14 @@ class _AbstractAutoencoder(torch.nn.Module):
         ----------
         X: np.ndarray
             The given data set
-        batch_size : int
-            size of the data batches
 
         Returns
         -------
         X_embed : np.ndarray
             The embedded data set
         """
-        dataloader = get_dataloader(X, batch_size, False, False)
-        X_embed = encode_batchwise(dataloader, self)
+        device = get_device_from_module(self)
+        torch_data = torch.from_numpy(X).float().to(device)
+        embedded_data = self.encode(torch_data)
+        X_embed = embedded_data.detach().cpu().numpy()
         return X_embed

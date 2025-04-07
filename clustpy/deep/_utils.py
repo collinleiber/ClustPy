@@ -1,10 +1,8 @@
 from sklearn.base import ClusterMixin
 import inspect
 import torch
-from itertools import islice
 import numpy as np
 import random
-from sklearn.metrics.pairwise import pairwise_distances_argmin_min
 import os
 import subprocess
 
@@ -169,7 +167,7 @@ def encode_batchwise(dataloader: torch.utils.data.DataLoader, neural_network: to
     Parameters
     ----------
     dataloader : torch.utils.data.DataLoader
-        dataloader to be used
+        data to embed
     neural_network : torch.nn.Module
         the neural network that is used for the encoding (e.g. an autoencoder)
 
@@ -179,15 +177,16 @@ def encode_batchwise(dataloader: torch.utils.data.DataLoader, neural_network: to
         The embedded data set
     """
     device = get_device_from_module(neural_network)
-    embeddings = []
+    embeddings_numpy = None
     for batch in dataloader:
         batch_data = batch[1].to(device)
         embedded_data = neural_network.encode(batch_data)
         # In case encode() returns more than one value (e.g., for a variational autoencoder), we will pick the first
         if type(embedded_data) is tuple:
             embedded_data = embedded_data[0]
-        embeddings.append(embedded_data.detach().cpu())
-    embeddings_numpy = torch.cat(embeddings, dim=0).numpy()
+        if embeddings_numpy is None:
+            embeddings_numpy = np.zeros((len(dataloader.dataset), embedded_data.shape[1]), dtype=float)
+        embeddings_numpy[batch[0]] = embedded_data.detach().cpu().numpy()
     return embeddings_numpy
 
 
@@ -199,19 +198,17 @@ def decode_batchwise(dataloader: torch.utils.data.DataLoader, neural_network: to
     Parameters
     ----------
     dataloader : torch.utils.data.DataLoader
-        dataloader to be used
+        data to decode
     neural_network : torch.nn.Module
         the neural network that is used for the decoding (e.g. an autoencoder)
-    device : torch.device
-        device to be trained on
 
     Returns
     -------
-    reconstructions_numpy : np.ndarray
-        The reconstructed data set
+    decodings_numpy : np.ndarray
+        The decoded data set
     """
     device = get_device_from_module(neural_network)
-    reconstructions = []
+    decodings_numpy = None
     for batch in dataloader:
         batch_data = batch[1].to(device)
         embedded_data = neural_network.encode(batch_data)
@@ -220,9 +217,10 @@ def decode_batchwise(dataloader: torch.utils.data.DataLoader, neural_network: to
             decoded_data = neural_network.decode(*embedded_data)
         else:
             decoded_data = neural_network.decode(embedded_data)
-        reconstructions.append(decoded_data.detach().cpu())
-    reconstructions_numpy = torch.cat(reconstructions, dim=0).numpy()
-    return reconstructions_numpy
+        if decodings_numpy is None:
+            decodings_numpy = np.zeros((len(dataloader.dataset), decoded_data.shape[1]), dtype=float)
+        decodings_numpy[batch[0]] = decoded_data.detach().cpu().numpy()
+    return decodings_numpy
 
 
 def encode_decode_batchwise(dataloader: torch.utils.data.DataLoader, neural_network: torch.nn.Module) -> (
@@ -242,19 +240,26 @@ def encode_decode_batchwise(dataloader: torch.utils.data.DataLoader, neural_netw
     -------
     tuple : (np.ndarray, np.ndarray)
         The embedded data set,
-        The reconstructed data set
+        The decoded data set
     """
     device = get_device_from_module(neural_network)
-    embeddings = []
-    reconstructions = []
+    embeddings_numpy = None
+    decodings_numpy = None
     for batch in dataloader:
         batch_data = batch[1].to(device)
-        embedding = neural_network.encode(batch_data)
-        embeddings.append(embedding.detach().cpu())
-        reconstructions.append(neural_network.decode(embedding).detach().cpu())
-    embeddings_numpy = torch.cat(embeddings, dim=0).numpy()
-    reconstructions_numpy = torch.cat(reconstructions, dim=0).numpy()
-    return embeddings_numpy, reconstructions_numpy
+        embedded_data = neural_network.encode(batch_data)
+        # In case encode() returns more than one value (e.g., for a variational autoencoder), we all of them will be used for decoding
+        if type(embedded_data) is tuple:
+            decoded_data = neural_network.decode(*embedded_data)
+            embedded_data = embedded_data[0]
+        else:
+            decoded_data = neural_network.decode(embedded_data)
+        if embeddings_numpy is None:
+            embeddings_numpy = np.zeros((len(dataloader.dataset), embedded_data.shape[1]), dtype=float)
+            decodings_numpy = np.zeros((len(dataloader.dataset), decoded_data.shape[1]), dtype=float)
+        embeddings_numpy[batch[0]] = embedded_data.detach().cpu().numpy()
+        decodings_numpy[batch[0]] = decoded_data.detach().cpu().numpy()
+    return embeddings_numpy, decodings_numpy
 
 
 def predict_batchwise(dataloader: torch.utils.data.DataLoader, neural_network: torch.nn.Module,
@@ -278,12 +283,11 @@ def predict_batchwise(dataloader: torch.utils.data.DataLoader, neural_network: t
         The predictions of the cluster_module for the data set
     """
     device = get_device_from_module(neural_network)
-    predictions = []
+    predictions_numpy = np.zeros(len(dataloader.dataset), dtype=int)
     for batch in dataloader:
         batch_data = batch[1].to(device)
         prediction = cluster_module.predict_hard(neural_network.encode(batch_data)).detach().cpu()
-        predictions.append(prediction)
-    predictions_numpy = torch.cat(predictions, dim=0).numpy()
+        predictions_numpy[batch[0]] = prediction
     return predictions_numpy
 
 
@@ -319,29 +323,6 @@ def int_to_one_hot(int_tensor: torch.Tensor, n_integers: int) -> torch.Tensor:
     onehot = torch.zeros([int_tensor.shape[0], n_integers], dtype=torch.float, device=int_tensor.device)
     onehot.scatter_(1, int_tensor.unsqueeze(1).long(), 1)
     return onehot
-
-
-def embedded_kmeans_prediction(X_embed: np.ndarray, cluster_centers: np.ndarray) -> np.ndarray:
-    """
-    Predicts the labels of the given embedded data.
-    Labels correspond to the id of the closest cluster center.
-
-    Parameters
-    ----------
-    X_embed : np.ndarray
-        dataloader to be used
-    cluster_centers : np.ndarray
-        input cluster centers
-
-    Returns
-    -------
-    predicted_labels : np.ndarray
-        The predicted labels
-    """
-    predicted_labels, _ = pairwise_distances_argmin_min(X=X_embed, Y=cluster_centers, metric='euclidean',
-                                                        metric_kwargs={'squared': True})
-    predicted_labels = predicted_labels.astype(np.int32)
-    return predicted_labels
 
 
 def run_initial_clustering(X: np.ndarray, n_clusters: int, clustering_class: ClusterMixin, clustering_params: dict,
