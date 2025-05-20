@@ -2,12 +2,11 @@ import numpy as np
 from clustpy.partition import ProjectedDipMeans
 from clustpy.partition.projected_dipmeans import _get_projected_data
 from sklearn.datasets import make_blobs
-from sklearn.utils.estimator_checks import check_estimator
+from clustpy.utils.checks import check_clustpy_estimator
 
 
 def test_projected_dipmeans_estimator():
-    check_estimator(ProjectedDipMeans(), 
-                    {"check_complex_data": "this check is expected to fail because complex values are not supported"})
+    check_clustpy_estimator(ProjectedDipMeans(), ("check_complex_data"))
 
 
 def test_get_projected_data():
@@ -53,3 +52,5 @@ def test_simple_ProjectedDipMeans():
     assert pdipmeans.cluster_centers_.shape == (pdipmeans.n_clusters_, X.shape[1])
     assert len(np.unique(pdipmeans.labels_)) == pdipmeans.n_clusters_
     assert np.array_equal(np.unique(pdipmeans.labels_), np.arange(pdipmeans.n_clusters_))
+    labels_predict = pdipmeans.predict(X)
+    assert np.array_equal(pdipmeans.labels_, labels_predict)

@@ -8,7 +8,9 @@ from scipy.spatial.distance import pdist, squareform
 from clustpy.utils import dip_test, dip_pval, dip_boot_samples
 from clustpy.partition.xmeans import _initial_kmeans_clusters, _execute_two_means
 from sklearn.base import BaseEstimator, ClusterMixin
-from sklearn.utils import check_random_state
+from clustpy.utils.checks import check_parameters
+from sklearn.utils.validation import check_is_fitted
+from sklearn.metrics.pairwise import pairwise_distances_argmin_min
 
 
 def _dipmeans(X: np.ndarray, significance: float, split_viewers_threshold: float, pval_strategy: str, n_boots: int,
@@ -125,6 +127,8 @@ class DipMeans(BaseEstimator, ClusterMixin):
         The final labels
     cluster_centers_ : np.ndarray
         The final cluster centers
+    n_features_in_ : int
+        the number of features used for the fitting
 
     References
     ----------
@@ -142,7 +146,7 @@ class DipMeans(BaseEstimator, ClusterMixin):
         self.n_split_trials = n_split_trials
         self.n_clusters_init = n_clusters_init
         self.max_n_clusters = max_n_clusters
-        self.random_state = check_random_state(random_state)
+        self.random_state = random_state
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DipMeans':
         """
@@ -161,10 +165,33 @@ class DipMeans(BaseEstimator, ClusterMixin):
         self : DipMeans
             this instance of the DipMeans algorithm
         """
+        X, _, random_state = check_parameters(X=X, y=y, random_state=self.random_state)
         n_clusters, labels, centers = _dipmeans(X, self.significance, self.split_viewers_threshold,
                                                 self.pval_strategy, self.n_boots, self.n_split_trials,
-                                                self.n_clusters_init, self.max_n_clusters, self.random_state)
+                                                self.n_clusters_init, self.max_n_clusters, random_state)
         self.n_clusters_ = n_clusters
         self.labels_ = labels
         self.cluster_centers_ = centers
+        self.n_features_in_ = X.shape[1]
         return self
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """
+        Predict the labels of an input dataset. For this method the results from the fit() method will be used.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            the given data set
+
+        Returns
+        -------
+        predicted_labels : np.ndarray
+            the predicted labels of the input data set
+        """
+        check_is_fitted(self, ["labels_", "n_features_in_"])
+        predicted_labels, _ = pairwise_distances_argmin_min(X=X, Y=self.cluster_centers_,
+                                                          metric='euclidean',
+                                                          metric_kwargs={'squared': True})
+        predicted_labels = predicted_labels.astype(np.int32)
+        return predicted_labels

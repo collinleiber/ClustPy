@@ -11,7 +11,7 @@ from scipy.spatial.distance import pdist, squareform
 from sklearn.neighbors import radius_neighbors_graph, kneighbors_graph
 from sklearn.cluster import KMeans
 from sklearn.base import BaseEstimator, ClusterMixin
-from sklearn.utils import check_random_state
+from clustpy.utils.checks import check_parameters
 import scipy
 
 
@@ -240,7 +240,7 @@ class SpecialK(BaseEstimator, ClusterMixin):
         Number of neighbors for the construction of the similarity matrix. Does not include the object itself (default: 10)
     percentage : float
         The amount of data points that should have at least n_neighbors neighbors.
-        Only relevant if use_neighborhood_adj_mat is set to True (default: 0.99)
+        Only relevant if similarity_matrix is set to 'NAM' (default: 0.99)
     n_cluster_pairs_to_consider : int
         The number of cluster pairs to consider when calculating the probability boundary.
         The cluster pairs responsible for the highest cut. If None, all pairs will be considered.
@@ -258,6 +258,8 @@ class SpecialK(BaseEstimator, ClusterMixin):
         The final number of clusters
     labels_ : np.ndarray
         The final labels
+    n_features_in_ : int
+        the number of features used for the fitting
 
     References
     ----------
@@ -266,7 +268,7 @@ class SpecialK(BaseEstimator, ClusterMixin):
     """
 
     def __init__(self, significance: float = 0.01, n_dimensions: int = 200, similarity_matrix: str = 'NAM',
-                 n_neighbors: int = 10, percentage: float = 0.99, n_cluster_pairs_to_consider: int = 10,
+                 n_neighbors: int = 5, percentage: float = 0.99, n_cluster_pairs_to_consider: int = 10,
                  max_n_clusters: int = np.inf, random_state: np.random.RandomState | int = None, debug: bool = False):
         self.significance = significance
         self.n_dimensions = n_dimensions
@@ -275,7 +277,7 @@ class SpecialK(BaseEstimator, ClusterMixin):
         self.percentage = percentage
         self.n_cluster_pairs_to_consider = n_cluster_pairs_to_consider
         self.max_n_clusters = max_n_clusters
-        self.random_state = check_random_state(random_state)
+        self.random_state = random_state
         self.debug = debug
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'SpecialK':
@@ -295,9 +297,11 @@ class SpecialK(BaseEstimator, ClusterMixin):
         self : SpecialK
             this instance of the SpecialK algorithm
         """
+        X, _, random_state = check_parameters(X=X, y=y, random_state=self.random_state)
         n_clusters, labels = _specialk(X, self.significance, self.n_dimensions, self.similarity_matrix,
                                        self.n_neighbors, self.percentage, self.n_cluster_pairs_to_consider,
-                                       self.max_n_clusters, self.random_state, self.debug)
+                                       self.max_n_clusters, random_state, self.debug)
         self.n_clusters_ = n_clusters
         self.labels_ = labels
+        self.features_in_ = X.shape[1]
         return self

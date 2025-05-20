@@ -6,6 +6,7 @@ Collin Leiber
 from sklearn.neighbors import NearestNeighbors
 import numpy as np
 from sklearn.base import BaseEstimator, ClusterMixin
+from clustpy.utils.checks import check_parameters
 
 
 def _multi_density_dbscan(X: np.ndarray, k: int, var: float, min_cluster_size: int) -> (int, np.ndarray, list):
@@ -198,6 +199,8 @@ class MultiDensityDBSCAN(BaseEstimator, ClusterMixin):
         The final labels
     cluster_densities_ : list
         The final cluster densities
+    n_features_in_ : int
+        the number of features used for the fitting
 
     References
     ----------
@@ -227,8 +230,10 @@ class MultiDensityDBSCAN(BaseEstimator, ClusterMixin):
         self : MultiDensityDBSCAN
             this instance of the Multi Density DBSCAN algorithm
         """
+        X, _, _ = check_parameters(X=X, y=y)
         n_clusters, labels, cluster_densities = _multi_density_dbscan(X, self.k, self.var, self.min_cluster_size)
         self.n_clusters_ = n_clusters
         self.labels_ = labels
         self.cluster_densities_ = cluster_densities
+        self.n_features_in_ = X.shape[1]
         return self

@@ -13,6 +13,9 @@ from sklearn.metrics import normalized_mutual_info_score as nmi
 from sklearn.base import BaseEstimator, ClusterMixin
 from clustpy.utils.plots import plot_scatter_matrix
 import clustpy.utils._information_theory as mdl
+from clustpy.utils.checks import check_parameters
+from sklearn.utils.validation import check_is_fitted
+
 
 """
 Output and naming of kmeans++ in Sklearn changed multiple times. This wrapper can work with multiple versions
@@ -41,7 +44,7 @@ def _kmeans_plus_plus(X: np.ndarray, n_clusters: int, x_squared_norms: np.ndarra
     X : np.ndarray
         the given data set
     n_clusters : int
-        list containing number of clusters for each subspace
+        the number of clusters
     x_squared_norms : np.ndarray
         Row-wise (squared) Euclidean norm of X. See sklearn.utils.extmath.row_norms
     random_state : np.random.RandomState
@@ -66,6 +69,29 @@ def _kmeans_plus_plus(X: np.ndarray, n_clusters: int, x_squared_norms: np.ndarra
     return centers
 
 
+def check_n_clusters_for_nr(n_clusters_in: list | tuple) -> list:
+    """
+    Check if n_clusters correctly defined as a list/tuple for non-redundant clustering.
+
+
+    Parameters
+    ----------
+    n_clusters_in : list | tuple
+        list containing the number of clusters for each subspace
+
+    Returns
+    -------
+    n_clusters : list
+        The checked n_clusters value
+    """
+    if type(n_clusters_in) is int:
+        n_clusters = [n_clusters_in]
+    else:
+        # Create copy
+        n_clusters = [n for n in n_clusters_in]
+    return n_clusters
+
+
 """
 Defines the numerical error that is accepted to consider a matrix as orthogonal or symmetric.
 """
@@ -75,7 +101,7 @@ _ACCEPTED_NUMERICAL_ERROR = 1e-6
 def _nrkmeans(X: np.ndarray, n_clusters: list, V: np.ndarray, m: list, P: list, centers: list, mdl_for_noisespace: bool,
               outliers: bool, max_iter: int, threshold_negative_eigenvalue: float, max_distance: float,
               precision: float, random_state: np.random.RandomState, debug: bool) -> (
-        np.ndarray, list, np.ndarray, list, list, list, list):
+        np.ndarray, list, np.ndarray, list, list, list, list, int):
     """
     Start the actual NrKmeans clustering procedure on the input data set.
 
@@ -112,14 +138,15 @@ def _nrkmeans(X: np.ndarray, n_clusters: list, V: np.ndarray, m: list, P: list, 
 
     Returns
     -------
-    tuple : (np.ndarray, list, np.ndarray, list, list, list, list)
+    tuple : (np.ndarray, list, np.ndarray, list, list, list, list, int)
         The labels,
         The cluster centers,
         The orthonormal rotation matrix,
         The dimensionalities of the subpsaces,
         The projections,
         The number of clusters for each subspace (usually the same as the input),
-        The scatter matrix of each subspace
+        The scatter matrix of each subspace,
+        The number of iterations used for clustering
     """
     V, m, P, centers, subspaces, labels, scatter_matrices = \
         _initialize_nrkmeans_parameters(
@@ -173,7 +200,7 @@ def _nrkmeans(X: np.ndarray, n_clusters: list, V: np.ndarray, m: list, P: list, 
     if debug:
         print("[NrKmeans] Converged in iteration " + str(iteration + 1))
     # Return relevant values
-    return labels, centers, V, m, P, n_clusters, scatter_matrices
+    return labels, centers, V, m, P, n_clusters, scatter_matrices, iteration + 1
 
 
 def _initialize_nrkmeans_parameters(X: np.ndarray, n_clusters: list, V: np.ndarray, m: list, P: list, centers: list,
@@ -223,7 +250,7 @@ def _initialize_nrkmeans_parameters(X: np.ndarray, n_clusters: list, V: np.ndarr
     """
     data_dimensionality = X.shape[1]
     # Check if n_clusters is a list
-    if not type(n_clusters) is list:
+    if not type(n_clusters) is list and not type(n_clusters) is tuple:
         raise ValueError(
             "Number of clusters must be specified for each subspace and therefore be a list.\nYour input:\n" + str(
                 n_clusters))
@@ -241,6 +268,8 @@ def _initialize_nrkmeans_parameters(X: np.ndarray, n_clusters: list, V: np.ndarr
                                 random_state=random_state)
         else:
             V = np.ones((1, 1))
+    else:
+        V = V.copy()
     if not _is_matrix_orthogonal(V):
         raise ValueError("Your input matrix V is not orthogonal.\nV:\n" + str(V))
     if V.shape[0] != data_dimensionality or V.shape[1] != data_dimensionality:
@@ -256,6 +285,8 @@ def _initialize_nrkmeans_parameters(X: np.ndarray, n_clusters: list, V: np.ndarr
     # If m is None but P is defined use P's dimensionality
     elif m is None:
         m = [len(x) for x in P]
+    else:
+        m = m.copy()
     if not type(m) is list or not len(m) is subspaces:
         raise ValueError("A dimensionality list m must be specified for each subspace.\nYour input:\n" + str(m))
     # Calculate projections P
@@ -266,6 +297,8 @@ def _initialize_nrkmeans_parameters(X: np.ndarray, n_clusters: list, V: np.ndarr
             choices = random_state.choice(possible_projections, dimensionality, replace=False)
             P.append(choices)
             possible_projections = list(set(possible_projections) - set(choices))
+    else:
+        P = P.copy()
     if not type(P) is list or not len(P) is subspaces:
         raise ValueError("Projection lists must be specified for each subspace.\nYour input:\n" + str(P))
     else:
@@ -284,6 +317,8 @@ def _initialize_nrkmeans_parameters(X: np.ndarray, n_clusters: list, V: np.ndarr
     # Define initial cluster centers with kmeans++ for each subspace
     if centers is None:
         centers = [_kmeans_plus_plus(X, k, row_norms(X, squared=True), random_state=random_state) for k in n_clusters]
+    else:
+        centers = centers.copy()
     if not type(centers) is list or not len(centers) is subspaces:
         raise ValueError("Cluster centers must be specified for each subspace.\nYour input:\n" + str(centers))
     else:
@@ -746,15 +781,15 @@ class NrKmeans(BaseEstimator, ClusterMixin):
 
     Parameters
     ----------
-    n_clusters : list
-        list containing number of clusters for each subspace
-    V : np.ndarray
+    n_clusters : list | tuple
+        list containing number of clusters for each subspace (default: (3, 3))
+    V_init : np.ndarray
         the initial orthonormal rotation matrix (default: None)
-    m : list
+    m_init : list
         list containing the initial dimensionalities for each subspace (default: None)
-    P : list
+    P_init : list
         list containing the initial projections (ids of corresponding dimensions) for each subspace (default: None)
-    cluster_centers : list
+    cluster_centers_init : list
         list containing the initial cluster centers for each subspace (default: None)
     mdl_for_noisespace : bool
         defines if MDL should be used to identify noise space dimensions instead of only considering negative eigenvalues (default: False)
@@ -785,6 +820,10 @@ class NrKmeans(BaseEstimator, ClusterMixin):
         The final labels. Shape equals (n_samples x n_subspaces)
     scatter_matrices_ : list
         The final scatter matrix of each subspace
+    n_iter_ : list
+        The number of iterations used to achieve the result
+    n_features_in_ : int
+        the number of features used for the fitting
 
     References
     ----------
@@ -798,13 +837,12 @@ class NrKmeans(BaseEstimator, ClusterMixin):
     Society for Industrial and Applied Mathematics, 2022.
     """
 
-    def __init__(self, n_clusters: list, V: np.ndarray = None, m: list = None, P: list = None,
-                 cluster_centers: list = None, mdl_for_noisespace: bool = False, outliers: bool = False,
+    def __init__(self, n_clusters: list | tuple = (3, 3), V_init: np.ndarray = None, m_init: list = None, P_init: list = None,
+                 cluster_centers_init: list = None, mdl_for_noisespace: bool = False, outliers: bool = False,
                  max_iter: int = 300, n_init: int = 1, cost_type: str = "default",
                  threshold_negative_eigenvalue: float = -1e-7, max_distance: float = None, precision: float = None,
                  random_state: np.random.RandomState | int = None, debug: bool = False):
         # Fixed attributes
-        self.input_n_clusters = n_clusters.copy()
         self.max_iter = max_iter
         self.n_init = n_init
         self.cost_type = cost_type
@@ -814,13 +852,13 @@ class NrKmeans(BaseEstimator, ClusterMixin):
         self.max_distance = max_distance
         self.precision = precision
         self.debug = debug
-        self.random_state = check_random_state(random_state)
+        self.random_state = random_state
         # Variables
         self.n_clusters = n_clusters
-        self.cluster_centers = cluster_centers
-        self.V = V
-        self.m = m
-        self.P = P
+        self.cluster_centers_init = cluster_centers_init
+        self.V_init = V_init
+        self.m_init = m_init
+        self.P_init = P_init
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'NrKmeans':
         """
@@ -839,6 +877,7 @@ class NrKmeans(BaseEstimator, ClusterMixin):
         self : NrKmeans
             this instance of the NrKmeans algorithm
         """
+        X, _, random_state = check_parameters(X=X, y=y, random_state=self.random_state)
         cost_type = self.cost_type.lower()
         assert cost_type in ["default", "mdl"], "cost_type must be 'default' or 'mdl'"
         # precision and max_distance are constant across all executions. Therefore, define those parameters here
@@ -846,13 +885,15 @@ class NrKmeans(BaseEstimator, ClusterMixin):
             self.max_distance = np.max(pdist(X))
         if self.mdl_for_noisespace and self.precision is None:
             self.precision = _get_precision(X)
-        all_random_states = self.random_state.choice(10000, self.n_init, replace=False)
+        all_random_states = random_state.choice(10000, self.n_init, replace=False)
+        # Check n_clusters
+        n_clusters = check_n_clusters_for_nr(self.n_clusters)
         # Get best result
         best_costs = np.inf
         for i in range(self.n_init):
             local_random_state = check_random_state(all_random_states[i])
-            labels, centers, V, m, P, n_clusters, scatter_matrices = _nrkmeans(X, self.n_clusters, self.V, self.m,
-                                                                               self.P, self.cluster_centers,
+            labels, centers, V, m, P, n_clusters, scatter_matrices, n_iter = _nrkmeans(X, n_clusters, self.V_init, self.m_init,
+                                                                               self.P_init, self.cluster_centers_init,
                                                                                self.mdl_for_noisespace,
                                                                                self.outliers, self.max_iter,
                                                                                self.threshold_negative_eigenvalue,
@@ -867,12 +908,14 @@ class NrKmeans(BaseEstimator, ClusterMixin):
                 best_costs = costs
                 # Update class variables
                 self.labels_ = labels
-                self.cluster_centers = centers
-                self.V = V
-                self.m = m
-                self.P = P
-                self.n_clusters = n_clusters
+                self.cluster_centers_ = centers
+                self.V_ = V
+                self.m_ = m
+                self.P_ = P
+                self.n_clusters_final_ = n_clusters
                 self.scatter_matrices_ = scatter_matrices
+                self.n_features_in_ = X.shape[1]
+                self.n_iter_ = n_iter
         return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:
@@ -891,22 +934,22 @@ class NrKmeans(BaseEstimator, ClusterMixin):
             the predicted labels of the input data set for each subspace. Shape equals (n_samples x n_subspaces)
         """
         # Check if NrKmeans has run
-        assert hasattr(self, "labels_"), "The NrKmeans algorithm has not run yet. Use the fit() function first."
-        predicted_labels = np.zeros((X.shape[0], len(self.n_clusters)), dtype=np.int32)
+        check_is_fitted(self, ["labels_", "n_features_in_"])
+        predicted_labels = np.zeros((X.shape[0], len(self.n_clusters_final_)), dtype=np.int32)
         # Get labels for each subspace
-        for sub in range(len(self.n_clusters)):
+        for sub in range(len(self.n_clusters_final_)):
             # Predict the labels
-            predicted_labels[:, sub] = _assign_labels(X, self.V, self.cluster_centers[sub], self.P[sub])
+            predicted_labels[:, sub] = _assign_labels(X, self.V_, self.cluster_centers_[sub], self.P_[sub])
             # (Optional) Check for outliers
             if self.outliers:
-                predicted_labels[:, sub], _ = _check_for_outliers(X, self.V, self.cluster_centers[sub],
+                predicted_labels[:, sub], _ = _check_for_outliers(X, self.V_, self.cluster_centers_[sub],
                                                                   predicted_labels[:, sub],
-                                                                  self.scatter_matrices_[sub], self.m[sub], self.P[sub],
+                                                                  self.scatter_matrices_[sub], self.m_[sub], self.P_[sub],
                                                                   self.labels_.shape[0], self.max_distance)
         # Return the predicted labels
         return predicted_labels
 
-    def transform_full_space(self, X: np.ndarray) -> np.ndarray:
+    def transform(self, X: np.ndarray) -> np.ndarray:
         """
         Transform the input dataset with the orthonormal rotation matrix identified by the fit function.
 
@@ -920,8 +963,9 @@ class NrKmeans(BaseEstimator, ClusterMixin):
         rotated_data : np.ndarray
             The rotated dataset
         """
-        assert hasattr(self, "labels_"), "The NrKmeans algorithm has not run yet. Use the fit() function first."
-        rotated_data = np.matmul(X, self.V)
+        check_is_fitted(self, ["labels_", "n_features_in_"])
+        X, _, _ = check_parameters(X, allow_size_1=True)
+        rotated_data = np.matmul(X, self.V_)
         return rotated_data
 
     def transform_subspace(self, X: np.ndarray, subspace_index: int) -> np.ndarray:
@@ -941,9 +985,31 @@ class NrKmeans(BaseEstimator, ClusterMixin):
         rotated_data : np.ndarray
             The rotated and projected dataset
         """
-        assert hasattr(self, "labels_"), "The NrKmeans algorithm has not run yet. Use the fit() function first."
-        subspace_V = self.V[:, self.P[subspace_index]]
+        check_is_fitted(self, ["labels_", "n_features_in_"])
+        assert subspace_index < len(self.n_clusters_final_), "subspace_index must be smaller than {0}".format(
+            len(self.n_clusters_final_))
+        subspace_V = self.V_[:, self.P_[subspace_index]]
         rotated_data = np.matmul(X, subspace_V)
+        return rotated_data
+
+    def fit_transform(self, X: np.ndarray, y: np.ndarray=None):
+        """
+        Fit the NrKmeans algorithm on the given data set and return the final rotated space.
+
+        Parameters
+        ----------
+        X: np.ndarray
+            The given data set
+        y : np.ndarray
+            the labels (can usually be ignored)
+
+        Returns
+        -------
+        X_embed : np.ndarray
+            The embedded data set
+        """
+        self.fit(X, y)
+        rotated_data = self.transform(X)
         return rotated_data
 
     def have_subspaces_been_lost(self) -> bool:
@@ -955,7 +1021,8 @@ class NrKmeans(BaseEstimator, ClusterMixin):
         lost : bool
              True if at least one subspace has been lost
         """
-        lost = len(self.n_clusters) != len(self.input_n_clusters)
+        check_is_fitted(self, ["labels_", "n_features_in_"])
+        lost = len(self.n_clusters) != len(self.n_clusters_final_)
         return lost
 
     def have_clusters_been_lost(self) -> bool:
@@ -968,7 +1035,8 @@ class NrKmeans(BaseEstimator, ClusterMixin):
         lost : bool
             True if at least one cluster has been lost
         """
-        lost = not np.array_equal(self.input_n_clusters, self.n_clusters)
+        check_is_fitted(self, ["labels_", "n_features_in_"])
+        lost = not np.array_equal(self.n_clusters_final_, self.n_clusters)
         return lost
 
     def plot_subspace(self, X: np.ndarray, subspace_index: int, labels: np.ndarray = None, plot_centers: bool = False,
@@ -991,12 +1059,12 @@ class NrKmeans(BaseEstimator, ClusterMixin):
         equal_axis : bool
             defines whether the axes should be scaled equally
         """
-        assert self.labels_ is not None, "The NrKmeans algorithm has not run yet. Use the fit() function first."
+        check_is_fitted(self, ["labels_", "n_features_in_"])
         if labels is None:
             labels = self.labels_[:, subspace_index]
         assert X.shape[0] == labels.shape[0], "Number of data objects must match the number of labels."
         plot_scatter_matrix(self.transform_subspace(X, subspace_index), labels,
-                            self.transform_subspace(self.cluster_centers[subspace_index], subspace_index) if
+                            self.transform_subspace(self.cluster_centers_[subspace_index], subspace_index) if
                             plot_centers else None, true_labels=gt, equal_axis=equal_axis)
 
     def calculate_mdl_costs(self, X: np.ndarray) -> (float, float, list):
@@ -1015,8 +1083,8 @@ class NrKmeans(BaseEstimator, ClusterMixin):
             The global costs,
             The subspace specific costs (one entry for each subspace)
         """
-        assert hasattr(self, "labels_"), "The NrKmeans algorithm has not run yet. Use the fit() function first."
-        total_costs, global_costs, all_subspace_costs = _mdl_costs(X, self.n_clusters, self.m, self.P, self.V,
+        check_is_fitted(self, ["labels_", "n_features_in_"])
+        total_costs, global_costs, all_subspace_costs = _mdl_costs(X, self.n_clusters_final_, self.m_, self.P_, self.V_,
                                                                    self.scatter_matrices_, self.labels_, self.outliers,
                                                                    self.max_distance, self.precision)
         return total_costs, global_costs, all_subspace_costs
@@ -1032,8 +1100,8 @@ class NrKmeans(BaseEstimator, ClusterMixin):
         costs : float
             The total loss of this NrKmeans object
         """
-        assert hasattr(self, "labels_"), "The NrKmeans algorithm has not run yet. Use the fit() function first."
-        costs = _get_total_cost_function(self.V, self.P, self.scatter_matrices_)
+        check_is_fitted(self, ["labels_", "n_features_in_"])
+        costs = _get_total_cost_function(self.V_, self.P_, self.scatter_matrices_)
         return costs
 
     def dissolve_noise_space(self, X: np.ndarray = None, random_feature_assignment: bool = True) -> 'NrKmeans':
@@ -1058,44 +1126,46 @@ class NrKmeans(BaseEstimator, ClusterMixin):
         self : NrKmeans
             The final updated NrKmeans object
         """
+        check_is_fitted(self, ["labels_", "n_features_in_"])
+        X, _, random_state = check_parameters(X, random_state=self.random_state, allow_size_1=True)
         # nothing to do if no noise space is present
-        if 1 not in self.n_clusters or len(self.n_clusters) == 1:
+        if 1 not in self.n_clusters_final_ or len(self.n_clusters_final_) == 1:
             return self
-        n_cluster_spaces = len(self.n_clusters) - 1
+        n_cluster_spaces = len(self.n_clusters_final_) - 1
         if random_feature_assignment:
             # assign each features of the noise space to one cluster space
-            projection_assignments = self.random_state.randint(0, n_cluster_spaces, size=self.m[-1])
+            projection_assignments = random_state.randint(0, n_cluster_spaces, size=self.m_[-1])
             for subspace_id in range(n_cluster_spaces):
                 relevant_entries = np.where(projection_assignments == subspace_id)[0]
                 # Update m and P
-                self.P[subspace_id] = np.r_[
-                    self.P[subspace_id], self.P[-1][relevant_entries]]
-                self.m[subspace_id] += len(relevant_entries)
+                self.P_[subspace_id] = np.r_[
+                    self.P_[subspace_id], self.P_[-1][relevant_entries]]
+                self.m_[subspace_id] += len(relevant_entries)
         else:
-            for proj in self.P[-1]:
+            for proj in self.P_[-1]:
                 best_match_id = None
                 best_mdl_costs = np.inf
                 for subspace_id in range(n_cluster_spaces):
                     # Update m and P
-                    self.P[subspace_id] = np.r_[self.P[subspace_id], [proj]]
-                    self.m[subspace_id] += 1
+                    self.P_[subspace_id] = np.r_[self.P_[subspace_id], [proj]]
+                    self.m_[subspace_id] += 1
                     # Get mdl costs
                     mdl_costs, _, _ = self.calculate_mdl_costs(X)
                     if mdl_costs < best_mdl_costs:
                         best_mdl_costs = mdl_costs
                         best_match_id = subspace_id
                     # Revert changes of m and P
-                    self.P[subspace_id] = np.delete(self.P[subspace_id], -1)
-                    self.m[subspace_id] -= 1
+                    self.P_[subspace_id] = np.delete(self.P_[subspace_id], -1)
+                    self.m_[subspace_id] -= 1
                 # Permanently add the noise space dimension to the best matching cluster space
-                self.P[best_match_id] = np.r_[self.P[best_match_id], [proj]]
-                self.m[best_match_id] += 1
+                self.P_[best_match_id] = np.r_[self.P_[best_match_id], [proj]]
+                self.m_[best_match_id] += 1
         # Remove all entries of the noise space
-        del self.n_clusters[-1]
-        del self.P[-1]
-        del self.m[-1]
+        del self.n_clusters_final_[-1]
+        del self.P_[-1]
+        del self.m_[-1]
         del self.scatter_matrices_[-1]
-        del self.cluster_centers[-1]
+        del self.cluster_centers_[-1]
         self.labels_ = self.labels_[:, :-1]
         return self
 

@@ -6,9 +6,11 @@ Collin Leiber
 from sklearn.cluster import KMeans
 import numpy as np
 from sklearn.base import BaseEstimator, ClusterMixin
-from sklearn.utils import check_random_state
 from clustpy.partition.xmeans import _initial_kmeans_clusters, _execute_two_means
 from scipy.stats import anderson
+from clustpy.utils.checks import check_parameters
+from sklearn.utils.validation import check_is_fitted
+from sklearn.metrics.pairwise import pairwise_distances_argmin_min
 
 
 def _gmeans(X: np.ndarray, significance: float, n_clusters_init: int, max_n_clusters: int, n_split_trials: int,
@@ -143,6 +145,8 @@ class GMeans(BaseEstimator, ClusterMixin):
         The final labels
     cluster_centers_ : np.ndarray
         The final cluster centers
+    n_features_in_ : int
+        the number of features used for the fitting
 
     References
     ----------
@@ -161,7 +165,7 @@ class GMeans(BaseEstimator, ClusterMixin):
         self.n_clusters_init = n_clusters_init
         self.max_n_clusters = max_n_clusters
         self.n_split_trials = n_split_trials
-        self.random_state = check_random_state(random_state)
+        self.random_state = random_state
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'GMeans':
         """
@@ -180,9 +184,32 @@ class GMeans(BaseEstimator, ClusterMixin):
         self : GMeans
             this instance of the GMeans algorithm
         """
+        X, _, random_state = check_parameters(X=X, y=y, random_state=self.random_state)
         n_clusters, labels, centers = _gmeans(X, self.significance, self.n_clusters_init, self.max_n_clusters,
-                                              self.n_split_trials, self.random_state)
+                                              self.n_split_trials, random_state)
         self.n_clusters_ = n_clusters
         self.labels_ = labels
         self.cluster_centers_ = centers
+        self.n_features_in_ = X.shape[1]
         return self
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """
+        Predict the labels of an input dataset. For this method the results from the fit() method will be used.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            the given data set
+
+        Returns
+        -------
+        predicted_labels : np.ndarray
+            the predicted labels of the input data set
+        """
+        check_is_fitted(self, ["labels_", "n_features_in_"])
+        predicted_labels, _ = pairwise_distances_argmin_min(X=X, Y=self.cluster_centers_,
+                                                          metric='euclidean',
+                                                          metric_kwargs={'squared': True})
+        predicted_labels = predicted_labels.astype(np.int32)
+        return predicted_labels

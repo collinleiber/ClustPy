@@ -2,12 +2,11 @@ from clustpy.hierarchical import Diana
 from clustpy.hierarchical.diana import _split_cluster, _get_cluster_with_max_diameter
 import numpy as np
 from sklearn.datasets import make_blobs
-from sklearn.utils.estimator_checks import check_estimator
+from clustpy.utils.checks import check_clustpy_estimator
 
 
 def test_diana_estimator():
-    check_estimator(Diana(3), 
-                    {"check_complex_data": "this check is expected to fail because complex values are not supported"})
+    check_clustpy_estimator(Diana(), ("check_complex_data"))
 
 
 def test_get_cluster_with_max_diameter():

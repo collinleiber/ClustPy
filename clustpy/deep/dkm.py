@@ -381,7 +381,7 @@ class DKM(_AbstractDeepClusteringAlgo):
     Parameters
     ----------
     n_clusters : int
-        number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN
+        number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN (default: 8)
     alphas : tuple
         tuple of different alpha values used for the prediction.
         Small values close to 0 are equivalent to homogeneous assignments to all clusters. Large values simulate a clear assignment as with kMeans.
@@ -395,10 +395,10 @@ class DKM(_AbstractDeepClusteringAlgo):
     clustering_optimizer_params : dict
         parameters of the optimizer for the actual clustering procedure, includes the learning rate. If None, it will be set to {"lr": 1e-4} (default: None)
     pretrain_epochs : int
-        number of epochs for the pretraining of the neural network (default: 50)
+        number of epochs for the pretraining of the neural network (default: 100)
     clustering_epochs : int
         number of epochs for each alpha value for the actual clustering procedure.
-        The total number of clustering epochs therefore corresponds to: len(alphas)*clustering_epochs (default: 100)
+        The total number of clustering epochs therefore corresponds to: len(alphas)*clustering_epochs (default: 150)
     optimizer_class : torch.optim.Optimizer
         the optimizer class (default: torch.optim.Adam)
     ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
@@ -411,7 +411,7 @@ class DKM(_AbstractDeepClusteringAlgo):
     embedding_size : int
         size of the embedding within the neural network (default: 10)
     clustering_loss_weight : float
-        weight of the clustering loss (default: 1.0)
+        weight of the clustering loss (default: 0.1)
     ssl_loss_weight : float
         weight of the self-supervised learning (ssl) loss (default: 1.0)
     custom_dataloaders : tuple
@@ -461,25 +461,18 @@ class DKM(_AbstractDeepClusteringAlgo):
     Pattern Recognition Letters 138 (2020): 185-192.
     """
 
-    def __init__(self, n_clusters: int, alphas: tuple = (1000), batch_size: int = 256,
+    def __init__(self, n_clusters: int = 8, alphas: tuple = (1000), batch_size: int = 256,
                  pretrain_optimizer_params: dict = None, clustering_optimizer_params: dict = None,
-                 pretrain_epochs: int = 50, clustering_epochs: int = 100,
+                 pretrain_epochs: int = 100, clustering_epochs: int = 150,
                  optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error,
                  neural_network: torch.nn.Module | tuple = None, neural_network_weights: str = None,
-                 embedding_size: int = 10, clustering_loss_weight: float = 1., ssl_loss_weight: float = 1.,
+                 embedding_size: int = 10, clustering_loss_weight: float = 0.1, ssl_loss_weight: float = 1.,
                  custom_dataloaders: tuple = None, augmentation_invariance: bool = False,
                  initial_clustering_class: ClusterMixin = KMeans, initial_clustering_params: dict = None,
                  device: torch.device = None, random_state: np.random.RandomState | int = None):
         super().__init__(batch_size, neural_network, neural_network_weights, embedding_size, device, random_state)
         self.n_clusters = n_clusters
-        if alphas is None:
-            alphas = _get_default_alphas()
-        elif (type(alphas) is tuple or type(alphas) is list) and len(alphas) == 3 and alphas[0] is None:
-            alphas = _get_default_alphas(init_alpha=alphas[1], n_alphas=alphas[2])
-        elif type(alphas) is int or type(alphas) is float:
-            alphas = [alphas]
-        assert type(alphas) is tuple or type(alphas) is list, "alphas must be a list, int or tuple"
         self.alphas = alphas
         self.pretrain_optimizer_params = pretrain_optimizer_params
         self.clustering_optimizer_params = clustering_optimizer_params
@@ -493,6 +486,25 @@ class DKM(_AbstractDeepClusteringAlgo):
         self.augmentation_invariance = augmentation_invariance
         self.initial_clustering_class = initial_clustering_class
         self.initial_clustering_params = initial_clustering_params
+
+    def _check_alphas(self) -> list:
+        """
+        Compute the actual alphas.
+
+        Returns
+        -------
+        alphas : list
+            the list with the alpha values
+        """
+        alphas = self.alphas
+        if alphas is None:
+            alphas = _get_default_alphas()
+        elif (type(alphas) is tuple or type(alphas) is list) and len(alphas) == 3 and alphas[0] is None:
+            alphas = _get_default_alphas(init_alpha=alphas[1], n_alphas=alphas[2])
+        elif type(alphas) is int or type(alphas) is float:
+            alphas = [alphas]
+        assert type(alphas) is tuple or type(alphas) is list, "alphas must be a list, int or tuple"
+        return alphas
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DKM':
         """
@@ -512,7 +524,8 @@ class DKM(_AbstractDeepClusteringAlgo):
             this instance of the DKM algorithm
         """
         X, _, random_state, pretrain_optimizer_params, clustering_optimizer_params, initial_clustering_params = self._check_parameters(X, y=y)
-        kmeans_labels, kmeans_centers, dkm_labels, dkm_centers, neural_network = _dkm(X, self.n_clusters, self.alphas,
+        alphas = self._check_alphas()
+        kmeans_labels, kmeans_centers, dkm_labels, dkm_centers, neural_network = _dkm(X, self.n_clusters, alphas,
                                                                                       self.batch_size,
                                                                                       pretrain_optimizer_params,
                                                                                       clustering_optimizer_params,
@@ -536,5 +549,5 @@ class DKM(_AbstractDeepClusteringAlgo):
         self.dkm_labels_ = dkm_labels
         self.dkm_cluster_centers_ = dkm_centers
         self.neural_network_trained_ = neural_network
-        self.n_features_in_ = X.shape[1]
+        self.set_n_featrues_in(X.shape[1])
         return self

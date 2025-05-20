@@ -3,12 +3,11 @@ from clustpy.partition import XMeans
 from clustpy.partition.xmeans import _execute_two_means, _merge_clusters, _initial_kmeans_clusters
 from sklearn.datasets import make_blobs
 from sklearn.metrics import normalized_mutual_info_score as nmi
-from sklearn.utils.estimator_checks import check_estimator
+from clustpy.utils.checks import check_clustpy_estimator
 
 
 def test_xmeans_estimator():
-    check_estimator(XMeans(), 
-                    {"check_complex_data": "this check is expected to fail because complex values are not supported"})
+    check_clustpy_estimator(XMeans(), ("check_complex_data"))
 
 
 def test_initial_kmeans_clusters():
@@ -107,3 +106,5 @@ def test_simple_XMeans():
     assert xmeans.cluster_centers_.shape == (xmeans.n_clusters_, X.shape[1])
     assert len(np.unique(xmeans.labels_)) == xmeans.n_clusters_
     assert np.array_equal(np.unique(xmeans.labels_), np.arange(xmeans.n_clusters_))
+    labels_predict = xmeans.predict(X)
+    assert np.array_equal(xmeans.labels_, labels_predict)

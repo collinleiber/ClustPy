@@ -8,8 +8,8 @@ from clustpy.utils import dip_test, dip_pval, dip_pval_gradient
 from clustpy.partition import UniDip
 from sklearn.decomposition import PCA
 from clustpy.partition.dipext import _angle, _n_starting_vectors_default, _ambiguous_modal_triangle_random
-from sklearn.utils import check_random_state
 from sklearn.base import BaseEstimator, ClusterMixin
+from clustpy.utils.checks import check_parameters
 
 
 def _dip_n_sub(X: np.ndarray, significance: float, threshold: float, step_size: float, momentum: float,
@@ -161,7 +161,7 @@ def _find_min_dippvalue_by_grouped_sgd(X: np.ndarray, labels: np.ndarray, n_clus
         for single_axis_dips in axis_dips]
     if X.shape[1] == 1:
         # Return axis_pvales and trivial projection
-        return axis_pvalues[0], np.array([1]), X
+        return axis_pvalues[0], np.array([1]), X[:, 0]
     # Calculate weighted sum of p-values (use negative dip-value if all p-values are 0)
     sum_weighted_pvalues_per_axis = np.array([
         np.sum(axis_pvalues[j] * cluster_sizes) if np.sum(axis_pvalues[j]) != 0 else -np.sum(
@@ -415,6 +415,8 @@ class DipNSub(BaseEstimator, ClusterMixin):
         The final labels
     subspace_: np.ndarray
         The resulting subspace
+    n_features_in_ : int
+        the number of features used for the fitting
 
     References
     ----------
@@ -434,7 +436,7 @@ class DipNSub(BaseEstimator, ClusterMixin):
         self.add_tails = add_tails
         self.outliers = outliers
         self.consider_duplicates = consider_duplicates
-        self.random_state = check_random_state(random_state)
+        self.random_state = random_state
         self.debug = debug
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DipNSub':
@@ -454,15 +456,19 @@ class DipNSub(BaseEstimator, ClusterMixin):
         self : DipNSub
             this instance of the DipNSub algorithm
         """
+        X, _, random_state = check_parameters(X=X, y=y, random_state=self.random_state)
         if self.n_starting_vectors is None:
-            self.n_starting_vectors = _n_starting_vectors_default(X.shape[1])
+            n_starting_vectors = _n_starting_vectors_default(X.shape[1])
+        else:
+            n_starting_vectors = self.n_starting_vectors
         n_clusters, labels, subspace = _dip_n_sub(X, significance=self.significance, threshold=self.threshold,
                                                   step_size=self.step_size, momentum=self.momentum,
-                                                  n_starting_vectors=self.n_starting_vectors,
+                                                  n_starting_vectors=n_starting_vectors,
                                                   add_tails=self.add_tails, outliers=self.outliers,
                                                   consider_duplicates=self.consider_duplicates,
-                                                  random_state=self.random_state, debug=self.debug)
+                                                  random_state=random_state, debug=self.debug)
         self.n_clusters_ = n_clusters
         self.labels_ = labels
         self.subspace_ = subspace
+        self.n_features_in_ = X.shape[1]
         return self

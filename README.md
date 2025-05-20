@@ -14,6 +14,8 @@ Further, it integrates various frequently used datasets (e.g., from the [UCI rep
 The focus of the ClustPy package is not on efficiency (here we recommend e.g. [pyclustering](https://pyclustering.github.io/)), 
 but on the possibility to try out a wide range of modern scientific methods.
 In particular, this should also make lesser-known methods accessible in a simple and convenient way.
+To get an initial overview of the integrated deep clustering methods, the following survey paper may be helpful:<br>
+[An Introductory Survey to Autoencoder-based Deep Clustering - Sandboxes for Combining Clustering with Deep Learning](https://arxiv.org/abs/2504.02087)
 
 Since it largely follows the implementation conventions of [sklearn clustering](https://scikit-learn.org/stable/modules/clustering.html), 
 it can be combined with many other packages (see below).

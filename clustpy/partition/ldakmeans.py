@@ -10,11 +10,13 @@ from sklearn.decomposition import PCA
 import numpy as np
 from scipy.linalg import eigh
 from clustpy.alternative.nrkmeans import _update_centers_and_scatter_matrix
-from sklearn.utils import check_random_state
+from clustpy.utils.checks import check_parameters
+from sklearn.utils.validation import check_is_fitted, check_random_state
+from sklearn.metrics.pairwise import pairwise_distances_argmin_min
 
 
 def _lda_kmeans(X: np.ndarray, n_clusters: int, n_dims: int, max_iter: int, kmeans_repetitions: int,
-                random_state: np.random.RandomState) -> (np.ndarray, np.ndarray, np.ndarray, float):
+                random_state: np.random.RandomState) -> (np.ndarray, np.ndarray, np.ndarray, float, int):
     """
     Start the actual LDA-Kmeans clustering procedure on the input data set.
 
@@ -35,18 +37,18 @@ def _lda_kmeans(X: np.ndarray, n_clusters: int, n_dims: int, max_iter: int, kmea
 
     Returns
     -------
-    tuple : (np.ndarray, np.ndarray, np.ndarray, float)
+    tuple : (np.ndarray, np.ndarray, np.ndarray, float, int)
         The labels as identified by LDAKmeans,
         The final rotation matrix,
         The cluster centers in the subspace,
-        The final error
+        The final error,
+        The number of iterations used for clustering
     """
-    assert n_clusters > 1, "n_clusters must be larger than 1"
     assert max_iter > 0, "max_iter must be larger than 0"
     if n_dims >= X.shape[1]:
         km = KMeans(n_clusters, n_init=kmeans_repetitions, random_state=random_state)
         km.fit(X)
-        return km.labels_, np.identity(X.shape[1]), km.cluster_centers_, km.inertia_
+        return km.labels_, np.identity(X.shape[1]), km.cluster_centers_, km.inertia_, 1
     # Check if labels stay the same (break condition)
     old_labels = None
     # Global parameters
@@ -79,7 +81,7 @@ def _lda_kmeans(X: np.ndarray, n_clusters: int, n_dims: int, max_iter: int, kmea
         except:
             # In case errors occur during eigenvalue decomposition keep algorithm running
             pass
-    return km.labels_, rotation, km.cluster_centers_, km.inertia_
+    return km.labels_, rotation, km.cluster_centers_, km.inertia_, iteration + 1
 
 
 class LDAKmeans(BaseEstimator, ClusterMixin):
@@ -92,7 +94,7 @@ class LDAKmeans(BaseEstimator, ClusterMixin):
     Parameters
     ----------
     n_clusters : int
-        the number of clusters
+        the number of clusters (default: 8)
     n_dims : int
         The number of features in the resulting subspace. If None this will be equal to n_clusters - 1 (default: None)
     max_iter : int
@@ -114,6 +116,8 @@ class LDAKmeans(BaseEstimator, ClusterMixin):
         The cluster centers in the subspace
     error_ : float
         The final error (KMeans error in the subspace)
+    n_features_in_ : int
+        the number of features used for the fitting
 
     References
     -------
@@ -121,14 +125,14 @@ class LDAKmeans(BaseEstimator, ClusterMixin):
     Proceedings of the 24th international conference on Machine learning. 2007.
     """
 
-    def __init__(self, n_clusters: int, n_dims: int = None, max_iter: int = 300, n_init: int = 1,
+    def __init__(self, n_clusters: int = 8, n_dims: int = None, max_iter: int = 300, n_init: int = 1,
                  kmeans_repetitions: int = 10, random_state: np.random.RandomState | int = None):
         self.n_clusters = n_clusters
-        self.n_dims = n_clusters - 1 if n_dims is None else n_dims
+        self.n_dims = n_dims
         self.max_iter = max_iter
         self.n_init = n_init
         self.kmeans_repetitions = kmeans_repetitions
-        self.random_state = check_random_state(random_state)
+        self.random_state = random_state
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'LDAKmeans':
         """
@@ -147,12 +151,14 @@ class LDAKmeans(BaseEstimator, ClusterMixin):
         self : LDAKmeans
             this instance of the LDAKmeans algorithm
         """
-        all_random_states = self.random_state.choice(10000, self.n_init, replace=False)
+        X, _, random_state = check_parameters(X=X, y=y, random_state=self.random_state)
+        all_random_states = random_state.choice(10000, self.n_init, replace=False)
+        n_dims = max(1, self.n_clusters - 1 if self.n_dims is None else self.n_dims)
         # Get best result
         best_costs = np.inf
         for i in range(self.n_init):
             local_random_state = check_random_state(all_random_states[i])
-            labels, rotation, centers, error = _lda_kmeans(X, self.n_clusters, self.n_dims, self.max_iter,
+            labels, rotation, centers, error, n_iter = _lda_kmeans(X, self.n_clusters, n_dims, self.max_iter,
                                                            self.kmeans_repetitions,
                                                            local_random_state)
             if error < best_costs:
@@ -162,9 +168,11 @@ class LDAKmeans(BaseEstimator, ClusterMixin):
                 self.rotation_ = rotation
                 self.cluster_centers_ = centers
                 self.error_ = error
+                self.n_features_in_ = X.shape[1]
+                self.n_iter_ = n_iter
         return self
 
-    def transform_subspace(self, X: np.ndarray) -> np.ndarray:
+    def transform(self, X: np.ndarray) -> np.ndarray:
         """
         Transform the input dataset with the rotation matrix identified by the fit function.
 
@@ -178,6 +186,48 @@ class LDAKmeans(BaseEstimator, ClusterMixin):
         rotated_data : np.ndarray
             The rotated data set
         """
-        assert hasattr(self, "labels_"), "The LDA-Kmeans algorithm has not run yet. Use the fit() function first."
+        check_is_fitted(self, ["labels_", "n_features_in_"])
+        X, _, _ = check_parameters(X, allow_size_1=True)
         rotated_data = np.matmul(X, self.rotation_)
         return rotated_data
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """
+        Predict the labels of an input dataset. For this method the results from the fit() method will be used.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            the given data set
+
+        Returns
+        -------
+        predicted_labels : np.ndarray
+            the predicted labels of the input data set
+        """
+        X_transform = self.transform(X)
+        predicted_labels, _ = pairwise_distances_argmin_min(X=X_transform, Y=self.cluster_centers_,
+                                                          metric='euclidean',
+                                                          metric_kwargs={'squared': True})
+        predicted_labels = predicted_labels.astype(np.int32)
+        return predicted_labels
+
+    def fit_transform(self, X: np.ndarray, y: np.ndarray=None):
+        """
+        Train the clusterin algorithm on the given data set and return the final embedded version of the data using the obtained subspace.
+
+        Parameters
+        ----------
+        X: np.ndarray
+            The given data set
+        y : np.ndarray
+            the labels (can usually be ignored)
+
+        Returns
+        -------
+        X_embed : np.ndarray
+            The embedded data set
+        """
+        self.fit(X, y)
+        X_embed = self.transform(X)
+        return X_embed

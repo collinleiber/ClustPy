@@ -2,16 +2,24 @@ import numpy as np
 from clustpy.alternative import NrKmeans
 from clustpy.alternative.nrkmeans import _assign_labels, _are_labels_equal, _is_matrix_orthogonal, _is_matrix_symmetric, \
     _create_full_rotation_matrix, _update_projections, _update_centers_and_scatter_matrix, _remove_empty_cluster, \
-    _get_cost_function_of_subspace, _get_total_cost_function, _remove_empty_subspace, _get_precision
+    _get_cost_function_of_subspace, _get_total_cost_function, _remove_empty_subspace, _get_precision, check_n_clusters_for_nr
 from clustpy.data import create_nr_data
 from unittest.mock import patch
-from sklearn.utils.estimator_checks import check_estimator
+from clustpy.utils.checks import check_clustpy_estimator
 
 
 def test_nrkmeans_estimator():
-    check_estimator(NrKmeans([3, 3]), 
-                    {"check_complex_data": "this check is expected to fail because complex values are not supported"})
+    # Ignore check_clustering as it does not accept multiple sets of labels
+    check_clustpy_estimator(NrKmeans([3, 3]), ("check_complex_data", "check_clustering"))
 
+
+def test_check_n_clusters_for_nr():
+    n_clusters = check_n_clusters_for_nr(3)
+    assert n_clusters == [3]
+    n_clusters = check_n_clusters_for_nr((3, 3))
+    assert n_clusters == [3, 3]
+    n_clusters = check_n_clusters_for_nr([3, 3])
+    assert n_clusters == [3, 3]
 
 def test_update_centers_and_scatter_matrices():
     X = np.array(
@@ -216,8 +224,8 @@ def test_simple_nrkmeans():
     assert not hasattr(nrk_2, "labels_")
     nrk_2.fit(X)
     assert np.array_equal(nrk_2.labels_, nrk.labels_)
-    assert np.array_equal(nrk_2.V, nrk.V)
-    assert all([np.array_equal(nrk_2.cluster_centers[i], nrk.cluster_centers[i]) for i in range(2)])
+    assert np.array_equal(nrk_2.V_, nrk.V_)
+    assert all([np.array_equal(nrk_2.cluster_centers_[i], nrk.cluster_centers_[i]) for i in range(2)])
     assert all([np.array_equal(nrk_2.scatter_matrices_[i], nrk.scatter_matrices_[i]) for i in range(2)])
     # Check result with mdl_for_noisespace and n_init=3 and outliers
     nrk_3 = NrKmeans([3, 3, 1], mdl_for_noisespace=True, n_init=3, outliers=True, random_state=1)
@@ -246,34 +254,40 @@ def test_plot_nrkmeans_result(mock_fig):
 
 
 def test_have_clusters_been_lost():
+    X = np.c_[np.zeros(25), np.zeros(25) + 1, np.zeros(25) + 2, np.zeros(25) + 3]
     nrk = NrKmeans([3, 3, 1], max_iter=1, random_state=1)
+    nrk.fit(X)
+    nrk.n_clusters_final_ = [3, 3, 1]
     assert not nrk.have_clusters_been_lost()
     # Overwrite n_clusters
-    nrk.n_clusters = [3, 1]
+    nrk.n_clusters_final_ = [3, 1]
     assert nrk.have_clusters_been_lost()
     # Should be true if a whole subspace got lost
-    nrk.n_clusters = [3, 2, 1]
+    nrk.n_clusters_final_ = [3, 2, 1]
     assert nrk.have_clusters_been_lost()
 
 
 def test_have_subspaces_been_lost():
+    X = np.c_[np.zeros(25), np.zeros(25) + 1, np.zeros(25) + 2, np.zeros(25) + 3]
     nrk = NrKmeans([3, 3, 1], max_iter=1, random_state=1)
+    nrk.fit(X)
+    nrk.n_clusters_final_ = [3, 3, 1]
     assert not nrk.have_subspaces_been_lost()
     # Overwrite n_clusters
-    nrk.n_clusters = [3, 1]
+    nrk.n_clusters_final_ = [3, 1]
     assert nrk.have_subspaces_been_lost()
     # Should be false if just a cluster got lost
-    nrk.n_clusters = [3, 2, 1]
+    nrk.n_clusters_final_ = [3, 2, 1]
     assert not nrk.have_subspaces_been_lost()
 
 
-def test_transform_full_space():
+def test_transform():
     X = np.c_[np.zeros(25), np.zeros(25) + 1, np.zeros(25) + 2, np.zeros(25) + 3]
     nrk = NrKmeans([3, 3, 1], max_iter=1, random_state=1)
     nrk.fit(X)
     # Overwrite V
-    nrk.V = np.array([[0, 1, 0, 0], [1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
-    X_transformed = nrk.transform_full_space(X)
+    nrk.V_ = np.array([[0, 1, 0, 0], [1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
+    X_transformed = nrk.transform(X)
     assert np.array_equal(X_transformed, np.c_[np.zeros(25) + 1, np.zeros(25), np.zeros(25) + 2, np.zeros(25) + 3])
 
 
@@ -282,8 +296,9 @@ def test_transform_subspace():
     nrk = NrKmeans([3, 1], max_iter=1, random_state=1)
     nrk.fit(X)
     # Overwrite V and P
-    nrk.V = np.array([[0, 1, 0, 0], [1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
-    nrk.P = [np.array([1, 3]), np.array([2, 0])]
+    nrk.V_ = np.array([[0, 1, 0, 0], [1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
+    nrk.P_ = [np.array([1, 3]), np.array([2, 0])]
+    nrk.n_clusters_final_ = [3, 1]
     X_transformed = nrk.transform_subspace(X, 0)
     assert np.array_equal(X_transformed, np.c_[np.zeros(25), np.zeros(25) + 3])
     X_transformed = nrk.transform_subspace(X, 1)
@@ -294,8 +309,8 @@ def test_calculate_mdl_costs():
     X = np.c_[np.zeros(30), np.r_[np.zeros(10), np.zeros(10) + 1, np.zeros(10) + 2], np.zeros(30) + 3]
     nrk = NrKmeans([4, 1], max_iter=1, random_state=1)
     nrk.fit(X)
-    nrk.V = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
-    nrk.P = [np.array([2, 0]), np.array([1])]
+    nrk.V_ = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+    nrk.P_ = [np.array([2, 0]), np.array([1])]
     nrk.scatter_matrices_ = [np.array([[30, 30, 30], [34, 34, 34], [38, 38, 38]]),
                              np.array([[32, 33, 34], [36, 37, 38], [40, 41, 42]])]
     costs = nrk.calculate_cost_function()

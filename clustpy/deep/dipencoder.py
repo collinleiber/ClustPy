@@ -687,7 +687,7 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
     pretrain_epochs : int
         number of epochs for the pretraining of the neural network (default: 100)
     clustering_epochs : int
-        number of epochs for the actual clustering procedure (default: 100)
+        number of epochs for the actual clustering procedure (default: 150)
     optimizer_class : torch.optim.Optimizer
         the optimizer class (default: torch.optim.Adam)
     ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
@@ -757,7 +757,7 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
 
     def __init__(self, n_clusters: int = 8, batch_size: int = None, pretrain_optimizer_params: dict = None,
                  clustering_optimizer_params: dict = None, pretrain_epochs: int = 100,
-                 clustering_epochs: int = 100, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
+                 clustering_epochs: int = 150, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error,
                  neural_network: torch.nn.Module | tuple = None, neural_network_weights: str = None,
                  embedding_size: int = 10, max_cluster_size_diff_factor: float = 3,

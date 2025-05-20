@@ -413,7 +413,7 @@ class DEC(_AbstractDeepClusteringAlgo):
     Parameters
     ----------
     n_clusters : int
-        number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN
+        number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN (default: 8)
     alpha : float
         alpha value for the prediction (default: 1.0)
     batch_size : int
@@ -486,7 +486,7 @@ class DEC(_AbstractDeepClusteringAlgo):
     International conference on machine learning. 2016.
     """
 
-    def __init__(self, n_clusters: int, alpha: float = 1.0, batch_size: int = 256,
+    def __init__(self, n_clusters: int = 8, alpha: float = 1.0, batch_size: int = 256,
                  pretrain_optimizer_params: dict = None, clustering_optimizer_params: dict = None,
                  pretrain_epochs: int = 100, clustering_epochs: int = 150,
                  optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
@@ -510,7 +510,6 @@ class DEC(_AbstractDeepClusteringAlgo):
         self.augmentation_invariance = augmentation_invariance
         self.initial_clustering_class = initial_clustering_class
         self.initial_clustering_params = initial_clustering_params
-        self.ssl_loss_weight = 0  # DEC does not use ssl loss when clustering
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DEC':
         """
@@ -529,6 +528,7 @@ class DEC(_AbstractDeepClusteringAlgo):
         self : DEC
             this instance of the DEC algorithm
         """
+        ssl_loss_weight = self.ssl_loss_weight if hasattr(self, "ssl_loss_weight") else 0 # DEC does not use ssl loss when clustering
         X, _, random_state, pretrain_optimizer_params, clustering_optimizer_params, initial_clustering_params = self._check_parameters(X, y=y)
         kmeans_labels, kmeans_centers, dec_labels, dec_centers, neural_network = _dec(X, self.n_clusters, self.alpha,
                                                                                       self.batch_size,
@@ -542,7 +542,7 @@ class DEC(_AbstractDeepClusteringAlgo):
                                                                                       self.neural_network_weights,
                                                                                       self.embedding_size,
                                                                                       self.clustering_loss_weight,
-                                                                                      self.ssl_loss_weight,
+                                                                                      ssl_loss_weight,
                                                                                       self.custom_dataloaders,
                                                                                       self.augmentation_invariance,
                                                                                       self.initial_clustering_class,
@@ -553,7 +553,7 @@ class DEC(_AbstractDeepClusteringAlgo):
         self.dec_labels_ = dec_labels
         self.dec_cluster_centers_ = dec_centers
         self.neural_network_trained_ = neural_network
-        self.n_features_in_ = X.shape[1]
+        self.set_n_featrues_in(X.shape[1])
         return self
 
 
@@ -566,7 +566,7 @@ class IDEC(DEC):
     Parameters
     ----------
     n_clusters : int
-        number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN
+        number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN (default: 8)
     alpha : float
         alpha value for the prediction (default: 1.0)
     batch_size : int
@@ -640,7 +640,7 @@ class IDEC(DEC):
     Guo, Xifeng, et al. "Improved deep embedded clustering with local structure preservation." IJCAI. 2017.
     """
 
-    def __init__(self, n_clusters: int, alpha: float = 1.0, batch_size: int = 256,
+    def __init__(self, n_clusters: int = 8, alpha: float = 1.0, batch_size: int = 256,
                  pretrain_optimizer_params: dict = None,
                  clustering_optimizer_params: dict = None, pretrain_epochs: int = 100,
                  clustering_epochs: int = 150, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,

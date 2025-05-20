@@ -311,5 +311,5 @@ class DEN(_AbstractDeepClusteringAlgo):
         self.labels_ = kmeans.labels_
         self.cluster_centers_ = kmeans.cluster_centers_
         self.neural_network_trained_ = neural_network
-        self.n_features_in_ = X.shape[1]
+        self.set_n_featrues_in(X.shape[1])
         return self

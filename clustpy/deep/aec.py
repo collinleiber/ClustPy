@@ -142,10 +142,13 @@ class _AEC_Module(_DCN_Module):
         centers : torch.Tensor
             The updated centers
         """
-        n_clusters = self.centers.shape[0]
-        centers = torch.from_numpy(np.array(
-            [np.mean(embedded[labels == i], axis=0) for i in range(n_clusters)]))
-        return centers
+        centers = self.centers.cpu().detach().numpy()
+        for i in range(self.centers.shape[0]):
+            X_in_cluster = embedded[labels == i]
+            if X_in_cluster.shape[0] > 0:
+                    centers[i] = np.mean(X_in_cluster, axis=0)
+        centers_torch = torch.from_numpy(centers)
+        return centers_torch
 
     def fit(self, neural_network: torch.nn.Module, trainloader: torch.utils.data.DataLoader,
             testloader: torch.utils.data.DataLoader, n_epochs: int, device: torch.device,
@@ -200,7 +203,8 @@ class _AEC_Module(_DCN_Module):
             embedded = encode_batchwise(testloader, neural_network)
             # update centroids
             centers = self.update_centroids(embedded, self.labels.cpu().detach().numpy())
-            self.centers = centers.to(device)
+            centers_not_nan = ~torch.any(centers.isnan(), dim=1)
+            self.centers[centers_not_nan] = centers[centers_not_nan].to(device)
             # update assignments
             labels = self.predict_hard(torch.tensor(embedded).to(device))
             self.labels = labels.to(device)
@@ -217,7 +221,7 @@ class AEC(_AbstractDeepClusteringAlgo):
     Parameters
     ----------
     n_clusters : int
-        number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN
+        number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN (default: 8)
     batch_size : int
         size of the data batches (default: 256)
     pretrain_optimizer_params : dict
@@ -233,7 +237,7 @@ class AEC(_AbstractDeepClusteringAlgo):
     ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
          self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: mean_squared_error)
     clustering_loss_weight : float
-        weight of the clustering loss (default: 0.05)
+        weight of the clustering loss (default: 0.1)
     ssl_loss_weight : float
         weight of the self-supervised learning (ssl) loss (default: 1.0)
     neural_network : torch.nn.Module | tuple
@@ -288,9 +292,9 @@ class AEC(_AbstractDeepClusteringAlgo):
     CIARP 2013, Havana, Cuba, November 20-23, 2013, Proceedings, Part I 18. Springer Berlin Heidelberg, 2013.
     """
 
-    def __init__(self, n_clusters: int, batch_size: int = 256, pretrain_optimizer_params: dict = None,
+    def __init__(self, n_clusters: int = 8, batch_size: int = 256, pretrain_optimizer_params: dict = None,
                  clustering_optimizer_params: dict = None, pretrain_epochs: int = 100,
-                 clustering_epochs: int = 50, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
+                 clustering_epochs: int = 150, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error, clustering_loss_weight: float = 0.1,
                  ssl_loss_weight: float = 1.0, neural_network: torch.nn.Module | tuple = None,
                  neural_network_weights: str = None, embedding_size: int = 10, custom_dataloaders: tuple = None,
@@ -350,5 +354,5 @@ class AEC(_AbstractDeepClusteringAlgo):
         self.labels_ = aec_labels
         self.cluster_centers_ = aec_centers
         self.neural_network_trained_ = neural_network
-        self.n_features_in_ = X.shape[1]
+        self.set_n_featrues_in(X.shape[1])
         return self

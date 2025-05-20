@@ -7,11 +7,12 @@ import numpy as np
 from sklearn.mixture import GaussianMixture as GMM
 from scipy.stats import ks_2samp
 from sklearn.base import BaseEstimator, ClusterMixin
-from sklearn.utils import check_random_state
+from clustpy.utils.checks import check_parameters
+from sklearn.utils.validation import check_is_fitted
 
 
 def _pgmeans(X, significance, n_projections, n_samples, n_new_centers, amount_random_centers, n_clusters_init,
-             max_n_clusters, random_state):
+             max_n_clusters, random_state) -> (int, np.ndarray, np.ndarray, GMM):
     """
     Start the actual PGMeans clustering procedure on the input data set.
 
@@ -44,10 +45,11 @@ def _pgmeans(X, significance, n_projections, n_samples, n_new_centers, amount_ra
 
     Returns
     -------
-    tuple : (int, np.ndarray, np.ndarray)
+    tuple : (int, np.ndarray, np.ndarray, GMM)
         The final number of clusters,
         The labels as identified by PGMeans,
-        The cluster centers as identified by PGMeans
+        The cluster centers as identified by PGMeans,
+        The final Gaussian Mixture Model
     """
     assert max_n_clusters >= n_clusters_init, "max_n_clusters can not be smaller than n_clusters_init"
     assert significance >= 0 and significance <= 1, "significance must be a value in the range [0, 1]"
@@ -83,7 +85,7 @@ def _pgmeans(X, significance, n_projections, n_samples, n_new_centers, amount_ra
     # Get values from GMM
     labels = current_gmm.predict(X).astype(np.int32)
     centers = current_gmm.means_
-    return n_clusters, labels, centers
+    return n_clusters, labels, centers, current_gmm
 
 
 def _project_model(gmm: GMM, projection_vector: np.ndarray, n_clusters: int,
@@ -253,6 +255,10 @@ class PGMeans(BaseEstimator, ClusterMixin):
         The final labels
     cluster_centers_ : np.ndarray
         The final cluster centers
+    gmm_ : GMM
+        The final Gaussian Mixture Model
+    n_features_in_ : int
+        the number of features used for the fitting
 
     References
     ----------
@@ -264,17 +270,13 @@ class PGMeans(BaseEstimator, ClusterMixin):
                  n_new_centers: int = 10, amount_random_centers: float = 0.5, n_clusters_init: int = 1,
                  max_n_clusters: int = np.inf, random_state: np.random.RandomState | int = None):
         self.significance = significance
-        if n_projections is None:
-            n_projections = int(-2.6198 * np.log(significance)) + 1
         self.n_projections = n_projections
-        if n_samples is None:
-            n_samples = int(3 / self.significance) + 1
         self.n_samples = n_samples
         self.n_new_centers = n_new_centers
         self.n_clusters_init = n_clusters_init
         self.max_n_clusters = max_n_clusters
         self.amount_random_centers = amount_random_centers
-        self.random_state = check_random_state(random_state)
+        self.random_state = random_state
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'PGMeans':
         """
@@ -293,11 +295,40 @@ class PGMeans(BaseEstimator, ClusterMixin):
         self : PGMeans
             this instance of the PGMeans algorithm
         """
-        self.n_samples = min(self.n_samples, X.shape[0])
-        n_clusters, labels, centers = _pgmeans(X, self.significance, self.n_projections, self.n_samples,
+        X, _, random_state = check_parameters(X=X, y=y, random_state=self.random_state)
+        if self.n_projections is None:
+            n_projections = int(-2.6198 * np.log(self.significance)) + 1
+        else:
+            n_projections = self.n_projections
+        if self.n_samples is None:
+            n_samples = int(3 / self.significance) + 1
+        else:
+            n_samples = self.n_samples
+        n_samples = min(n_samples, X.shape[0])
+        n_clusters, labels, centers, gmm = _pgmeans(X, self.significance, n_projections, n_samples,
                                                self.n_new_centers, self.amount_random_centers, self.n_clusters_init,
-                                               self.max_n_clusters, self.random_state)
+                                               self.max_n_clusters, random_state)
         self.n_clusters_ = n_clusters
         self.labels_ = labels
         self.cluster_centers_ = centers
+        self.gmm_ = gmm
+        self.n_features_in_ = X.shape[1]
         return self
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """
+        Predict the labels of an input dataset. For this method the results from the fit() method will be used.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            the given data set
+
+        Returns
+        -------
+        predicted_labels : np.ndarray
+            the predicted labels of the input data set
+        """
+        check_is_fitted(self, ["labels_", "n_features_in_"])
+        predicted_labels = self.gmm_.predict(X).astype(np.int32)
+        return predicted_labels

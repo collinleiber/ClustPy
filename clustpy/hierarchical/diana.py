@@ -8,6 +8,7 @@ import numpy as np
 from scipy.spatial.distance import pdist, squareform
 from clustpy.hierarchical._cluster_tree import BinaryClusterTree
 import copy
+from clustpy.utils.checks import check_parameters
 
 
 def _diana(X: np.ndarray, n_clusters: int, distance_threshold: float, construct_full_tree: bool, metric: str) -> (
@@ -173,6 +174,8 @@ class Diana(BaseEstimator, ClusterMixin):
         The final labels
     tree_ : BinaryClusterTree
         The resulting cluster tree
+    n_features_in_ : int
+        the number of features used for the fitting
 
     References
     ----------
@@ -204,12 +207,16 @@ class Diana(BaseEstimator, ClusterMixin):
         self : Diana
             this instance of the Diana algorithm
         """
+        X, _, _ = check_parameters(X=X, y=y)
         assert self.n_clusters is None or self.distance_threshold == 0, "If n_clusters is set, distance_threshold must be 0. Else the number of identified clusters can be incorrect"
         if self.n_clusters is None or self.n_clusters > X.shape[0]:
-            self.n_clusters = X.shape[0]
-        labels, tree = _diana(X, self.n_clusters, self.distance_threshold, self.construct_full_tree, self.metric)
+            n_clusters = X.shape[0]
+        else:
+            n_clusters = self.n_clusters
+        labels, tree = _diana(X, n_clusters, self.distance_threshold, self.construct_full_tree, self.metric)
         self.labels_ = labels
         self.tree_ = tree
+        self.n_features_in_ = X.shape[1]
         return self
 
     def flat_clustering(self, n_leaf_nodes_to_keep: int) -> np.ndarray:

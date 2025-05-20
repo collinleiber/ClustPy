@@ -7,6 +7,7 @@ from sklearn.utils import check_X_y, check_array, check_random_state
 def check_clustpy_estimator(estimator_obj: BaseEstimator, checks_to_ignore: tuple | list = ("check_complex_data")):
     """
     Run the check_estimator function from sklearn ignoring the check for complex data.
+    For more information, check: https://github.com/scikit-learn/scikit-learn/blob/main/sklearn/utils/estimator_checks.py
 
     Parameters
     ----------
@@ -24,10 +25,12 @@ def check_clustpy_estimator(estimator_obj: BaseEstimator, checks_to_ignore: tupl
             except Exception as e:
                 print("Check", check_name, "failed.")
                 raise e
+        else:
+            print("Skip check:", check_name)
 
 
 def check_parameters(X: np.ndarray, *, y: np.ndarray=None, random_state: np.random.RandomState | int=None,
-                     allow_nd: bool=False) -> (np.ndarray, np.ndarray, np.random.RandomState):
+                     allow_nd: bool=False, allow_size_1: bool=False) -> (np.ndarray, np.ndarray, np.random.RandomState):
     """
     Check if parameters for X, y and random_state are defined in accordance with the sklearn standard.
 
@@ -41,6 +44,8 @@ def check_parameters(X: np.ndarray, *, y: np.ndarray=None, random_state: np.rand
         the random state (default: None)
     allow_nd : bool
         allow n-dimensional arrays instead of only allowing 2d arrays (default: False)
+    allow_size_1 : bool
+        allow a dataset with a single sample
 
     Returns
     -------
@@ -62,5 +67,7 @@ def check_parameters(X: np.ndarray, *, y: np.ndarray=None, random_state: np.rand
         assert np.array_equal(class_labels, np.arange(len(class_labels))), "y is not defined as expected. Should only contain labels within [0, n_classes - 1]. Labels in y: {0}".format(class_labels)
     if X.ndim == 1:
         raise ValueError("Data can not be a 1d array.")
+    if not allow_size_1 and X.shape[0] == 1:
+        raise ValueError("Model cannot be fitted if n_samples = 1. X shape =", X.shape)
     random_state = check_random_state(random_state)
     return X, y, random_state

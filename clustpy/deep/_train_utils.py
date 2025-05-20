@@ -96,6 +96,9 @@ def get_neural_network(input_dim: int, embedding_size: int = 10, neural_network:
                    "fitted"), "Neural network has no attribute 'fitted' and is therefore not compatible. Check documentation of fitted, e.g., at clustpy.deep.neural_networks._abstract_autoencoder._AbstractAutoencoder"
     if neural_network_weights is not None:
         neural_network.load_parameters(neural_network_weights)
+    if neural_network.work_on_copy:
+        # If neural network is used by multiple deep clustering algorithms, create a deep copy of the object
+        neural_network = copy.deepcopy(neural_network)
     # Move neural network to device
     device = detect_device(device)
     neural_network.to(device)
@@ -127,7 +130,7 @@ def get_trained_network(trainloader: torch.utils.data.DataLoader = None, data: n
     batch_size : int
         size of the data batches (default: 128)
     optimizer_params : dict
-        parameters of the optimizer for the neural network training, includes the learning rate (default: {"lr": 1e-3})
+        parameters of the optimizer for the neural network training, includes the learning rate. If None, it will be set to {"lr": 1e-3} (default: None)
     optimizer_class : torch.optim.Optimizer
         optimizer for training (default: torch.optim.Adam)
     device : torch.device
@@ -169,9 +172,6 @@ def get_trained_network(trainloader: torch.utils.data.DataLoader = None, data: n
         optimizer_params = {"lr": 1e-3} if optimizer_params is None else optimizer_params
         neural_network.fit(n_epochs=n_epochs, optimizer_params=optimizer_params, dataloader=trainloader,
                            optimizer_class=optimizer_class, ssl_loss_fn=ssl_loss_fn)
-    if neural_network.work_on_copy:
-        # If neural network is used by multiple deep clustering algorithms, create a deep copy of the object
-        neural_network = copy.deepcopy(neural_network)
     return neural_network
 
 

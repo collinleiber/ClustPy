@@ -11,6 +11,7 @@ import numpy as np
 import tqdm
 from collections.abc import Callable
 from clustpy.deep._utils import set_torch_seed
+from sklearn.utils import check_random_state
 
 
 class StackedAutoencoder(FeedforwardAutoencoder):
@@ -211,7 +212,8 @@ class StackedAutoencoder(FeedforwardAutoencoder):
         ValueError: data cannot be None if dataloader is None
         ValueError: evalloader cannot be None if scheduler=torch.optim.lr_scheduler.ReduceLROnPlateau
         """
-        set_torch_seed(self.random_state)
+        random_state = check_random_state(self.random_state)
+        set_torch_seed(random_state)
         self.layerwise_training(n_epochs_per_layer, optimizer_params, batch_size, data, dataloader,
                                 optimizer_class, ssl_loss_fn, corruption_fn)
         super().fit(n_epochs, optimizer_params, batch_size, data, data_eval, dataloader, evalloader,

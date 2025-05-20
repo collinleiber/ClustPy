@@ -1,12 +1,12 @@
 import numpy as np
 from clustpy.partition import SkinnyDip, UniDip
 from sklearn.datasets import make_blobs
-from sklearn.utils.estimator_checks import check_estimator
+from clustpy.utils.checks import check_clustpy_estimator
 
 
 def test_skinnydip_estimator():
-    check_estimator(SkinnyDip(), 
-                    {"check_complex_data": "this check is expected to fail because complex values are not supported"})
+    check_clustpy_estimator(SkinnyDip(), ("check_complex_data"))
+
 
 """
 Tests regarding the SkinnyDip object

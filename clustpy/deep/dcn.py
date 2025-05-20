@@ -375,7 +375,7 @@ class DCN(_AbstractDeepClusteringAlgo):
     Parameters
     ----------
     n_clusters : int
-        number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN
+        number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN (default: 8)
     batch_size : int
         size of the data batches (default: 256)
     pretrain_optimizer_params : dict
@@ -391,7 +391,7 @@ class DCN(_AbstractDeepClusteringAlgo):
     ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
          self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: mean_squared_error)
     clustering_loss_weight : float
-        weight of the clustering loss (default: 0.05)
+        weight of the clustering loss (default: 0.1)
     ssl_loss_weight : float
         weight of the self-supervised learning (ssl) loss (default: 1.0)
     neural_network : torch.nn.Module | tuple
@@ -449,10 +449,10 @@ class DCN(_AbstractDeepClusteringAlgo):
     international conference on machine learning. PMLR, 2017.
     """
 
-    def __init__(self, n_clusters: int, batch_size: int = 256, pretrain_optimizer_params: dict = None,
-                 clustering_optimizer_params: dict = None, pretrain_epochs: int = 50,
-                 clustering_epochs: int = 50, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
-                 ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error, clustering_loss_weight: float = 0.05,
+    def __init__(self, n_clusters: int = 8, batch_size: int = 256, pretrain_optimizer_params: dict = None,
+                 clustering_optimizer_params: dict = None, pretrain_epochs: int = 100,
+                 clustering_epochs: int = 150, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
+                 ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error, clustering_loss_weight: float = 0.1,
                  ssl_loss_weight: float = 1.0, neural_network: torch.nn.Module | tuple = None,
                  neural_network_weights: str = None, embedding_size: int = 10, custom_dataloaders: tuple = None,
                  augmentation_invariance: bool = False, initial_clustering_class: ClusterMixin = KMeans,
@@ -515,5 +515,5 @@ class DCN(_AbstractDeepClusteringAlgo):
         self.dcn_labels_ = dcn_labels
         self.dcn_cluster_centers_ = dcn_centers
         self.neural_network_trained_ = neural_network
-        self.n_features_in_ = X.shape[1]
+        self.set_n_featrues_in(X.shape[1])
         return self

@@ -283,7 +283,7 @@ def predict_batchwise(dataloader: torch.utils.data.DataLoader, neural_network: t
         The predictions of the cluster_module for the data set
     """
     device = get_device_from_module(neural_network)
-    predictions_numpy = np.zeros(len(dataloader.dataset), dtype=int)
+    predictions_numpy = np.zeros(len(dataloader.dataset), dtype=np.int32)
     for batch in dataloader:
         batch_data = batch[1].to(device)
         prediction = cluster_module.predict_hard(neural_network.encode(batch_data)).detach().cpu()

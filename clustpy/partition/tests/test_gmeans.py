@@ -3,12 +3,11 @@ from clustpy.partition import GMeans
 from clustpy.partition.gmeans import _anderson_darling_statistic_to_prob
 from sklearn.datasets import make_blobs
 from scipy.stats import anderson
-from sklearn.utils.estimator_checks import check_estimator
+from clustpy.utils.checks import check_clustpy_estimator
 
 
 def test_gmeans_estimator():
-    check_estimator(GMeans(), 
-                    {"check_complex_data": "this check is expected to fail because complex values are not supported"})
+    check_clustpy_estimator(GMeans(), ("check_complex_data"))
 
 
 def test_anderson_darling_statistic_to_prob():
@@ -52,3 +51,5 @@ def test_simple_GMeans():
     assert gmeans.cluster_centers_.shape == (gmeans.n_clusters_, X.shape[1])
     assert len(np.unique(gmeans.labels_)) == gmeans.n_clusters_
     assert np.array_equal(np.unique(gmeans.labels_), np.arange(gmeans.n_clusters_))
+    labels_predict = gmeans.predict(X)
+    assert np.array_equal(gmeans.labels_, labels_predict)

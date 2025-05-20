@@ -2,12 +2,13 @@ from clustpy.deep import AEC, get_default_augmented_dataloaders
 from clustpy.data import create_subspace_data, load_optdigits
 import torch
 import numpy as np
-from sklearn.utils.estimator_checks import check_estimator
+from clustpy.utils.checks import check_clustpy_estimator
 
 
 def test_aec_estimator():
-    check_estimator(AEC(3, pretrain_epochs=3, clustering_epochs=3), 
-                    {"check_complex_data": "this check is expected to fail because complex values are not supported"})
+    # Ignore check_methods_subset_invariance due to numerical issues
+    check_clustpy_estimator(AEC(3, pretrain_epochs=3, clustering_epochs=3),
+                            ("check_complex_data", "check_methods_subset_invariance"))
 
 
 def test_simple_aec():

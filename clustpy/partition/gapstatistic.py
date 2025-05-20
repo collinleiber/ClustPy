@@ -6,10 +6,12 @@ Collin Leiber
 import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.base import BaseEstimator, ClusterMixin
-from sklearn.utils import check_random_state
 from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
 from scipy.spatial.distance import pdist
+from clustpy.utils.checks import check_parameters
+from sklearn.utils.validation import check_is_fitted
+from sklearn.metrics.pairwise import pairwise_distances_argmin_min
 
 
 def _gap_statistic(X: np.ndarray, min_n_clusters: int, max_n_clusters: int, n_boots: int,
@@ -47,6 +49,7 @@ def _gap_statistic(X: np.ndarray, min_n_clusters: int, max_n_clusters: int, n_bo
         The sk values
     """
     assert max_n_clusters >= min_n_clusters, "max_n_clusters can not be smaller than min_n_clusters"
+    max_n_clusters = min(max_n_clusters, X.shape[0] - 1)
     assert n_boots > 0, "n_boots must be larger than 0"
     # Get min and max values for each dimension
     if use_principal_components:
@@ -197,6 +200,8 @@ class GapStatistic(BaseEstimator, ClusterMixin):
         The Gap values,
     sks_ : np.ndarray
         The sk values
+    n_features_in_ : int
+        the number of features used for the fitting
 
     Examples
     ----------
@@ -226,7 +231,7 @@ class GapStatistic(BaseEstimator, ClusterMixin):
         self.n_boots = n_boots
         self.use_principal_components = use_principal_components
         self.use_log = use_log
-        self.random_state = check_random_state(random_state)
+        self.random_state = random_state
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'GapStatistic':
         """
@@ -245,15 +250,17 @@ class GapStatistic(BaseEstimator, ClusterMixin):
         self : GapStatistic
             this instance of the GapStatistic algorithm
         """
+        X, _, random_state = check_parameters(X=X, y=y, random_state=self.random_state)
         n_clusters, labels, centers, gaps, sks = _gap_statistic(X, self.min_n_clusters, self.max_n_clusters,
                                                                 self.n_boots,
                                                                 self.use_principal_components, self.use_log,
-                                                                self.random_state)
+                                                                random_state)
         self.n_clusters_ = n_clusters
         self.labels_ = labels
         self.cluster_centers_ = centers
         self.gaps_ = gaps
         self.sks_ = sks
+        self.n_features_in_ = X.shape[1]
         return self
 
     def plot(self) -> None:
@@ -261,10 +268,31 @@ class GapStatistic(BaseEstimator, ClusterMixin):
         Plot the result of the Gap Statistic.
         Shows the number of the clusters on the x-axis and the Gap values on the y-axis.
         """
-        assert hasattr(self, "gaps_"), "The Gap Statistic algorithm has not run yet. Use the fit() function first."
+        check_is_fitted(self, ["labels_", "n_features_in_"])
         plt.plot(np.arange(self.min_n_clusters, self.max_n_clusters + 1), self.gaps_[:-1])
         plt.errorbar(np.arange(self.min_n_clusters, self.max_n_clusters + 1), self.gaps_[:-1], self.sks_[:-1],
                      capsize=3, linestyle='None')
         plt.ylabel("Gap Statistic")
         plt.xlabel("n_clusters")
         plt.show()
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """
+        Predict the labels of an input dataset. For this method the results from the fit() method will be used.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            the given data set
+
+        Returns
+        -------
+        predicted_labels : np.ndarray
+            the predicted labels of the input data set
+        """
+        check_is_fitted(self, ["labels_", "n_features_in_"])
+        predicted_labels, _ = pairwise_distances_argmin_min(X=X, Y=self.cluster_centers_,
+                                                          metric='euclidean',
+                                                          metric_kwargs={'squared': True})
+        predicted_labels = predicted_labels.astype(np.int32)
+        return predicted_labels

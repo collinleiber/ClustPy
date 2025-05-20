@@ -549,9 +549,9 @@ class DeepECT(_AbstractDeepClusteringAlgo):
     clustering_optimizer_params : dict
         parameters of the optimizer for the actual clustering procedure, includes the learning rate. If None, it will be set to {"lr": 1e-4} (default: None)
     pretrain_epochs : int
-        number of epochs for the pretraining of the neural network (default: 50)
+        number of epochs for the pretraining of the neural network (default: 100)
     clustering_epochs : int
-        Number of epochs for the actual clustering procedure (default: 200)
+        Number of epochs for the actual clustering procedure (default: 150)
     grow_interval : int
         Number of epochs after which the the tree is grown (default: 2)
     pruning_threshold : float
@@ -602,7 +602,7 @@ class DeepECT(_AbstractDeepClusteringAlgo):
     """
 
     def __init__(self, max_n_leaf_nodes: int = 20, batch_size: int = 256, pretrain_optimizer_params: dict = None,
-                 clustering_optimizer_params: dict = None, pretrain_epochs: int = 50, clustering_epochs: int = 200,
+                 clustering_optimizer_params: dict = None, pretrain_epochs: int = 100, clustering_epochs: int = 150,
                  grow_interval: int = 2, pruning_threshold: float = 0.1,
                  optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error,
@@ -654,7 +654,7 @@ class DeepECT(_AbstractDeepClusteringAlgo):
         self.tree_ = tree
         self.labels_ = labels
         self.neural_network_trained_ = neural_network
-        self.n_features_in_ = X.shape[1]
+        self.set_n_featrues_in(X.shape[1])
         return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:

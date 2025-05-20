@@ -1,17 +1,17 @@
 import numpy as np
 from clustpy.alternative import OrthogonalClustering, ClusteringInOrthogonalSpaces
 from clustpy.data import create_nr_data
-from sklearn.utils.estimator_checks import check_estimator
+from clustpy.utils.checks import check_clustpy_estimator
 
 
 def test_orthogonal_clustering_estimator():
-    check_estimator(OrthogonalClustering([3, 3]), 
-                    {"check_complex_data": "this check is expected to fail because complex values are not supported"})
+    # Ignore check_clustering as it does not accept multiple sets of labels
+    check_clustpy_estimator(OrthogonalClustering([3, 3]), ("check_complex_data", "check_clustering"))
 
 
 def test_clustering_in_orthogonal_spaces_estimator():
-    check_estimator(ClusteringInOrthogonalSpaces([3, 3]), 
-                    {"check_complex_data": "this check is expected to fail because complex values are not supported"})
+    # Ignore check_clustering as it does not accept multiple sets of labels
+    check_clustpy_estimator(ClusteringInOrthogonalSpaces([3, 3]), ("check_complex_data", "check_clustering"))
 
 
 def test_simple_orthogonal_clustering():

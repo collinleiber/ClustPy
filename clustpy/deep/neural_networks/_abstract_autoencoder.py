@@ -14,7 +14,6 @@ from collections.abc import Callable
 from sklearn.utils import check_random_state
 from clustpy.deep._utils import set_torch_seed
 from collections.abc import Callable
-from sklearn.base import TransformerMixin, BaseEstimator
 
 
 class FullyConnectedBlock(torch.nn.Module):
@@ -92,7 +91,7 @@ class FullyConnectedBlock(torch.nn.Module):
         return forwarded
 
 
-class _AbstractAutoencoder(torch.nn.Module, TransformerMixin, BaseEstimator):
+class _AbstractAutoencoder(torch.nn.Module):
     """
     An abstract autoencoder class that can be used by other autoencoder implementations.
 
@@ -108,17 +107,15 @@ class _AbstractAutoencoder(torch.nn.Module, TransformerMixin, BaseEstimator):
 
     Attributes
     ----------
-    fitted  : bool
+    fitted : bool
         indicates whether the autoencoder is already fitted
-    work_on_copy : bool
-        indicates whether deep clustering algorithms should work on a copy of the original autoencoder
     """
 
     def __init__(self, work_on_copy: bool = True, random_state: np.random.RandomState | int = None):
         super(_AbstractAutoencoder, self).__init__()
-        self.fitted = False
         self.work_on_copy = work_on_copy
-        self.random_state = check_random_state(random_state)
+        self.random_state = random_state
+        self.fitted = False
 
     def encode(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -328,7 +325,8 @@ class _AbstractAutoencoder(torch.nn.Module, TransformerMixin, BaseEstimator):
         ValueError: data cannot be None if dataloader is None
         ValueError: evalloader cannot be None if scheduler=torch.optim.lr_scheduler.ReduceLROnPlateau
         """
-        set_torch_seed(self.random_state)
+        random_state = check_random_state(self.random_state)
+        set_torch_seed(random_state)
         if dataloader is None:
             if data is None:
                 raise ValueError("data must be specified if dataloader is None")
@@ -441,8 +439,10 @@ class _AbstractAutoencoder(torch.nn.Module, TransformerMixin, BaseEstimator):
         X_embed : np.ndarray
             The embedded data set
         """
+        if not self.fitted:
+            raise ValueError("The autoencoder is not fitted yet. Rnu fit() first.")
         device = get_device_from_module(self)
         torch_data = torch.from_numpy(X).float().to(device)
         embedded_data = self.encode(torch_data)
         X_embed = embedded_data.detach().cpu().numpy()
-        return X_embed
+        return X_embed.astype(X.dtype)

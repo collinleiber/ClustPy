@@ -3,12 +3,11 @@ from clustpy.partition import GapStatistic
 from clustpy.partition.gapstatistic import _execute_kmeans, _generate_random_data
 from sklearn.datasets import make_blobs
 from unittest.mock import patch
-from sklearn.utils.estimator_checks import check_estimator
+from clustpy.utils.checks import check_clustpy_estimator
 
 
 def test_gapstatistic_estimator():
-    check_estimator(GapStatistic(), 
-                    {"check_complex_data": "this check is expected to fail because complex values are not supported"})
+    check_clustpy_estimator(GapStatistic(), ("check_complex_data"))
 
 
 def test_execute_kmeans():
@@ -74,6 +73,8 @@ def test_simple_GapStatistic():
     assert gapstat.cluster_centers_.shape == (gapstat.n_clusters_, X.shape[1])
     assert len(np.unique(gapstat.labels_)) == gapstat.n_clusters_
     assert np.array_equal(np.unique(gapstat.labels_), np.arange(gapstat.n_clusters_))
+    labels_predict = gapstat.predict(X)
+    assert np.array_equal(gapstat.labels_, labels_predict)
 
 
 @patch("matplotlib.pyplot.show")  # Used to test plots (show will not be called)

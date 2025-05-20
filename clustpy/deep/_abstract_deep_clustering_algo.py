@@ -41,7 +41,11 @@ class _AbstractDeepClusteringAlgo(ClusterMixin, TransformerMixin, BaseEstimator)
     def _check_parameters(self, X: np.ndarray, *, y: np.ndarray=None) -> (np.ndarray, np.ndarray, np.random.RandomState, dict, dict, dict):
         """
         Check if parameters for X, y and random_state are defined in accordance with the sklearn standard.
-        Furthermore, it checks the deep clustering specific settings for augmentation_invariance, pretrain_optimizer_params, clustering_optimizer_params and initial_clustering_params.
+        Furthermore, it checks the deep clustering specific settings for augmentation_invariance and verifies the values for pretrain_optimizer_params, clustering_optimizer_params and initial_clustering_params.
+        If those values are None, they will be specified as follows:
+        - pretrain_optimizer_params = {"lr": 1e-3}
+        - clustering_optimizer_params = {"lr": 1e-4}
+        - initial_clustering_params = {}
 
         Parameters
         ----------
@@ -95,14 +99,14 @@ class _AbstractDeepClusteringAlgo(ClusterMixin, TransformerMixin, BaseEstimator)
             The embedded data set
         """
         check_is_fitted(self, ["labels_", "neural_network_trained_", "n_features_in_"])
-        X, _, _ = check_parameters(X)
+        X, _, _ = check_parameters(X, allow_size_1=True)
         if X.shape[1] != self.n_features_in_:
             raise ValueError(
             f"X has {X.shape[1]} features, but {self.__class__.__name__} "
             f"is expecting {self.n_features_in_} features as input."
         )
         X_embed = self.neural_network_trained_.transform(X)
-        return X_embed.astype(X.dtype)
+        return X_embed
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> '_AbstractDeepClusteringAlgo':
         """
@@ -120,6 +124,8 @@ class _AbstractDeepClusteringAlgo(ClusterMixin, TransformerMixin, BaseEstimator)
         self : _AbstractDeepClusteringAlgo
             this instance of the _AbstractDeepClusteringAlgo
         """
+        self.neural_network_trained_ = self.neural_network
+        self.set_n_featrues_in(X.shape[1])
         return self
 
     def fit_transform(self, X: np.ndarray, y: np.ndarray=None):
@@ -161,7 +167,6 @@ class _AbstractDeepClusteringAlgo(ClusterMixin, TransformerMixin, BaseEstimator)
         predicted_labels : np.ndarray
             The predicted labels
         """
-        X, _, _  = check_parameters(X)
         X_embed = self.transform(X)
         if cluster_centers is None:
             assert hasattr(self, "cluster_centers_"), "predict method of AbstractDeepClusteringAlgo can only be used if cluster_centers are give as input parameter or cluster_centers_ are defined as attribute"
@@ -170,3 +175,15 @@ class _AbstractDeepClusteringAlgo(ClusterMixin, TransformerMixin, BaseEstimator)
                                                         metric_kwargs={'squared': True})
         predicted_labels = predicted_labels.astype(np.int32)
         return predicted_labels
+
+    def set_n_featrues_in(self, n_features: int) -> None:
+        """
+        Set the attribute n_features_in_ for this deep clustering algorithm and set fitted to true for the underlying neural network.
+
+        Parameters
+        ----------
+        n_features: int
+            The number of input features
+        """
+        self.n_features_in_ = n_features
+        self.neural_network_trained_.fitted = True
