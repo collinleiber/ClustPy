@@ -257,6 +257,8 @@ def _transform_text_data(data: np.ndarray, use_tfidf: bool, use_stemming: bool, 
         The default is to keep all features with non-zero variance, i.e. remove only the features that have the same value in all samples 
     sublinear_tf : bool
         Apply sublinear term frequency scaling, i.e. replace tf with 1 + log(tf) (see sklearn TfidfTransformer)
+    data_all : np.ndarray
+        The complete data set, i.e., if no subset is used. If it is None, it will be equal to data (default: None)
 
     Returns
     -------
@@ -275,7 +277,7 @@ def _transform_text_data(data: np.ndarray, use_tfidf: bool, use_stemming: bool, 
     # (Optional) Check for variance threshold
     if min_variance != 0:
         selector = VarianceThreshold(min_variance)
-        data_sparse_all = selector.fit(data_sparse_all)
+        data_sparse_all = selector.fit_transform(data_sparse_all)
         data_sparse = selector.transform(data_sparse)
     # (Optional) Apply tf-idf
     if use_tfidf:

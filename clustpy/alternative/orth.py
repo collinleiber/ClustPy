@@ -255,6 +255,7 @@ class OrthogonalClustering(BaseEstimator, ClusterMixin):
             The transformed dataset
         """
         check_is_fitted(self, ["labels_", "n_features_in_"])
+        X, _, _ = check_parameters(X, allow_size_1=True)
         assert subspace_index < len(self.cluster_centers_), "subspace_index must be smaller than {0}".format(
             len(self.cluster_centers_))
         X = X - self.global_mean_
@@ -361,6 +362,7 @@ class ClusteringInOrthogonalSpaces(OrthogonalClustering):
             The transformed dataset
         """
         check_is_fitted(self, ["labels_", "n_features_in_"])
+        X, _, _ = check_parameters(X, allow_size_1=True)
         assert subspace_index < len(self.cluster_centers_), "subspace_index must be smaller than {0}".format(
             len(self.cluster_centers_))
         X = X - self.global_mean_

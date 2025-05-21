@@ -591,9 +591,10 @@ def load_webkb(use_universities: tuple = ("cornell", "texas", "washington", "wis
                sublinear_tf: bool = False, remove_headers: bool = True, return_X_y: bool = False, 
                downloads_path: str = None) -> Bunch:
     """
-    Load the WebKB data set. It consists of 1041 Html documents from different universities (default: "cornell", "texas",
-    "washington" and "wisconsin"). These web pages have a specified category (default: "course", "faculty", "project",
-    "student"). For more information see the references website.
+    Load the WebKB data set. It consists of 8282 Html documents from different universities ("wisconsin", "washington", "texas", "cornell", "misc").
+    These web pages have a specified category ("student", "staff", "project", "faculty", "department", "course", "other").
+    The first column of the labels contains the category information and the second the university information.
+    For more information see the references website.
     The data is usually preprocessed by using stemming and removing stop words. Furthermore, words with a document frequency
     smaller than min_df or with a variance smaller than min_variance are usually removed and tf-idf is applied.
     N=1041, d=323, k=[4,4] using the default settings.

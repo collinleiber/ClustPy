@@ -203,8 +203,7 @@ class _AEC_Module(_DCN_Module):
             embedded = encode_batchwise(testloader, neural_network)
             # update centroids
             centers = self.update_centroids(embedded, self.labels.cpu().detach().numpy())
-            centers_not_nan = ~torch.any(centers.isnan(), dim=1)
-            self.centers[centers_not_nan] = centers[centers_not_nan].to(device)
+            self.centers = centers.to(device)
             # update assignments
             labels = self.predict_hard(torch.tensor(embedded).to(device))
             self.labels = labels.to(device)

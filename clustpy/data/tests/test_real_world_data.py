@@ -135,4 +135,4 @@ def test_load_coil100():
 @pytest.mark.data
 def test_load_webkb():
     _helper_test_data_loader(load_webkb, 1041, 323, [4, 4], dataloader_params={"downloads_path": TEST_DOWNLOAD_PATH})
-    _helper_test_data_loader(load_webkb, 1041, 323, [4, 4], dataloader_params={"downloads_path": TEST_DOWNLOAD_PATH, "use_categories": None, "use_universities": None})
+    _helper_test_data_loader(load_webkb, 8282, 761, [7, 5], dataloader_params={"downloads_path": TEST_DOWNLOAD_PATH, "use_categories": None, "use_universities": None})

@@ -986,6 +986,7 @@ class NrKmeans(BaseEstimator, ClusterMixin):
             The rotated and projected dataset
         """
         check_is_fitted(self, ["labels_", "n_features_in_"])
+        X, _, _ = check_parameters(X, allow_size_1=True)
         assert subspace_index < len(self.n_clusters_final_), "subspace_index must be smaller than {0}".format(
             len(self.n_clusters_final_))
         subspace_V = self.V_[:, self.P_[subspace_index]]

@@ -124,7 +124,7 @@ class _AbstractDeepClusteringAlgo(ClusterMixin, TransformerMixin, BaseEstimator)
         self : _AbstractDeepClusteringAlgo
             this instance of the _AbstractDeepClusteringAlgo
         """
-        self.neural_network_trained_ = self.neural_network
+        self.neural_network_trained_ = self.neural_network # placeholder
         self.set_n_featrues_in(X.shape[1])
         return self
 

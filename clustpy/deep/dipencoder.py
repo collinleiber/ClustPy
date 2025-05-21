@@ -852,7 +852,7 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
         self.projection_thresholds_ = dipencoder_module.projection_thresholds_
         self.index_dict_ = index_dict
         self.neural_network_trained_ = neural_network
-        self.n_features_in_ = X.shape[1]
+        self.set_n_featrues_in(X.shape[1])
         return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:
