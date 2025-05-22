@@ -874,9 +874,6 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
             The predicted labels
         """
         X_embed = self.transform(X)
-        print("index", self.index_dict_)
-        print("axes",self.projection_axes_)
-        print("thresholds", self.projection_thresholds_)
         labels_pred = _predict_using_thresholds(X_embed, self.projection_axes_, self.projection_thresholds_, self.n_clusters, self.index_dict_)
         return labels_pred.astype(np.int32)
 
