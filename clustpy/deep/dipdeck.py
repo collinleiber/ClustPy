@@ -14,6 +14,7 @@ from sklearn.cluster import KMeans
 from sklearn.base import ClusterMixin
 import tqdm
 from collections.abc import Callable
+from sklearn.utils.validation import check_is_fitted
 
 
 def _dip_deck(X: np.ndarray, n_clusters_init: int, dip_merge_threshold: float, clustering_loss_weight: float,
@@ -754,6 +755,7 @@ class DipDECK(_AbstractDeepClusteringAlgo):
             The predicted labels
         """
         # Get embedded centers
+        check_is_fitted(self, ["projection_axes_", "n_features_in_"])
         embedded_centers = self.transform(self.cluster_centers_)
         predicted_labels = super().predict(X, embedded_centers)
         return predicted_labels

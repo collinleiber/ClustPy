@@ -631,7 +631,7 @@ def _assign_outliers(X_1d: np.ndarray, labels: np.ndarray, n_clusters: int, sort
     return labels
 
 
-class SkinnyDip(BaseEstimator, ClusterMixin):
+class SkinnyDip(ClusterMixin, BaseEstimator):
     """
     Execute the SkinnyDip clustering procedure.
     This approach iteratively executes the univariate clustering algorithm UniDip on each feature.
@@ -723,7 +723,7 @@ class SkinnyDip(BaseEstimator, ClusterMixin):
         return self
 
 
-class UniDip(BaseEstimator, ClusterMixin):
+class UniDip(ClusterMixin, BaseEstimator):
     """
     Execute the UniDip clustering procedure.
     This univariate clustering algorithm recursively uses the Dip-test of unimodality to check if a set of samples is distributed uni- or multimodally.

@@ -376,7 +376,7 @@ def _get_min_dippvalue_using_grouped_gradient(X: np.ndarray, labels: np.ndarray,
     return gradient, dip_values, projected_data
 
 
-class DipNSub(BaseEstimator, ClusterMixin):
+class DipNSub(ClusterMixin, BaseEstimator):
     """
     Execute the Dip`n`Sub clustering procedure.
     It searches for projection axes in which as many samples as possible are part of multimodal clusters.

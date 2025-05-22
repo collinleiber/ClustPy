@@ -9,6 +9,7 @@ from scipy.spatial.distance import pdist, squareform
 from clustpy.hierarchical._cluster_tree import BinaryClusterTree
 import copy
 from clustpy.utils.checks import check_parameters
+from sklearn.utils.validation import check_is_fitted
 
 
 def _diana(X: np.ndarray, n_clusters: int, distance_threshold: float, construct_full_tree: bool, metric: str) -> (
@@ -151,7 +152,7 @@ def _split_cluster(cluster_distance_matrix: np.ndarray, split_cluster_id: int, n
     return labels_new
 
 
-class Diana(BaseEstimator, ClusterMixin):
+class Diana(ClusterMixin, BaseEstimator):
     """
     The DIvisive ANAlysis (DIANA) clustering algorithm.
     DIANA build a top-down clustering hierarchy by considering pairwise dissimilarity of objects.
@@ -235,7 +236,7 @@ class Diana(BaseEstimator, ClusterMixin):
         labels_pruned : np.ndarray
             The new cluster labels
         """
-        assert self.labels_ is not None, "The DIANA algorithm has not run yet. Use the fit() function first."
+        check_is_fitted(self, ["tree_", "labels_", "n_features_in_"])
         tree_copy = copy.deepcopy(self.tree_)
         labels_pruned = tree_copy.prune_to_n_leaf_nodes(n_leaf_nodes_to_keep, self.labels_)
         return labels_pruned

@@ -1035,10 +1035,10 @@ def nrkmeans_init(data: np.ndarray, n_clusters: list, rounds: int = 10, max_iter
     else:
         mdl_for_noisespace = False
     for i in range(rounds):
-        nrkmeans = NrKmeans(n_clusters=n_clusters, cluster_centers=input_centers, P=P, V=V, max_iter=max_iter,
+        nrkmeans = NrKmeans(n_clusters=n_clusters, cluster_centers_init=input_centers, P_init=P, V_init=V, max_iter=max_iter,
                             random_state=random_state, mdl_for_noisespace=mdl_for_noisespace)
         nrkmeans.fit(X=data)
-        centers_i, P_i, V_i, scatter_matrices_i = nrkmeans.cluster_centers, nrkmeans.P, nrkmeans.V, nrkmeans.scatter_matrices_
+        centers_i, P_i, V_i, scatter_matrices_i = nrkmeans.cluster_centers_, nrkmeans.P_, nrkmeans.V_, nrkmeans.scatter_matrices_
         if len(P_i) != len(n_clusters):
             if debug:
                 print(

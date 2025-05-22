@@ -113,7 +113,7 @@ def _get_projected_data(X: np.ndarray, n_random_projections: int, random_state: 
     return projected_data
 
 
-class ProjectedDipMeans(BaseEstimator, ClusterMixin):
+class ProjectedDipMeans(ClusterMixin, BaseEstimator):
     """
     Execute the Projected DipMeans clustering procedure.
     It repeatedly creates random projection axes for each cluster and tests whether the data projected onto that projection axis is unimodal.
@@ -211,6 +211,7 @@ class ProjectedDipMeans(BaseEstimator, ClusterMixin):
             the predicted labels of the input data set
         """
         check_is_fitted(self, ["labels_", "n_features_in_"])
+        X, _, _ = check_parameters(X=X, n_features_in=self.n_features_in_, allow_size_1=True)
         predicted_labels, _ = pairwise_distances_argmin_min(X=X, Y=self.cluster_centers_,
                                                           metric='euclidean',
                                                           metric_kwargs={'squared': True})

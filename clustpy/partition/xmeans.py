@@ -349,7 +349,7 @@ def _bic_score(n_points: int, cluster_sizes: np.ndarray, n_dims: int, variance: 
     return bic_total
 
 
-class XMeans(BaseEstimator, ClusterMixin):
+class XMeans(ClusterMixin, BaseEstimator):
     """
 
     Parameters
@@ -455,6 +455,7 @@ class XMeans(BaseEstimator, ClusterMixin):
             the predicted labels of the input data set
         """
         check_is_fitted(self, ["labels_", "n_features_in_"])
+        X, _, _ = check_parameters(X=X, n_features_in=self.n_features_in_, allow_size_1=True)
         predicted_labels, _ = pairwise_distances_argmin_min(X=X, Y=self.cluster_centers_,
                                                           metric='euclidean',
                                                           metric_kwargs={'squared': True})

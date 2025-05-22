@@ -770,7 +770,7 @@ def _are_labels_equal(labels_new: np.ndarray, labels_old: np.ndarray) -> bool:
 """
 
 
-class NrKmeans(BaseEstimator, ClusterMixin):
+class NrKmeans(ClusterMixin, BaseEstimator):
     """
     The Non-Redundant Kmeans (NrKmeans) algorithm.
     The algorithm will search for the optimal cluster subspaces and assignments
@@ -935,6 +935,7 @@ class NrKmeans(BaseEstimator, ClusterMixin):
         """
         # Check if NrKmeans has run
         check_is_fitted(self, ["labels_", "n_features_in_"])
+        X, _, _ = check_parameters(X=X, n_features_in=self.n_features_in_, allow_size_1=True)
         predicted_labels = np.zeros((X.shape[0], len(self.n_clusters_final_)), dtype=np.int32)
         # Get labels for each subspace
         for sub in range(len(self.n_clusters_final_)):
@@ -964,7 +965,7 @@ class NrKmeans(BaseEstimator, ClusterMixin):
             The rotated dataset
         """
         check_is_fitted(self, ["labels_", "n_features_in_"])
-        X, _, _ = check_parameters(X, allow_size_1=True)
+        X, _, _ = check_parameters(X=X, n_features_in=self.n_features_in_, allow_size_1=True)
         rotated_data = np.matmul(X, self.V_)
         return rotated_data
 
@@ -986,7 +987,7 @@ class NrKmeans(BaseEstimator, ClusterMixin):
             The rotated and projected dataset
         """
         check_is_fitted(self, ["labels_", "n_features_in_"])
-        X, _, _ = check_parameters(X, allow_size_1=True)
+        X, _, _ = check_parameters(X=X, n_features_in=self.n_features_in_, allow_size_1=True)
         assert subspace_index < len(self.n_clusters_final_), "subspace_index must be smaller than {0}".format(
             len(self.n_clusters_final_))
         subspace_V = self.V_[:, self.P_[subspace_index]]
@@ -1061,6 +1062,7 @@ class NrKmeans(BaseEstimator, ClusterMixin):
             defines whether the axes should be scaled equally
         """
         check_is_fitted(self, ["labels_", "n_features_in_"])
+        X, _, _ = check_parameters(X=X, n_features_in=self.n_features_in_, allow_size_1=True)
         if labels is None:
             labels = self.labels_[:, subspace_index]
         assert X.shape[0] == labels.shape[0], "Number of data objects must match the number of labels."
@@ -1085,6 +1087,7 @@ class NrKmeans(BaseEstimator, ClusterMixin):
             The subspace specific costs (one entry for each subspace)
         """
         check_is_fitted(self, ["labels_", "n_features_in_"])
+        X, _, _ = check_parameters(X=X, n_features_in=self.n_features_in_, allow_size_1=True)
         total_costs, global_costs, all_subspace_costs = _mdl_costs(X, self.n_clusters_final_, self.m_, self.P_, self.V_,
                                                                    self.scatter_matrices_, self.labels_, self.outliers,
                                                                    self.max_distance, self.precision)
@@ -1128,7 +1131,7 @@ class NrKmeans(BaseEstimator, ClusterMixin):
             The final updated NrKmeans object
         """
         check_is_fitted(self, ["labels_", "n_features_in_"])
-        X, _, random_state = check_parameters(X, random_state=self.random_state, allow_size_1=True)
+        X, _, _ = check_parameters(X=X, n_features_in=self.n_features_in_, allow_size_1=True, random_state=self.random_state)
         # nothing to do if no noise space is present
         if 1 not in self.n_clusters_final_ or len(self.n_clusters_final_) == 1:
             return self

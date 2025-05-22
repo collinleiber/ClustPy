@@ -1114,7 +1114,7 @@ class _Nrkmeans_Mdl_Costs():
         return color
 
 
-class AutoNR(BaseEstimator, ClusterMixin):
+class AutoNR(ClusterMixin, BaseEstimator):
     """
     The AutoNR algorithm.
     The algorithm will search for the best number of subspaces and clusters per subspace in a non-redundant clustering setting.

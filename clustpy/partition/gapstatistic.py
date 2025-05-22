@@ -163,7 +163,7 @@ def _execute_kmeans(X: np.ndarray, n_clusters: int, use_log: bool, random_state:
     return labels, W_k
 
 
-class GapStatistic(BaseEstimator, ClusterMixin):
+class GapStatistic(ClusterMixin, BaseEstimator):
     """
     Estimate the number of cluster for KMeans using the Gar Statistic.
     Calculate the Gap Statistic by comparing within cluster dispersion of the input data set with that of ranomly sampled data.
@@ -291,6 +291,7 @@ class GapStatistic(BaseEstimator, ClusterMixin):
             the predicted labels of the input data set
         """
         check_is_fitted(self, ["labels_", "n_features_in_"])
+        X, _, _ = check_parameters(X=X, n_features_in=self.n_features_in_, allow_size_1=True)
         predicted_labels, _ = pairwise_distances_argmin_min(X=X, Y=self.cluster_centers_,
                                                           metric='euclidean',
                                                           metric_kwargs={'squared': True})

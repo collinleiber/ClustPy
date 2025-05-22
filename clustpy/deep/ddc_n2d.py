@@ -15,6 +15,7 @@ from sklearn.base import TransformerMixin, BaseEstimator, ClusterMixin
 from sklearn.mixture import GaussianMixture as GMM
 import inspect
 from collections.abc import Callable
+from clustpy.utils.checks import check_parameters
 
 
 def _manifold_based_sequential_dc(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_params: dict,
@@ -107,7 +108,7 @@ def _manifold_based_sequential_dc(X: np.ndarray, n_clusters: int, batch_size: in
     return n_clusters, labels, centers_ae, centers_manifold, neural_network, manifold
 
 
-class DDC_density_peak_clustering(BaseEstimator, ClusterMixin):
+class DDC_density_peak_clustering(ClusterMixin, BaseEstimator):
     """
     A variant of the Density Peak Algorithm as proposed in the DDC paper.
 
@@ -122,6 +123,8 @@ class DDC_density_peak_clustering(BaseEstimator, ClusterMixin):
         The final number of clusters
     labels_ : np.ndarray
         The final labels
+    n_features_in_ : int
+        the number of features used for the fitting
 
     References
     ----------
@@ -149,9 +152,11 @@ class DDC_density_peak_clustering(BaseEstimator, ClusterMixin):
         self : DDC_density_peak_clustering
             this instance of the DDC variant of the Density Peak Clsutering algorithm
         """
+        X, _, _ = check_parameters(X=X, y=y)
         n_clusters, labels = _density_peak_clustering(X, self.ratio)
         self.n_clusters_ = n_clusters
         self.labels_ = labels
+        self.n_features_in_ = X.shape[1]
         return self
 
 
@@ -311,8 +316,6 @@ class DDC(_AbstractDeepClusteringAlgo):
                  device: torch.device = None, random_state: np.random.RandomState | int = None):
         super().__init__(batch_size, neural_network, neural_network_weights, embedding_size, device, random_state)
         self.ratio = ratio
-        if ratio > 1:
-            print("[WARNING] ratio for DDC algorithm has been set to a value > 1 which can cause poor results")
         self.pretrain_optimizer_params = pretrain_optimizer_params
         self.pretrain_epochs = pretrain_epochs
         self.optimizer_class = optimizer_class
@@ -339,6 +342,8 @@ class DDC(_AbstractDeepClusteringAlgo):
         """
         X, _, random_state, pretrain_optimizer_params, _, _ = self._check_parameters(X, y=y)
         tsne_params = {"n_components": 2} if self.tsne_params is None else self.tsne_params
+        if self.ratio > 1:
+            print("[WARNING] ratio for DDC algorithm has been set to a value > 1 which can cause poor results")
         n_clusters, labels, centers_ae, _, neural_network, tsne = _manifold_based_sequential_dc(X, None, self.batch_size,
                                                                                     pretrain_optimizer_params,
                                                                                     self.pretrain_epochs,

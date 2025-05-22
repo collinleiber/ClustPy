@@ -116,7 +116,7 @@ def _anderson_darling_statistic_to_prob(statistic: float, n_points: int) -> floa
     return p_value
 
 
-class GMeans(BaseEstimator, ClusterMixin):
+class GMeans(ClusterMixin, BaseEstimator):
     """
     Execute the GMeans clustering procedure.
     Determines the number of clusters by repeatedly trying to split a cluster into two clusters.
@@ -208,6 +208,7 @@ class GMeans(BaseEstimator, ClusterMixin):
             the predicted labels of the input data set
         """
         check_is_fitted(self, ["labels_", "n_features_in_"])
+        X, _, _ = check_parameters(X=X, n_features_in=self.n_features_in_, allow_size_1=True)
         predicted_labels, _ = pairwise_distances_argmin_min(X=X, Y=self.cluster_centers_,
                                                           metric='euclidean',
                                                           metric_kwargs={'squared': True})

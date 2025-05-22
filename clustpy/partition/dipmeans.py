@@ -91,7 +91,7 @@ def _dipmeans(X: np.ndarray, significance: float, split_viewers_threshold: float
     return n_clusters, labels, centers
 
 
-class DipMeans(BaseEstimator, ClusterMixin):
+class DipMeans(ClusterMixin, BaseEstimator):
     """
     Execute the DipMeans clustering procedure.
     In contrast to other algorithms (e.g. KMeans) DipMeans is able to identify the number of clusters by itself.
@@ -190,6 +190,7 @@ class DipMeans(BaseEstimator, ClusterMixin):
             the predicted labels of the input data set
         """
         check_is_fitted(self, ["labels_", "n_features_in_"])
+        X, _, _ = check_parameters(X=X, n_features_in=self.n_features_in_, allow_size_1=True)
         predicted_labels, _ = pairwise_distances_argmin_min(X=X, Y=self.cluster_centers_,
                                                           metric='euclidean',
                                                           metric_kwargs={'squared': True})

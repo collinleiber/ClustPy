@@ -14,6 +14,7 @@ from clustpy.hierarchical._cluster_tree import BinaryClusterTree, _ClusterTreeNo
 import tqdm
 import copy
 from collections.abc import Callable
+from sklearn.utils.validation import check_is_fitted
 
 
 class _DeepECT_ClusterTreeNode(_ClusterTreeNode):
@@ -671,6 +672,7 @@ class DeepECT(_AbstractDeepClusteringAlgo):
         predicted_labels : np.ndarray
             The predicted labels
         """
+        check_is_fitted(self, ["tree_", "labels_", "n_features_in_"])
         leaf_nodes, _ = self.tree_.get_leaf_and_split_nodes()
         leaf_centers = np.array([leaf.center.data.detach().cpu().numpy() for leaf in leaf_nodes])
         leaf_labels = np.array([leaf.labels[0] for leaf in leaf_nodes])
@@ -694,7 +696,7 @@ class DeepECT(_AbstractDeepClusteringAlgo):
         labels_pruned : np.ndarray
             The new cluster labels
         """
-        assert self.labels_ is not None, "The DeepECT algorithm has not run yet. Use the fit() function first."
+        check_is_fitted(self, ["tree_", "labels_", "n_features_in_"])
         tree_copy = copy.deepcopy(self.tree_)
         labels_pruned = tree_copy.prune_to_n_leaf_nodes(n_leaf_nodes_to_keep, self.labels_)
         return labels_pruned

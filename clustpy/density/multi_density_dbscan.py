@@ -175,7 +175,7 @@ def _add_neighbors_to_neighbor_list(densities: np.ndarray, labels: np.ndarray, c
     return current_neighbors
 
 
-class MultiDensityDBSCAN(BaseEstimator, ClusterMixin):
+class MultiDensityDBSCAN(ClusterMixin, BaseEstimator):
     """
     The Multi Density DBSCAN algorithm.
     First, the densities of all data points will be calculated.

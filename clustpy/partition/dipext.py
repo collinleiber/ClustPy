@@ -661,7 +661,7 @@ class DipExt(TransformerMixin, BaseEstimator):
             The transformed feature space (Number of samples x number of components)
         """
         check_is_fitted(self, ["projection_axes_", "n_features_in_"])
-        X, _, _ = check_parameters(X, allow_size_1=True)
+        X, _, _ = check_parameters(X=X, n_features_in=self.n_features_in_, allow_size_1=True)
         subspace = _transform_using_projections(X, self.projection_axes_, self.do_dip_scaling, self.dip_values_,
                                                 self.argsorted_dips_, self.max_min_values_)
         return subspace
@@ -701,7 +701,7 @@ class DipExt(TransformerMixin, BaseEstimator):
         return subspace
 
 
-class DipInit(DipExt, BaseEstimator, ClusterMixin):
+class DipInit(DipExt, ClusterMixin, BaseEstimator):
     """
     Execute the DipInit clustering procedure.
     Initially, DipExt is executed to identify relevant features.

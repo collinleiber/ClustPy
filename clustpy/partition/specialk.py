@@ -218,7 +218,7 @@ def _get_symmetrically_normalized_adjacency_matrix(X: np.ndarray, n_neighbors: i
     return similarity_matrix
 
 
-class SpecialK(BaseEstimator, ClusterMixin):
+class SpecialK(ClusterMixin, BaseEstimator):
     """
     Execute the SpecialK clustering procedure.
     SpecialK is able to autonomously identify a suitable number of clusters for spectral clustering procedures.

@@ -214,7 +214,7 @@ def _initial_gmm_clusters(X: np.ndarray, n_clusters_init: int, gmm_repetitions: 
     return n_clusters, initial_gmm
 
 
-class PGMeans(BaseEstimator, ClusterMixin):
+class PGMeans(ClusterMixin, BaseEstimator):
     """
     Execute the PGMeans clustering procedure.
     Determines the number of clusters by executing the EM algorithm multiple times to create different Gaussian Mixtures (GMMs).
@@ -330,5 +330,6 @@ class PGMeans(BaseEstimator, ClusterMixin):
             the predicted labels of the input data set
         """
         check_is_fitted(self, ["labels_", "n_features_in_"])
+        X, _, _ = check_parameters(X=X, n_features_in=self.n_features_in_, allow_size_1=True)
         predicted_labels = self.gmm_.predict(X).astype(np.int32)
         return predicted_labels

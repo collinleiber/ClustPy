@@ -99,7 +99,7 @@ class _AbstractDeepClusteringAlgo(ClusterMixin, TransformerMixin, BaseEstimator)
             The embedded data set
         """
         check_is_fitted(self, ["labels_", "neural_network_trained_", "n_features_in_"])
-        X, _, _ = check_parameters(X, allow_size_1=True)
+        X, _, _ = check_parameters(X, allow_size_1=True, n_features_in=self.n_features_in_)
         if X.shape[1] != self.n_features_in_:
             raise ValueError(
             f"X has {X.shape[1]} features, but {self.__class__.__name__} "

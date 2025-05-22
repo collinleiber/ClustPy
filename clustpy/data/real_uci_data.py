@@ -1338,6 +1338,8 @@ def load_wholesale_customers(return_X_y: bool = False, downloads_path: str = Non
     wholesale = np.genfromtxt(directory + "Wholesale customers data.csv", delimiter=",", skip_header=True)
     labels = wholesale[:,:2] - 1
     data = wholesale[:,2:]
+    # Convert labels to int32 format
+    labels = labels.astype(np.int32)
     # Return values
     if return_X_y:
         return data, labels

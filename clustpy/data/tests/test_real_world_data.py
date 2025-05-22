@@ -50,7 +50,7 @@ def test_load_newsgroups():
     # Train data set
     _helper_test_data_loader(load_newsgroups, 11314, 2000, 20, dataloader_params={"subset": "train"})
     # Test data set and different number of features
-    _helper_test_data_loader(load_newsgroups, 7532, 500, 20, dataloader_params={"subset": "test", "n_features": 500})
+    _helper_test_data_loader(load_newsgroups, 7532, 500, 20, dataloader_params={"subset": "test", "max_features": 500})
 
 
 @pytest.mark.data
