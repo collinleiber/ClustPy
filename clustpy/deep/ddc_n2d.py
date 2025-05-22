@@ -15,6 +15,7 @@ from sklearn.base import TransformerMixin, BaseEstimator, ClusterMixin
 from sklearn.mixture import GaussianMixture as GMM
 import inspect
 from collections.abc import Callable
+from clustpy.utils.checks import check_parameters
 
 
 def _manifold_based_sequential_dc(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_params: dict,
@@ -74,7 +75,8 @@ def _manifold_based_sequential_dc(X: np.ndarray, n_clusters: int, batch_size: in
     tuple : (int, np.ndarray, np.ndarray, torch.nn.Module, TransformerMixin)
         The number of clusters,
         The cluster labels,
-        The cluster centers,
+        The cluster centers in the embedding of the AE,
+        The cluster centers in the embedding of the manifold algorithm,
         The final neural network,
         The Manifold object
     """
@@ -93,17 +95,20 @@ def _manifold_based_sequential_dc(X: np.ndarray, n_clusters: int, batch_size: in
     manifold_class_parameters = inspect.getfullargspec(manifold_class).args + inspect.getfullargspec(
         manifold_class).kwonlyargs
     if "random_state" not in manifold_params.keys() and "random_state" in manifold_class_parameters:
+        manifold_params = manifold_params.copy()
         manifold_params["random_state"] = random_state
     # Execute Manifold
     manifold = manifold_class(**manifold_params)
     X_manifold = manifold.fit_transform(X_embed)
     # Execute Clustering Algorithm
-    n_clusters, labels, centers, clustering_algo = run_initial_clustering(X_manifold, n_clusters, clustering_class,
+    n_clusters, labels, centers_manifold, _ = run_initial_clustering(X_manifold, n_clusters, clustering_class,
                                                                           clustering_params, random_state)
-    return n_clusters, labels, centers, neural_network, manifold
+    # Calculate centers in the embedding of the AE
+    centers_ae = np.array([np.mean(X_embed[labels == c], axis=0) for c in range(n_clusters)])
+    return n_clusters, labels, centers_ae, centers_manifold, neural_network, manifold
 
 
-class DDC_density_peak_clustering(BaseEstimator, ClusterMixin):
+class DDC_density_peak_clustering(ClusterMixin, BaseEstimator):
     """
     A variant of the Density Peak Algorithm as proposed in the DDC paper.
 
@@ -118,6 +123,8 @@ class DDC_density_peak_clustering(BaseEstimator, ClusterMixin):
         The final number of clusters
     labels_ : np.ndarray
         The final labels
+    n_features_in_ : int
+        the number of features used for the fitting
 
     References
     ----------
@@ -145,9 +152,11 @@ class DDC_density_peak_clustering(BaseEstimator, ClusterMixin):
         self : DDC_density_peak_clustering
             this instance of the DDC variant of the Density Peak Clsutering algorithm
         """
+        X, _, _ = check_parameters(X=X, y=y)
         n_clusters, labels = _density_peak_clustering(X, self.ratio)
         self.n_clusters_ = n_clusters
         self.labels_ = labels
+        self.n_features_in_ = X.shape[1]
         return self
 
 
@@ -242,7 +251,7 @@ class DDC(_AbstractDeepClusteringAlgo):
     batch_size : int
         size of the data batches (default: 256)
     pretrain_optimizer_params : dict
-        parameters of the optimizer for the pretraining of the neural network, includes the learning rate (default: {"lr": 1e-3})
+        parameters of the optimizer for the pretraining of the neural network, includes the learning rate. If None, it will be set to {"lr": 1e-3} (default: None)
     pretrain_epochs : int
         number of epochs for the pretraining of the neural network (default: 100)
     optimizer_class : torch.optim.Optimizer
@@ -263,7 +272,7 @@ class DDC(_AbstractDeepClusteringAlgo):
         If None, the default dataloaders will be used (default: None)
     tsne_params : dict
         Parameters for the t-SNE execution. For example, perplexity can be changed by setting tsne_params to {"n_components": 2, "perplexity": 25}.
-        Check out sklearn.manifold.TSNE for more information (default: {"n_components": 2})
+        Check out sklearn.manifold.TSNE for more information. If None, it will be set to {"n_components": 2} (default: None)
     device : torch.device
         The device on which to perform the computations.
         If device is None then it will be automatically chosen: if a gpu is available the gpu with the highest amount of free memory will be chosen (default: None)
@@ -282,6 +291,8 @@ class DDC(_AbstractDeepClusteringAlgo):
         The t-SNE object
     n_features_in_ : int
         the number of features used for the fitting
+    cluster_centers_ : np.ndarray
+        The final cluster centers defined as the mean of assigned samples within the AE embedding
 
     Examples
     ----------
@@ -305,8 +316,6 @@ class DDC(_AbstractDeepClusteringAlgo):
                  device: torch.device = None, random_state: np.random.RandomState | int = None):
         super().__init__(batch_size, neural_network, neural_network_weights, embedding_size, device, random_state)
         self.ratio = ratio
-        if ratio > 1:
-            print("[WARNING] ratio for DDC algorithm has been set to a value > 1 which can cause poor results")
         self.pretrain_optimizer_params = pretrain_optimizer_params
         self.pretrain_epochs = pretrain_epochs
         self.optimizer_class = optimizer_class
@@ -333,7 +342,9 @@ class DDC(_AbstractDeepClusteringAlgo):
         """
         X, _, random_state, pretrain_optimizer_params, _, _ = self._check_parameters(X, y=y)
         tsne_params = {"n_components": 2} if self.tsne_params is None else self.tsne_params
-        n_clusters, labels, _, neural_network, tsne = _manifold_based_sequential_dc(X, None, self.batch_size,
+        if self.ratio > 1:
+            print("[WARNING] ratio for DDC algorithm has been set to a value > 1 which can cause poor results")
+        n_clusters, labels, centers_ae, _, neural_network, tsne = _manifold_based_sequential_dc(X, None, self.batch_size,
                                                                                     pretrain_optimizer_params,
                                                                                     self.pretrain_epochs,
                                                                                     self.optimizer_class,
@@ -348,10 +359,31 @@ class DDC(_AbstractDeepClusteringAlgo):
                                                                                     random_state)
         self.labels_ = labels
         self.n_clusters_ = n_clusters
+        self.cluster_centers_ = centers_ae
         self.neural_network_trained_ = neural_network
         self.tsne_ = tsne
-        self.n_features_in_ = X.shape[1]
+        self.set_n_featrues_in(X.shape[1])
         return self
+    
+    def predict(self, X: np.ndarray,) -> np.ndarray:
+        """
+        Predicts the labels of the input data.
+        Note that this is just a very imprecise estimation as the manifold does not learn a function f() to map the data into the final embedding.
+        Therefore, the prediction is calculated by checking the distance to the clostest mean of samples in a cluster within the embedding of the AE.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            input data
+
+        Returns
+        -------
+        predicted_labels : np.ndarray
+            The predicted labels
+        """
+        print("WARNING: predict does not use the embedding of the manifold and is, therefore, just a very rough estimate")
+        predicted_labels = super().predict(X)
+        return predicted_labels
 
 
 class N2D(_AbstractDeepClusteringAlgo):
@@ -363,11 +395,11 @@ class N2D(_AbstractDeepClusteringAlgo):
     Parameters
     ----------
     n_clusters : int
-        number of clusters
+        number of clusters (default: 8)
     batch_size : int
         size of the data batches (default: 256)
     pretrain_optimizer_params : dict
-        parameters of the optimizer for the pretraining of the neural network, includes the learning rate (default: {"lr": 1e-3})
+        parameters of the optimizer for the pretraining of the neural network, includes the learning rate. If None, it will be set to {"lr": 1e-3} (default: None)
     pretrain_epochs : int
         number of epochs for the pretraining of the neural network (default: 100)
     optimizer_class : torch.optim.Optimizer
@@ -390,7 +422,7 @@ class N2D(_AbstractDeepClusteringAlgo):
         the manifold technique class (default: TSNE)
     manifold_params : dict
         Parameters for the manifold execution. For example, perplexity can be changed for TSNE by setting manifold_params to {"n_components": 2, "perplexity": 25}.
-        Check out e.g. sklearn.manifold.TSNE for more information (default: {"n_components": 2})
+        Check out e.g. sklearn.manifold.TSNE for more information. If None, it will be set to {"n_components": n_clusters} (default: None)
     device : torch.device
         The device on which to perform the computations.
         If device is None then it will be automatically chosen: if a gpu is available the gpu with the highest amount of free memory will be chosen (default: None)
@@ -401,14 +433,16 @@ class N2D(_AbstractDeepClusteringAlgo):
     ----------
     labels_ : np.ndarray
         The final labels
-    cluster_centers_ : np.ndarray
-        The final cluster centers
+    cluster_centers_manifold_ : np.ndarray
+        The final cluster centers within the embedding of the manifold
     neural_network_trained_ : torch.nn.Module
         The final neural network
     manifold_ : TransformerMixin
         The manifold object
     n_features_in_ : int
         the number of features used for the fitting
+    cluster_centers_ : np.ndarray
+        The final cluster centers defined as the mean of assigned samples within the AE embedding
 
     References
     ----------
@@ -416,7 +450,7 @@ class N2D(_AbstractDeepClusteringAlgo):
     2020 25th international conference on pattern recognition (ICPR). IEEE, 2021.
     """
 
-    def __init__(self, n_clusters: int, batch_size: int = 256, pretrain_optimizer_params: dict = None,
+    def __init__(self, n_clusters: int = 8, batch_size: int = 256, pretrain_optimizer_params: dict = None,
                  pretrain_epochs: int = 100, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error,
                  neural_network: torch.nn.Module | tuple = None, neural_network_weights: str = None,
@@ -451,8 +485,8 @@ class N2D(_AbstractDeepClusteringAlgo):
             this instance of the N2D algorithm
         """
         X, _, random_state, pretrain_optimizer_params, _, _ = self._check_parameters(X, y=y)
-        manifold_params = {"n_components": 2} if self.manifold_params is None else self.manifold_params
-        _, labels, centers, neural_network, manifold = _manifold_based_sequential_dc(X, self.n_clusters,
+        manifold_params = {"n_components": self.n_clusters} if self.manifold_params is None else self.manifold_params
+        _, labels, centers_ae, centers_manifold, neural_network, manifold = _manifold_based_sequential_dc(X, self.n_clusters,
                                                                                               self.batch_size,
                                                                                               pretrain_optimizer_params,
                                                                                               self.pretrain_epochs,
@@ -467,8 +501,29 @@ class N2D(_AbstractDeepClusteringAlgo):
                                                                                               GMM, {}, self.device,
                                                                                               random_state)
         self.labels_ = labels.astype(np.int32)
-        self.cluster_centers_ = centers
+        self.cluster_centers_manifold_ = centers_manifold
+        self.cluster_centers_ = centers_ae
         self.neural_network_trained_ = neural_network
         self.manifold_ = manifold
-        self.n_features_in_ = X.shape[1]
+        self.set_n_featrues_in(X.shape[1])
         return self
+    
+    def predict(self, X: np.ndarray,) -> np.ndarray:
+        """
+        Predicts the labels of the input data.
+        Note that this is just a very imprecise estimation as the manifold does not learn a function f() to map the data into the final embedding.
+        Therefore, the prediction is calculated by checking the distance to the clostest mean of samples in a cluster within the embedding of the AE.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            input data
+
+        Returns
+        -------
+        predicted_labels : np.ndarray
+            The predicted labels
+        """
+        print("WARNING: predict does not use the embedding of the manifold and is, therefore, just a very rough estimate")
+        predicted_labels = super().predict(X)
+        return predicted_labels

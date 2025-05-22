@@ -77,13 +77,44 @@ def _get_n_clusters_from_algo(algo_obj: ClusterMixin) -> int:
     return n_clusters
 
 
+def _get_fixed_seed_for_each_run(n_repetitions: int, 
+                                 random_state: np.random.RandomState | int | list) -> list:
+    """
+    Get the same seed for each run of an algorithm and data set.
+
+    Parameters
+    ----------
+    n_repetitions : int
+        Number of times that the clustering procedure should be executed on the same data set
+    random_state : np.random.RandomState | int | list
+        use a fixed random state to get a repeatable solution. Can also be of type int. 
+        Furthermore, if can be a list containing an int for each repetition
+
+    Returns
+    -------
+    seeds : list
+        List of seeds (integers), one for earch repetition
+    """
+    if random_state is None or isinstance(random_state, (int, np.integer)) or isinstance(random_state, np.random.RandomState):
+        random_state = check_random_state(random_state)
+        seeds = random_state.choice(10000, n_repetitions, replace=False)
+    elif type(random_state) is list or type(random_state) is tuple or type(random_state) is np.ndarray:
+        seeds = random_state
+    else:
+        raise Exception("random_state must be of type int, np.random.RandomState or list")
+    assert len(seeds) == n_repetitions, "If random_state is a list, its length must be equal to the number of repetitions"
+    assert all([isinstance(entry, (int, np.integer)) for entry in seeds]), "If random_state is a list, all entries must be integers"
+    assert np.unique(seeds).shape[0] == n_repetitions, "Each seed must be unique, however duplicates were found in the seeds/random_state"
+    return seeds
+
+
 def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metrics: list = None,
                      labels_true: np.ndarray = None, n_repetitions: int = 10,
                      X_test: np.ndarray = None, labels_true_test: np.ndarray = None,
                      aggregation_functions: tuple = (np.mean, np.std), add_runtime: bool = True,
                      add_n_clusters: bool = False, save_path: str = None, save_labels_path: str = None,
                      ignore_algorithms: tuple = (), dataset_name: str = None,
-                     random_state: np.random.RandomState | int = None, quiet: bool = False) -> pd.DataFrame:
+                     random_state: np.random.RandomState | int | list = None, quiet: bool = False) -> pd.DataFrame:
     """
     Evaluate the clustering result of different clustering algorithms (as specified by evaluation_algorithms) on a given data set using different metrics (as specified by evaluation_metrics).
     Each algorithm will be executed n_repetitions times and all specified metrics will be used to evaluate the clustering result.
@@ -119,8 +150,9 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
         List of algorithm names (as specified in the EvaluationAlgorithm object) that should be ignored for this specific data set (default: [])
     dataset_name : str
         The name of the dataset; only relevant if iteration_specific_params are defined for an EvaluationAlgorithm (default: None)
-    random_state : np.random.RandomState | int
-        use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
+    random_state : np.random.RandomState | int | list
+        use a fixed random state to get a repeatable solution. Can also be of type int. 
+        Furthermore, if can be a list containing an int for each repetition (default: None)
     quiet : bool
         Do not print any output
 
@@ -157,7 +189,7 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
     assert evaluation_metrics is not None or add_runtime or add_n_clusters, \
         "Either evaluation metrics must be defined or add_runtime/add_n_clusters must be True"
     assert type(aggregation_functions) is list or type(
-        aggregation_functions) is tuple, "aggregation_functions must be list or tuple"
+        aggregation_functions) is tuple, "aggregation_functions must be list or tuple. Yout input is of type {0}".format(type(aggregation_functions))
     if type(evaluation_algorithms) is not list:
         evaluation_algorithms = [evaluation_algorithms]
     if type(evaluation_metrics) is not list and evaluation_metrics is not None:
@@ -166,9 +198,11 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
         save_labels_path = save_labels_path + ".csv"
     assert save_labels_path is None or len(
         save_labels_path.split(".")) == 2, "save_labels_path must only contain a single dot. E.g., NAME.csv"
-    # Use same seed for each algorithm
-    random_state = check_random_state(random_state)
-    seeds = random_state.choice(10000, n_repetitions, replace=False)
+    if save_path is not None and "." not in save_path:
+        save_path = save_path + ".csv"
+    assert save_path is None or len(
+        save_path.split(".")) == 2, "save_path must only contain a single dot. E.g., NAME.csv"
+    seeds = _get_fixed_seed_for_each_run(n_repetitions, random_state)
     algo_names = [a.name for a in evaluation_algorithms]
     assert max(
         np.unique(algo_names, return_counts=True)[1]) == 1, "Some names of your algorithms do not seem to be unique!"
@@ -238,6 +272,10 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
                         elif iteration_params_key[0] == dataset_name:
                             tmp_params[iteration_params_key[1]] = \
                                 eval_algo.iteration_specific_params[iteration_params_key][rep]
+                # Add random state to algorithm
+                algo_input_params = inspect.getfullargspec(eval_algo.algorithm).args + inspect.getfullargspec(eval_algo.algorithm).kwonlyargs
+                if "random_state" in algo_input_params and "random_state" not in tmp_params.keys():
+                    tmp_params["random_state"] = seeds[rep]
                 # Execute algorithm
                 start_time = time.time()
                 algo_obj = eval_algo.algorithm(**tmp_params)
@@ -251,13 +289,7 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
                 # Optional: Obtain labels from the predict method
                 if X_test is not None:
                     try:
-                        predict_params = inspect.getfullargspec(algo_obj.predict).args
-                        # Normally, there should not be X_train and X_test as input
-                        if "X_train" in predict_params and "X_test" in predict_params:
-                            labels_predicted_test = algo_obj.predict(X_train=X_processed,
-                                                                     X_test=X_test_processed)  # TODO Remove special case for DipEncoder
-                        else:
-                            labels_predicted_test = algo_obj.predict(X_test_processed)
+                        labels_predicted_test = algo_obj.predict(X_test_processed)
                     except Exception as e:
                         if not quiet:
                             print("Problem when running the predict method of {0} in iteration {1}".format(eval_algo.name,
@@ -294,17 +326,23 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
                         try:
                             assert type(eval_metric) is EvaluationMetric, "All metrics must be of type EvaluationMetric"
                             # Check if metric uses ground truth (e.g. NMI, ACC, ...)
-                            if eval_metric.use_gt:
-                                assert labels_true is not None, "Ground truth can not be None if it is used for the chosen metric"
+                            if eval_metric.metric_type == "external":
+                                assert labels_true is not None, "Ground truth can not be None if an external metric is used"
                                 result = eval_metric.method(labels_true, algo_obj.labels_, **eval_metric.params)
                                 if X_test is not None and labels_predicted_test is not None:
                                     result_test = eval_metric.method(labels_true_test, labels_predicted_test,
                                                                      **eval_metric.params)
-                            else:
+                            elif eval_metric.metric_type == "internal":
                                 # Metric does not use ground truth (e.g. Silhouette, ...)
                                 result = eval_metric.method(X, algo_obj.labels_, **eval_metric.params)
                                 if X_test is not None and labels_predicted_test is not None:
                                     result_test = eval_metric.method(X_test, labels_predicted_test,
+                                                                     **eval_metric.params)
+                            else:
+                                # A custom metric is used
+                                result = eval_metric.method(X, labels_true, algo_obj.labels_, algo_obj, **eval_metric.params)
+                                if X_test is not None and labels_predicted_test is not None:
+                                    result_test = eval_metric.method(X_test, labels_true_test, labels_predicted_test, algo_obj,
                                                                      **eval_metric.params)
                             df.at[rep, (eval_algo.name, eval_metric.name)] = result
                             if not quiet:
@@ -354,7 +392,7 @@ def evaluate_multiple_datasets(evaluation_datasets: list, evaluation_algorithms:
                                n_repetitions: int = 10, aggregation_functions: tuple = (np.mean, np.std),
                                add_runtime: bool = True, add_n_clusters: bool = False, save_path: str = None,
                                save_intermediate_results: bool = False, save_labels_path: str = None,
-                               random_state: np.random.RandomState | int = None, quiet: bool = False) -> pd.DataFrame:
+                               random_state: np.random.RandomState | int | list = None, quiet: bool = False) -> pd.DataFrame:
     """
     Evaluate the clustering result of different clustering algorithms (as specified by evaluation_algorithms) on a set of data sets (as specified by evaluation_datasets) using different metrics (as specified by evaluation_metrics).
     Each algorithm will be executed n_repetitions times and all specified metrics will be used to evaluate the clustering result.
@@ -379,11 +417,15 @@ def evaluate_multiple_datasets(evaluation_datasets: list, evaluation_algorithms:
     save_path : str
         The path where the final DataFrame should be saved as csv. If None, the DataFrame will not be saved (default: None)
     save_intermediate_results : bool
-        Defines whether the result of each data set should be separately saved. Useful if the evaluation takes a lot of time (default: False)
+        Defines whether the result of each data set should be separately saved. 
+        Useful if the evaluation takes a lot of time.
+        The files will be saved as [save_path]_[DATASET_NAME]. 
+        This implies that save_path has to be defined if save_intermediate_results is set to True (default: False)
     save_labels_path : str
         The path where the clustering labels should be saved as csv. If None, the labels will not be saved (default: None)
-    random_state : np.random.RandomState | int
-        use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
+    random_state : np.random.RandomState | int | list
+        use a fixed random state to get a repeatable solution. Can also be of type int.
+        Furthermore, if can be a list containing an int for each repetition (default: None)
     quiet : bool
         Do not print any output
 
@@ -434,9 +476,14 @@ def evaluate_multiple_datasets(evaluation_datasets: list, evaluation_algorithms:
         save_labels_path = save_labels_path + ".csv"
     assert save_labels_path is None or len(
         save_labels_path.split(".")) == 2, "save_labels_path must only contain a single dot. E.g., NAME.csv"
+    if save_path is not None and "." not in save_path:
+        save_path = save_path + ".csv"
+    assert save_path is None or len(
+        save_path.split(".")) == 2, "save_path must only contain a single dot. E.g., NAME.csv"
     data_names = [d.name for d in evaluation_datasets]
     assert max(
         np.unique(data_names, return_counts=True)[1]) == 1, "Some names of your datasets do not seem to be unique!"
+    seeds = _get_fixed_seed_for_each_run(n_repetitions, random_state)
     df_list = []
     for eval_data in evaluation_datasets:
         try:
@@ -466,7 +513,7 @@ def evaluate_multiple_datasets(evaluation_datasets: list, evaluation_algorithms:
                                   add_runtime=add_runtime, add_n_clusters=add_n_clusters, save_path=inner_save_path,
                                   save_labels_path=inner_save_labels_path,
                                   ignore_algorithms=eval_data.ignore_algorithms, dataset_name=eval_data.name,
-                                  random_state=random_state, quiet=quiet)
+                                  random_state=seeds, quiet=quiet)
             df_list.append(df)
         except Exception as e:
             if not quiet:
@@ -555,24 +602,29 @@ def _get_data_and_labels_from_evaluation_dataset(data_input: np.ndarray, data_lo
     return X, labels_true, X_test, labels_true_test
 
 
-def evaluation_df_to_latex_table(df: pd.DataFrame, output_path: str, use_std: bool = True, best_in_bold: bool = True,
-                                 second_best_underlined: bool = True, color_by_value: str = None,
-                                 higher_is_better: list = None, in_percent: int = True,
-                                 decimal_places: int = 1) -> None:
+def evaluation_df_to_latex_table(df: pd.DataFrame, relevant_row : str | int = "mean", output_path: str = None, pm_row: str | int | None = "std", 
+                                 bracket_row: str | int | None = None, best_in_bold: bool = True, second_best_underlined: bool = True, 
+                                 color_by_value: str = None, higher_is_better: list = None, multiplier: int | float | list | None = 100,
+                                 decimal_places: int = 1, color_min_max: tuple = (5, 70)) -> str:
     """
     Convert the resulting dataframe of an evaluation into a latex table.
     Note that the latex package booktabs is required, so usepackage{booktabs} must be included in the latex file.
-    This method will only consider the mean values. Therefore, note that "mean" must be included in the aggregations!
-    If "std" is also contained in the dataframe (and use_std is True) this value will also be added by using plusminus.
+    This method will only consider the values contained in the row with the name relevant_row.
+    The default relevant_row is "mean", which implies that the mean was used as an aggregation function when creating the dataframe.
+    Other values can be added to the latex table either after plus-minus by specifying pm_row or in brackets by specifying bracket_row.
 
     Parameters
     ----------
     df : pd.DataFrame
         The pandas dataframe. Can also be a string that contains the path to the saved dataframe
-    output_path : std
-        The path were the resulting latex table text file will be stored
-    use_std : bool
-        Defines if the standard deviation (std) should also be added to the latex table (default: True)
+    relevant_row : str | int
+        The name of the row in the df that is used to create the latex table (default: "mean")
+    output_path : str
+        The path were the resulting latex table text file will be stored (default: None)
+    pm_row : str | int
+        The name of the row in the df that should be added to the latex table after the value from relevant_row separated by plus-minus (default: "std")
+    bracket_row : str | int
+        The name of the row in the df that should be added to the latex table in brackets after the value from relevant_row and, if stated, the value from pm_row (default: None)
     best_in_bold : bool
         Print best value for each combination of dataset and metric in bold.
         Note, that the latex package bm is used, so usepackage{bm} must be included in the latex file (default: True)
@@ -585,11 +637,21 @@ def evaluation_df_to_latex_table(df: pd.DataFrame, output_path: str, use_std: bo
     higher_is_better : list
         List with booleans. Each value indicates if a high value for a certain metric is better than a low value.
         The length of the list must be equal to the number of different metrics.
-        If None, it is always assumed that a higher value is better, except for the runtime (default: None)
-    in_percent : bool
-        If true, all values, except n_clusters and runtime, will be converted to percentages -> all values will be multiplied by 100 (default: True)
+        Entries can also be None if neither higher nor lower is better.
+        If None, it is always assumed that a higher value is better, except for the runtime and for n_clusters (default: None)
+    multiplier : int | float | list | None
+        If defined, all values, except n_clusters and runtime, will be multiplied by this value, e.g. to receive values in percent they will be multiplied by 100.
+        Can also be a list containing a different value for each metric. 
+        If it is None, the original values will be used (default: 100)
     decimal_places : int
         Number of decimal places that should be used in the latex table (default: 1)
+    color_min_max : tuple
+        Range of the color saturation used if color_by_value is defined. First entry is min (>= 0) and second entry is max (<= 100) (default: (5, 70))
+
+    Returns
+    -------
+    output : str
+        The created latex string
     """
     # Load dataframe
     assert type(df) == pd.DataFrame or type(df) == str, "Type of df must be pandas DataFrame or string (path to file)"
@@ -602,92 +664,133 @@ def evaluation_df_to_latex_table(df: pd.DataFrame, output_path: str, use_std: bo
     # Get main information from dataframe
     if multiple_datasets:
         datasets = list(dict.fromkeys([s[0] for s in df.index]))
-        std_contained = "std" in [s[1] for s in df.index]
+        pm_row_contained = pm_row in [s[1] for s in df.index]
+        bracket_row_contained = bracket_row in [s[1] for s in df.index]
     else:
         datasets = [None]
-        std_contained = "std" in [s for s in df.index]
+        pm_row_contained = pm_row in [s for s in df.index]
+        bracket_row_contained = bracket_row in [s for s in df.index]
     algorithms = list(dict.fromkeys([s[0] for s in df.keys()]))
     metrics = list(dict.fromkeys([s[1] for s in df.keys()]))
+    if multiplier is None or type(multiplier) is int or type(multiplier) is float:
+        multiplier = [multiplier] * len(metrics)
+    assert len(multiplier) == len(
+        metrics), "multiplier must be float/int or the length of multiplier must match the number of metrics. multiplier = {0} (length {1}), metrics = {2} (length {3})".format(
+        multiplier, len(multiplier), metrics, len(metrics))
     assert higher_is_better is None or len(higher_is_better) == len(
         metrics), "Length of higher_is_better and the number of metrics does not match. higher_is_better = {0} (length {1}), metrics = {2} (length {3})".format(
         higher_is_better, len(higher_is_better), metrics, len(metrics))
-    # Write output
-    with open(output_path, "w") as f:
-        # Write standard table
-        f.write(
-            "\\begin{table}\n\\centering\n\\caption{TODO}\n\\resizebox{1\\textwidth}{!}{\n\\begin{tabular}{l|")
-        if multiple_datasets:
-            f.write("l|" + "c" * len(algorithms) + "}\n\\toprule\n\\textbf{Dataset} & ")
-        else:
-            f.write("c" * len(algorithms) + "}\n\\toprule\n")
-        f.write("\\textbf{Metric} & " + " & ".join([a.replace("_", "\\_") for a in algorithms]) + "\\\\\n\\midrule\n")
-        # Write values into table
-        for j, d in enumerate(datasets):
-            for i, m in enumerate(metrics):
-                # Check if a higher value is better for this metric
-                metric_is_higher_better = (m != "runtime") if higher_is_better is None else higher_is_better[i]
-                # Escape underscore that could be contained in metric name
-                m_write = m.replace("_", "\\_")
-                # Write name of dataset and metric
-                if multiple_datasets:
-                    if i == 0:
-                        # Escape underscore that could be contained in dataset name
-                        to_write = d.replace("_", "\\_") + " & " + m_write
-                    else:
-                        to_write = "& " + m_write
+    # Check color range
+    assert (type(color_min_max) is tuple or type(color_min_max) is list) and len(color_min_max) == 2 and color_min_max[0] <= color_min_max[
+        1] and color_min_max[0] >= 0 and color_min_max[1] <= 100, "color_min_max must be a tuple containing two values within [0, 100], where the first value is smaller than the second"
+    c_min, c_max = color_min_max
+    c_max_adj = c_max - c_min
+    # Create string
+    output = ""
+    # Create string for standard table
+    output += "\\begin{table}\n\\centering\n\\caption{TODO}\n\\resizebox{1\\textwidth}{!}{\n\\begin{tabular}{l|"
+    if multiple_datasets:
+        output += "l|" + "c" * len(algorithms) + "}\n\\toprule\n\\textbf{Dataset} & "
+    else:
+        output += "c" * len(algorithms) + "}\n\\toprule\n"
+    output += "\\textbf{Metric} & " + " & ".join([a.replace("_", "\\_") for a in algorithms]) + "\\\\\n\\midrule\n"
+    # Write values into table
+    for j, d in enumerate(datasets):
+        for i, m in enumerate(metrics):
+            # Check if a higher value is better for this metric
+            if higher_is_better is None:
+                if m == "n_clusters":
+                    metric_is_higher_better = None
                 else:
-                    to_write = m_write
-                # Get all values from the experiments (are stored separately to calculated min values)
-                all_values = []
-                for a in algorithms:
+                    metric_is_higher_better = (m != "runtime")
+            else:
+                metric_is_higher_better = higher_is_better[i]
+            # Escape underscore that could be contained in metric name
+            m_write = m.replace("_", "\\_")
+            # Write name of dataset and metric
+            if multiple_datasets:
+                if i == 0:
+                    # Escape underscore that could be contained in dataset name
+                    to_write = d.replace("_", "\\_") + " & " + m_write
+                else:
+                    to_write = "& " + m_write
+            else:
+                to_write = m_write
+            # Get all values from the experiments (are stored separately to calculated min values)
+            all_values = []
+            for a in algorithms:
+                if multiple_datasets:
+                    relevant_value = df[a, m][d, relevant_row]
+                else:
+                    relevant_value = df[a, m][relevant_row]
+                if relevant_value is not None and not np.isnan(relevant_value):
+                    if multiplier[i] is not None and m not in ["n_clusters", "runtime"]:
+                        relevant_value *= multiplier[i]
+                    relevant_value = round(relevant_value, decimal_places)
+                all_values.append(relevant_value)
+            all_values_sorted = np.unique(all_values)  # automatically sorted
+            all_values_sorted = all_values_sorted[~np.isnan(all_values_sorted)]
+            for k, a in enumerate(algorithms):
+                relevant_value = all_values[k]
+                value_write = "$" + str(relevant_value)
+                # If pm_row is specified and contained in the dataframe, information will be added
+                if pm_row is not None and pm_row_contained:
                     if multiple_datasets:
-                        mean_value = df[a, m][d, "mean"]
+                        pm_value = df[a, m][d, pm_row]
                     else:
-                        mean_value = df[a, m]["mean"]
-                    if in_percent and m not in ["n_clusters", "runtime"]:
-                        mean_value *= 100
-                    mean_value = round(mean_value, decimal_places)
-                    all_values.append(mean_value)
-                all_values_sorted = np.unique(all_values)  # automatically sorted
-                for k, a in enumerate(algorithms):
-                    mean_value = all_values[k]
-                    # If standard deviation is contained in the dataframe, information will be added
-                    if use_std and std_contained:
-                        if multiple_datasets:
-                            std_value = df[a, m][d, "std"]
-                        else:
-                            std_value = df[a, m]["std"]
-                        if in_percent and m not in ["n_clusters", "runtime"]:
-                            std_value *= 100
-                        std_value = round(std_value, decimal_places)
-                        value_write = "$" + str(mean_value) + " \\pm " + str(std_value) + "$"
+                        pm_value = df[a, m][pm_row]
+                    if pm_value is not None and not np.isnan(pm_value):
+                        if multiplier[i] is not None and m not in ["n_clusters", "runtime"]:
+                            pm_value *= multiplier[i]
+                        pm_value = round(pm_value, decimal_places)
+                    value_write = value_write + " \\pm " + str(pm_value)
+                # If bracket_row is specified and contained in the dataframe, information will be added
+                if bracket_row is not None and bracket_row_contained:
+                    if multiple_datasets:
+                        bracket_value = df[a, m][d, bracket_row]
                     else:
-                        value_write = "$" + str(mean_value) + "$"
+                        bracket_value = df[a, m][bracket_row]
+                    if bracket_value is not None and not np.isnan(bracket_value):
+                        if multiplier[i] is not None and m not in ["n_clusters", "runtime"]:
+                            bracket_value *= multiplier[i]
+                        bracket_value = round(bracket_value, decimal_places)
+                    value_write = value_write + "~(" + str(bracket_value) +")"
+                value_write = value_write + "$"
+                if relevant_value is not None and not np.isnan(relevant_value):
                     # Optional: Write best value in bold and second best underlined
-                    if best_in_bold and ((mean_value == all_values_sorted[-1] and metric_is_higher_better) or (
-                            mean_value == all_values_sorted[0] and not metric_is_higher_better)):
+                    if best_in_bold and metric_is_higher_better is not None and (
+                            (relevant_value == all_values_sorted[-1] and metric_is_higher_better) or (
+                            relevant_value == all_values_sorted[0] and not metric_is_higher_better)):
                         value_write = "\\bm{" + value_write + "}"
-                    elif second_best_underlined and (
-                            (mean_value == all_values_sorted[-2] and metric_is_higher_better) or (
-                            mean_value == all_values_sorted[1] and not metric_is_higher_better)):
+                    elif second_best_underlined and metric_is_higher_better is not None and (
+                            (relevant_value == all_values_sorted[-2] and metric_is_higher_better) or (
+                            relevant_value == all_values_sorted[1] and not metric_is_higher_better)):
                         value_write = "\\underline{" + value_write + "}"
                     # Optional: Color cells by value difference
-                    if color_by_value is not None:
+                    if color_by_value is not None and metric_is_higher_better is not None:
                         if all_values_sorted[-1] != all_values_sorted[0]:
-                            color_saturation = round((mean_value - all_values_sorted[0]) / (
-                                    all_values_sorted[-1] - all_values_sorted[0]) * 65) + 5  # value between 5 and 70
+                            if metric_is_higher_better:
+                                color_saturation = round((relevant_value - all_values_sorted[0]) / (
+                                        all_values_sorted[-1] - all_values_sorted[0]) * c_max_adj) + c_min  # value between c_min and c_max
+                            else:
+                                color_saturation = round((all_values_sorted[-1] - relevant_value) / (
+                                        all_values_sorted[-1] - all_values_sorted[0]) * c_max_adj) + c_min  # value between c_min and c_max
                         else:
                             color_saturation = 0
                         assert type(color_saturation) is int, "color_saturation must be an int but is {0}".format(
                             type(color_saturation))
                         value_write = "\\cellcolor{" + color_by_value + "!" + str(color_saturation) + "}" + value_write
-                    to_write += " & " + value_write
-                to_write += "\\\\\n"
-                f.write(to_write)
-            if j != len(datasets) - 1:
-                f.write("\\midrule\n")
-            else:
-                f.write("\\bottomrule\n\\end{tabular}}\n\\end{table}")
+                to_write += " & " + value_write
+            to_write += "\\\\\n"
+            output += to_write
+        if j != len(datasets) - 1:
+            output += "\\midrule\n"
+        else:
+            output += "\\bottomrule\n\\end{tabular}}\n\\end{table}"
+    if output_path != None:
+        with open(output_path, "w") as f:
+            f.write(output)
+    return output
 
 
 class EvaluationDataset():
@@ -755,7 +858,7 @@ class EvaluationDataset():
             preprocess_methods) is list or preprocess_methods is None, "preprocess_methods must be a method, a list of methods or None"
         self.preprocess_methods = preprocess_methods
         assert preprocess_params is None or type(preprocess_params) is dict or type(
-            preprocess_methods) is list, "preprocess_params must be a dict or a list of dicts"
+            preprocess_params) is list, "preprocess_params must be a dict or a list of dicts"
         self.preprocess_params = {} if preprocess_params is None else preprocess_params
         assert type(ignore_algorithms) is list or type(
             ignore_algorithms) is tuple, "ignore_algorithms must be a tuple or a list"
@@ -775,28 +878,30 @@ class EvaluationMetric():
         The actual metric function
     params : dict
         Parameters given to the metric function (default: {})
-    use_gt : bool
-        If true, the input to the metric will be the ground truth labels and the predicted labels (e.g. normalized mutual information).
-        If false, the input will be the data and the predicted labels (e.g. silhouette score) (default: True)
+    metric_type : str
+        The type of an EvaluationMetric can be either 'external', 'internal' or 'custom'.
+        If 'external', the metric (e.g. normalized mutual information) compares the predicted labels with ground truth labels, i.e., it is defined as metric(labels_true, labels_pred, **params).
+        If 'internal', the metric (e.g. silhouette score) compares the predicted labels with patterns in the data, i.e., it is defined as metric(X, labels_pred, **params).
+        If 'custom', a custom metric is used that can use the data, ground truth labels, predicted labels and other attributes from the algorithm, i.e., it is defined as metric(X, labels_true, labels_pred, algorithm_obj, **params) (default: "external")
 
     Examples
     ----------
     See evaluate_multiple_datasets()
 
     >>> from sklearn.metrics import normalized_mutual_info_score as nmi, silhouette_score as silhouette
-    >>> em1 = EvaluationMetric(name="nmi", metric=nmi, params={"average_method": "geometric"}, use_gt=True),
-    >>> em2 = EvaluationMetric(name="silhouette", metric=silhouette, use_gt=False)
+    >>> em1 = EvaluationMetric(name="nmi", metric=nmi, params={"average_method": "geometric"}, metric_type="external"),
+    >>> em2 = EvaluationMetric(name="silhouette", metric=silhouette, metric_type="internal")
     """
 
-    def __init__(self, name: str, metric: Callable, params: dict = None, use_gt: bool = True):
+    def __init__(self, name: str, metric: Callable, params: dict = None, metric_type: str = "external"):
         assert type(name) is str, "name must be a string"
         self.name = name
         assert callable(metric), "method must be a method"
         self.method = metric
         assert params is None or type(params) is dict, "params must be a dict"
         self.params = {} if params is None else params
-        assert type(use_gt) is bool, "use_gt must be bool"
-        self.use_gt = use_gt
+        assert type(metric_type) is str and metric_type in ["external", "internal", "custom"], "metric_type must be str. Options are 'external', 'internal' and 'custom'"
+        self.metric_type = metric_type
 
 
 class EvaluationAlgorithm():
@@ -863,5 +968,5 @@ class EvaluationAlgorithm():
             preprocess_methods) is list or preprocess_methods is None, "preprocess_methods must be a method, a list of methods or None"
         self.preprocess_methods = preprocess_methods
         assert preprocess_params is None or type(preprocess_params) is dict or type(
-            preprocess_methods) is list, "preprocess_params must be a dict or a list of dicts"
+            preprocess_params) is list, "preprocess_params must be a dict or a list of dicts"
         self.preprocess_params = {} if preprocess_params is None else preprocess_params

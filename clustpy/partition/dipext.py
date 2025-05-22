@@ -8,7 +8,9 @@ from clustpy.utils import dip_test, dip_gradient
 import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.base import BaseEstimator, ClusterMixin, TransformerMixin
-from sklearn.utils import check_random_state
+from clustpy.utils.checks import check_parameters
+from sklearn.utils.validation import check_is_fitted
+from sklearn.metrics.pairwise import pairwise_distances_argmin_min
 
 
 def _dip_ext(X: np.ndarray, n_components: int, do_dip_scaling: bool, step_size: float, momentum: float,
@@ -48,8 +50,8 @@ def _dip_ext(X: np.ndarray, n_components: int, do_dip_scaling: bool, step_size: 
         List containing the used projection axes,
         The indices of the sorted original dip-values (decreasing), needed to adjust order of the features when using transform()
     """
-    assert n_components is None or n_components < X.shape[
-        1], "n_components must be None or smaller than the dimensionality of the data set."
+    if n_components is not None and n_components >= X.shape[1]:
+        raise ValueError("n_components must be None or smaller than the dimensionality of the data set. You set n_components = {0} with n_features = {1}".format(n_components, X.shape[1]))
     assert dip_threshold <= 1 and dip_threshold >= 0, "dip_threshold must be within [0, 1]"
     assert type(ambiguous_triangle_strategy) is str, "ambiguous_triangle_strategy must be of type str"
     ambiguous_triangle_strategy = ambiguous_triangle_strategy.lower()
@@ -84,8 +86,10 @@ def _dip_ext(X: np.ndarray, n_components: int, do_dip_scaling: bool, step_size: 
     dip_values = np.array(dip_values)[argsorted_dip]
     subspace = subspace[:, argsorted_dip]
     if do_dip_scaling:
-        subspace = _dip_scaling(subspace, dip_values)
-    return subspace, dip_values, projection_axes, argsorted_dip
+        subspace, max_min_values = _dip_scaling(subspace, dip_values)
+    else:
+        max_min_values = None
+    return subspace, dip_values, projection_axes, argsorted_dip, max_min_values
 
 
 def _find_max_dip_by_sgd(X: np.ndarray, step_size: float, momentum: float, n_starting_vectors: int,
@@ -403,7 +407,7 @@ Utils
 
 
 def _transform_using_projections(X: np.ndarray, projection_axes: list, do_dip_scaling: bool,
-                                 dip_values: np.ndarray, argsorted_dips: np.ndarray) -> np.ndarray:
+                                 dip_values: np.ndarray, argsorted_dips: np.ndarray, max_min_values: tuple) -> np.ndarray:
     """
     Transform a give data set using the projection axes obtained by a previous DipExt execution.
 
@@ -419,6 +423,8 @@ def _transform_using_projections(X: np.ndarray, projection_axes: list, do_dip_sc
         The dip-value of each resulting feature
     argsorted_dips : np.ndarray
         The indices of the sorted original dip-values (decreasing), needed to adjust order of the features
+    max_min_values : tuple
+        Tuple containing the max and min values for each feature. Should be None if do_dip_scaling is False
 
     Returns
     -------
@@ -439,7 +445,7 @@ def _transform_using_projections(X: np.ndarray, projection_axes: list, do_dip_sc
     subspace = subspace[:, argsorted_dips]
     # Optional: Scale data set using the dip-values
     if do_dip_scaling:
-        subspace = _dip_scaling(subspace, dip_values)
+        subspace, _ = _dip_scaling(subspace, dip_values, max_min_values)
     return subspace
 
 
@@ -493,7 +499,7 @@ def _n_starting_vectors_default(n_dims: int) -> int:
     return n_starting_vectors
 
 
-def _dip_scaling(X: np.ndarray, dip_values: np.ndarray) -> np.ndarray:
+def _dip_scaling(X: np.ndarray, dip_values: np.ndarray,  max_min_values: tuple = None) -> (np.ndarray, tuple):
     """
     Perform dip scaling.
     Normalize each features using min-max normalization and multiply all feature values by their corresponding dip-values.
@@ -504,15 +510,26 @@ def _dip_scaling(X: np.ndarray, dip_values: np.ndarray) -> np.ndarray:
         the given data set
     dip_values : np.ndarray
         The dip-values for each feature
+    max_min_values : tuple
+        Tuple containing the max and min values for each feature. Can be None during the fitting stage
 
     Returns
     -------
-    X : np.ndarray
-        The scaled data set
+    tuple : (np.ndarray, tuple)
+        The scaled data set,
+        The Max and Min values used for scaling
+    
     """
-    X = np.array([dip_values[i] * (X[:, i] - np.min(X[:, i])) / (np.max(X[:, i]) - np.min(X[:, i])) for i in
-                  range(X.shape[1])]).T
-    return X
+    if max_min_values is None:
+        max_values = np.max(X, axis=0).reshape((1, -1))
+        min_values = np.min(X, axis=0).reshape((1, -1))
+        max_min_values = (max_values, min_values)
+    else:
+        max_values, min_values = max_min_values
+    diffs = max_values - min_values
+    diffs[diffs == 0] = 1
+    X_scaled = dip_values.reshape((1, -1)) * ((X - min_values) / diffs)
+    return X_scaled, max_min_values
 
 
 def _dip_init(subspace: np.ndarray, n_clusters: int) -> (np.ndarray, np.ndarray):
@@ -589,6 +606,8 @@ class DipExt(TransformerMixin, BaseEstimator):
         List containing the axes used for the transformation
     argsorted_dips_ : np.ndarray
         The indices of the sorted original dip-values (decreasing), needed to adjust order of the features when using transform()
+    n_features_in_ : int
+        the number of features used for the fitting
 
     References
     ----------
@@ -606,7 +625,7 @@ class DipExt(TransformerMixin, BaseEstimator):
         self.dip_threshold = dip_threshold
         self.n_starting_vectors = n_starting_vectors
         self.ambiguous_triangle_strategy = ambiguous_triangle_strategy
-        self.random_state = check_random_state(random_state)
+        self.random_state = random_state
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DipExt':
         """
@@ -641,9 +660,10 @@ class DipExt(TransformerMixin, BaseEstimator):
         subspace : np.ndarray
             The transformed feature space (Number of samples x number of components)
         """
-        assert hasattr(self, "projection_axes_"), "Projection axes have not been obtained. Run fit() first."
+        check_is_fitted(self, ["projection_axes_", "n_features_in_"])
+        X, _, _ = check_parameters(X=X, estimator_obj=self, allow_size_1=True)
         subspace = _transform_using_projections(X, self.projection_axes_, self.do_dip_scaling, self.dip_values_,
-                                                self.argsorted_dips_)
+                                                self.argsorted_dips_, self.max_min_values_)
         return subspace
 
     def fit_transform(self, X: np.ndarray, y: np.ndarray = None) -> np.ndarray:
@@ -662,21 +682,26 @@ class DipExt(TransformerMixin, BaseEstimator):
         subspace : np.ndarray
             The transformed feature space (Number of samples x number of components)
         """
+        X, _, random_state = check_parameters(X=X, y=y, random_state=self.random_state)
         if self.n_starting_vectors is None:
-            self.n_starting_vectors = _n_starting_vectors_default(X.shape[1])
-        subspace, dip_values, projections, argsorted_dip = _dip_ext(X, self.n_components, self.do_dip_scaling,
+            n_starting_vectors = _n_starting_vectors_default(X.shape[1])
+        else:
+            n_starting_vectors = self.n_starting_vectors
+        subspace, dip_values, projections, argsorted_dip, max_min_values = _dip_ext(X, self.n_components, self.do_dip_scaling,
                                                                     self.step_size, self.momentum, self.dip_threshold,
-                                                                    self.n_starting_vectors,
+                                                                    n_starting_vectors,
                                                                     self.ambiguous_triangle_strategy,
-                                                                    self.random_state)
-        self.n_components = len(dip_values)
+                                                                    random_state)
+        self.n_components_final_ = len(dip_values)
         self.dip_values_ = dip_values
         self.projection_axes_ = projections
         self.argsorted_dips_ = argsorted_dip
+        self.n_features_in_ = X.shape[1]
+        self.max_min_values_ = max_min_values
         return subspace
 
 
-class DipInit(DipExt, BaseEstimator, ClusterMixin):
+class DipInit(DipExt, ClusterMixin, BaseEstimator):
     """
     Execute the DipInit clustering procedure.
     Initially, DipExt is executed to identify relevant features.
@@ -688,7 +713,7 @@ class DipInit(DipExt, BaseEstimator, ClusterMixin):
     Parameters
     ----------
     n_clusters : int
-        The number of clusters
+        The number of clusters (default: 8)
     n_components : int
         The number of components to extract. Can be None, in that case dip_threshold wil be used to define the number of components (default: None)
     do_dip_scaling : bool
@@ -714,6 +739,14 @@ class DipInit(DipExt, BaseEstimator, ClusterMixin):
         The final labels
     cluster_centers_ : np.ndarray
         The final cluster centers
+    dip_values_ : np.ndarray
+        The dip-value of each resulting feature
+    projection_axes_ : list
+        List containing the axes used for the transformation
+    argsorted_dips_ : np.ndarray
+        The indices of the sorted original dip-values (decreasing), needed to adjust order of the features when using transform()
+    n_features_in_ : int
+        the number of features used for the fitting
 
     References
     ----------
@@ -721,7 +754,7 @@ class DipInit(DipExt, BaseEstimator, ClusterMixin):
     The European Conference on Machine Learning and Principles and Practice of Knowledge Discovery in Databases 2020
     """
 
-    def __init__(self, n_clusters: int, n_components: int = None, do_dip_scaling: bool = True, step_size: float = 0.1,
+    def __init__(self, n_clusters: int = 8, n_components: int = None, do_dip_scaling: bool = True, step_size: float = 0.1,
                  momentum: float = 0.95, dip_threshold: float = 0.5, n_starting_vectors: int = None,
                  ambiguous_triangle_strategy: str = "ignore", random_state: np.random.RandomState | int = None):
         super().__init__(n_components, do_dip_scaling, step_size, momentum, dip_threshold, n_starting_vectors,
@@ -750,3 +783,24 @@ class DipInit(DipExt, BaseEstimator, ClusterMixin):
         self.labels_ = labels
         self.cluster_centers_ = centers
         return self
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """
+        Predict the labels of an input dataset. For this method the results from the fit() method will be used.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            the given data set
+
+        Returns
+        -------
+        predicted_labels : np.ndarray
+            the predicted labels of the input data set
+        """
+        X_transform = self.transform(X)
+        predicted_labels, _ = pairwise_distances_argmin_min(X=X_transform, Y=self.cluster_centers_,
+                                                          metric='euclidean',
+                                                          metric_kwargs={'squared': True})
+        predicted_labels = predicted_labels.astype(np.int32)
+        return predicted_labels

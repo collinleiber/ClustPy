@@ -5,6 +5,13 @@ from clustpy.deep.neural_networks import FeedforwardAutoencoder, ConvolutionalAu
 import numpy as np
 import torch
 from unittest.mock import patch
+from clustpy.utils.checks import check_clustpy_estimator
+
+
+def test_dipencoder_estimator():
+    # Ignore check_methods_subset_invariance due to numerical issues
+    check_clustpy_estimator(DipEncoder(2, pretrain_epochs=3, clustering_epochs=3),
+                            ("check_complex_data", "check_methods_subset_invariance"))
 
 
 def test_simple_dipencoder():
@@ -25,8 +32,8 @@ def test_simple_dipencoder():
     # assert np.allclose(dipencoder.projection_axes_, dipencoder2.projection_axes_, atol=1e-1)
     # assert dipencoder.index_dict_ == dipencoder2.index_dict_
     # Test predict
-    labels_predict = dipencoder.predict(X, X)
-    assert np.sum(dipencoder.labels_ == labels_predict) / labels_predict.shape[0] > 0.9
+    labels_predict = dipencoder.predict(X)
+    assert np.array_equal(dipencoder.labels_, labels_predict)
 
 
 def test_supervised_dipencoder():

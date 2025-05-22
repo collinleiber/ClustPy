@@ -6,7 +6,14 @@ from clustpy.deep._data_utils import get_dataloader
 import numpy as np
 import torch
 from clustpy.data import create_subspace_data, load_optdigits
+from clustpy.utils.checks import check_clustpy_estimator
 
+
+def test_deepect_estimator():
+    # Ignore check_methods_subset_invariance due to numerical issues
+    check_clustpy_estimator(DeepECT(pretrain_epochs=3, clustering_epochs=3),
+                            ("check_complex_data", "check_methods_subset_invariance"))
+    
 
 def test_DeepECT_ClusterTreeNode():
     cluster_tree = BinaryClusterTree(_DeepECT_ClusterTreeNode)

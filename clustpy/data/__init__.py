@@ -1,11 +1,11 @@
 from .synthetic_data_creator import create_subspace_data, create_nr_data
-from .real_world_data import load_newsgroups, load_iris, load_wine, load_breast_cancer, load_reuters, load_imagenet_dog, \
+from .real_world_data import load_newsgroups, load_iris, load_wine, load_breast_cancer, load_rcv1, load_imagenet_dog, \
     load_imagenet10, load_coil20, load_coil100, load_olivetti_faces, load_webkb
 from .real_uci_data import load_har, load_letterrecognition, load_optdigits, load_pendigits, load_banknotes, load_htru2, \
     load_mice_protein, load_ecoli, load_spambase, load_seeds, load_statlog_shuttle, load_forest_types, \
     load_breast_tissue, load_soybean_large, load_soybean_small, load_skin, load_user_knowledge, load_dermatology, \
     load_multiple_features, load_statlog_australian_credit_approval, load_breast_cancer_wisconsin_original, \
-    load_semeion, load_cmu_faces
+    load_semeion, load_cmu_faces, load_gene_expression_cancer_rna_seq, load_sport_articles, load_wholesale_customers
 from .real_timeseries_data import load_motestrain, load_olive_oil, load_symbols, load_diatom_size_reduction, \
     load_proximal_phalanx_outline, load_plane, load_sony_aibo_robot_surface, load_two_patterns, load_lsst
 from .real_clustpy_data import load_aloi_small, load_fruit, load_nrletters, load_stickfigures
@@ -34,7 +34,7 @@ __all__ = ['create_subspace_data',
            'load_wine',
            'load_breast_cancer',
            'load_olivetti_faces',
-           'load_reuters',
+           'load_rcv1',
            'load_banknotes',
            'load_htru2',
            'load_motestrain',
@@ -100,4 +100,7 @@ __all__ = ['create_subspace_data',
            'z_normalization',
            'load_cifar100',
            'flatten_images',
-           'unflatten_images']
+           'unflatten_images',
+           'load_gene_expression_cancer_rna_seq',
+           'load_sport_articles',
+           'load_wholesale_customers']

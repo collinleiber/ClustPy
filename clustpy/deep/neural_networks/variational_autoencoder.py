@@ -9,6 +9,8 @@ import torch
 from clustpy.deep.neural_networks.feedforward_autoencoder import FullyConnectedBlock, FeedforwardAutoencoder
 from collections.abc import Callable
 import numpy as np
+from clustpy.utils.checks import check_parameters
+from clustpy.deep._utils import get_device_from_module
 
 
 def _vae_sampling(q_mean: torch.Tensor, q_logvar: torch.Tensor) -> torch.Tensor:
@@ -181,3 +183,24 @@ class VariationalAutoencoder(FeedforwardAutoencoder):
 
         total_loss = ssl_loss + beta * kl_loss
         return total_loss, z, reconstruction
+
+    def transform(self, X: np.ndarray) -> np.ndarray:
+        """
+        Embed the given data set using the trained variational autoencoder.
+
+        Parameters
+        ----------
+        X: np.ndarray
+            The given data set
+
+        Returns
+        -------
+        X_embed : np.ndarray
+            The embedded data set
+        """
+        X, _, _ = check_parameters(X)
+        device = get_device_from_module(self)
+        torch_data = torch.from_numpy(X).float().to(device)
+        embedded_data = self.encode(torch_data)[0]
+        X_embed = embedded_data.detach().cpu().numpy()
+        return X_embed.astype(X.dtype)

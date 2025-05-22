@@ -7,6 +7,7 @@ from clustpy.utils import dip_test, dip_pval
 import numpy as np
 from sklearn.base import BaseEstimator, ClusterMixin
 from sklearn.utils import check_random_state
+from clustpy.utils.checks import check_parameters
 
 
 def _skinnydip(X: np.ndarray, significance: float, pval_strategy: str, n_boots: int, add_tails: bool, outliers: bool,
@@ -630,7 +631,7 @@ def _assign_outliers(X_1d: np.ndarray, labels: np.ndarray, n_clusters: int, sort
     return labels
 
 
-class SkinnyDip(BaseEstimator, ClusterMixin):
+class SkinnyDip(ClusterMixin, BaseEstimator):
     """
     Execute the SkinnyDip clustering procedure.
     This approach iteratively executes the univariate clustering algorithm UniDip on each feature.
@@ -663,6 +664,8 @@ class SkinnyDip(BaseEstimator, ClusterMixin):
         The final number of clusters
     labels_ : np.ndarray
         The final labels
+    n_features_in_ : int
+        the number of features used for the fitting
 
     Examples
     ----------
@@ -691,7 +694,7 @@ class SkinnyDip(BaseEstimator, ClusterMixin):
         self.add_tails = add_tails
         self.outliers = outliers
         self.max_cluster_size_diff_factor = max_cluster_size_diff_factor
-        self.random_state = check_random_state(random_state)
+        self.random_state = random_state
         self.debug = debug
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'SkinnyDip':
@@ -711,14 +714,16 @@ class SkinnyDip(BaseEstimator, ClusterMixin):
         self : SkinnyDip
             this instance of the SkinnyDip algorithm
         """
+        X, _, random_state = check_parameters(X=X, y=y, random_state=self.random_state)
         n_clusters, labels = _skinnydip(X, self.significance, self.pval_strategy, self.n_boots, self.add_tails,
-                                        self.outliers, self.max_cluster_size_diff_factor, self.random_state, self.debug)
+                                        self.outliers, self.max_cluster_size_diff_factor, random_state, self.debug)
         self.n_clusters_ = n_clusters
         self.labels_ = labels
+        self.n_features_in_ = X.shape[1]
         return self
 
 
-class UniDip(BaseEstimator, ClusterMixin):
+class UniDip(ClusterMixin, BaseEstimator):
     """
     Execute the UniDip clustering procedure.
     This univariate clustering algorithm recursively uses the Dip-test of unimodality to check if a set of samples is distributed uni- or multimodally.
@@ -755,6 +760,8 @@ class UniDip(BaseEstimator, ClusterMixin):
         The final labels
     cluster_boundaries_ : list
         List of tuples containing the id of the first sample in a cluster and the first sample that is not part of the cluster anymore
+    n_features_in_ : int
+        the number of features used for the fitting
 
     References
     ----------
@@ -776,7 +783,7 @@ class UniDip(BaseEstimator, ClusterMixin):
         self.add_tails = add_tails
         self.outliers = outliers
         self.max_cluster_size_diff_factor = max_cluster_size_diff_factor
-        self.random_state = check_random_state(random_state)
+        self.random_state = random_state
         self.debug = debug
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'UniDip':
@@ -796,11 +803,15 @@ class UniDip(BaseEstimator, ClusterMixin):
         self : UniDip
             this instance of the UniDip algorithm
         """
+        assert X.ndim == 1 or X.shape[1] == 1, "[UniDip] Data must be 1-dimensional. Your input has shape: {0}".format(X.shape)
+        X, _, random_state = check_parameters(X=X.reshape((-1, 1)), y=y, random_state=self.random_state)
+        X = X.reshape(-1)
         n_clusters, labels, cluster_boundaries = _tailoreddip(X, self.significance, self.pval_strategy, self.n_boots,
                                                               self.add_tails, self.outliers,
-                                                              self.max_cluster_size_diff_factor, self.random_state,
+                                                              self.max_cluster_size_diff_factor, random_state,
                                                               self.debug)
         self.n_clusters_ = n_clusters
         self.labels_ = labels
         self.cluster_boundaries_ = cluster_boundaries
+        self.n_features_in_ = 1
         return self

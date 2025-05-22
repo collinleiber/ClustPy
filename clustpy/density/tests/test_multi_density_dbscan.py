@@ -2,6 +2,11 @@ from clustpy.density import MultiDensityDBSCAN
 from clustpy.density.multi_density_dbscan import _sort_neighbors_by_densities, _add_neighbors_to_neighbor_list
 from sklearn.datasets import make_blobs
 import numpy as np
+from clustpy.utils.checks import check_clustpy_estimator
+
+
+def test_multi_density_dbscan_estimator():
+    check_clustpy_estimator(MultiDensityDBSCAN(k=5), ("check_complex_data"))
 
 
 def test_add_neighbors_to_neighbor_list():

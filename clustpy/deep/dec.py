@@ -5,8 +5,7 @@ Dominik Mautz,
 Collin Leiber
 """
 
-from clustpy.deep._utils import encode_batchwise, squared_euclidean_distance, predict_batchwise, \
-    embedded_kmeans_prediction, mean_squared_error
+from clustpy.deep._utils import encode_batchwise, squared_euclidean_distance, predict_batchwise, mean_squared_error
 from clustpy.deep._train_utils import get_default_deep_clustering_initialization
 from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
 import torch
@@ -414,15 +413,15 @@ class DEC(_AbstractDeepClusteringAlgo):
     Parameters
     ----------
     n_clusters : int
-        number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN
+        number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN (default: 8)
     alpha : float
         alpha value for the prediction (default: 1.0)
     batch_size : int
         size of the data batches (default: 256)
     pretrain_optimizer_params : dict
-        parameters of the optimizer for the pretraining of the neural network, includes the learning rate (default: {"lr": 1e-3})
+        parameters of the optimizer for the pretraining of the neural network, includes the learning rate. If None, it will be set to {"lr": 1e-3} (default: None)
     clustering_optimizer_params : dict
-        parameters of the optimizer for the actual clustering procedure, includes the learning rate (default: {"lr": 1e-4})
+        parameters of the optimizer for the actual clustering procedure, includes the learning rate. If None, it will be set to {"lr": 1e-4} (default: None)
     pretrain_epochs : int
         number of epochs for the pretraining of the neural network (default: 100)
     clustering_epochs : int
@@ -451,7 +450,7 @@ class DEC(_AbstractDeepClusteringAlgo):
     initial_clustering_class : ClusterMixin
         clustering class to obtain the initial cluster labels after the pretraining (default: KMeans)
     initial_clustering_params : dict
-        parameters for the initial clustering class (default: {})
+        parameters for the initial clustering class. If None, it will be set to {} (default: None)
     device : torch.device
         The device on which to perform the computations.
         If device is None then it will be automatically chosen: if a gpu is available the gpu with the highest amount of free memory will be chosen (default: None)
@@ -487,7 +486,7 @@ class DEC(_AbstractDeepClusteringAlgo):
     International conference on machine learning. 2016.
     """
 
-    def __init__(self, n_clusters: int, alpha: float = 1.0, batch_size: int = 256,
+    def __init__(self, n_clusters: int = 8, alpha: float = 1.0, batch_size: int = 256,
                  pretrain_optimizer_params: dict = None, clustering_optimizer_params: dict = None,
                  pretrain_epochs: int = 100, clustering_epochs: int = 150,
                  optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
@@ -511,7 +510,6 @@ class DEC(_AbstractDeepClusteringAlgo):
         self.augmentation_invariance = augmentation_invariance
         self.initial_clustering_class = initial_clustering_class
         self.initial_clustering_params = initial_clustering_params
-        self.ssl_loss_weight = 0  # DEC does not use ssl loss when clustering
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DEC':
         """
@@ -530,6 +528,7 @@ class DEC(_AbstractDeepClusteringAlgo):
         self : DEC
             this instance of the DEC algorithm
         """
+        ssl_loss_weight = self.ssl_loss_weight if hasattr(self, "ssl_loss_weight") else 0 # DEC does not use ssl loss when clustering
         X, _, random_state, pretrain_optimizer_params, clustering_optimizer_params, initial_clustering_params = self._check_parameters(X, y=y)
         kmeans_labels, kmeans_centers, dec_labels, dec_centers, neural_network = _dec(X, self.n_clusters, self.alpha,
                                                                                       self.batch_size,
@@ -543,7 +542,7 @@ class DEC(_AbstractDeepClusteringAlgo):
                                                                                       self.neural_network_weights,
                                                                                       self.embedding_size,
                                                                                       self.clustering_loss_weight,
-                                                                                      self.ssl_loss_weight,
+                                                                                      ssl_loss_weight,
                                                                                       self.custom_dataloaders,
                                                                                       self.augmentation_invariance,
                                                                                       self.initial_clustering_class,
@@ -554,26 +553,8 @@ class DEC(_AbstractDeepClusteringAlgo):
         self.dec_labels_ = dec_labels
         self.dec_cluster_centers_ = dec_centers
         self.neural_network_trained_ = neural_network
-        self.n_features_in_ = X.shape[1]
+        self.set_n_featrues_in(X.shape[1])
         return self
-
-    def predict(self, X: np.ndarray) -> np.ndarray:
-        """
-        Predicts the labels of the input data.
-
-        Parameters
-        ----------
-        X : np.ndarray
-            input data
-
-        Returns
-        -------
-        predicted_labels : np.ndarray
-            The predicted labels
-        """
-        X_embed = self.transform(X)
-        predicted_labels = embedded_kmeans_prediction(X_embed, self.cluster_centers_)
-        return predicted_labels
 
 
 class IDEC(DEC):
@@ -585,15 +566,15 @@ class IDEC(DEC):
     Parameters
     ----------
     n_clusters : int
-        number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN
+        number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN (default: 8)
     alpha : float
         alpha value for the prediction (default: 1.0)
     batch_size : int
         size of the data batches (default: 256)
     pretrain_optimizer_params : dict
-        parameters of the optimizer for the pretraining of the neural network, includes the learning rate (default: {"lr": 1e-3})
+        parameters of the optimizer for the pretraining of the neural network, includes the learning rate. If None, it will be set to {"lr": 1e-3} (default: None)
     clustering_optimizer_params : dict
-        parameters of the optimizer for the actual clustering procedure, includes the learning rate (default: {"lr": 1e-4})
+        parameters of the optimizer for the actual clustering procedure, includes the learning rate. If None, it will be set to {"lr": 1e-4} (default: None)
     pretrain_epochs : int
         number of epochs for the pretraining of the neural network (default: 100)
     clustering_epochs : int
@@ -624,7 +605,7 @@ class IDEC(DEC):
     initial_clustering_class : ClusterMixin
         clustering class to obtain the initial cluster labels after the pretraining (default: KMeans)
     initial_clustering_params : dict
-        parameters for the initial clustering class (default: {})
+        parameters for the initial clustering class. If None, it will be set to {} (default: None)
     device : torch.device
         The device on which to perform the computations.
         If device is None then it will be automatically chosen: if a gpu is available the gpu with the highest amount of free memory will be chosen (default: None)
@@ -659,7 +640,7 @@ class IDEC(DEC):
     Guo, Xifeng, et al. "Improved deep embedded clustering with local structure preservation." IJCAI. 2017.
     """
 
-    def __init__(self, n_clusters: int, alpha: float = 1.0, batch_size: int = 256,
+    def __init__(self, n_clusters: int = 8, alpha: float = 1.0, batch_size: int = 256,
                  pretrain_optimizer_params: dict = None,
                  clustering_optimizer_params: dict = None, pretrain_epochs: int = 100,
                  clustering_epochs: int = 150, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,

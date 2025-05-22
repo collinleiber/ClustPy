@@ -76,7 +76,7 @@ def test_example_4():
         EvaluationAlgorithm("kmeans_minmax", KMeans, {"n_clusters": None}, preprocess_methods=minmax)]
 
     metrics = [EvaluationMetric("NMI", nmi), EvaluationMetric("ACC", acc),
-               EvaluationMetric("Silhouette", silhouette_score, use_gt=False)]
+               EvaluationMetric("Silhouette", silhouette_score, metric_type="internal")]
 
     df = evaluate_multiple_datasets(datasets, algorithms, metrics, n_repetitions=5,
                                     aggregation_functions=[np.mean, np.std, np.max, np.min],

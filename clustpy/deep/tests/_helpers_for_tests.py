@@ -46,7 +46,13 @@ class _TestAutoencoder(torch.nn.Module):
     def fit(self):
         self.fitted = True
         return self
-
+    
+    def transform(self, X):
+        torch_data = torch.from_numpy(X).float()
+        embedded_data = self.encode(torch_data)
+        X_embed = embedded_data.detach().numpy()
+        return X_embed
+    
 
 class _TestClusterModule(torch.nn.Module):
     """

@@ -491,15 +491,15 @@ class VaDE(_AbstractDeepClusteringAlgo):
     Parameters
     ----------
     n_clusters : int
-        number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN
+        number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN (default: 8)
     batch_size : int
         size of the data batches (default: 256)
     pretrain_optimizer_params : dict
-        parameters of the optimizer for the pretraining of the neural network, includes the learning rate (default: {"lr": 1e-3})
+        parameters of the optimizer for the pretraining of the neural network, includes the learning rate. If None, it will be set to {"lr": 1e-3} (default: None)
     clustering_optimizer_params : dict
-        parameters of the optimizer for the actual clustering procedure, includes the learning rate (default: {"lr": 1e-4})
+        parameters of the optimizer for the actual clustering procedure, includes the learning rate. If None, it will be set to {"lr": 1e-4} (default: None)
     pretrain_epochs : int
-        number of epochs for the pretraining of the neural network (default: 10)
+        number of epochs for the pretraining of the neural network (default: 100)
     clustering_epochs : int
         number of epochs for the actual clustering procedure (default: 150)
     optimizer_class : torch.optim.Optimizer
@@ -525,7 +525,7 @@ class VaDE(_AbstractDeepClusteringAlgo):
     initial_clustering_class : ClusterMixin
         clustering class to obtain the initial cluster labels after the pretraining (default: GaussianMixture)
     initial_clustering_params : dict
-        parameters for the initial clustering class (default: {"n_init": 10, "covariance_type": "diag"})
+        parameters for the initial clustering class. If None, it will be set to {"n_init": 10, "covariance_type": "diag"} (default: None)
     device : torch.device
         The device on which to perform the computations.
         If device is None then it will be automatically chosen: if a gpu is available the gpu with the highest amount of free memory will be chosen (default: None)
@@ -566,8 +566,8 @@ class VaDE(_AbstractDeepClusteringAlgo):
     Jiang, Zhuxi, et al. "Variational Deep Embedding: An Unsupervised and Generative Approach to Clustering." IJCAI. 2017.
     """
 
-    def __init__(self, n_clusters: int, batch_size: int = 256, pretrain_optimizer_params: dict = None,
-                 clustering_optimizer_params: dict = None, pretrain_epochs: int = 10,
+    def __init__(self, n_clusters: int = 8, batch_size: int = 256, pretrain_optimizer_params: dict = None,
+                 clustering_optimizer_params: dict = None, pretrain_epochs: int = 100,
                  clustering_epochs: int = 150, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = torch.nn.BCELoss(reduction='sum'),
                  clustering_loss_weight: float = 1.0, ssl_loss_weight: float = 1.0,
@@ -639,7 +639,7 @@ class VaDE(_AbstractDeepClusteringAlgo):
         self.vade_cluster_centers_ = vade_centers
         self.vade_covariances_ = vade_covariances
         self.neural_network_trained_ = neural_network
-        self.n_features_in_ = X.shape[1]
+        self.set_n_featrues_in(X.shape[1])
         return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:

@@ -1,9 +1,20 @@
 import numpy as np
 from clustpy.alternative import OrthogonalClustering, ClusteringInOrthogonalSpaces
 from clustpy.data import create_nr_data
+from clustpy.utils.checks import check_clustpy_estimator
 
 
-def test_simple_OrthogonalClustering():
+def test_orthogonal_clustering_estimator():
+    # Ignore check_clustering as it does not accept multiple sets of labels
+    check_clustpy_estimator(OrthogonalClustering([3, 3]), ("check_complex_data", "check_clustering"))
+
+
+def test_clustering_in_orthogonal_spaces_estimator():
+    # Ignore check_clustering as it does not accept multiple sets of labels
+    check_clustpy_estimator(ClusteringInOrthogonalSpaces([3, 3]), ("check_complex_data", "check_clustering"))
+
+
+def test_simple_orthogonal_clustering():
     X, labels = create_nr_data(200, n_clusters=[3, 4, 5], subspace_features=[2, 2, 2], n_outliers=[0, 0, 0],
                                random_state=1)
     orth = OrthogonalClustering([3, 4, 5], random_state=1)
@@ -27,7 +38,7 @@ def test_simple_OrthogonalClustering():
     assert np.array_equal(orth_2.labels_[:-1], orth_2.predict(X[:-1]))
 
 
-def test_simple_ClusteringInOrthogonalSpaces():
+def test_simple_clustering_in_orthogonal_spaces():
     X, labels = create_nr_data(200, n_clusters=[3, 4, 5], subspace_features=[2, 2, 2], n_outliers=[0, 0, 0],
                                random_state=1)
     orth = ClusteringInOrthogonalSpaces([3, 4, 5], random_state=1)

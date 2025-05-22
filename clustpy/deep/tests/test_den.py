@@ -3,11 +3,13 @@ from clustpy.data import create_subspace_data
 import torch
 import numpy as np
 from scipy.spatial.distance import pdist, squareform
-from clustpy.utils.checks import check_estimator_wo_complex_data
+from clustpy.utils.checks import check_clustpy_estimator
 
 
 def test_den_estimator():
-    check_estimator_wo_complex_data(DEN(n_clusters=3, pretrain_epochs=3))
+    # Ignore check_methods_subset_invariance due to numerical issues
+    check_clustpy_estimator(DEN(n_clusters=3, pretrain_epochs=3),
+                            ("check_complex_data", "check_methods_subset_invariance"))
 
 
 def test_simple_den():
