@@ -291,7 +291,7 @@ class GapStatistic(ClusterMixin, BaseEstimator):
             the predicted labels of the input data set
         """
         check_is_fitted(self, ["labels_", "n_features_in_"])
-        X, _, _ = check_parameters(X=X, n_features_in=self.n_features_in_, allow_size_1=True)
+        X, _, _ = check_parameters(X=X, estimator_obj=self, allow_size_1=True)
         predicted_labels, _ = pairwise_distances_argmin_min(X=X, Y=self.cluster_centers_,
                                                           metric='euclidean',
                                                           metric_kwargs={'squared': True})

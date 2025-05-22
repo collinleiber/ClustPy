@@ -755,7 +755,7 @@ class DipDECK(_AbstractDeepClusteringAlgo):
             The predicted labels
         """
         # Get embedded centers
-        check_is_fitted(self, ["projection_axes_", "n_features_in_"])
+        check_is_fitted(self, ["labels_", "n_features_in_"])
         embedded_centers = self.transform(self.cluster_centers_)
         predicted_labels = super().predict(X, embedded_centers)
         return predicted_labels

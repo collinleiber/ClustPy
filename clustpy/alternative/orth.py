@@ -222,7 +222,7 @@ class OrthogonalClustering(ClusterMixin, BaseEstimator):
             the predicted labels of the input data set for each subspace. Shape equals (n_samples x n_subspaces)
         """
         check_is_fitted(self, ["labels_", "n_features_in_"])
-        X, _, _ = check_parameters(X=X, n_features_in=self.n_features_in_, allow_size_1=True)
+        X, _, _ = check_parameters(X=X, estimator_obj=self, allow_size_1=True)
         predicted_labels = np.zeros((X.shape[0], len(self.cluster_centers_)), dtype=np.int32)
         # Get labels for each subspace
         for subspace in range(len(self.cluster_centers_)):
@@ -256,7 +256,7 @@ class OrthogonalClustering(ClusterMixin, BaseEstimator):
             The transformed dataset
         """
         check_is_fitted(self, ["labels_", "n_features_in_"])
-        X, _, _ = check_parameters(X=X, n_features_in=self.n_features_in_, allow_size_1=True)
+        X, _, _ = check_parameters(X=X, estimator_obj=self, allow_size_1=True)
         assert subspace_index < len(self.cluster_centers_), "subspace_index must be smaller than {0}".format(
             len(self.cluster_centers_))
         X = X - self.global_mean_
@@ -363,7 +363,7 @@ class ClusteringInOrthogonalSpaces(OrthogonalClustering):
             The transformed dataset
         """
         check_is_fitted(self, ["labels_", "n_features_in_"])
-        X, _, _ = check_parameters(X=X, n_features_in=self.n_features_in_, allow_size_1=True)
+        X, _, _ = check_parameters(X=X, estimator_obj=self, allow_size_1=True)
         assert subspace_index < len(self.cluster_centers_), "subspace_index must be smaller than {0}".format(
             len(self.cluster_centers_))
         X = X - self.global_mean_

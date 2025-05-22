@@ -14,6 +14,7 @@ from collections.abc import Callable
 from sklearn.utils import check_random_state
 from clustpy.deep._utils import set_torch_seed
 from collections.abc import Callable
+from clustpy.utils.checks import check_parameters
 
 
 class FullyConnectedBlock(torch.nn.Module):
@@ -441,6 +442,7 @@ class _AbstractAutoencoder(torch.nn.Module):
         """
         if not self.fitted:
             raise ValueError("The autoencoder is not fitted yet. Rnu fit() first.")
+        X, _, _ = check_parameters(X, allow_size_1=True)
         device = get_device_from_module(self)
         torch_data = torch.from_numpy(X).float().to(device)
         embedded_data = self.encode(torch_data)

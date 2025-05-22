@@ -5,7 +5,7 @@ Collin Leiber
 
 from clustpy.alternative.nrkmeans import NrKmeans, _get_total_cost_function, _mdl_costs
 import numpy as np
-from sklearn.base import BaseEstimator, ClusterMixin
+from sklearn.base import BaseEstimator, ClusterMixin, TransformerMixin
 from clustpy.utils.plots import plot_scatter_matrix
 from clustpy.utils.checks import check_parameters
 from sklearn.utils.validation import check_is_fitted
@@ -95,7 +95,7 @@ def _transform_subkmeans_scatter_to_nrkmeans_scatters(X: np.ndarray, scatter_mat
     return nrkmeans_scatter_matrices
 
 
-class SubKmeans(ClusterMixin, BaseEstimator):
+class SubKmeans(TransformerMixin, ClusterMixin, BaseEstimator):
     """
     The Subspace Kmeans (SubKmeans) algorithm.
     The algorithm will simultaneously search for cluster assignments and an optimal subspace regarding those assignments.
@@ -248,7 +248,7 @@ class SubKmeans(ClusterMixin, BaseEstimator):
             The rotated dataset
         """
         check_is_fitted(self, ["labels_", "n_features_in_"])
-        X, _, _ = check_parameters(X=X, n_features_in=self.n_features_in_, allow_size_1=True)
+        X, _, _ = check_parameters(X=X, estimator_obj=self, allow_size_1=True)
         rotated_data = np.matmul(X, self.V_)
         return rotated_data
 
@@ -268,7 +268,7 @@ class SubKmeans(ClusterMixin, BaseEstimator):
             The rotated and projected dataset
         """
         check_is_fitted(self, ["labels_", "n_features_in_"])
-        X, _, _ = check_parameters(X=X, n_features_in=self.n_features_in_, allow_size_1=True)
+        X, _, _ = check_parameters(X=X, estimator_obj=self, allow_size_1=True)
         clustered_space_V = self.V_[:, :self.m_]
         rotated_data = np.matmul(X, clustered_space_V)
         return rotated_data
@@ -312,7 +312,7 @@ class SubKmeans(ClusterMixin, BaseEstimator):
             defines whether the axes should be scaled equally
         """
         check_is_fitted(self, ["labels_", "n_features_in_"])
-        X, _, _ = check_parameters(X=X, n_features_in=self.n_features_in_, allow_size_1=True)
+        X, _, _ = check_parameters(X=X, estimator_obj=self, allow_size_1=True)
         if labels is None:
             labels = self.labels_
         assert X.shape[0] == labels.shape[0], "Number of data objects must match the number of labels."
@@ -337,7 +337,7 @@ class SubKmeans(ClusterMixin, BaseEstimator):
             The subspace specific costs (one entry for each subspace)
         """
         check_is_fitted(self, ["labels_", "n_features_in_"])
-        X, _, _ = check_parameters(X=X, n_features_in=self.n_features_in_, allow_size_1=True)
+        X, _, _ = check_parameters(X=X, estimator_obj=self, allow_size_1=True)
         m = _transform_subkmeans_m_to_nrkmeans_m(self.m_, X.shape[1])
         P = _transform_subkmeans_P_to_nrkmeans_P(self.m_, self.V_.shape[0])
         scatter_matrices = _transform_subkmeans_scatter_to_nrkmeans_scatters(X, self.scatter_matrix_)
@@ -364,7 +364,7 @@ class SubKmeans(ClusterMixin, BaseEstimator):
             The total loss of this SubKmeans object
         """
         check_is_fitted(self, ["labels_", "n_features_in_"])
-        X, _, _ = check_parameters(X=X, n_features_in=self.n_features_in_, allow_size_1=True)
+        X, _, _ = check_parameters(X=X, estimator_obj=self, allow_size_1=True)
         P = _transform_subkmeans_P_to_nrkmeans_P(self.m_, self.V_.shape[0])
         scatter_matrices = _transform_subkmeans_scatter_to_nrkmeans_scatters(X, self.scatter_matrix_)
         costs = _get_total_cost_function(self.V_, P, scatter_matrices)

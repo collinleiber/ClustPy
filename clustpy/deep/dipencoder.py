@@ -436,30 +436,34 @@ class _DipEncoder_Module(torch.nn.Module):
         labels_pred_matrix = np.zeros((X.shape[0], self.n_clusters))
         projection_thresholds = []
         for m in range(self.n_clusters - 1):
-            if n_points_in_all_clusters[m] < 4:
-                projection_thresholds += [None] * (self.n_clusters - m + 1)
-                continue
             for n in range(m + 1, self.n_clusters):
-                if n_points_in_all_clusters[n] < 4:
-                    projection_thresholds.append(None)
-                    continue
                 # Get correct projection vector
                 projection_vector = projections[self.index_dict[(m, n)]]
                 # Project data
                 X_proj = np.matmul(X, projection_vector)
                 X_proj_m = X_proj[points_in_all_clusters[m]]
                 X_proj_n = X_proj[points_in_all_clusters[n]]
-                # Sort data
-                sorted_indices_m = X_proj_m.argsort()
-                sorted_indices_n = X_proj_n.argsort()
-                # Execute mirrored dip
-                _, low_m, high_m = _dip_mirrored_data(X_proj_m[sorted_indices_m], None)
-                low_m_coor = X_proj_m[sorted_indices_m[low_m]]
-                high_m_coor = X_proj_m[sorted_indices_m[high_m]]
-                _, low_n, high_n = _dip_mirrored_data(X_proj_n[sorted_indices_n], None)
-                low_n_coor = X_proj_n[sorted_indices_n[low_n]]
-                high_n_coor = X_proj_n[sorted_indices_n[high_n]]
-                # Check if projected test data matches cluster structure
+                if n_points_in_all_clusters[m] < 4:
+                    low_m_coor = np.mean(X_proj_m)
+                    high_m_coor = low_m_coor
+                else:
+                    # Sort data
+                    sorted_indices_m = X_proj_m.argsort()
+                    # Execute mirrored dip
+                    _, low_m, high_m = _dip_mirrored_data(X_proj_m[sorted_indices_m], None)
+                    low_m_coor = X_proj_m[sorted_indices_m[low_m]]
+                    high_m_coor = X_proj_m[sorted_indices_m[high_m]]
+                if n_points_in_all_clusters[n] < 4:
+                    low_n_coor = np.mean(X_proj_n)
+                    high_n_coor = low_n_coor
+                else:
+                    # Sort data
+                    sorted_indices_n = X_proj_n.argsort()
+                    # Execute mirrored dip
+                    _, low_n, high_n = _dip_mirrored_data(X_proj_n[sorted_indices_n], None)
+                    low_n_coor = X_proj_n[sorted_indices_n[low_n]]
+                    high_n_coor = X_proj_n[sorted_indices_n[high_n]]
+                # Check if projected data is better captured by cluster m or n
                 if low_m_coor > high_n_coor:  # cluster m right of cluster n
                     threshold = high_n_coor + (low_m_coor - high_n_coor) / 2
                     labels_pred_matrix[X_proj < threshold, n] += 1
@@ -870,6 +874,9 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
             The predicted labels
         """
         X_embed = self.transform(X)
+        print("index", self.index_dict_)
+        print("axes",self.projection_axes_)
+        print("thresholds", self.projection_thresholds_)
         labels_pred = _predict_using_thresholds(X_embed, self.projection_axes_, self.projection_thresholds_, self.n_clusters, self.index_dict_)
         return labels_pred.astype(np.int32)
 

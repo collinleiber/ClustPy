@@ -8,7 +8,7 @@ from sklearn.utils.validation import check_is_fitted
 from sklearn.metrics.pairwise import pairwise_distances_argmin_min
 
 
-class _AbstractDeepClusteringAlgo(ClusterMixin, TransformerMixin, BaseEstimator):
+class _AbstractDeepClusteringAlgo(TransformerMixin, ClusterMixin, BaseEstimator):
     """
     An abstract deep clustering algorithm class that can be used by other deep clustering implementations.
 
@@ -99,7 +99,7 @@ class _AbstractDeepClusteringAlgo(ClusterMixin, TransformerMixin, BaseEstimator)
             The embedded data set
         """
         check_is_fitted(self, ["labels_", "neural_network_trained_", "n_features_in_"])
-        X, _, _ = check_parameters(X, allow_size_1=True, n_features_in=self.n_features_in_)
+        X, _, _ = check_parameters(X, allow_size_1=True, estimator_obj=self)
         if X.shape[1] != self.n_features_in_:
             raise ValueError(
             f"X has {X.shape[1]} features, but {self.__class__.__name__} "

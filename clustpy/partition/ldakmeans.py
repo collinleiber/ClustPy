@@ -3,7 +3,7 @@ authors:
 Collin Leiber
 """
 
-from sklearn.base import BaseEstimator, ClusterMixin
+from sklearn.base import BaseEstimator, ClusterMixin, TransformerMixin
 from sklearn.cluster import KMeans
 from sklearn.metrics import normalized_mutual_info_score as nmi
 from sklearn.decomposition import PCA
@@ -84,7 +84,7 @@ def _lda_kmeans(X: np.ndarray, n_clusters: int, n_dims: int, max_iter: int, kmea
     return km.labels_, rotation, km.cluster_centers_, km.inertia_, iteration + 1
 
 
-class LDAKmeans(ClusterMixin, BaseEstimator):
+class LDAKmeans(TransformerMixin, ClusterMixin, BaseEstimator):
     """
     Execute the LDA-Kmeans clustering procedure.
     The initial rotation are normally the (n_clusters-1) components of a PCA.
@@ -187,7 +187,7 @@ class LDAKmeans(ClusterMixin, BaseEstimator):
             The rotated data set
         """
         check_is_fitted(self, ["labels_", "n_features_in_"])
-        X, _, _ = check_parameters(X=X, n_features_in=self.n_features_in_, allow_size_1=True)
+        X, _, _ = check_parameters(X=X, estimator_obj=self, allow_size_1=True)
         rotated_data = np.matmul(X, self.rotation_)
         return rotated_data
 

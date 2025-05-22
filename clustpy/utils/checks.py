@@ -30,7 +30,7 @@ def check_clustpy_estimator(estimator_obj: BaseEstimator, checks_to_ignore: tupl
 
 
 def check_parameters(X: np.ndarray, *, y: np.ndarray=None, random_state: np.random.RandomState | int=None,
-                     allow_nd: bool=False, allow_size_1: bool=False, n_features_in: int=None) -> (np.ndarray, np.ndarray, np.random.RandomState):
+                     allow_nd: bool=False, allow_size_1: bool=False, estimator_obj: BaseEstimator = None) -> (np.ndarray, np.ndarray, np.random.RandomState):
     """
     Check if parameters for X, y and random_state are defined in accordance with the sklearn standard.
 
@@ -46,8 +46,8 @@ def check_parameters(X: np.ndarray, *, y: np.ndarray=None, random_state: np.rand
         allow n-dimensional arrays instead of only allowing 2d arrays (default: False)
     allow_size_1 : bool
         allow a dataset with a single sample
-    n_features_in : int
-        compare this value with the number of features in X
+    estimator_obj : BaseEstimator
+        Initialization of the tested BaseEstimator (default: None)
 
     Returns
     -------
@@ -71,7 +71,7 @@ def check_parameters(X: np.ndarray, *, y: np.ndarray=None, random_state: np.rand
         raise ValueError("Data can not be a 1d array.")
     if not allow_size_1 and X.shape[0] == 1:
         raise ValueError("Model cannot be fitted if n_samples = 1. X shape =", X.shape)
-    if n_features_in is not None and n_features_in != X.shape[1]:
-        raise ValueError("Number of features in X is not correct. X has {0} features but {1} is expceted.".format(X.shape[1], n_features_in))
+    if estimator_obj is not None and estimator_obj.n_features_in_ != X.shape[1]:
+        raise ValueError("X has {0} features, but {1} is expecting {2} features as input.".format(X.shape[1], estimator_obj.__class__.__name__, estimator_obj.n_features_in_))
     random_state = check_random_state(random_state)
     return X, y, random_state
