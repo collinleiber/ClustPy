@@ -3,7 +3,7 @@ from clustpy.data import load_banknotes, load_spambase, load_seeds, load_skin, l
     load_pendigits, load_ecoli, load_htru2, load_letterrecognition, load_har, load_statlog_shuttle, load_mice_protein, \
     load_user_knowledge, load_breast_tissue, load_forest_types, load_dermatology, load_multiple_features, \
     load_statlog_australian_credit_approval, load_breast_cancer_wisconsin_original, load_optdigits, load_semeion, \
-    load_cmu_faces
+    load_cmu_faces, load_gene_expression_cancer_rna_seq, load_sport_articles, load_wholesale_customers
 from pathlib import Path
 import os
 import shutil
@@ -222,3 +222,21 @@ def test_load_cmu_faces():
     # Non-flatten
     assert dataset.images.shape == (624, 30, 32)
     assert dataset.image_format == "HW"
+
+
+@pytest.mark.data
+def test_load_gene_expression_cancer_rna_seq():
+    _helper_test_data_loader(load_gene_expression_cancer_rna_seq, 801, 20531, 5,
+                             dataloader_params={"downloads_path": TEST_DOWNLOAD_PATH})
+
+
+@pytest.mark.data
+def test_load_sport_articles():
+    _helper_test_data_loader(load_sport_articles, 1000, 55, 2,
+                             dataloader_params={"downloads_path": TEST_DOWNLOAD_PATH})
+
+
+@pytest.mark.data
+def test_load_wholesale_customers():
+    _helper_test_data_loader(load_wholesale_customers, 440, 6, [2, 3],
+                             dataloader_params={"downloads_path": TEST_DOWNLOAD_PATH})

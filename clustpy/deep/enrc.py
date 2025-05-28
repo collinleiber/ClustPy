@@ -1035,10 +1035,10 @@ def nrkmeans_init(data: np.ndarray, n_clusters: list, rounds: int = 10, max_iter
     else:
         mdl_for_noisespace = False
     for i in range(rounds):
-        nrkmeans = NrKmeans(n_clusters=n_clusters, cluster_centers=input_centers, P=P, V=V, max_iter=max_iter,
+        nrkmeans = NrKmeans(n_clusters=n_clusters, cluster_centers_init=input_centers, P_init=P, V_init=V, max_iter=max_iter,
                             random_state=random_state, mdl_for_noisespace=mdl_for_noisespace)
         nrkmeans.fit(X=data)
-        centers_i, P_i, V_i, scatter_matrices_i = nrkmeans.cluster_centers, nrkmeans.P, nrkmeans.V, nrkmeans.scatter_matrices_
+        centers_i, P_i, V_i, scatter_matrices_i = nrkmeans.cluster_centers_, nrkmeans.P_, nrkmeans.V_, nrkmeans.scatter_matrices_
         if len(P_i) != len(n_clusters):
             if debug:
                 print(
@@ -1926,9 +1926,9 @@ class ENRC(_AbstractDeepClusteringAlgo):
     batch_size : int
         size of the data batches (default: 128)
     pretrain_optimizer_params : dict
-        parameters of the optimizer for the pretraining of the neural network, includes the learning rate (default: {"lr": 1e-3})
+        parameters of the optimizer for the pretraining of the neural network, includes the learning rate. If None, it will be set to {"lr": 1e-3} (default: None)
     clustering_optimizer_params : dict
-        parameters of the optimizer for the actual clustering procedure, includes the learning rate (default: {"lr": 1e-4})
+        parameters of the optimizer for the actual clustering procedure, includes the learning rate. If None, it will be set to {"lr": 1e-4} (default: None)
     pretrain_epochs : int
         number of epochs for the pretraining of the neural network (default: 100)
     clustering_epochs : int
@@ -2104,7 +2104,7 @@ class ENRC(_AbstractDeepClusteringAlgo):
         self.betas = betas
         self.n_clusters = n_clusters
         self.neural_network_trained_ = neural_network
-        self.n_features_in_ = X.shape[1]
+        self.set_n_featrues_in(X.shape[1])
         return self
 
     def predict(self, X: np.ndarray = None, use_P: bool = True,
@@ -2264,9 +2264,9 @@ class ACeDeC(ENRC):
     batch_size : int
         size of the data batches (default: 128)
     pretrain_optimizer_params : dict
-        parameters of the optimizer for the pretraining of the neural network, includes the learning rate (default: {"lr": 1e-3})
+        parameters of the optimizer for the pretraining of the neural network, includes the learning rate. If None, it will be set to {"lr": 1e-3} (default: None)
     clustering_optimizer_params : dict
-        parameters of the optimizer for the actual clustering procedure, includes the learning rate (default: {"lr": 1e-4})
+        parameters of the optimizer for the actual clustering procedure, includes the learning rate. If None, it will be set to {"lr": 1e-4} (default: None)
     pretrain_epochs : int
         number of epochs for the pretraining of the neural network (default: 100)
     clustering_epochs : int

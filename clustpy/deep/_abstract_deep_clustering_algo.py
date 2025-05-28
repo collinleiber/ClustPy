@@ -5,9 +5,10 @@ import torch
 from clustpy.deep._data_utils import augmentation_invariance_check
 from clustpy.utils.checks import check_parameters
 from sklearn.utils.validation import check_is_fitted
+from sklearn.metrics.pairwise import pairwise_distances_argmin_min
 
 
-class _AbstractDeepClusteringAlgo(ClusterMixin, TransformerMixin, BaseEstimator):
+class _AbstractDeepClusteringAlgo(TransformerMixin, ClusterMixin, BaseEstimator):
     """
     An abstract deep clustering algorithm class that can be used by other deep clustering implementations.
 
@@ -40,7 +41,11 @@ class _AbstractDeepClusteringAlgo(ClusterMixin, TransformerMixin, BaseEstimator)
     def _check_parameters(self, X: np.ndarray, *, y: np.ndarray=None) -> (np.ndarray, np.ndarray, np.random.RandomState, dict, dict, dict):
         """
         Check if parameters for X, y and random_state are defined in accordance with the sklearn standard.
-        Furthermore, it checks the deep clustering specific settings for augmentation_invariance, pretrain_optimizer_params, clustering_optimizer_params and initial_clustering_params.
+        Furthermore, it checks the deep clustering specific settings for augmentation_invariance and verifies the values for pretrain_optimizer_params, clustering_optimizer_params and initial_clustering_params.
+        If those values are None, they will be specified as follows:
+        - pretrain_optimizer_params = {"lr": 1e-3}
+        - clustering_optimizer_params = {"lr": 1e-4}
+        - initial_clustering_params = {}
 
         Parameters
         ----------
@@ -94,14 +99,14 @@ class _AbstractDeepClusteringAlgo(ClusterMixin, TransformerMixin, BaseEstimator)
             The embedded data set
         """
         check_is_fitted(self, ["labels_", "neural_network_trained_", "n_features_in_"])
-        X, _, _ = check_parameters(X)
+        X, _, _ = check_parameters(X, allow_size_1=True, estimator_obj=self)
         if X.shape[1] != self.n_features_in_:
             raise ValueError(
             f"X has {X.shape[1]} features, but {self.__class__.__name__} "
             f"is expecting {self.n_features_in_} features as input."
         )
-        X_embed = self.neural_network_trained_.transform(X, self.batch_size)
-        return X_embed.astype(X.dtype)
+        X_embed = self.neural_network_trained_.transform(X)
+        return X_embed
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> '_AbstractDeepClusteringAlgo':
         """
@@ -119,6 +124,8 @@ class _AbstractDeepClusteringAlgo(ClusterMixin, TransformerMixin, BaseEstimator)
         self : _AbstractDeepClusteringAlgo
             this instance of the _AbstractDeepClusteringAlgo
         """
+        self.neural_network_trained_ = self.neural_network # placeholder
+        self.set_n_featrues_in(X.shape[1])
         return self
 
     def fit_transform(self, X: np.ndarray, y: np.ndarray=None):
@@ -140,3 +147,43 @@ class _AbstractDeepClusteringAlgo(ClusterMixin, TransformerMixin, BaseEstimator)
         self.fit(X, y)
         X_embed = self.transform(X)
         return X_embed
+
+    def predict(self, X: np.ndarray, cluster_centers: np.ndarray = None) -> np.ndarray:
+        """
+        Predicts the labels of the input data.
+        The labels will be equal to the id of the closest cluster center in the embedding of the autoencoder.
+        Therefore, cluster_centers must be give as input parameter or cluster_centers_ must be defined as an attribute.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            input data
+        cluster_centers : np.ndarray
+            the cluster centers. It is expected that the cluster centers lie within the embedded feature space, not in the original.
+            Can be None if attibute cluster_centers_ is defined
+
+        Returns
+        -------
+        predicted_labels : np.ndarray
+            The predicted labels
+        """
+        X_embed = self.transform(X)
+        if cluster_centers is None:
+            assert hasattr(self, "cluster_centers_"), "predict method of AbstractDeepClusteringAlgo can only be used if cluster_centers are give as input parameter or cluster_centers_ are defined as attribute"
+            cluster_centers = self.cluster_centers_
+        predicted_labels, _ = pairwise_distances_argmin_min(X=X_embed, Y=cluster_centers, metric='euclidean',
+                                                        metric_kwargs={'squared': True})
+        predicted_labels = predicted_labels.astype(np.int32)
+        return predicted_labels
+
+    def set_n_featrues_in(self, n_features: int) -> None:
+        """
+        Set the attribute n_features_in_ for this deep clustering algorithm and set fitted to true for the underlying neural network.
+
+        Parameters
+        ----------
+        n_features: int
+            The number of input features
+        """
+        self.n_features_in_ = n_features
+        self.neural_network_trained_.fitted = True

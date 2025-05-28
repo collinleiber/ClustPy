@@ -1,6 +1,11 @@
 import numpy as np
 from clustpy.partition import DipNSub
 from clustpy.data import create_subspace_data
+from clustpy.utils.checks import check_clustpy_estimator
+
+
+def test_dipnsub_estimator():
+    check_clustpy_estimator(DipNSub(), ("check_complex_data"))
 
 """
 Tests regarding the DipNSub object

@@ -5,7 +5,7 @@ Collin Leiber
 
 import torch
 import numpy as np
-from clustpy.deep._utils import detect_device, encode_batchwise, embedded_kmeans_prediction, mean_squared_error
+from clustpy.deep._utils import detect_device, encode_batchwise, mean_squared_error
 from clustpy.deep._data_utils import get_train_and_test_dataloader
 from clustpy.deep._train_utils import get_neural_network
 from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
@@ -13,7 +13,6 @@ import tqdm
 from sklearn.neighbors import NearestNeighbors
 from sklearn.cluster import KMeans
 from collections.abc import Callable
-from clustpy.utils.checks import check_parameters
 
 
 class DEN(_AbstractDeepClusteringAlgo):
@@ -44,7 +43,7 @@ class DEN(_AbstractDeepClusteringAlgo):
     batch_size : int
         size of the data batches (default: 256)
     pretrain_optimizer_params : dict
-        parameters of the optimizer for the pretraining of the neural network, includes the learning rate (default: {"lr": 1e-3})
+        parameters of the optimizer for the pretraining of the neural network, includes the learning rate. If None, it will be set to {"lr": 1e-3} (default: None)
     pretrain_epochs : int
         number of epochs for the pretraining of the neural network (default: 100)
     optimizer_class : torch.optim.Optimizer
@@ -312,25 +311,5 @@ class DEN(_AbstractDeepClusteringAlgo):
         self.labels_ = kmeans.labels_
         self.cluster_centers_ = kmeans.cluster_centers_
         self.neural_network_trained_ = neural_network
-        self.n_features_in_ = X.shape[1]
+        self.set_n_featrues_in(X.shape[1])
         return self
-
-
-    def predict(self, X: np.ndarray) -> np.ndarray:
-        """
-        Predicts the labels of the input data.
-
-        Parameters
-        ----------
-        X : np.ndarray
-            input data
-
-        Returns
-        -------
-        predicted_labels : np.ndarray
-            The predicted labels
-        """
-        X, _, _  = check_parameters(X)
-        X_embed = self.transform(X)
-        predicted_labels = embedded_kmeans_prediction(X_embed, self.cluster_centers_)
-        return predicted_labels

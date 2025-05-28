@@ -7,13 +7,14 @@ import torch
 import numpy as np
 from clustpy.deep._early_stopping import EarlyStopping
 from clustpy.deep._data_utils import get_dataloader
-from clustpy.deep._utils import encode_batchwise, get_device_from_module, mean_squared_error
+from clustpy.deep._utils import get_device_from_module, mean_squared_error
 import os
 import tqdm
 from collections.abc import Callable
 from sklearn.utils import check_random_state
 from clustpy.deep._utils import set_torch_seed
 from collections.abc import Callable
+from clustpy.utils.checks import check_parameters
 
 
 class FullyConnectedBlock(torch.nn.Module):
@@ -107,17 +108,15 @@ class _AbstractAutoencoder(torch.nn.Module):
 
     Attributes
     ----------
-    fitted  : bool
+    fitted : bool
         indicates whether the autoencoder is already fitted
-    work_on_copy : bool
-        indicates whether deep clustering algorithms should work on a copy of the original autoencoder
     """
 
     def __init__(self, work_on_copy: bool = True, random_state: np.random.RandomState | int = None):
         super(_AbstractAutoencoder, self).__init__()
-        self.fitted = False
         self.work_on_copy = work_on_copy
-        self.random_state = check_random_state(random_state)
+        self.random_state = random_state
+        self.fitted = False
 
     def encode(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -327,7 +326,8 @@ class _AbstractAutoencoder(torch.nn.Module):
         ValueError: data cannot be None if dataloader is None
         ValueError: evalloader cannot be None if scheduler=torch.optim.lr_scheduler.ReduceLROnPlateau
         """
-        set_torch_seed(self.random_state)
+        random_state = check_random_state(self.random_state)
+        set_torch_seed(random_state)
         if dataloader is None:
             if data is None:
                 raise ValueError("data must be specified if dataloader is None")
@@ -426,7 +426,7 @@ class _AbstractAutoencoder(torch.nn.Module):
         self.fitted = True
         return self
 
-    def transform(self, X: np.ndarray, batch_size: int) -> np.ndarray:
+    def transform(self, X: np.ndarray) -> np.ndarray:
         """
         Embed the given data set using the trained autoencoder.
 
@@ -434,14 +434,17 @@ class _AbstractAutoencoder(torch.nn.Module):
         ----------
         X: np.ndarray
             The given data set
-        batch_size : int
-            size of the data batches
 
         Returns
         -------
         X_embed : np.ndarray
             The embedded data set
         """
-        dataloader = get_dataloader(X, batch_size, False, False)
-        X_embed = encode_batchwise(dataloader, self)
-        return X_embed
+        if not self.fitted:
+            raise ValueError("The autoencoder is not fitted yet. Rnu fit() first.")
+        X, _, _ = check_parameters(X, allow_size_1=True)
+        device = get_device_from_module(self)
+        torch_data = torch.from_numpy(X).float().to(device)
+        embedded_data = self.encode(torch_data)
+        X_embed = embedded_data.detach().cpu().numpy()
+        return X_embed.astype(X.dtype)

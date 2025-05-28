@@ -5,6 +5,19 @@ from sklearn.datasets import make_blobs
 import torch
 import numpy as np
 from sklearn.manifold import Isomap
+from clustpy.utils.checks import check_clustpy_estimator
+
+
+def test_ddc_estimator():
+    # Ignore check_methods_subset_invariance due to numerical issues
+    check_clustpy_estimator(DDC(pretrain_epochs=3, tsne_params={"perplexity": 5}),
+                            ("check_complex_data", "check_methods_subset_invariance"))
+
+
+def test_n2d_estimator():
+    # Ignore check_methods_subset_invariance due to numerical issues
+    check_clustpy_estimator(N2D(3, pretrain_epochs=3, manifold_params={"perplexity": 5}),
+                            ("check_complex_data", "check_methods_subset_invariance"))
 
 
 def test_ddc_density_peak_clustering():

@@ -3,6 +3,15 @@ from clustpy.partition import DipExt, DipInit
 from clustpy.partition.dipext import _dip_scaling, _n_starting_vectors_default, _angle, \
     _ambiguous_modal_triangle_random, _get_ambiguous_modal_triangle_possibilities, _ambiguous_modal_triangle_all
 from clustpy.data import create_subspace_data
+from clustpy.utils.checks import check_clustpy_estimator
+
+
+def test_dipext_estimator():
+    check_clustpy_estimator(DipExt(), ("check_complex_data"))
+
+
+def test_dipinit_estimator():
+    check_clustpy_estimator(DipInit(3), ("check_complex_data"))
 
 
 def test_angle():
@@ -24,13 +33,17 @@ def test_dip_scaling():
                   [6, 10, 16],
                   [8, 10, 18]])
     dip_values = np.array([0.5, 0.1, 0.2])
-    subspace = _dip_scaling(X, dip_values)
+    subspace, max_min_values = _dip_scaling(X, dip_values)
     X_result = np.array([[0, 0, 0],
                          [0.25 * 0.5, 0.5 * 0.1, 0.25 * 0.2],
                          [0.5 * 0.5, 0.5 * 0.1, 0.5 * 0.2],
                          [0.75 * 0.5, 0.1, 0.75 * 0.2],
                          [0.5, 0.1, 0.2]])
     assert np.array_equal(subspace, X_result)
+    max_result = np.array([[8, 10, 18]])
+    assert np.array_equal(max_min_values[0], max_result)
+    min_result = np.array([[0, 0, 10]])
+    assert np.array_equal(max_min_values[1], min_result)
 
 
 def test_get_ambiguous_modal_triangle_possibilities():
@@ -94,9 +107,9 @@ def test_simple_DipExt():
     assert np.array_equal(subspace, subspace2)
     X2 = X[:15]
     subspace = dipext.transform(X2)
-    assert subspace.shape == (15, dipext.n_components)
+    assert subspace.shape == (15, dipext.n_components_final_)
     subspace2 = dipext2.transform(X2)
-    assert subspace2.shape == (15, dipext2.n_components)
+    assert subspace2.shape == (15, dipext2.n_components_final_)
     assert np.array_equal(subspace, subspace2)
 
 
@@ -132,3 +145,5 @@ def test_simple_DipInit():
     dipinit.fit(X)
     assert dipinit.labels_.dtype == np.int32
     assert dipinit.labels_.shape == labels.shape
+    labels_predict = dipinit.predict(X)
+    assert np.array_equal(dipinit.labels_, labels_predict)

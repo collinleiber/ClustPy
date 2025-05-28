@@ -1,6 +1,12 @@
 import numpy as np
 from clustpy.partition import SkinnyDip, UniDip
 from sklearn.datasets import make_blobs
+from clustpy.utils.checks import check_clustpy_estimator
+
+
+def test_skinnydip_estimator():
+    check_clustpy_estimator(SkinnyDip(), ("check_complex_data"))
+
 
 """
 Tests regarding the SkinnyDip object

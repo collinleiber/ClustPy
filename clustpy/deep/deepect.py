@@ -6,8 +6,7 @@ Julian Schilcher
 
 import numpy as np
 import torch
-from clustpy.deep._utils import squared_euclidean_distance, encode_batchwise, predict_batchwise, \
-    embedded_kmeans_prediction, mean_squared_error
+from clustpy.deep._utils import squared_euclidean_distance, encode_batchwise, predict_batchwise, mean_squared_error
 from clustpy.deep._train_utils import get_default_deep_clustering_initialization
 from sklearn.cluster import KMeans
 from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
@@ -15,6 +14,7 @@ from clustpy.hierarchical._cluster_tree import BinaryClusterTree, _ClusterTreeNo
 import tqdm
 import copy
 from collections.abc import Callable
+from sklearn.utils.validation import check_is_fitted
 
 
 class _DeepECT_ClusterTreeNode(_ClusterTreeNode):
@@ -546,13 +546,13 @@ class DeepECT(_AbstractDeepClusteringAlgo):
     batch_size : int
         Size of the data batches (default: 256)
     pretrain_optimizer_params : dict
-        parameters of the optimizer for the pretraining of the neural network, includes the learning rate (default: {"lr": 1e-3})
+        parameters of the optimizer for the pretraining of the neural network, includes the learning rate. If None, it will be set to {"lr": 1e-3} (default: None)
     clustering_optimizer_params : dict
-        parameters of the optimizer for the actual clustering procedure, includes the learning rate (default: {"lr": 1e-4})
+        parameters of the optimizer for the actual clustering procedure, includes the learning rate. If None, it will be set to {"lr": 1e-4} (default: None)
     pretrain_epochs : int
-        number of epochs for the pretraining of the neural network (default: 50)
+        number of epochs for the pretraining of the neural network (default: 100)
     clustering_epochs : int
-        Number of epochs for the actual clustering procedure (default: 200)
+        Number of epochs for the actual clustering procedure (default: 150)
     grow_interval : int
         Number of epochs after which the the tree is grown (default: 2)
     pruning_threshold : float
@@ -603,7 +603,7 @@ class DeepECT(_AbstractDeepClusteringAlgo):
     """
 
     def __init__(self, max_n_leaf_nodes: int = 20, batch_size: int = 256, pretrain_optimizer_params: dict = None,
-                 clustering_optimizer_params: dict = None, pretrain_epochs: int = 50, clustering_epochs: int = 200,
+                 clustering_optimizer_params: dict = None, pretrain_epochs: int = 100, clustering_epochs: int = 150,
                  grow_interval: int = 2, pruning_threshold: float = 0.1,
                  optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error,
@@ -655,7 +655,7 @@ class DeepECT(_AbstractDeepClusteringAlgo):
         self.tree_ = tree
         self.labels_ = labels
         self.neural_network_trained_ = neural_network
-        self.n_features_in_ = X.shape[1]
+        self.set_n_featrues_in(X.shape[1])
         return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:
@@ -672,11 +672,11 @@ class DeepECT(_AbstractDeepClusteringAlgo):
         predicted_labels : np.ndarray
             The predicted labels
         """
-        X_embed = self.transform(X)
+        check_is_fitted(self, ["tree_", "labels_", "n_features_in_"])
         leaf_nodes, _ = self.tree_.get_leaf_and_split_nodes()
         leaf_centers = np.array([leaf.center.data.detach().cpu().numpy() for leaf in leaf_nodes])
         leaf_labels = np.array([leaf.labels[0] for leaf in leaf_nodes])
-        cluster_center_assignments = embedded_kmeans_prediction(X_embed, leaf_centers)
+        cluster_center_assignments = super().predict(X, leaf_centers)
         predicted_labels = leaf_labels[cluster_center_assignments]
         return predicted_labels
 
@@ -696,7 +696,7 @@ class DeepECT(_AbstractDeepClusteringAlgo):
         labels_pruned : np.ndarray
             The new cluster labels
         """
-        assert self.labels_ is not None, "The DeepECT algorithm has not run yet. Use the fit() function first."
+        check_is_fitted(self, ["tree_", "labels_", "n_features_in_"])
         tree_copy = copy.deepcopy(self.tree_)
         labels_pruned = tree_copy.prune_to_n_leaf_nodes(n_leaf_nodes_to_keep, self.labels_)
         return labels_pruned

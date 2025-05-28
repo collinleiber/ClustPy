@@ -5,9 +5,11 @@ Collin Leiber
 
 from clustpy.alternative.nrkmeans import NrKmeans, _get_total_cost_function, _mdl_costs
 import numpy as np
-from sklearn.base import BaseEstimator, ClusterMixin
+from sklearn.base import BaseEstimator, ClusterMixin, TransformerMixin
 from clustpy.utils.plots import plot_scatter_matrix
-from sklearn.utils import check_random_state
+from clustpy.utils.checks import check_parameters
+from sklearn.utils.validation import check_is_fitted
+from sklearn.metrics.pairwise import pairwise_distances_argmin_min
 
 
 def _transform_subkmeans_m_to_nrkmeans_m(m: int, dims: int) -> list:
@@ -93,7 +95,7 @@ def _transform_subkmeans_scatter_to_nrkmeans_scatters(X: np.ndarray, scatter_mat
     return nrkmeans_scatter_matrices
 
 
-class SubKmeans(BaseEstimator, ClusterMixin):
+class SubKmeans(TransformerMixin, ClusterMixin, BaseEstimator):
     """
     The Subspace Kmeans (SubKmeans) algorithm.
     The algorithm will simultaneously search for cluster assignments and an optimal subspace regarding those assignments.
@@ -105,12 +107,12 @@ class SubKmeans(BaseEstimator, ClusterMixin):
     Parameters
     ----------
     n_clusters : int
-        the number of clusters
-    V : np.ndarray
+        the number of clusters (deafault: 8)
+    V_init : np.ndarray
         the orthonormal rotation matrix (default: None)
-    m : int
+    m_init : int
         the initial dimensionality of the clustered space (default: None)
-    cluster_centers : np.ndarray
+    cluster_centers_init : np.ndarray
         list containing the initial cluster centers (default: None)
     mdl_for_noisespace : bool
         defines if MDL should be used to identify noise space dimensions instead of only considering negative eigenvalues (default: False)
@@ -141,6 +143,10 @@ class SubKmeans(BaseEstimator, ClusterMixin):
         The final labels
     scatter_matrix_ : np.ndarray
         The final scatter matrix
+    n_iter_ : list
+        The number of iterations used to achieve the result
+    n_features_in_ : int
+        the number of features used for the fitting
 
     References
     ----------
@@ -154,8 +160,8 @@ class SubKmeans(BaseEstimator, ClusterMixin):
     Society for Industrial and Applied Mathematics, 2022.
     """
 
-    def __init__(self, n_clusters: int, V: np.ndarray = None, m: int = None,
-                 cluster_centers: np.ndarray = None, mdl_for_noisespace: bool = False, outliers: bool = False,
+    def __init__(self, n_clusters: int = 8, V_init: np.ndarray = None, m_init: int = None,
+                 cluster_centers_init: np.ndarray = None, mdl_for_noisespace: bool = False, outliers: bool = False,
                  max_iter: int = 300, n_init: int = 1, cost_type: str = "default",
                  threshold_negative_eigenvalue: float = -1e-7, max_distance: float = None, precision: float = None,
                  random_state: np.random.RandomState | int = None, debug: bool = False):
@@ -169,12 +175,12 @@ class SubKmeans(BaseEstimator, ClusterMixin):
         self.max_distance = max_distance
         self.precision = precision
         self.debug = debug
-        self.random_state = check_random_state(random_state)
+        self.random_state = random_state
         # Variables
         self.n_clusters = n_clusters
-        self.cluster_centers = cluster_centers
-        self.V = V
-        self.m = m
+        self.cluster_centers_init = cluster_centers_init
+        self.V_init = V_init
+        self.m_init = m_init
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'SubKmeans':
         """
@@ -191,37 +197,40 @@ class SubKmeans(BaseEstimator, ClusterMixin):
         self : SubKmeans
             this instance of the SubKmeans algorithm
         """
-        n_clusters = [self.n_clusters, 1]
-        if self.m is not None:
-            m = _transform_subkmeans_m_to_nrkmeans_m(self.m, X.shape[1])
-            P = _transform_subkmeans_P_to_nrkmeans_P(self.m, X.shape[1])
+        X, _, random_state = check_parameters(X=X, y=y, random_state=self.random_state)
+        n_clusters = [self.n_clusters, 1] if self.n_clusters != 1 else [1]
+        if self.m_init is not None:
+            m_init = _transform_subkmeans_m_to_nrkmeans_m(self.m_init, X.shape[1])
+            P_init = _transform_subkmeans_P_to_nrkmeans_P(self.m_init, X.shape[1])
         else:
-            m = self.m
-            P = None
-        if self.cluster_centers is not None:
-            cluster_centers = _transform_subkmeans_centers_to_nrkmeans_centers(X, self.cluster_centers)
+            m_init = self.m_init
+            P_init = None
+        if self.cluster_centers_init is not None:
+            cluster_centers_init = _transform_subkmeans_centers_to_nrkmeans_centers(X, self.cluster_centers_init)
         else:
-            cluster_centers = self.cluster_centers
-        nrkmeans = NrKmeans(n_clusters, V=self.V, m=m, P=P, cluster_centers=cluster_centers,
+            cluster_centers_init = self.cluster_centers_init
+        nrkmeans = NrKmeans(n_clusters, V_init=self.V_init, m_init=m_init, P_init=P_init, cluster_centers_init=cluster_centers_init,
                             mdl_for_noisespace=self.mdl_for_noisespace, outliers=self.outliers,
                             max_iter=self.max_iter, n_init=self.n_init,
                             threshold_negative_eigenvalue=self.threshold_negative_eigenvalue,
                             max_distance=self.max_distance,
-                            precision=self.precision, random_state=self.random_state, debug=self.debug)
+                            precision=self.precision, random_state=random_state, debug=self.debug)
         nrkmeans.fit(X)
         # Adjust rotation to match SubKmeans properties
-        if len(nrkmeans.P) == 2:
-            self.V = nrkmeans.V[:, np.r_[nrkmeans.P[0], nrkmeans.P[1]]]
+        if len(nrkmeans.P_) == 2:
+            self.V_ = nrkmeans.V_[:, np.r_[nrkmeans.P_[0], nrkmeans.P_[1]]]
         else:
-            self.V = nrkmeans.V[:, np.r_[nrkmeans.P[0]]]
+            self.V_ = nrkmeans.V_[:, np.r_[nrkmeans.P_[0]]]
         if nrkmeans.labels_.ndim == 1:
             self.labels_ = nrkmeans.labels_
         else:
             self.labels_ = nrkmeans.labels_[:, 0]
-        self.cluster_centers = nrkmeans.cluster_centers[0]
-        self.m = nrkmeans.m[0]
+        self.n_iter_ = nrkmeans.n_iter_
+        self.cluster_centers_ = nrkmeans.cluster_centers_[0]
+        self.m_ = nrkmeans.m_[0]
         self.scatter_matrix_ = nrkmeans.scatter_matrices_[0]
-        self.n_clusters = nrkmeans.n_clusters[0]
+        self.n_clusters_final_ = nrkmeans.n_clusters_final_[0]
+        self.n_features_in_ = X.shape[1]
         return self
 
     def transform_full_space(self, X: np.ndarray) -> np.ndarray:
@@ -238,11 +247,12 @@ class SubKmeans(BaseEstimator, ClusterMixin):
         rotated_data : np.ndarray
             The rotated dataset
         """
-        assert hasattr(self, "labels_"), "The SubKmeans algorithm has not run yet. Use the fit() function first."
-        rotated_data = np.matmul(X, self.V)
+        check_is_fitted(self, ["labels_", "n_features_in_"])
+        X, _, _ = check_parameters(X=X, estimator_obj=self, allow_size_1=True)
+        rotated_data = np.matmul(X, self.V_)
         return rotated_data
 
-    def transform_clustered_space(self, X: np.ndarray) -> np.ndarray:
+    def transform(self, X: np.ndarray) -> np.ndarray:
         """
         Transform the input dataset with the orthonormal rotation matrix identified by the fit function and
         project it into the clustered space.
@@ -257,10 +267,31 @@ class SubKmeans(BaseEstimator, ClusterMixin):
         rotated_data : np.ndarray
             The rotated and projected dataset
         """
-        assert hasattr(self, "labels_"), "The SubKmeans algorithm has not run yet. Use the fit() function first."
-        clustered_space_V = self.V[:, :self.m]
+        check_is_fitted(self, ["labels_", "n_features_in_"])
+        X, _, _ = check_parameters(X=X, estimator_obj=self, allow_size_1=True)
+        clustered_space_V = self.V_[:, :self.m_]
         rotated_data = np.matmul(X, clustered_space_V)
         return rotated_data
+
+    def fit_transform(self, X: np.ndarray, y: np.ndarray=None):
+        """
+        Train the clusterin algorithm on the given data set and return the final embedded version of the data using the obtained subspace.
+
+        Parameters
+        ----------
+        X: np.ndarray
+            The given data set
+        y : np.ndarray
+            the labels (can usually be ignored)
+
+        Returns
+        -------
+        X_embed : np.ndarray
+            The embedded data set
+        """
+        self.fit(X, y)
+        X_embed = self.transform(X)
+        return X_embed
 
     def plot_clustered_space(self, X: np.ndarray, labels: np.ndarray = None, plot_centers: bool = False,
                              gt: np.ndarray = None, equal_axis=False) -> None:
@@ -280,12 +311,13 @@ class SubKmeans(BaseEstimator, ClusterMixin):
         equal_axis : bool
             defines whether the axes should be scaled equally
         """
-        assert hasattr(self, "labels_"), "The SubKmeans algorithm has not run yet. Use the fit() function first."
+        check_is_fitted(self, ["labels_", "n_features_in_"])
+        X, _, _ = check_parameters(X=X, estimator_obj=self, allow_size_1=True)
         if labels is None:
             labels = self.labels_
         assert X.shape[0] == labels.shape[0], "Number of data objects must match the number of labels."
-        plot_scatter_matrix(self.transform_clustered_space(X), labels,
-                            self.transform_clustered_space(self.cluster_centers) if
+        plot_scatter_matrix(self.transform(X), labels,
+                            self.transform(self.cluster_centers_) if
                             plot_centers else None, true_labels=gt, equal_axis=equal_axis)
 
     def calculate_mdl_costs(self, X: np.ndarray) -> (float, float, list):
@@ -304,12 +336,13 @@ class SubKmeans(BaseEstimator, ClusterMixin):
             The global costs,
             The subspace specific costs (one entry for each subspace)
         """
-        assert hasattr(self, "labels_"), "The SubKmeans algorithm has not run yet. Use the fit() function first."
-        m = _transform_subkmeans_m_to_nrkmeans_m(self.m, X.shape[1])
-        P = _transform_subkmeans_P_to_nrkmeans_P(self.m, self.V.shape[0])
+        check_is_fitted(self, ["labels_", "n_features_in_"])
+        X, _, _ = check_parameters(X=X, estimator_obj=self, allow_size_1=True)
+        m = _transform_subkmeans_m_to_nrkmeans_m(self.m_, X.shape[1])
+        P = _transform_subkmeans_P_to_nrkmeans_P(self.m_, self.V_.shape[0])
         scatter_matrices = _transform_subkmeans_scatter_to_nrkmeans_scatters(X, self.scatter_matrix_)
         labels = np.c_[self.labels_, np.zeros(self.labels_.shape[0])]
-        total_costs, global_costs, all_subspace_costs = _mdl_costs(X, [self.n_clusters, 1], m, P, self.V,
+        total_costs, global_costs, all_subspace_costs = _mdl_costs(X, [self.n_clusters, 1], m, P, self.V_,
                                                                    scatter_matrices, labels,
                                                                    self.outliers, self.max_distance, self.precision)
         return total_costs, global_costs, all_subspace_costs
@@ -330,8 +363,31 @@ class SubKmeans(BaseEstimator, ClusterMixin):
         costs : float
             The total loss of this SubKmeans object
         """
-        assert hasattr(self, "labels_"), "The SubKmeans algorithm has not run yet. Use the fit() function first."
-        P = _transform_subkmeans_P_to_nrkmeans_P(self.m, self.V.shape[0])
+        check_is_fitted(self, ["labels_", "n_features_in_"])
+        X, _, _ = check_parameters(X=X, estimator_obj=self, allow_size_1=True)
+        P = _transform_subkmeans_P_to_nrkmeans_P(self.m_, self.V_.shape[0])
         scatter_matrices = _transform_subkmeans_scatter_to_nrkmeans_scatters(X, self.scatter_matrix_)
-        costs = _get_total_cost_function(self.V, P, scatter_matrices)
+        costs = _get_total_cost_function(self.V_, P, scatter_matrices)
         return costs
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """
+        Predict the labels of an input dataset. For this method the results from the fit() method will be used.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            the given data set
+
+        Returns
+        -------
+        predicted_labels : np.ndarray
+            the predicted labels of the input data set
+        """
+        X_transform = self.transform(X)
+        centers_transform = self.transform(self.cluster_centers_)
+        predicted_labels, _ = pairwise_distances_argmin_min(X=X_transform, Y=centers_transform,
+                                                          metric='euclidean',
+                                                          metric_kwargs={'squared': True})
+        predicted_labels = predicted_labels.astype(np.int32)
+        return predicted_labels

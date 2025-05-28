@@ -9,9 +9,8 @@ from clustpy.utils import dip_test
 import torch
 import numpy as np
 from clustpy.partition.skinnydip import _dip_mirrored_data
-from clustpy.deep._utils import detect_device, encode_batchwise, run_initial_clustering, mean_squared_error
-from clustpy.deep._data_utils import get_train_and_test_dataloader
-from clustpy.deep._train_utils import get_trained_network
+from clustpy.deep._utils import detect_device, encode_batchwise, mean_squared_error
+from clustpy.deep._train_utils import get_default_deep_clustering_initialization
 from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
 from clustpy.deep.neural_networks._resnet_ae_modules import EncoderBlock, DecoderBlock
 import matplotlib.pyplot as plt
@@ -285,148 +284,6 @@ def plot_dipencoder_embedding(X_embed: np.ndarray, n_clusters: int, labels: np.n
         plt.show()
 
 
-def _get_dip_error(dip_module: _Dip_Module, X_embed: torch.Tensor, projection_axis_index: int,
-                   points_in_m: torch.Tensor, points_in_n: torch.Tensor, n_points_in_m: int, n_points_in_n: int,
-                   max_cluster_size_diff_factor: float, device: torch.device) -> torch.Tensor:
-    """
-    Calculate the dip error for the projection axis between cluster m and cluster n.
-    In details it returns:
-    0.5 * ((Dip-value of cluster m) + (Dip-value of cluster m)) - (Dip-value of cluster m and n)
-    on this specific projeciton axis.
-
-    Parameters
-    ----------
-    dip_module : _Dip_Module
-        The DipModule
-    X_embed : torch.Tensor
-        The embedded data set
-    projection_axis_index : int
-        The index of the projection axis within the DipModule 
-    points_in_m : torch.Tensor
-        Tensor containing the indices of the objects within cluster m
-    points_in_n : torch.Tensor
-        Tensor containing the indices of the objects within cluster n
-    n_points_in_m : int
-        Size of cluster m
-    n_points_in_n : int
-        Size of cluster n
-    max_cluster_size_diff_factor : float
-        The maximum different in size when comparing two clusters regarding the number of samples.
-        If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) closest samples will be used
-    device : torch.device
-        device to be trained on
-
-    Returns
-    -------
-    dip_loss_new : torch.Tensor
-        The final Dip loss on the specified projection axis
-    """
-    # Calculate dip cluster m
-    dip_value_m = dip_module(X_embed[points_in_m], projection_axis_index)
-
-    # Calculate dip cluster n
-    dip_value_n = dip_module(X_embed[points_in_n], projection_axis_index)
-
-    # Calculate dip combined clusters m and n
-    if n_points_in_m > max_cluster_size_diff_factor * n_points_in_n:
-        perm = torch.randperm(n_points_in_m).to(device)
-        sampled_m = points_in_m[perm[:int(n_points_in_n * max_cluster_size_diff_factor)]]
-        dip_value_mn = dip_module(torch.cat([X_embed[sampled_m], X_embed[points_in_n]]),
-                                  projection_axis_index)
-    elif n_points_in_n > max_cluster_size_diff_factor * n_points_in_m:
-        perm = torch.randperm(n_points_in_n).to(device)
-        sampled_n = points_in_n[perm[:int(n_points_in_m * max_cluster_size_diff_factor)]]
-        dip_value_mn = dip_module(torch.cat([X_embed[points_in_m], X_embed[sampled_n]]),
-                                  projection_axis_index)
-    else:
-        dip_value_mn = dip_module(X_embed[torch.cat([points_in_m, points_in_n])], projection_axis_index)
-    # We want to maximize dip between clusters => set mn loss to -dip
-    dip_loss_new = 0.5 * (dip_value_m + dip_value_n) - dip_value_mn
-    return dip_loss_new
-
-
-def _predict(X_train: np.ndarray, X_test: np.ndarray, labels_train: np.ndarray, projections: np.ndarray,
-             n_clusters: int, index_dict: dict) -> np.ndarray:
-    """
-    Predict the clustering labels using the current structure of the neural network and DipModule.
-    Therefore, we determine the modal interval for two clusters on their corresponding projection axis using X_train.
-    The center between the upper bound of the left cluster and the lower bound of the right cluster will be used as a threshold.
-    If an object of X_test is left of this threshold it will be assigned to the left cluster. The same applies analogously to the right cluster.
-    In the end the object will be assigned the label of the cluster that matched most often.
-
-    Parameters
-    ----------
-    X_train : np.ndarray
-        The data set used to retrieve the modal intervals
-    X_test : np.ndarray
-        The data set for which we want to retrieve the labels
-    labels_train : np.ndarray
-        The labels of X_train
-    projections : np.ndarray
-        Matrix containing all the projection axes
-    n_clusters : int
-        The total number of clusters
-    index_dict : dict
-        A dictionary to match the indices of two clusters to a projection axis
-
-    Returns
-    -------
-    labels_pred : np.ndarray
-        The predicted labels for X_test
-    """
-    points_in_all_clusters = [np.where(labels_train == clus)[0] for clus in range(n_clusters)]
-    n_points_in_all_clusters = [points_in_cluster.shape[0] for points_in_cluster in points_in_all_clusters]
-    labels_pred_matrix = np.zeros((X_test.shape[0], n_clusters))
-    for m in range(n_clusters - 1):
-        if n_points_in_all_clusters[m] < 4:
-            continue
-        for n in range(m + 1, n_clusters):
-            if n_points_in_all_clusters[n] < 4:
-                continue
-            # Get correct projection vector
-            projection_vector = projections[index_dict[(m, n)]]
-            # Project data
-            X_train_m = X_train[points_in_all_clusters[m]]
-            X_train_n = X_train[points_in_all_clusters[n]]
-            x_proj_m = np.matmul(X_train_m, projection_vector)
-            x_proj_n = np.matmul(X_train_n, projection_vector)
-            # Sort data
-            sorted_indices_m = x_proj_m.argsort()
-            sorted_indices_n = x_proj_n.argsort()
-            # Execute mirrored dip
-            _, low_m, high_m = _dip_mirrored_data(x_proj_m[sorted_indices_m], None)
-            low_m_coor = x_proj_m[sorted_indices_m[low_m]]
-            high_m_coor = x_proj_m[sorted_indices_m[high_m]]
-            _, low_n, high_n = _dip_mirrored_data(x_proj_n[sorted_indices_n], None)
-            low_n_coor = x_proj_n[sorted_indices_n[low_n]]
-            high_n_coor = x_proj_n[sorted_indices_n[high_n]]
-            # Project testdata onto projection line
-            x_test_proj = np.matmul(X_test, projection_vector)
-            # Check if projected test data matches cluster structure
-            if low_m_coor > high_n_coor:  # cluster m right of cluster n
-                threshold = (low_m_coor - high_n_coor) / 2
-                labels_pred_matrix[x_test_proj <= low_m_coor - threshold, n] += 1
-                labels_pred_matrix[x_test_proj >= high_n_coor + threshold, m] += 1
-            elif low_n_coor > high_m_coor:  # cluster n right of cluster m
-                threshold = (low_n_coor - high_m_coor) / 2
-                labels_pred_matrix[x_test_proj <= low_n_coor - threshold, m] += 1
-                labels_pred_matrix[x_test_proj >= high_m_coor + threshold, n] += 1
-            else:
-                center_coor_m = (low_m_coor + high_m_coor) / 2
-                center_coor_n = (low_n_coor + high_n_coor) / 2
-                if center_coor_m > center_coor_n:  # cluster m right of cluster n
-                    threshold = (high_n_coor - low_m_coor) / 2
-                    labels_pred_matrix[x_test_proj <= low_m_coor + threshold, n] += 1
-                    labels_pred_matrix[x_test_proj >= high_n_coor - threshold, m] += 1
-                else:  # cluster n right of cluster m
-                    threshold = (high_m_coor - low_n_coor) / 2
-                    labels_pred_matrix[x_test_proj <= low_n_coor + threshold, m] += 1
-                    labels_pred_matrix[x_test_proj >= high_m_coor - threshold, n] += 1
-    # Get best matching cluster
-    labels_pred = np.argmax(labels_pred_matrix, axis=1)
-    return labels_pred
-
-
 def _get_ssl_loss_of_first_batch(trainloader: torch.utils.data.DataLoader, neural_network: torch.nn.Module,
                                  ssl_loss_fn: Callable | torch.nn.modules.loss._Loss, device: torch.device) -> torch.Tensor:
     """
@@ -470,192 +327,345 @@ def _get_ssl_loss_of_first_batch(trainloader: torch.utils.data.DataLoader, neura
     return ssl_loss.detach()
 
 
-def _dipencoder(X: np.ndarray, n_clusters: int, embedding_size: int, batch_size: int,
-                optimizer_class: torch.optim.Optimizer, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss,
-                clustering_epochs: int, clustering_optimizer_params: dict, pretrain_epochs: int,
-                pretrain_optimizer_params: dict, neural_network: torch.nn.Module | tuple, neural_network_weights: str,
-                max_cluster_size_diff_factor: float, clustering_loss_weight: float, ssl_loss_weight: float,
-                custom_dataloaders: tuple, augmentation_invariance: bool, initial_clustering_class: ClusterMixin,
-                initial_clustering_params: dict, labels_gt: np.ndarray, device: torch.device,
-                random_state: np.random.RandomState) -> (
-        np.ndarray, np.ndarray, dict, torch.nn.Module):
+def _predict_using_thresholds(X: np.ndarray, projections: np.ndarray, projection_thresholds: list,
+            n_clusters: int, index_dict: dict) -> np.ndarray:
     """
-    Start the actual DipEncoder procedure on the input data set.
-    If labels_gt is None this method will act as a clustering algorithm else it will only be used to learn an embedding.
+    Predict the clustering labels using the embedding of the neural network and the saved threshold on the projection axes.
+    If an object of X is left of this threshold it matches the left cluster. The same applies analogously to the right cluster.
+    In the end the object will be assigned the label of the cluster that matched most often.
 
     Parameters
     ----------
-    X : np.ndarray / torch.Tensor
-        the given data set. Can be a np.ndarray or a torch.Tensor
+    X : np.ndarray
+        The data set used to predict the labels
+    projections : np.ndarray
+        Matrix containing all the projection axes
+    projection_thresholds : list
+        List containing the thresholds for each projection axis and a tuple indicating which cluster is left and right of the threshold
     n_clusters : int
-        number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN
-    embedding_size : int
-        size of the embedding within the neural network
-    batch_size : int
-        size of the data batches for the actual training of the DipEncoder
-    optimizer_class : torch.optim.Optimizer
-        the optimizer class
-    ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
-         self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
-    clustering_epochs : int
-        number of epochs for the actual clustering procedure
-    clustering_optimizer_params : dict
-        parameters of the optimizer for the actual clustering procedure, includes the learning rate
-    pretrain_epochs : int
-        number of epochs for the pretraining of the neural network
-    pretrain_optimizer_params : dict
-        parameters of the optimizer for the pretraining of the neural network, includes the learning rate
-    neural_network : torch.nn.Module | tuple
-        the input neural network.
-        Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict)
-    neural_network_weights : str
-        Path to a file containing the state_dict of the neural_network.
-    max_cluster_size_diff_factor : float
-        The maximum different in size when comparing two clusters regarding the number of samples.
-        If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) closest samples will be used
-    clustering_loss_weight : float
-        weight of the clustering loss
-    ssl_loss_weight : float
-        weight of the self-supervised learning (ssl) loss.
-        If None, it will be equal to 1/(4L), where L is the reconstruction loss of the first batch of an untrained neural network
-    custom_dataloaders : tuple
-        tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
-        Can also be a tuple of strings, where the first entry is the path to a saved trainloader and the second entry the path to a saved testloader.
-        In this case the dataloaders will be loaded by torch.load(PATH).
-        If None, the default dataloaders will be used
-    augmentation_invariance : bool
-        If True, augmented samples provided in custom_dataloaders[0] will be used to learn
-        cluster assignments that are invariant to the augmentation transformations
-    initial_clustering_class : ClusterMixin
-        clustering class to obtain the initial cluster labels after the pretraining
-    initial_clustering_params : dict
-        parameters for the initial clustering class
-    labels_gt : no.ndarray
-        Ground truth labels. If None, the DipEncoder will be used for clustering
-    device : torch.device
-        The device on which to perform the computations
-    random_state : np.random.RandomState
-        use a fixed random state to get a repeatable solution
+        The total number of clusters
+    index_dict : dict
+        A dictionary to match the indices of two clusters to a projection axis
 
     Returns
     -------
-    tuple : (np.ndarray, np.ndarray, dict, torch.nn.Module)
-        The labels as identified by the DipEncoder,
-        The final projection axes between the clusters,
-        A dictionary to match the indices of two clusters to a projection axis,
-        The final neural network
+    labels_pred : np.ndarray
+        The predicted labels
     """
-    MIN_NUMBER_OF_POINTS = 10
-    # Deep Learning stuff
-    device = detect_device(device)
-    trainloader, testloader, _ = get_train_and_test_dataloader(X, batch_size, custom_dataloaders)
-    # Get initial AE
-    neural_network = get_trained_network(trainloader, n_epochs=pretrain_epochs,
-                                         optimizer_params=pretrain_optimizer_params, optimizer_class=optimizer_class,
-                                         device=device, ssl_loss_fn=ssl_loss_fn, embedding_size=embedding_size,
-                                         neural_network=neural_network, neural_network_weights=neural_network_weights,
-                                         random_state=random_state)
-    # Get factor for AE loss
-    # rand_samples = torch.rand((batch_size, X.shape[1]))
-    # data_min = np.min(X)
-    # data_max = np.max(X)
-    # rand_samples_resized = (rand_samples * (data_max - data_min) + data_min).to(device)
-    # rand_samples_reconstruction = neural_network.forward(rand_samples_resized)
-    # reconstruction_loss_weight = loss_fn(rand_samples_reconstruction, rand_samples_resized).detach()
-    if ssl_loss_weight is None:
-        ssl_loss_weight = _get_ssl_loss_of_first_batch(trainloader, neural_network, ssl_loss_fn, device)
-        ssl_loss_weight = 1 / (4 * ssl_loss_weight)
-        print("Setting ssl_loss_weight automatically; set to", ssl_loss_weight)
-    # Create initial projections
-    X_embed = encode_batchwise(testloader, neural_network)
-    if labels_gt is None:
-        # Execute intitial clustering to get labels and centers
-        n_clusters, labels_new, centers, _ = run_initial_clustering(X_embed, n_clusters,
-                                                                    initial_clustering_class,
-                                                                    initial_clustering_params, random_state)
-        labels_torch = torch.from_numpy(labels_new)
-    else:
-        labels_torch = torch.from_numpy(labels_gt)
-        centers = np.array([np.mean(X_embed[labels_gt == i], axis=0) for i in range(n_clusters)])
-    n_cluster_combinations = int((n_clusters - 1) * n_clusters / 2)
-    projections = np.zeros((n_cluster_combinations, embedding_size))
-    # Create initial projections vectors by using difference between cluster centers
-    index_dict = {}
+    labels_pred_matrix = np.zeros((X.shape[0], n_clusters))
     for m in range(n_clusters - 1):
         for n in range(m + 1, n_clusters):
-            mean_1 = centers[m]
-            mean_2 = centers[n]
-            v = mean_1 - mean_2
-            projections[len(index_dict)] = v
-            index_dict[(m, n)] = len(index_dict)
-    # Create DipModule
-    dip_module = _Dip_Module(projections).to(device)
-    # Create SGD Optimizer
-    optimizer = optimizer_class(list(neural_network.parameters()) + list(dip_module.parameters()),
-                                **clustering_optimizer_params)
-    # Start Optimization
-    tbar = tqdm.trange(clustering_epochs + 1, desc="DipEncoder training")
-    for iteration in tbar:
-        # Update labels for clustering
-        if labels_gt is None:
-            X_embed = encode_batchwise(testloader, neural_network)
-            labels_new = _predict(X_embed, X_embed, labels_new, dip_module.projection_axes.detach().cpu().numpy(),
-                                  n_clusters, index_dict)
-            labels_torch = torch.from_numpy(labels_new).int().to(device)
-        if iteration == clustering_epochs:
-            break
-        total_loss = 0
-        for batch in trainloader:
-            ids = batch[0]
-            # SSL Loss
-            if augmentation_invariance:
-                ssl_loss, embedded, _, embedded_aug, _ = neural_network.loss_augmentation(batch, ssl_loss_fn,
-                                                                                          device)
-            else:
-                ssl_loss, embedded, _ = neural_network.loss(batch, ssl_loss_fn, device)
-            # Get points within each cluster
-            points_in_all_clusters = [torch.where(labels_torch[ids] == clus)[0].to(device) for clus in
-                                      range(n_clusters)]
-            n_points_in_all_clusters = [points_in_cluster.shape[0] for points_in_cluster in points_in_all_clusters]
-            if augmentation_invariance:
-                # Regular embedded data will be combined with augmented data
-                points_in_all_clusters = [torch.cat((p_c, p_c + embedded.shape[0])) for p_c in points_in_all_clusters]
-                n_points_in_all_clusters = [2 * n_c for n_c in n_points_in_all_clusters]
-                embedded = torch.cat((embedded, embedded_aug), 0)
-            dip_loss = torch.tensor(0)
-            for m in range(n_clusters - 1):
-                if n_points_in_all_clusters[m] < MIN_NUMBER_OF_POINTS:
-                    continue
-                for n in range(m + 1, n_clusters):
-                    if n_points_in_all_clusters[n] < MIN_NUMBER_OF_POINTS:
-                        continue
-                    dip_loss_new = _get_dip_error(
-                        dip_module, embedded, index_dict[(m, n)], points_in_all_clusters[m], points_in_all_clusters[n],
-                        n_points_in_all_clusters[m], n_points_in_all_clusters[n], max_cluster_size_diff_factor,
-                        device)
-                    dip_loss = dip_loss + dip_loss_new
-            final_dip_loss = torch.true_divide(dip_loss, n_cluster_combinations)
-            loss = clustering_loss_weight * final_dip_loss + ssl_loss * ssl_loss_weight
-            total_loss += loss.item()
-            # Optimize
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-        postfix_str = {"Loss": total_loss}
-        tbar.set_postfix(postfix_str)
-    # Get final labels
-    if labels_gt is None:
-        X_embed = encode_batchwise(testloader, neural_network)
-        labels_final = _predict(X_embed, X_embed, labels_new, dip_module.projection_axes.detach().cpu().numpy(),
-                                n_clusters, index_dict)
-        labels_final = labels_final.astype(np.int32)
-    else:
-        labels_final = labels_gt
-    return labels_final, dip_module.projection_axes.detach().cpu().numpy(), index_dict, neural_network
+            # Get correct projection vector
+            projection_vector = projections[index_dict[(m, n)]]
+            threshold, cluster_tuple = projection_thresholds[index_dict[(m, n)]]
+            assert m in cluster_tuple and n in cluster_tuple
+            # Project data
+            X_proj = np.matmul(X, projection_vector)
+            labels_pred_matrix[X_proj < threshold, cluster_tuple[0]] += 1
+            labels_pred_matrix[X_proj >= threshold, cluster_tuple[1]] += 1
+    # Get best matching cluster
+    labels_pred = np.argmax(labels_pred_matrix, axis=1)
+    return labels_pred
 
+
+class _DipEncoder_Module(torch.nn.Module):
+    """
+    The _DipEncoder_Module. Contains most of the algorithm specific procedures like the loss function.
+
+    Parameters
+    ----------
+    n_clusters : int
+        nNumber of clusters
+    index_dict : dict
+        A dictionary to match the indices of two clusters to a projection axis
+    dip_module : torch.nn.Module
+        The DipModule
+    init_np_labelss : np.ndarray
+        The initial cluster labels
+    max_cluster_size_diff_factor : float
+        The maximum different in size when comparing two clusters regarding the number of samples.
+        If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) samples will be used
+    augmentation_invariance : bool
+        If True, augmented samples provided in custom_dataloaders[0] will be used to learn
+        cluster assignments that are invariant to the augmentation transformations (default: False)
+    use_gt : bool
+        Use the ground truth to learn the embedding. In that case the labels will not change during optimization (default: False)
+
+    Attributes
+    ----------
+    labels : float
+        the cluster labels
+    projection_thresholds_ : bool
+        A list containing the thresholds for each projection axis and a tuple indicating which cluster is left and right of the threshold
+    """
+
+    def __init__(self, n_clusters: int, index_dict: dict, dip_module: torch.nn.Module, 
+                 init_np_labels: np.ndarray, max_cluster_size_diff_factor: float, augmentation_invariance: bool = False, 
+                 use_gt: bool = False):
+        super().__init__()
+        self.n_clusters = n_clusters
+        self.index_dict = index_dict
+        self.dip_module = dip_module
+        self.labels = init_np_labels
+        self.max_cluster_size_diff_factor = max_cluster_size_diff_factor
+        self.augmentation_invariance = augmentation_invariance
+        self.use_gt = use_gt
+
+    def _update_labels_and_thresholds(self, X: np.ndarray) -> (np.ndarray, list):
+        """
+        Predict the clustering labels using the current structure of the neural network and DipModule.
+        Therefore, we determine the modal interval for two clusters on their corresponding projection axis using X.
+        The center between the upper bound of the left cluster and the lower bound of the right cluster will be used as a threshold.
+        If an object of X is left of this threshold it matches the left cluster. The same applies analogously to the right cluster.
+        In the end the object will be assigned the label of the cluster that matched most often.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            The data set used to retrieve the modal intervals
+
+        Returns
+        -------
+        tuple : (np.ndarray, list)
+            The new labels,
+            A list containing the thresholds for each projection axis and a tuple indicating which cluster is left and right of the threshold
+        """
+        projections = self.dip_module.projection_axes.detach().cpu().numpy()
+        points_in_all_clusters = [np.where(self.labels == clus)[0] for clus in range(self.n_clusters)]
+        n_points_in_all_clusters = [points_in_cluster.shape[0] for points_in_cluster in points_in_all_clusters]
+        labels_pred_matrix = np.zeros((X.shape[0], self.n_clusters))
+        projection_thresholds = []
+        for m in range(self.n_clusters - 1):
+            for n in range(m + 1, self.n_clusters):
+                # Get correct projection vector
+                projection_vector = projections[self.index_dict[(m, n)]]
+                # Project data
+                X_proj = np.matmul(X, projection_vector)
+                X_proj_m = X_proj[points_in_all_clusters[m]]
+                X_proj_n = X_proj[points_in_all_clusters[n]]
+                if n_points_in_all_clusters[m] < 4:
+                    low_m_coor = np.mean(X_proj_m)
+                    high_m_coor = low_m_coor
+                else:
+                    # Sort data
+                    sorted_indices_m = X_proj_m.argsort()
+                    # Execute mirrored dip
+                    _, low_m, high_m = _dip_mirrored_data(X_proj_m[sorted_indices_m], None)
+                    low_m_coor = X_proj_m[sorted_indices_m[low_m]]
+                    high_m_coor = X_proj_m[sorted_indices_m[high_m]]
+                if n_points_in_all_clusters[n] < 4:
+                    low_n_coor = np.mean(X_proj_n)
+                    high_n_coor = low_n_coor
+                else:
+                    # Sort data
+                    sorted_indices_n = X_proj_n.argsort()
+                    # Execute mirrored dip
+                    _, low_n, high_n = _dip_mirrored_data(X_proj_n[sorted_indices_n], None)
+                    low_n_coor = X_proj_n[sorted_indices_n[low_n]]
+                    high_n_coor = X_proj_n[sorted_indices_n[high_n]]
+                # Check if projected data is better captured by cluster m or n
+                if low_m_coor > high_n_coor:  # cluster m right of cluster n
+                    threshold = high_n_coor + (low_m_coor - high_n_coor) / 2
+                    labels_pred_matrix[X_proj < threshold, n] += 1
+                    labels_pred_matrix[X_proj >= threshold, m] += 1
+                    projection_thresholds.append((threshold, (n, m)))
+                elif low_n_coor > high_m_coor:  # cluster n right of cluster m
+                    threshold = high_m_coor + (low_n_coor - high_m_coor) / 2
+                    labels_pred_matrix[X_proj < threshold, m] += 1
+                    labels_pred_matrix[X_proj >= threshold, n] += 1
+                    projection_thresholds.append((threshold, (m, n)))
+                else:
+                    center_coor_m = (low_m_coor + high_m_coor) / 2
+                    center_coor_n = (low_n_coor + high_n_coor) / 2
+                    if center_coor_m > center_coor_n:  # cluster m right of cluster n
+                        threshold = low_m_coor + (high_n_coor - low_m_coor) / 2
+                        labels_pred_matrix[X_proj < threshold, n] += 1
+                        labels_pred_matrix[X_proj >= threshold, m] += 1
+                        projection_thresholds.append((threshold, (n, m)))
+                    else:  # cluster n right of cluster m
+                        threshold = low_n_coor + (high_m_coor - low_n_coor) / 2
+                        labels_pred_matrix[X_proj < threshold, m] += 1
+                        labels_pred_matrix[X_proj >= threshold, n] += 1
+                        projection_thresholds.append((threshold, (m, n)))
+        # Get best matching cluster
+        labels_pred = np.argmax(labels_pred_matrix, axis=1)
+        return labels_pred, projection_thresholds
+
+    def _get_dip_error(self, X_embed: torch.Tensor, projection_axis_index: int,
+                    points_in_m: torch.Tensor, points_in_n: torch.Tensor, n_points_in_m: int, n_points_in_n: int,
+                    device: torch.device) -> torch.Tensor:
+        """
+        Calculate the dip error for the projection axis between cluster m and cluster n.
+        In details it returns:
+        0.5 * ((Dip-value of cluster m) + (Dip-value of cluster m)) - (Dip-value of cluster m and n)
+        on this specific projeciton axis.
+
+        Parameters
+        ----------
+        X_embed : torch.Tensor
+            The embedded data set
+        projection_axis_index : int
+            The index of the projection axis within the DipModule 
+        points_in_m : torch.Tensor
+            Tensor containing the indices of the objects within cluster m
+        points_in_n : torch.Tensor
+            Tensor containing the indices of the objects within cluster n
+        n_points_in_m : int
+            Size of cluster m
+        n_points_in_n : int
+            Size of cluster n
+        device : torch.device
+            device to be trained on
+
+        Returns
+        -------
+        dip_loss_new : torch.Tensor
+            The final Dip loss on the specified projection axis
+        """
+        # Calculate dip cluster m
+        dip_value_m = self.dip_module(X_embed[points_in_m], projection_axis_index)
+        # Calculate dip cluster n
+        dip_value_n = self.dip_module(X_embed[points_in_n], projection_axis_index)
+        # Calculate dip combined clusters m and n
+        if n_points_in_m > self.max_cluster_size_diff_factor * n_points_in_n:
+            perm = torch.randperm(n_points_in_m).to(device)
+            sampled_m = points_in_m[perm[:int(n_points_in_n * self.max_cluster_size_diff_factor)]]
+            dip_value_mn = self.dip_module(torch.cat([X_embed[sampled_m], X_embed[points_in_n]]),
+                                    projection_axis_index)
+        elif n_points_in_n > self.max_cluster_size_diff_factor * n_points_in_m:
+            perm = torch.randperm(n_points_in_n).to(device)
+            sampled_n = points_in_n[perm[:int(n_points_in_m * self.max_cluster_size_diff_factor)]]
+            dip_value_mn = self.dip_module(torch.cat([X_embed[points_in_m], X_embed[sampled_n]]),
+                                    projection_axis_index)
+        else:
+            dip_value_mn = self.dip_module(X_embed[torch.cat([points_in_m, points_in_n])], projection_axis_index)
+        # We want to maximize dip between clusters => set mn loss to -dip
+        dip_loss_new = 0.5 * (dip_value_m + dip_value_n) - dip_value_mn
+        return dip_loss_new
+
+    def _loss(self, batch: list, labels_torch: torch.Tensor, neural_network: torch.nn.Module, 
+              ssl_loss_fn: Callable | torch.nn.modules.loss._Loss, ssl_loss_weight: float, 
+              clustering_loss_weight: float, device: torch.device) -> torch.Tensor:
+        """
+        Calculate the complete DipEncoder + neural network loss.
+
+        Parameters
+        ----------
+        batch : list
+            the minibatch
+        labels_torch : torch.Tensor
+            the current cluster labels as torch tensor
+        neural_network : torch.nn.Module
+            the neural network
+        ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
+            self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
+        ssl_loss_weight : float
+            weight of the self-supervised learning (ssl) loss
+        clustering_loss_weight : float
+            weight of the clustering loss
+        device : torch.device
+            device to be trained on
+
+        Returns
+        -------
+        loss : torch.Tensor
+            the final DipEncoder loss
+        """
+        MIN_NUMBER_OF_POINTS = 10
+        ids = batch[0]
+        # SSL Loss
+        if self.augmentation_invariance:
+            ssl_loss, embedded, _, embedded_aug, _ = neural_network.loss_augmentation(batch, ssl_loss_fn,
+                                                                                    device)
+        else:
+            ssl_loss, embedded, _ = neural_network.loss(batch, ssl_loss_fn, device)
+        # Get points within each cluster
+        points_in_all_clusters = [torch.where(labels_torch[ids] == clus)[0].to(device) for clus in
+                                range(self.n_clusters)]
+        n_points_in_all_clusters = [points_in_cluster.shape[0] for points_in_cluster in points_in_all_clusters]
+        if self.augmentation_invariance:
+            # Regular embedded data will be combined with augmented data
+            points_in_all_clusters = [torch.cat((p_c, p_c + embedded.shape[0])) for p_c in points_in_all_clusters]
+            n_points_in_all_clusters = [2 * n_c for n_c in n_points_in_all_clusters]
+            embedded = torch.cat((embedded, embedded_aug), 0)
+        dip_loss = torch.tensor(0)
+        for m in range(self.n_clusters - 1):
+            if n_points_in_all_clusters[m] < MIN_NUMBER_OF_POINTS:
+                continue
+            for n in range(m + 1, self.n_clusters):
+                if n_points_in_all_clusters[n] < MIN_NUMBER_OF_POINTS:
+                    continue
+                dip_loss_new = self._get_dip_error(
+                    embedded, self.index_dict[(m, n)], points_in_all_clusters[m], points_in_all_clusters[n],
+                    n_points_in_all_clusters[m], n_points_in_all_clusters[n], device)
+                dip_loss = dip_loss + dip_loss_new
+        final_dip_loss = torch.true_divide(dip_loss, len(self.index_dict))
+        loss = clustering_loss_weight * final_dip_loss + ssl_loss * ssl_loss_weight
+        return loss
+
+    def fit(self, neural_network: torch.nn.Module, trainloader: torch.utils.data.DataLoader, 
+            testloader: torch.utils.data.DataLoader, n_epochs: int,
+            device: torch.device, optimizer: torch.optim.Optimizer, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss,
+            clustering_loss_weight: float, ssl_loss_weight: float) -> '_DipEncoder_Module':
+        """
+        Trains the _DipEncoder_Module in place.
+
+        Parameters
+        ----------
+        neural_network : torch.nn.Module
+            the neural network
+        trainloader : torch.utils.data.DataLoader
+            dataloader to be used for training
+        testloader : torch.utils.data.DataLoader
+            dataloader to be used for updating the clustering parameters
+        n_epochs : int
+            number of epochs for the clustering procedure
+        device : torch.device
+            device to be trained on
+        optimizer : torch.optim.Optimizer
+            the optimizer for training
+        ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
+            self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
+        clustering_loss_weight : float
+            weight of the clustering loss
+        ssl_loss_weight : float
+            weight of the self-supervised learning (ssl) loss
+
+        Returns
+        -------
+        self : _DipEncoder_Module
+            this instance of the _DipEncoder_Module
+        """
+        labels_torch = torch.from_numpy(self.labels).int().to(device)
+        # Start Optimization
+        tbar = tqdm.trange(n_epochs + 1, desc="DipEncoder training")
+        for iteration in tbar:
+            # Update labels for clustering
+            if not self.use_gt:
+                X_embed = encode_batchwise(testloader, neural_network)
+                self.labels, self.projection_thresholds_ = self._update_labels_and_thresholds(X_embed)
+                labels_torch = torch.from_numpy(self.labels).int().to(device)
+            if iteration == n_epochs:
+                break
+            total_loss = 0
+            for batch in trainloader:
+                loss = self._loss(batch, labels_torch, neural_network, ssl_loss_fn, ssl_loss_weight, clustering_loss_weight, device)
+                total_loss += loss.item()
+                # Optimize
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+            postfix_str = {"Loss": total_loss}
+            tbar.set_postfix(postfix_str)
+        # Get final labels
+        self.labels = self.labels.astype(np.int32)
+        if self.use_gt:
+            X_embed = encode_batchwise(testloader, neural_network)
+            _, self.projection_thresholds_ = self._update_labels_and_thresholds(X_embed)
+        return self
 
 """
-DipEncoder
+DipEncoder object
 """
 
 
@@ -670,18 +680,18 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
     Parameters
     ----------
     n_clusters : int
-        number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN
+        number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN (default: 8)
     batch_size : int
         size of the data batches for the actual training of the DipEncoder.
         Should be larger the more clusters we have. If it is None, it will be set to (25 x n_clusters) (default: None)
     pretrain_optimizer_params : dict
-        parameters of the optimizer for the pretraining of the neural network, includes the learning rate (default: {"lr": 1e-3})
+        parameters of the optimizer for the pretraining of the neural network, includes the learning rate. If None, it will be set to {"lr": 1e-3} (default: None)
     clustering_optimizer_params : dict
-        parameters of the optimizer for the actual clustering procedure, includes the learning rate (default: {"lr": 1e-4})
+        parameters of the optimizer for the actual clustering procedure, includes the learning rate. If None, it will be set to {"lr": 1e-4} (default: None)
     pretrain_epochs : int
         number of epochs for the pretraining of the neural network (default: 100)
     clustering_epochs : int
-        number of epochs for the actual clustering procedure (default: 100)
+        number of epochs for the actual clustering procedure (default: 150)
     optimizer_class : torch.optim.Optimizer
         the optimizer class (default: torch.optim.Adam)
     ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
@@ -712,7 +722,7 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
     initial_clustering_class : ClusterMixin
         clustering class to obtain the initial cluster labels after the pretraining (default: KMeans)
     initial_clustering_params : dict
-        parameters for the initial clustering class (default: {})
+        parameters for the initial clustering class. If None, it will be set to {} (default: None)
     device : torch.device
         The device on which to perform the computations.
         If device is None then it will be automatically chosen: if a gpu is available the gpu with the highest amount of free memory will be chosen (default: None)
@@ -727,6 +737,8 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
         The final projection axes between the clusters
     index_dict_ : dict
         A dictionary to match the indices of two clusters to a projection axis
+    projection_thresholds_ : list
+        A list containing the thresholds for each projection axis and a tuple indicating which cluster is left and right of the threshold
     neural_network_trained_ : torch.nn.Module
         The final neural network
     n_features_in_ : int
@@ -747,9 +759,9 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
     Proceedings of the 28th ACM SIGKDD Conference on Knowledge Discovery & Data Mining. 2022.
     """
 
-    def __init__(self, n_clusters: int, batch_size: int = None, pretrain_optimizer_params: dict = None,
+    def __init__(self, n_clusters: int = 8, batch_size: int = None, pretrain_optimizer_params: dict = None,
                  clustering_optimizer_params: dict = None, pretrain_epochs: int = 100,
-                 clustering_epochs: int = 100, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
+                 clustering_epochs: int = 150, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error,
                  neural_network: torch.nn.Module | tuple = None, neural_network_weights: str = None,
                  embedding_size: int = 10, max_cluster_size_diff_factor: float = 3,
@@ -757,9 +769,7 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
                  custom_dataloaders: tuple = None, augmentation_invariance: bool = False,
                  initial_clustering_class: ClusterMixin = KMeans, initial_clustering_params: dict = None,
                  device: torch.device = None, random_state: np.random.RandomState | int = None):
-        assert batch_size is not None or n_clusters is not None, "n_clusters and batch_size can not both be None"
-        super().__init__(25 * n_clusters if batch_size is None else batch_size, neural_network, neural_network_weights,
-                         embedding_size, device, random_state)
+        super().__init__(batch_size, neural_network, neural_network_weights, embedding_size, device, random_state)
         self.n_clusters = n_clusters
         self.pretrain_optimizer_params = pretrain_optimizer_params
         self.clustering_optimizer_params = clustering_optimizer_params
@@ -793,52 +803,78 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
             This instance of the DipEncoder
         """
         X, y, random_state, pretrain_optimizer_params, clustering_optimizer_params, initial_clustering_params = self._check_parameters(X, y=y)
+        assert self.batch_size is not None or self.n_clusters is not None, "n_clusters and batch_size can not both be None"
+        batch_size = 25 * self.n_clusters if self.batch_size is None else self.batch_size
+        # Get initial setting (device, dataloaders, pretrained AE and initial clustering result)
+        device, trainloader, testloader, _, neural_network, X_embed, n_clusters, init_labels, init_centers, _ = get_default_deep_clustering_initialization(
+            X, self.n_clusters, batch_size, pretrain_optimizer_params, self.pretrain_epochs, self.optimizer_class, self.ssl_loss_fn,
+            self.neural_network, self.embedding_size, self.custom_dataloaders, self.initial_clustering_class if y is None else None, 
+            initial_clustering_params, self.device, random_state, neural_network_weights=self.neural_network_weights)
         if y is not None:
-            assert len(np.unique(y)) == self.n_clusters, "n_clusters must match number of unique labels in y."
-        labels, projection_axes, index_dict, neural_network = _dipencoder(X, self.n_clusters, self.embedding_size,
-                                                                          self.batch_size, self.optimizer_class,
-                                                                          self.ssl_loss_fn, self.clustering_epochs,
-                                                                          clustering_optimizer_params,
-                                                                          self.pretrain_epochs,
-                                                                          pretrain_optimizer_params,
-                                                                          self.neural_network,
-                                                                          self.neural_network_weights,
-                                                                          self.max_cluster_size_diff_factor,
-                                                                          self.clustering_loss_weight,
-                                                                          self.ssl_loss_weight,
-                                                                          self.custom_dataloaders,
-                                                                          self.augmentation_invariance,
-                                                                          self.initial_clustering_class,
-                                                                          initial_clustering_params,
-                                                                          y, self.device, random_state)
-        self.labels_ = labels
-        self.projection_axes_ = projection_axes
+            class_labels = np.unique(y)
+            if len(class_labels) != self.n_clusters:
+                print("WARNING: If y is specified, the number of labels must match n_clusters. Therefore, n_clusters was changed from {0} to {1}".format(self.n_clusters, len(class_labels)))
+                n_clusters = len(class_labels)
+            # If y is give, overwrite labels and centers
+            init_labels = y.astype(int)
+            init_centers = np.array([np.mean(X_embed[y == i], axis=0) for i in range(n_clusters)])
+        n_cluster_combinations = int((n_clusters - 1) * n_clusters / 2)
+        # Get factor for AE loss
+        # rand_samples = torch.rand((batch_size, X.shape[1]))
+        # data_min = np.min(X)
+        # data_max = np.max(X)
+        # rand_samples_resized = (rand_samples * (data_max - data_min) + data_min).to(device)
+        # rand_samples_reconstruction = neural_network.forward(rand_samples_resized)
+        # reconstruction_loss_weight = loss_fn(rand_samples_reconstruction, rand_samples_resized).detach()
+        if self.ssl_loss_weight is None:
+            ssl_loss_weight = _get_ssl_loss_of_first_batch(trainloader, neural_network, self.ssl_loss_fn, device)
+            ssl_loss_weight = 1 / (4 * ssl_loss_weight)
+            print("INFO: Setting ssl_loss_weight automatically; set to", ssl_loss_weight)
+        else:
+            ssl_loss_weight = self.ssl_loss_weight
+        # Create initial projections vectors by using difference between cluster centers
+        index_dict = {}
+        projections = np.zeros((n_cluster_combinations, self.embedding_size))
+        for m in range(n_clusters - 1):
+            for n in range(m + 1, n_clusters):
+                mean_1 = init_centers[m]
+                mean_2 = init_centers[n]
+                v = mean_1 - mean_2
+                projections[len(index_dict)] = v
+                index_dict[(m, n)] = len(index_dict)
+        # Create DipModule
+        dip_module = _Dip_Module(projections).to(device)
+        # Create SGD Optimizer
+        optimizer = self.optimizer_class(list(neural_network.parameters()) + list(dip_module.parameters()),
+                                    **clustering_optimizer_params)
+        dipencoder_module = _DipEncoder_Module(n_clusters, index_dict, dip_module, init_labels, self.max_cluster_size_diff_factor, self.augmentation_invariance, y is not None)
+        dipencoder_module.fit(neural_network, trainloader, testloader, self.clustering_epochs, device, optimizer, self.ssl_loss_fn, 
+                              self.clustering_loss_weight, ssl_loss_weight)
+        # Save values
+        self.labels_ = dipencoder_module.labels
+        self.projection_axes_ = dip_module.projection_axes.detach().cpu().numpy()
+        self.projection_thresholds_ = dipencoder_module.projection_thresholds_
         self.index_dict_ = index_dict
         self.neural_network_trained_ = neural_network
-        self.n_features_in_ = X.shape[1]
+        self.set_n_featrues_in(X.shape[1])
         return self
 
-    def predict(self, X_train: np.ndarray, X_test: np.ndarray) -> np.ndarray:
+    def predict(self, X: np.ndarray) -> np.ndarray:
         """
-        Predict the labels of the X_test dataset using the information gained by the fit function and the X_train dataset.
-        Beware that the current labels influence the labels obtained by predict(). Therefore, it can occur that the outcome of
-        dipencoder.fit(X) does not match dipencoder.predict(X).
+        Predicts the labels of the input data.
 
         Parameters
         ----------
-        X_train : np.ndarray
-            The data set used to train the DipEncoder (i.e. to retrieve the projection axes, modal intervals, ...)
-        X_test : np.ndarray
-            The data set for which we want to retrieve the labels
+        X : np.ndarray
+            input data
 
         Returns
         -------
-        labels_pred : np.ndarray
-            The predicted labels for X_test
+        predicted_labels : np.ndarray
+            The predicted labels
         """
-        X_train = self.transform(X_train)
-        X_test = self.transform(X_test)
-        labels_pred = _predict(X_train, X_test, self.labels_, self.projection_axes_, self.n_clusters, self.index_dict_)
+        X_embed = self.transform(X)
+        labels_pred = _predict_using_thresholds(X_embed, self.projection_axes_, self.projection_thresholds_, self.n_clusters, self.index_dict_)
         return labels_pred.astype(np.int32)
 
     def plot(self, X: np.ndarray, edge_width: float = 0.2, show_legend: bool = True) -> None:

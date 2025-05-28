@@ -3,6 +3,11 @@ from clustpy.partition import PGMeans
 from clustpy.partition.pgmeans import _initial_gmm_clusters, _update_gmm_with_new_center, _project_model
 from sklearn.datasets import make_blobs
 from sklearn.mixture import GaussianMixture as GMM
+from clustpy.utils.checks import check_clustpy_estimator
+
+
+def test_pgmeans_estimator():
+    check_clustpy_estimator(PGMeans(), ("check_complex_data"))
 
 
 def test_project_model():
@@ -113,3 +118,5 @@ def test_simple_PGMeans():
     assert pgmeans.cluster_centers_.shape == (pgmeans.n_clusters_, X.shape[1])
     assert len(np.unique(pgmeans.labels_)) == pgmeans.n_clusters_
     assert np.array_equal(np.unique(pgmeans.labels_), np.arange(pgmeans.n_clusters_))
+    labels_predict = pgmeans.predict(X)
+    assert np.array_equal(pgmeans.labels_, labels_predict)

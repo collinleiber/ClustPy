@@ -14,6 +14,8 @@ Further, it integrates various frequently used datasets (e.g., from the [UCI rep
 The focus of the ClustPy package is not on efficiency (here we recommend e.g. [pyclustering](https://pyclustering.github.io/)), 
 but on the possibility to try out a wide range of modern scientific methods.
 In particular, this should also make lesser-known methods accessible in a simple and convenient way.
+To get an initial overview of the integrated deep clustering methods, the following survey paper may be helpful:<br>
+[An Introductory Survey to Autoencoder-based Deep Clustering - Sandboxes for Combining Clustering with Deep Learning](https://arxiv.org/abs/2504.02087)
 
 Since it largely follows the implementation conventions of [sklearn clustering](https://scikit-learn.org/stable/modules/clustering.html), 
 it can be combined with many other packages (see below).
@@ -320,7 +322,7 @@ algorithms = [
     EvaluationAlgorithm("kmeans_minmax", KMeans, {"n_clusters": None}, preprocess_methods=minmax)]
 
 metrics = [EvaluationMetric("NMI", nmi), EvaluationMetric("ACC", acc),
-           EvaluationMetric("Silhouette", silhouette_score, use_gt=False)]
+           EvaluationMetric("Silhouette", silhouette_score, metric_type="internal")]
 
 df = evaluate_multiple_datasets(datasets, algorithms, metrics, n_repetitions=5,
                                 aggregation_functions=[np.mean, np.std, np.max, np.min],
@@ -354,8 +356,9 @@ Benchmarking Deep Clustering Algorithms With ClustPy.
 
 - [Application of Deep Clustering Algorithms](https://dl.acm.org/doi/abs/10.1145/3583780.3615290) (CIKM 10/2023)
 - [Benchmarking Deep Clustering Algorithms With ClustPy](https://ieeexplore.ieee.org/document/10411702) (ICDMW 12/2023)
-- [Data with Density-Based Clusters: A Generator for Systematic Evaluation of Clustering Algorithms](https://link.springer.com/chapter/10.1007/978-3-031-70368-3_1) (ECML-PKDD 08/2024)
+- [Data with Density-Based Clusters: A Generator for Systematic Evaluation of Clustering Algorithms](https://link.springer.com/chapter/10.1007/978-3-031-70368-3_1) (ECML PKDD 08/2024)
 - [Statistical Modeling of Univariate Multimodal Data](https://arxiv.org/abs/2412.15894) (arXiv 12/2024)
 - [SHADE: Deep Density-based Clustering](https://arxiv.org/pdf/2410.06265) (ICDM 12/2024)
 - [Dying Clusters Is All You Need - Deep Clustering With an Unknown Number of Clusters](https://ieeexplore.ieee.org/document/10917902) (ICDMW 12/2024)
+- [A Symmetric Purity Measure for Clustering Comparison](https://link.springer.com/article/10.1007/s40745-025-00594-z) (Annals of Data Science 04/2025)
 - [Breaking the Reclustering Barrier in Centroid-based Deep Clustering](https://openreview.net/forum?id=r01fcKhzT5) (ICLR 04/2025)

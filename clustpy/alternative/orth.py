@@ -7,8 +7,10 @@ from sklearn.base import BaseEstimator, ClusterMixin
 import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
-from sklearn.utils import check_random_state
 from sklearn.metrics.pairwise import pairwise_distances_argmin_min
+from clustpy.utils.checks import check_parameters
+from sklearn.utils.validation import check_is_fitted
+from clustpy.alternative.nrkmeans import check_n_clusters_for_nr
 
 
 def _clustering_via_orthogonalization(X: np.ndarray, n_clusters: list, explained_variance_for_clustering: float,
@@ -131,7 +133,7 @@ def _clustering_in_orthogonal_spaces_transform(X: np.ndarray, km: KMeans) -> (np
     return X, P, centers_subspace
 
 
-class OrthogonalClustering(BaseEstimator, ClusterMixin):
+class OrthogonalClustering(ClusterMixin, BaseEstimator):
     """
     Execute the Orthogonal Clustering procedure (Orth1).
     The algorithm will search for multiple clustering solutions by transforming the feature space after each KMeans execution.
@@ -139,8 +141,8 @@ class OrthogonalClustering(BaseEstimator, ClusterMixin):
 
     Parameters
     ----------
-    n_clusters : list
-        list containing number of clusters for each subspace
+    n_clusters : list | tuple
+        list containing number of clusters for each subspace (default: (3, 3))
     explained_variance_for_clustering : float
         Defines the variance that is contained in the subspace used for clustering. This subspace is received by performing PCA.
         If explained_variance_for_clustering is 1, PCA will not be executed before performing KMeans (default: 0.9)
@@ -159,6 +161,8 @@ class OrthogonalClustering(BaseEstimator, ClusterMixin):
         The PCA transformations
     global_mean_ : np.ndarray
         The mean value of the fitted data set
+    n_features_in_ : int
+        the number of features used for the fitting
 
 
     References
@@ -167,11 +171,11 @@ class OrthogonalClustering(BaseEstimator, ClusterMixin):
     Seventh IEEE international conference on data mining (ICDM 2007). IEEE, 2007.
     """
 
-    def __init__(self, n_clusters: list, explained_variance_for_clustering: float = 0.9,
+    def __init__(self, n_clusters: list | tuple = (3, 3), explained_variance_for_clustering: float = 0.9,
                  random_state: np.random.RandomState = None):
         self.n_clusters = n_clusters
         self.explained_variance_for_clustering = explained_variance_for_clustering
-        self.random_state = check_random_state(random_state)
+        self.random_state = random_state
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'OrthogonalClustering':
         """
@@ -190,14 +194,17 @@ class OrthogonalClustering(BaseEstimator, ClusterMixin):
         self : OrthogonalClustering
             this instance of the OrthogonalClustering algorithm
         """
-        labels, centers, projections, pcas, global_mean = _clustering_via_orthogonalization(X, self.n_clusters,
+        X, _, random_state = check_parameters(X=X, y=y, random_state=self.random_state)
+        n_clusters = check_n_clusters_for_nr(self.n_clusters)
+        labels, centers, projections, pcas, global_mean = _clustering_via_orthogonalization(X, n_clusters,
                                                                                             self.explained_variance_for_clustering,
-                                                                                            True, self.random_state)
+                                                                                            True, random_state)
         self.labels_ = labels
         self.cluster_centers_ = centers
         self.projections_ = projections
         self.PCAs_ = pcas
         self.global_mean_ = global_mean
+        self.n_features_in_ = X.shape[1]
         return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:
@@ -214,11 +221,11 @@ class OrthogonalClustering(BaseEstimator, ClusterMixin):
         predicted_labels : np.ndarray
             the predicted labels of the input data set for each subspace. Shape equals (n_samples x n_subspaces)
         """
-        # Check if algorithm has run
-        assert hasattr(self, "labels_"), "The algorithm has not run yet. Use the fit() function first."
-        predicted_labels = np.zeros((X.shape[0], len(self.n_clusters)), dtype=np.int32)
+        check_is_fitted(self, ["labels_", "n_features_in_"])
+        X, _, _ = check_parameters(X=X, estimator_obj=self, allow_size_1=True)
+        predicted_labels = np.zeros((X.shape[0], len(self.cluster_centers_)), dtype=np.int32)
         # Get labels for each subspace
-        for subspace in range(len(self.n_clusters)):
+        for subspace in range(len(self.cluster_centers_)):
             X_transform = self.transform_subspace(X, subspace)
             if self.PCAs_ is not None:
                 X_transform = self.PCAs_[subspace].transform(X_transform)
@@ -248,8 +255,10 @@ class OrthogonalClustering(BaseEstimator, ClusterMixin):
         X : np.ndarray
             The transformed dataset
         """
-        assert subspace_index < len(self.n_clusters), "subspace_index must be smaller than {0}".format(
-            len(self.n_clusters))
+        check_is_fitted(self, ["labels_", "n_features_in_"])
+        X, _, _ = check_parameters(X=X, estimator_obj=self, allow_size_1=True)
+        assert subspace_index < len(self.cluster_centers_), "subspace_index must be smaller than {0}".format(
+            len(self.cluster_centers_))
         X = X - self.global_mean_
         for subspace in range(subspace_index):
             if self.PCAs_ is not None:
@@ -274,8 +283,8 @@ class ClusteringInOrthogonalSpaces(OrthogonalClustering):
 
     Parameters
     ----------
-    n_clusters : list
-        list containing number of clusters for each subspace
+    n_clusters : list | tuple
+        list containing number of clusters for each subspace (default: (3, 3))
     explained_variance_for_clustering : float
         Defines the variance that is contained in the subspace used for clustering. This subspace is received by performing PCA.
         If explained_variance_for_clustering is 1, PCA will not be executed before performing KMeans (default: 0.9)
@@ -294,6 +303,8 @@ class ClusteringInOrthogonalSpaces(OrthogonalClustering):
         The PCA transformations
     global_mean_ : np.ndarray
         The mean value of the fitted data set
+    n_features_in_ : int
+        the number of features used for the fitting
 
     References
     ----------
@@ -301,7 +312,7 @@ class ClusteringInOrthogonalSpaces(OrthogonalClustering):
     Seventh IEEE international conference on data mining (ICDM 2007). IEEE, 2007.
     """
 
-    def __init__(self, n_clusters: list, explained_variance_for_clustering: float = 0.9,
+    def __init__(self, n_clusters: list | tuple = (3, 3), explained_variance_for_clustering: float = 0.9,
                  random_state: np.random.RandomState | int = None):
         super().__init__(n_clusters, explained_variance_for_clustering, random_state)
 
@@ -322,14 +333,17 @@ class ClusteringInOrthogonalSpaces(OrthogonalClustering):
         self : ClusteringInOrthogonalSpaces
             this instance of the ClusteringInOrthogonalSpaces algorithm
         """
-        labels, centers, projections, pcas, global_mean = _clustering_via_orthogonalization(X, self.n_clusters,
+        X, _, random_state = check_parameters(X=X, y=y, random_state=self.random_state)
+        n_clusters = check_n_clusters_for_nr(self.n_clusters)
+        labels, centers, projections, pcas, global_mean = _clustering_via_orthogonalization(X, n_clusters,
                                                                                             self.explained_variance_for_clustering,
-                                                                                            False, self.random_state)
+                                                                                            False, random_state)
         self.labels_ = labels
         self.cluster_centers_ = centers
         self.projections_ = projections
         self.PCAs_ = pcas
         self.global_mean_ = global_mean
+        self.n_features_in_ = X.shape[1]
         return self
 
     def transform_subspace(self, X: np.ndarray, subspace_index: int) -> np.ndarray:
@@ -348,8 +362,10 @@ class ClusteringInOrthogonalSpaces(OrthogonalClustering):
         X : np.ndarray
             The transformed dataset
         """
-        assert subspace_index < len(self.n_clusters), "subspace_index must be smaller than {0}".format(
-            len(self.n_clusters))
+        check_is_fitted(self, ["labels_", "n_features_in_"])
+        X, _, _ = check_parameters(X=X, estimator_obj=self, allow_size_1=True)
+        assert subspace_index < len(self.cluster_centers_), "subspace_index must be smaller than {0}".format(
+            len(self.cluster_centers_))
         X = X - self.global_mean_
         for subspace in range(1, subspace_index):
             X = X @ self.projections_[subspace]

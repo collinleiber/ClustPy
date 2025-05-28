@@ -3,6 +3,13 @@ from clustpy.deep.dcn import _compute_centroids
 from clustpy.data import create_subspace_data, load_optdigits
 import torch
 import numpy as np
+from clustpy.utils.checks import check_clustpy_estimator
+
+
+def test_dcn_estimator():
+    # Ignore check_methods_subset_invariance due to numerical issues
+    check_clustpy_estimator(DCN(3, pretrain_epochs=3, clustering_epochs=3),
+                            ("check_complex_data", "check_methods_subset_invariance"))
 
 
 def test_simple_dcn():

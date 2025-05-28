@@ -2,6 +2,14 @@ from clustpy.deep import VaDE
 from clustpy.data import create_subspace_data
 import numpy as np
 import torch
+from clustpy.utils.checks import check_clustpy_estimator
+from clustpy.deep import mean_squared_error
+
+
+def test_vade_estimator():
+    # Ignore check_methods_subset_invariance due to numerical issues
+    check_clustpy_estimator(VaDE(3, pretrain_epochs=3, clustering_epochs=3, ssl_loss_fn=mean_squared_error),
+                            ("check_complex_data", "check_methods_subset_invariance"))
 
 
 def test_simple_vade():
