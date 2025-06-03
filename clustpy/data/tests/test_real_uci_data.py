@@ -3,7 +3,7 @@ from clustpy.data import load_banknotes, load_spambase, load_seeds, load_skin, l
     load_pendigits, load_ecoli, load_htru2, load_letterrecognition, load_har, load_statlog_shuttle, load_mice_protein, \
     load_user_knowledge, load_breast_tissue, load_forest_types, load_dermatology, load_multiple_features, \
     load_statlog_australian_credit_approval, load_breast_cancer_wisconsin_original, load_optdigits, load_semeion, \
-    load_cmu_faces, load_gene_expression_cancer_rna_seq, load_sport_articles, load_wholesale_customers
+    load_cmu_faces, load_gene_expression_cancer_rna_seq, load_sport_articles, load_wholesale_customers, load_reuters21578
 from pathlib import Path
 import os
 import shutil
@@ -240,3 +240,22 @@ def test_load_sport_articles():
 def test_load_wholesale_customers():
     _helper_test_data_loader(load_wholesale_customers, 440, 6, [2, 3],
                              dataloader_params={"downloads_path": TEST_DOWNLOAD_PATH})
+
+
+@pytest.mark.data
+def test_load_reuters21578():
+    # Full data set
+    _helper_test_data_loader(load_reuters21578, 8367, 2000, 5,
+                             dataloader_params={"downloads_path": TEST_DOWNLOAD_PATH})
+    # Lewis train data
+    _helper_test_data_loader(load_reuters21578, 5791, 2000, 5,
+                             dataloader_params={"subset": "train", "downloads_path": TEST_DOWNLOAD_PATH})
+    # Lewis test data
+    _helper_test_data_loader(load_reuters21578, 2300, 2000, 5,
+                             dataloader_params={"subset": "test", "downloads_path": TEST_DOWNLOAD_PATH})
+    # cgi train data
+    _helper_test_data_loader(load_reuters21578, 8091, 2000, 5,
+                             dataloader_params={"subset": "train-cgi", "downloads_path": TEST_DOWNLOAD_PATH})
+    # cgi test data
+    _helper_test_data_loader(load_reuters21578, 276, 2000, 5,
+                             dataloader_params={"subset": "test-cgi", "downloads_path": TEST_DOWNLOAD_PATH})

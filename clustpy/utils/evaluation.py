@@ -7,6 +7,7 @@ from collections.abc import Callable
 import os
 import inspect
 from sklearn.datasets._base import Bunch
+import sys
 
 
 def _preprocess_dataset(X: np.ndarray, preprocess_methods: list, preprocess_params: list) -> np.ndarray:
@@ -284,7 +285,7 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
                 except Exception as e:
                     if not quiet:
                         print("Execution of {0} raised an exception in iteration {1}".format(eval_algo.name, rep))
-                        print(e)
+                        print('Error on line {}'.format(sys.exc_info()[-1].tb_lineno), type(e).__name__, e)
                     continue
                 # Optional: Obtain labels from the predict method
                 if X_test is not None:
@@ -294,7 +295,7 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
                         if not quiet:
                             print("Problem when running the predict method of {0} in iteration {1}".format(eval_algo.name,
                                                                                                        rep))
-                            print(e)
+                            print('Error on line {}'.format(sys.exc_info()[-1].tb_lineno), type(e).__name__, e)
                         labels_predicted_test = None
                 runtime = time.time() - start_time
                 if add_runtime:
@@ -354,7 +355,7 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
                         except Exception as e:
                             if not quiet:
                                 print("Metric {0} raised an exception and will be skipped".format(eval_metric.name))
-                                print(e)
+                                print('Error on line {}'.format(sys.exc_info()[-1].tb_lineno), type(e).__name__, e)
                 if eval_algo.deterministic:
                     for element in range(1, n_repetitions):
                         if add_runtime:
@@ -373,7 +374,7 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
         except Exception as e:
             if not quiet:
                 print("Algorithm {0} raised an exception and will be skipped".format(eval_algo.name))
-                print(e)
+                print('Error on line {}'.format(sys.exc_info()[-1].tb_lineno), type(e).__name__, e)
         # Prepare eval_algo params for next dataset
         if automatically_set_n_clusters:
             eval_algo.params["n_clusters"] = None
@@ -518,7 +519,7 @@ def evaluate_multiple_datasets(evaluation_datasets: list, evaluation_algorithms:
         except Exception as e:
             if not quiet:
                 print("Dataset {0} raised an exception and will be skipped".format(eval_data.name))
-                print(e)
+                print('Error on line {}'.format(sys.exc_info()[-1].tb_lineno), type(e).__name__, e)
     all_dfs = pd.concat(df_list, keys=data_names)
     if save_path is not None:
         # Check if directory exists
@@ -602,7 +603,7 @@ def _get_data_and_labels_from_evaluation_dataset(data_input: np.ndarray, data_lo
     return X, labels_true, X_test, labels_true_test
 
 
-def evaluation_df_to_latex_table(df: pd.DataFrame, relevant_row : str | int = "mean", output_path: str = None, pm_row: str | int | None = "std", 
+def evaluation_df_to_latex_table(df: pd.DataFrame | str, relevant_row : str | int = "mean", output_path: str = None, pm_row: str | int | None = "std", 
                                  bracket_row: str | int | None = None, best_in_bold: bool = True, second_best_underlined: bool = True, 
                                  color_by_value: str = None, higher_is_better: list = None, multiplier: int | float | list | None = 100,
                                  decimal_places: int = 1, color_min_max: tuple = (5, 70)) -> str:
@@ -615,7 +616,7 @@ def evaluation_df_to_latex_table(df: pd.DataFrame, relevant_row : str | int = "m
 
     Parameters
     ----------
-    df : pd.DataFrame
+    df : pd.DataFrame | str
         The pandas dataframe. Can also be a string that contains the path to the saved dataframe
     relevant_row : str | int
         The name of the row in the df that is used to create the latex table (default: "mean")

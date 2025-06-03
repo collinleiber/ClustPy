@@ -3,7 +3,7 @@ try:
 except:
     print(
         "[WARNING] Could not import PIL in clustpy.data.real_world_data. Please install PIL by 'pip install Pillow' if necessary")
-from clustpy.data._utils import _download_file, _get_download_dir, _decompress_z_file, _load_data_file, flatten_images
+from clustpy.data._utils import _download_file, _get_download_dir, _decompress_z_file, _load_data_file, flatten_images, _transform_text_data
 import os
 import numpy as np
 import zipfile
@@ -1345,3 +1345,168 @@ def load_wholesale_customers(return_X_y: bool = False, downloads_path: str = Non
         return data, labels
     else:
         return Bunch(dataset_name="WholesaleCustomers", data=data, target=labels)
+
+def load_reuters21578(subset: str = "all", categories: tuple = ("grain", "money-fx", "earn", "acq", "crude"),
+               use_tfidf: bool = True, use_stemming: bool = True, use_stop_words: bool = True, max_df: float | int = 1., 
+               min_df: float | int = 1, max_features: int = 2000, min_variance : float = 0., 
+               sublinear_tf: bool = False, return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+    """
+    Load the Reuters21578 data set. It consists of 21578 Reuters newswire artices divided into different categories.
+    When loading the artices, the title will be included in the text.
+    The data is preprocessed by only considering articles with a single category.
+    Furthermore, the documents are usually converted into feature vectors using tf-idf.
+    Note that two different train-test splits are available: Lewis and cgi. The default is Lewis.
+    For the Lewis split, the data set is composed of 5791 training and 2300 instances (default settings).
+    For the cgi split, the data set is composed of 8091 training and 276 instances.
+    N=8367, d=2000, k=5 using the default settings.
+
+    Parameters
+    ----------
+    subset : str
+        can be 'all', 'test', 'train', 'test-cgi' or 'train-cgi'. 'all' combines test and train data (default: 'all')
+    categories : tuple
+        specify the categories. Can be None if all categories should be used (default: ("grain", "money-fx", "earn", "acq", "crude"))
+    use_tfidf : bool
+        If true, tf-idf will be applied as the last step of the pipeline (default: True)
+    use_stemming : bool
+        If true, the SnowballStemmer from nltk will be used when creating the count matrix (default: True)
+    use_stop_words : bool
+        If true, the list of English stopwords from sklearn CountVectorizer will be used (default: True)
+    max_df : float | int
+        Ignore words that have a document frequency strictly higher than max_df. 
+        If float, the parameter represents a proportion of documents, integer corresponds to absolute counts (see sklearn CountVectorizer) (default: 1.0)
+    min_df : float | int
+        Ignore words that have a document frequency strictly lower than min_df.
+        If float, the parameter represents a proportion of documents, integer corresponds to absolute counts (see sklearn CountVectorizer) (default: 1)
+    max_features : int
+        If not None, the resulting count matric will ony contain the top max_features ordered by term frequency across the corpus (see sklearn CountVectorizer).
+        Note that this value could be further reduced if min_variance is smaller than one (default: 2000)
+    min_variance : float
+        Features with a variance lower than min_variance will be removed (see sklearn VarianceThreshold). 
+        The default is to keep all features with non-zero variance, i.e. remove only the features that have the same value in all samples (default: 0.)
+    sublinear_tf : bool
+        Apply sublinear term frequency scaling, i.e. replace tf with 1 + log(tf) (see sklearn TfidfTransformer) (default: False)
+    return_X_y : bool
+        If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
+    downloads_path : str
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
+
+    Returns
+    -------
+    bunch : Bunch
+        A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
+        Alternatively, if return_X_y is True two arrays will be returned:
+        the data numpy array (8367 x 2000 - using the default settings), the labels numpy array (8367 - using the default settings)
+
+    References
+    -------
+    https://archive.ics.uci.edu/dataset/137/reuters+21578+text+categorization+collection
+    """
+    subset = subset.lower()
+    assert subset in ["all", "train",
+                      "test", "test-cgi", "train-cgi"], "subset must match 'all', 'train', 'test', 'train-cgi' or 'test-cgi'. Your input {0}".format(subset)
+    # Check if data is already downloaded
+    directory = _get_download_dir(downloads_path) + "/Reuters21578/"
+    filename = directory + "reuters+21578+text+categorization+collection.zip"
+    if not os.path.isfile(filename):
+        if not os.path.isdir(directory):
+            os.mkdir(directory)
+        _download_file("https://archive.ics.uci.edu/static/public/137/reuters+21578+text+categorization+collection.zip",
+                       filename)
+        # Unpack zipfile
+        with zipfile.ZipFile(filename, 'r') as zipf:
+            zipf.extractall(directory)
+        with tarfile.open(directory + "reuters21578.tar.gz", "r:gz") as tar:
+            tar.extractall(directory)
+    # Load actual articles into arrays
+    all_topics = []
+    all_bodies = []
+    all_lewis_splits = []
+    all_cgi_splits = []
+    for file in os.listdir(directory):
+        if file.endswith(".sgm"):
+            in_body = False
+            with open(directory + file, "rb") as f:
+                for line in f.readlines():
+                    # Needed so that reut2-017.sgm is not crashing due to encoding
+                    line = line.decode('utf-8','ignore')
+                    # New entry starts
+                    if line.startswith("<REUTERS"):
+                        in_body = False
+                        body = ""
+                        topics = []
+                        lewis_split = line.split("LEWISSPLIT=\"")[1].split("\" CGISPLIT=")[0]
+                        cgi_split = line.split("CGISPLIT=\"")[1].split("\" OLDID=")[0]
+                        if "CSECS" in cgi_split:
+                            # 4 entries have an additional CSECS tag that should be removed
+                            cgi_split = cgi_split.split("\" CSECS=")[0]
+                        text_id = line.split("NEWID=\"")[1].split("\">")[0]
+                    # Extract topics
+                    if line.startswith("<TOPICS>"):
+                        topics_remaining = line
+                        while "<D>" in topics_remaining:
+                            topics_remaining = topics_remaining.split("<D>", 1)[1]
+                            topics.append(topics_remaining.split("</D>")[0])
+                    if line.startswith("<TEXT TYPE=\"UNPROC\""):
+                        in_body = True
+                    # Add title to text/body
+                    if "<TITLE>" in line:
+                        body += line.split("<TITLE>")[1].split("</TITLE>")[0] + ". "
+                    # New body starts. All following lines are part of the body
+                    if "<BODY>" in line:
+                        body += line.split("<BODY>")[1].replace("\n", " ")
+                        in_body = True
+                    elif in_body and line != " Reuter\n":
+                        # Check if body part is ending
+                        if "</BODY>" in line or "</TEXT>" in line:
+                            in_body = False
+                        else:
+                            body += line.replace("\n", " ")
+                    # Entry ends
+                    if line.startswith("</REUTERS>"):
+                        assert len(body) > 1, f"body empty in {file}, text id = {text_id}"
+                        assert len(lewis_split) > 1, f"lewis split empty in {file}, text id = {text_id}"
+                        assert len(cgi_split) > 1, f"cgi split empty in {file}, text id = {text_id}"
+                        all_bodies.append(body)
+                        all_lewis_splits.append(lewis_split)
+                        all_cgi_splits.append(cgi_split)
+                        all_topics.append(topics)
+    assert len(all_bodies) == 21578, "number of articles is not correct. Should be 21578 but is {0}".format(len(all_bodies))
+    # Filter documents to receive only articles with a single relevant category
+    for i in range(len(all_topics)-1, -1, -1):
+        hits = 0
+        new_topic = None
+        for t in all_topics[i]:
+            if categories is None or t in categories:
+                hits += 1
+                new_topic = t
+        if hits != 1:
+            del all_bodies[i]
+            del all_lewis_splits[i]
+            del all_cgi_splits[i]
+            del all_topics[i]
+        else:
+            all_topics[i] = new_topic
+    # Transform raw data
+    data = _transform_text_data(all_bodies, use_tfidf, use_stemming, use_stop_words, max_df, min_df, max_features, min_variance, 
+                                sublinear_tf)
+    # Get labels
+    LE = LabelEncoder()
+    labels = LE.fit_transform(all_topics)
+    # Select subset
+    if subset != "all":
+        if subset == "train":
+            relevant = np.array(all_lewis_splits) == "TRAIN"
+        elif subset == "test":
+            relevant = np.array(all_lewis_splits) == "TEST"
+        elif subset == "train-cgi":
+            relevant = np.array(all_cgi_splits) == "TRAINING-SET"
+        elif subset == "test-cgi":
+            relevant = np.array(all_cgi_splits) == "PUBLISHED-TESTSET"
+        data = data[relevant]
+        labels = labels[relevant]
+    # Return values
+    if return_X_y:
+        return data, labels
+    else:
+        return Bunch(dataset_name="Reuters21578", data=data, target=labels, classes=categories)

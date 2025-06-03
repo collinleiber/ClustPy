@@ -616,7 +616,7 @@ def load_webkb(use_universities: tuple = ("cornell", "texas", "washington", "wis
         If float, the parameter represents a proportion of documents, integer corresponds to absolute counts (see sklearn CountVectorizer) (default: 1.0)
     min_df : float | int
         Ignore words that have a document frequency strictly lower than min_df.
-        If float, the parameter represents a proportion of documents, integer corresponds to absolute counts (see sklearn CountVectorizer) (default: 1)
+        If float, the parameter represents a proportion of documents, integer corresponds to absolute counts (see sklearn CountVectorizer) (default: 0.01)
     max_features : int
         If not None, the resulting count matric will ony contain the top max_features ordered by term frequency across the corpus (see sklearn CountVectorizer).
         Note that this value could be further reduced if min_variance is smaller than one (default: None)
