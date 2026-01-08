@@ -118,6 +118,9 @@ class _AbstractAutoencoder(torch.nn.Module):
         self.random_state = random_state
         self.fitted = False
         self.allow_nd_input = False
+        rs = check_random_state(self.random_state)
+        set_torch_seed(rs)
+        print("Ich bin da _AbstractAutoencoder")
 
     def encode(self, x: torch.Tensor) -> torch.Tensor:
         """
