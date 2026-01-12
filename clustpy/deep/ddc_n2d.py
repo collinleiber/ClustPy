@@ -316,13 +316,14 @@ class DDC(_AbstractDeepClusteringAlgo):
     Knowledge-Based Systems 197 (2020): 105841.
     """
 
-    def __init__(self, ratio: float = 0.1, batch_size: int = 256, pretrain_optimizer_params: dict = None,
+    def __init__(self,n_clusters: int = None, ratio: float = 0.1, batch_size: int = 256, pretrain_optimizer_params: dict = None,
                  pretrain_epochs: int = 100, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error,
                  neural_network: torch.nn.Module | tuple = None, neural_network_weights: str = None,
                  embedding_size: int = 10, custom_dataloaders: tuple = None, tsne_params: dict = None,
                  device: torch.device = None, random_state: np.random.RandomState | int = None):
         super().__init__(batch_size, neural_network, neural_network_weights, embedding_size, device, random_state)
+        self.n_clusters = n_clusters
         self.ratio = ratio
         self.pretrain_optimizer_params = pretrain_optimizer_params
         self.pretrain_epochs = pretrain_epochs
@@ -352,7 +353,7 @@ class DDC(_AbstractDeepClusteringAlgo):
         tsne_params = {"n_components": 2} if self.tsne_params is None else self.tsne_params
         if self.ratio > 1:
             print("[WARNING] ratio for DDC algorithm has been set to a value > 1 which can cause poor results")
-        n_clusters, labels, centers_ae, _, neural_network, tsne = _manifold_based_sequential_dc(X,val_set, None, self.batch_size,
+        n_clusters, labels, centers_ae, _, neural_network, tsne = _manifold_based_sequential_dc(X,val_set, self.n_clusters, self.batch_size,
                                                                                     pretrain_optimizer_params,
                                                                                     self.pretrain_epochs,
                                                                                     self.optimizer_class,
