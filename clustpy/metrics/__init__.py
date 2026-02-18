@@ -8,7 +8,7 @@ from .multipe_labelings_scoring import is_multi_labelings_n_clusters_correct, Mu
     multiple_labelings_pc_jaccard_score, multiple_labelings_pc_precision_score, multiple_labelings_pc_rand_score, \
     multiple_labelings_pc_recall_score
 from .confusion_matrix import ConfusionMatrix
-from .hierarchical_metrics import dendrogram_purity, leaf_purity
+from .hierarchical_metrics import dendrogram_purity, leaf_purity, node_purity
 
 __all__ = ['variation_of_information',
            'unsupervised_clustering_accuracy',
@@ -33,4 +33,5 @@ __all__ = ['variation_of_information',
            'dendrogram_purity',
            'leaf_purity',
            'purity',
-           'cvnn_score']
+           'cvnn_score',
+           'node_purity']

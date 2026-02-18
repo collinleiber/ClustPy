@@ -1,8 +1,36 @@
-from clustpy.hierarchical._cluster_tree import BinaryClusterTree
+from clustpy.hierarchical._cluster_tree import BinaryClusterTree, _ClusterTreeNode
 from clustpy.metrics.confusion_matrix import ConfusionMatrix
-from clustpy.metrics.external_clustering_metrics import purity
-from clustpy.metrics._metrics_utils import _check_number_of_points
+from clustpy.metrics._metrics_utils import _check_labels_arrays
 import numpy as np
+
+
+def node_purity(node: _ClusterTreeNode, labels_true: np.ndarray, labels_pred: np.ndarray) -> float:
+    """
+    Calculate the purity of this node within a Cluster Tree.
+    A leaf with no assigned points receives a purity score of 0.
+
+    Parameters
+    ----------
+    node: _ClusterTreeNode
+        The node of a clustering tree
+    labels_true : np.ndarray
+        The ground truth labels of the data set
+    labels_pred : np.ndarray
+        The labels as predicted by a clustering algorithm
+
+    Returns
+    -------
+    node_purity : float
+        The node purity
+    """
+    labels_true, labels_pred = _check_labels_arrays(labels_true, labels_pred)
+    samples_in_leaf = np.isin(labels_pred, node.labels)
+    if np.any(samples_in_leaf):
+        sizes_gt_matches = np.unique(labels_true[samples_in_leaf], return_counts=True)[1]
+        node_purity = sizes_gt_matches.max() / samples_in_leaf.sum()
+    else:
+        node_purity = 0.
+    return node_purity
 
 
 def leaf_purity(
@@ -10,7 +38,8 @@ def leaf_purity(
 ) -> float:
     """
     Calculates the leaf purity of the tree.
-    Uses labels fromm leafs in the tree to calculate the purity (see clustpy.metrics.purity).
+    The leaf purity is equal to a weighted average of the maximum class purity across all leaves.
+    Uses labels from leafs in the tree to identify the most frequent ground truth class and weights the score by the size of the leaf.
     If each label contains a single label, this is equal to the standard purity metric.
 
     Parameters
@@ -32,12 +61,14 @@ def leaf_purity(
     Mautz, Dominik, Claudia Plant, and Christian Böhm. "Deepect: The deep embedded cluster tree."
     Data Science and Engineering 5 (2020): 419-432.
     """
-    _check_number_of_points(labels_true, labels_pred)
+    cm = ConfusionMatrix(labels_true, labels_pred)
     leaf_nodes, _ = tree.get_leaf_and_split_nodes()
-    labels_pred_adj = -np.ones(labels_pred.shape[0])
-    for i, leaf_node in enumerate(leaf_nodes):
-        labels_pred_adj[np.isin(labels_pred, leaf_node.labels)] = i
-    leaf_purity = purity(labels_true, labels_pred_adj)
+    leaf_purity = 0
+    for leaf_node in leaf_nodes:
+        relevant_columns = np.isin(cm.pred_clusters, leaf_node.labels)
+        column_sum = cm.confusion_matrix[:, relevant_columns].sum(1)
+        leaf_purity += column_sum.max()
+    leaf_purity = leaf_purity / len(labels_true)
     return leaf_purity
 
 
@@ -74,7 +105,7 @@ def dendrogram_purity(
     """
     if labels_pred is None:
         labels_pred = np.arange(labels_true.shape[0])
-    _check_number_of_points(labels_true, labels_pred)
+    labels_true, labels_pred = _check_labels_arrays(labels_true, labels_pred)
     if type(dendrogram) is BinaryClusterTree:
         # Transform ClusterTree to sklearn dendrogram
         dendrogram = dendrogram.export_sklearn_dendrogram()

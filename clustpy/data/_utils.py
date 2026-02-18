@@ -11,10 +11,10 @@ import numpy as np
 import urllib.request
 import os
 from pathlib import Path
-import ssl
 from PIL import Image
 from sklearn.feature_extraction.text import TfidfTransformer, CountVectorizer
 from sklearn.feature_selection import VarianceThreshold
+from sklearn.datasets import fetch_file
 
 
 DEFAULT_DOWNLOAD_PATH = str(Path.home() / "Downloads/clustpy_datafiles")
@@ -63,11 +63,11 @@ def _download_file(file_url: str, filename_local: str) -> None:
     filename_local : str
         local name of the file after it has been downloaded
     """
+    local_path = Path(filename_local)
+    local_dir = local_path.parent
+    local_filename = local_path.name
     print("Downloading data set from {0} to {1}".format(file_url, filename_local))
-    default_ssl = ssl._create_default_https_context
-    ssl._create_default_https_context = ssl._create_unverified_context
-    urllib.request.urlretrieve(file_url, filename_local)
-    ssl._create_default_https_context = default_ssl
+    fetch_file(file_url, folder=local_dir, local_filename=local_filename)
 
 
 def _download_file_from_google_drive(file_id: str, filename_local: str, chunk_size: int = 32768) -> None:

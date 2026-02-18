@@ -39,9 +39,15 @@ jobs:
           pip install pytest pytest-cov
           pip install -e .[full]
 
-      - name: Test with pytest
+      - name: Test with pytest (using data tests)
+        if: ${{ matrix.python-version == '3.10' }}
         run: |
           pytest -m "not largedata" --cov
+
+      - name: Test with pytest (not using data tests)
+        if: ${{ matrix.python-version != '3.10' }}
+        run: |
+          pytest -m "not data" --cov
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v4.0.1

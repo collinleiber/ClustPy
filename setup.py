@@ -28,7 +28,7 @@ setup(
     python_requires='>=3.10',
     install_requires=['numpy',
                       'scipy',
-                      'scikit-learn',
+                      'scikit-learn>=1.6',
                       'matplotlib',
                       'torch',
                       'pandas',

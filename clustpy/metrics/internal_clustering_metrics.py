@@ -1,6 +1,7 @@
 from sklearn.neighbors import NearestNeighbors
 from scipy.spatial.distance import pdist
 import numpy as np
+from clustpy.metrics._metrics_utils import _check_length_data_and_labels
 
 
 def cvnn_score(X: np.ndarray, labels: np.ndarray | int | tuple, n_neighbors: int = 5, metric: str = "euclidean") -> float | np.ndarray:
@@ -55,6 +56,7 @@ def cvnn_score(X: np.ndarray, labels: np.ndarray | int | tuple, n_neighbors: int
         tuple : (float, float)
             The cluster spearation and cluster compactness value
         """
+        X, labels = _check_length_data_and_labels(X, labels)
         assert isinstance(labels, np.ndarray), "labels must be of type np.nddary. Your input has type {0}".format(type(labels))
         unique_clusters = np.unique(labels)
         # Calculate neighbor weights

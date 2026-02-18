@@ -1,4 +1,4 @@
-from clustpy.metrics._metrics_utils import _check_number_of_points
+from clustpy.metrics._metrics_utils import _check_labels_arrays
 import numpy as np
 
 """
@@ -333,7 +333,7 @@ def _get_pair_counting_categories(labels_true: np.ndarray, labels_pred: np.ndarr
         The number of false negatives,
         The number of true negatives
     """
-    _check_number_of_points(labels_true, labels_pred)
+    labels_true, labels_pred = _check_labels_arrays(labels_true, labels_pred)
     if labels_true.ndim != 1 or labels_pred.ndim != 1:
         raise Exception("labels_true and labels_pred labels should just contain a single column.")
     n_tp = 0
@@ -384,7 +384,6 @@ class PairCountingScores():
     """
 
     def __init__(self, labels_true: np.ndarray, labels_pred: np.ndarray):
-        _check_number_of_points(labels_true, labels_pred)
         n_tp, n_fp, n_fn, n_tn = _get_pair_counting_categories(labels_true, labels_pred)
         self.n_tp = n_tp
         self.n_fp = n_fp

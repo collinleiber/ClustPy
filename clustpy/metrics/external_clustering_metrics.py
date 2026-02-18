@@ -3,7 +3,7 @@ from scipy.optimize import linear_sum_assignment
 from clustpy.metrics.confusion_matrix import ConfusionMatrix
 from scipy.special import comb
 from sklearn.metrics import normalized_mutual_info_score as nmi
-from clustpy.metrics._metrics_utils import _check_number_of_points
+from clustpy.metrics._metrics_utils import _check_labels_arrays
 
 
 def variation_of_information(labels_true: np.ndarray, labels_pred: np.ndarray) -> float:
@@ -29,21 +29,17 @@ def variation_of_information(labels_true: np.ndarray, labels_pred: np.ndarray) -
     Meilă, Marina. "Comparing clusterings by the variation of information."
     Learning theory and kernel machines. Springer, Berlin, Heidelberg, 2003. 173-187.
     """
-    _check_number_of_points(labels_true, labels_pred)
+    confusion_matrix = ConfusionMatrix(labels_true, labels_pred).confusion_matrix
     n = len(labels_true)
-    cluster_ids_true = np.unique(labels_true)
-    cluster_ids_pred = np.unique(labels_pred)
-    result = 0.0
-    for id_true in cluster_ids_true:
-        points_in_cluster_gt = np.argwhere(labels_true == id_true)[:, 0]
-        p = len(points_in_cluster_gt) / n
-        for id_pred in cluster_ids_pred:
-            points_in_cluster_pred = np.argwhere(labels_pred == id_pred)[:, 0]
-            q = len(points_in_cluster_pred) / n
-            r = len([point for point in points_in_cluster_gt if point in points_in_cluster_pred]) / n
-            if r != 0:
-                result += r * (np.log(r / p) + np.log(r / q))
-    vi = -1 * result
+    p = confusion_matrix.sum(1).reshape((-1, 1)) / n
+    q = confusion_matrix.sum(0).reshape((1, -1)) / n
+    r = confusion_matrix / n
+    # Consider zero entries
+    mask = (r == 0)
+    r[mask] = 1
+    result = r * (np.log(r / p) + np.log(r / q))
+    result[mask] = 0
+    vi = -result.sum()
     return vi
 
 
@@ -72,13 +68,9 @@ def unsupervised_clustering_accuracy(labels_true: np.ndarray, labels_pred: np.nd
     Yang, Yi, et al. "Image clustering using local discriminant models and global integration."
     IEEE Transactions on Image Processing 19.10 (2010): 2761-2773.
     """
-    _check_number_of_points(labels_true, labels_pred)
-    max_label = int(max(labels_pred.max(), labels_true.max()) + 1)
-    match_matrix = np.zeros((max_label, max_label), dtype=np.int64)
-    for i in range(labels_true.shape[0]):
-        match_matrix[int(labels_true[i]), int(labels_pred[i])] -= 1
-    indices = linear_sum_assignment(match_matrix)
-    acc = -np.sum(match_matrix[indices]) / labels_pred.size
+    confusion_matrix = ConfusionMatrix(labels_true, labels_pred, "square").confusion_matrix
+    indices = linear_sum_assignment(-confusion_matrix)
+    acc = np.sum(confusion_matrix[indices]) / len(labels_true)
     return acc
 
 
@@ -110,17 +102,16 @@ def information_theoretic_external_cluster_validity_measure(labels_true: np.ndar
     Byron E. Dom. 2002. "An information-theoretic external cluster-validity measure."
     In Proceedings of the Eighteenth conference on Uncertainty in artificial intelligence (UAI'02).
     """
-    _check_number_of_points(labels_true, labels_pred)
     # Build confusion matrix
-    cm = ConfusionMatrix(labels_true, labels_pred)
+    confusion_matrix = ConfusionMatrix(labels_true, labels_pred).confusion_matrix
     n_points = labels_true.shape[0]
-    n_classes = cm.confusion_matrix.shape[0]
+    n_classes = confusion_matrix.shape[0]
     # Get number of objects per predicted label
-    hks = np.sum(cm.confusion_matrix, axis=0)
+    hks = np.sum(confusion_matrix, axis=0)
     # Calculate Q_0
-    cm_tmp = cm.confusion_matrix.copy()  # Needed if some cells are 0 so log can be calculated
+    cm_tmp = confusion_matrix.copy()  # Needed if some cells are 0 so log can be calculated
     cm_tmp[cm_tmp == 0] = 1  # will later be multiplied by 0, so this does not change the final result
-    empirical_conditional_entropy = cm.confusion_matrix / n_points * np.log(cm_tmp / hks)
+    empirical_conditional_entropy = confusion_matrix / n_points * np.log(cm_tmp / hks)
     empirical_conditional_entropy = - np.sum(
         empirical_conditional_entropy)  # [~np.isnan(empirical_conditional_entropy)])
     sum_binom_coefficient = np.sum([np.log(comb(hk + n_classes - 1, n_classes - 1)) for hk in hks])
@@ -128,7 +119,7 @@ def information_theoretic_external_cluster_validity_measure(labels_true: np.ndar
     if scale:
         # --- Scale Q_0 to (0, 1] ---
         # Get number of objects per ground truth label
-        hcs = np.sum(cm.confusion_matrix, axis=1)
+        hcs = np.sum(confusion_matrix, axis=1)
         # Calculate Q_2
         min_Q_0 = np.sum([np.log(comb(hc + n_classes - 1, n_classes - 1)) for hc in hcs]) / n_points
         entropy_H_C = -np.sum([hc / n_points * np.log(hc / n_points) for hc in hcs])
@@ -164,7 +155,7 @@ def fair_normalized_mutual_information(labels_true: np.ndarray, labels_pred: np.
     Amelio, Alessia, and Clara Pizzuti. "Is normalized mutual information a fair measure for comparing community detection methods?."
     Proceedings of the 2015 IEEE/ACM international conference on advances in social networks analysis and mining 2015. 2015.
     """
-    _check_number_of_points(labels_true, labels_pred)
+    _check_labels_arrays(labels_true, labels_pred)
     # Get the normalized mutual information
     my_nmi = nmi(labels_true, labels_pred)
     # Get number of clusters
@@ -199,7 +190,6 @@ def purity(labels_true: np.ndarray, labels_pred: np.ndarray) -> float:
     -------
     Manning, Christopher D. An introduction to information retrieval. 2009.
     """
-    _check_number_of_points(labels_true, labels_pred)
     conf_matrix = ConfusionMatrix(labels_true, labels_pred).confusion_matrix
     best_matches = np.max(conf_matrix, axis=0)
     purity = np.sum(best_matches) / labels_true.shape[0]

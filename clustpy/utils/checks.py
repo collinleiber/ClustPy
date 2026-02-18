@@ -1,4 +1,4 @@
-from sklearn.utils.estimator_checks import check_estimator
+from sklearn.utils.estimator_checks import estimator_checks_generator
 from sklearn.base import BaseEstimator
 import numpy as np
 from sklearn.utils import check_X_y, check_array, check_random_state
@@ -16,7 +16,7 @@ def check_clustpy_estimator(estimator_obj: BaseEstimator, checks_to_ignore: tupl
     checks_to_ignore : tuple | list
         List containing the names of checks to ignore (default: ("check_complex_data"))
     """
-    all_checks = check_estimator(estimator_obj, True)
+    all_checks = estimator_checks_generator(estimator_obj)
     for estimator, check in all_checks:
         check_name = check.func.__name__
         if not check_name in checks_to_ignore:
