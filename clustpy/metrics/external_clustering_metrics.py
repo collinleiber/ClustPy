@@ -155,7 +155,7 @@ def fair_normalized_mutual_information(labels_true: np.ndarray, labels_pred: np.
     Amelio, Alessia, and Clara Pizzuti. "Is normalized mutual information a fair measure for comparing community detection methods?."
     Proceedings of the 2015 IEEE/ACM international conference on advances in social networks analysis and mining 2015. 2015.
     """
-    _check_labels_arrays(labels_true, labels_pred)
+    labels_true, labels_pred = _check_labels_arrays(labels_true, labels_pred)
     # Get the normalized mutual information
     my_nmi = nmi(labels_true, labels_pred)
     # Get number of clusters
