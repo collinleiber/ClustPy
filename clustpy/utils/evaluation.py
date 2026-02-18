@@ -219,7 +219,7 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
                                              1]) == 1, "Some names of your metrics do not seem to be unique! Note that metrics must not be named 'runtime' or 'n_clusters'"
     header = pd.MultiIndex.from_product([algo_names, metric_names], names=["algorithm", "metric"])
     value_placeholder = np.zeros((n_repetitions, len(algo_names) * len(metric_names)))
-    df = pd.DataFrame(value_placeholder, columns=header, index=range(n_repetitions))
+    df = pd.DataFrame(value_placeholder, columns=header, index=[str(rep) for rep in range(n_repetitions)])
     for eval_algo in evaluation_algorithms:
         automatically_set_n_clusters = False
         try:
@@ -336,11 +336,11 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
                                 if X_test is not None and labels_predicted_test is not None:
                                     result_test = eval_metric.method(X_test, labels_true_test, labels_predicted_test, algo_obj,
                                                                      **eval_metric.params)
-                            df.at[rep, (eval_algo.name, eval_metric.name)] = result
+                            df.at[str(rep), (eval_algo.name, eval_metric.name)] = result
                             if not quiet:
                                 print("-- {0}: {1}".format(eval_metric.name, result))
                             if X_test is not None and labels_predicted_test is not None:
-                                df.at[rep, (eval_algo.name, eval_metric.name + "_TEST")] = result_test
+                                df.at[str(rep), (eval_algo.name, eval_metric.name + "_TEST")] = result_test
                                 if not quiet:
                                     print("-- {0} (TEST): {1}".format(eval_metric.name, result_test))
                         except Exception as e:
@@ -348,28 +348,29 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
                                 print("Metric {0} raised an exception and will be skipped".format(eval_metric.name))
                                 print('Error on line {}'.format(sys.exc_info()[-1].tb_lineno), type(e).__name__, e)
                 if add_runtime:
-                    df.at[rep, (eval_algo.name, "runtime")] = runtime
+                    df.at[str(rep), (eval_algo.name, "runtime")] = runtime
                     if not quiet:
                         print("-- runtime: {0}".format(runtime))
                 if add_n_clusters:
                     n_clusters = _get_n_clusters_from_algo(algo_obj)
-                    df.at[rep, (eval_algo.name, "n_clusters")] = n_clusters
+                    df.at[str(rep), (eval_algo.name, "n_clusters")] = n_clusters
                     if not quiet:
                         print("-- n_clusters: {0}".format(n_clusters))
                 if eval_algo.deterministic:
                     for element in range(1, n_repetitions):
-                        if add_runtime:
-                            df.at[element, (eval_algo.name, "runtime")] = df.at[
-                                0, (eval_algo.name, "runtime")]
-                        if add_n_clusters:
-                            df.at[element, (eval_algo.name, "n_clusters")] = df.at[
-                                0, (eval_algo.name, "n_clusters")]
+
                         for eval_metric in evaluation_metrics:
-                            df.at[element, (eval_algo.name, eval_metric.name)] = df.at[
+                            df.at[str(element), (eval_algo.name, eval_metric.name)] = df.at[
                                 0, (eval_algo.name, eval_metric.name)]
                             if X_test is not None:
-                                df.at[element, (eval_algo.name, eval_metric.name + "_TEST")] = df.at[
+                                df.at[str(element), (eval_algo.name, eval_metric.name + "_TEST")] = df.at[
                                     0, (eval_algo.name, eval_metric.name + "_TEST")]
+                        if add_runtime:
+                            df.at[str(element), (eval_algo.name, "runtime")] = df.at[
+                                0, (eval_algo.name, "runtime")]
+                        if add_n_clusters:
+                            df.at[str(element), (eval_algo.name, "n_clusters")] = df.at[
+                                0, (eval_algo.name, "n_clusters")]
                     break
         except Exception as e:
             if not quiet:
@@ -606,8 +607,8 @@ def _get_data_and_labels_from_evaluation_dataset(data_input: np.ndarray, data_lo
     return X, labels_true, X_test, labels_true_test
 
 
-def evaluation_df_to_latex_table(df: pd.DataFrame | str, relevant_row : str | int = "mean", output_path: str = None, pm_row: str | int | None = "std", 
-                                 bracket_row: str | int | None = None, best_in_bold: bool = True, second_best_underlined: bool = True, 
+def evaluation_df_to_latex_table(df: pd.DataFrame | str, relevant_row : str = "mean", output_path: str = None, pm_row: str | None = "std", 
+                                 bracket_row: str | None = None, best_in_bold: bool = True, second_best_underlined: bool = True, 
                                  third_best_dashed_underlined: bool = False, color_by_value: str = None, higher_is_better: list = None, 
                                  multiplier: int | float | list | None = 100, decimal_places: int = 1, color_min_max: tuple = (5, 70)) -> str:
     """
@@ -621,13 +622,13 @@ def evaluation_df_to_latex_table(df: pd.DataFrame | str, relevant_row : str | in
     ----------
     df : pd.DataFrame | str
         The pandas dataframe. Can also be a string that contains the path to the saved dataframe
-    relevant_row : str | int
+    relevant_row : str
         The name of the row in the df that is used to create the latex table (default: "mean")
     output_path : str
         The path were the resulting latex table text file will be stored (default: None)
-    pm_row : str | int
+    pm_row : str
         The name of the row in the df that should be added to the latex table after the value from relevant_row separated by plus-minus (default: "std")
-    bracket_row : str | int
+    bracket_row : str
         The name of the row in the df that should be added to the latex table in brackets after the value from relevant_row and, if stated, the value from pm_row (default: None)
     best_in_bold : bool
         Print best value for each combination of dataset and metric in bold.

@@ -61,25 +61,21 @@ def cvnn_score(X: np.ndarray, labels: np.ndarray | int | tuple, n_neighbors: int
         unique_clusters = np.unique(labels)
         # Calculate neighbor weights
         n_neighbors = nrbs_indices.shape[1]
-        n_neighbors_not_in_cluster = np.zeros(X.shape[0])
-        for k in range(n_neighbors):
-            n_neighbors_not_in_cluster += (labels != labels[nrbs_indices[:, k]])
-        n_neighbors_not_in_cluster /= n_neighbors
+        n_neighbors_not_in_cluster = (labels.reshape((-1, 1)) != labels[nrbs_indices]).mean(1)
         cluster_separation_scores = np.zeros(unique_clusters.shape[0])
         cluster_compactness_scores = np.zeros(unique_clusters.shape[0])
         # Do per-cluster calculations
-        for c in unique_clusters:
+        for i, c in enumerate(unique_clusters):
             in_cluster = (labels == c)
             # Calculate separation (mean of neighbor weights in cluster)
-            cluster_separation_scores[c] = n_neighbors_not_in_cluster[in_cluster].mean()
+            cluster_separation_scores[i] = n_neighbors_not_in_cluster[in_cluster].mean()
             # Calculate compartness (mean of pair-wise distances in cluster)
             X_in_cluster = X[in_cluster]
             if X_in_cluster.shape[0] > 1:
                 cluster_distances = pdist(X_in_cluster, metric=metric)
-                in_cluster_pairs = (X_in_cluster.shape[0] * (X_in_cluster.shape[0] - 1)) / 2
-                cluster_compactness_scores[c] = cluster_distances.sum() / in_cluster_pairs
+                cluster_compactness_scores[i] = cluster_distances.mean()
             else:
-                cluster_compactness_scores[c] = 0
+                cluster_compactness_scores[i] = 0
         # Calculate final CVNN
         cluster_separation_final = cluster_separation_scores.max()
         cluster_compactness_final = cluster_compactness_scores.sum()
@@ -99,7 +95,12 @@ def cvnn_score(X: np.ndarray, labels: np.ndarray | int | tuple, n_neighbors: int
             cluster_separations[i] = cluster_separation_l
             cluster_compactnesses[i] = cluster_compactness_l
         # Normalize scores
-        cvnn = cluster_separations / cluster_separations.max() + cluster_compactnesses / cluster_compactnesses.max()
+        max_cluster_separations = cluster_separations.max()
+        max_cluster_compactnesses = cluster_compactnesses.max()
+        if max_cluster_separations != 0 and max_cluster_compactnesses != 0:
+            cvnn = cluster_separations / max_cluster_separations + cluster_compactnesses / max_cluster_compactnesses
+        else:
+            cvnn = 0
     elif isinstance(labels, np.ndarray):
         # Do not normalize scores
         cluster_separation, cluster_compactness = _internal_cvnn_score(X, labels, nrbs_indices, metric)
