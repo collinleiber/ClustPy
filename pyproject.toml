@@ -1,2 +1,54 @@
 [build-system]
 requires = ["setuptools", "wheel", "Cython>=0.29", "numpy >= 1.15"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "clustpy"
+dynamic = ["version"]
+description = "A Python library for advanced clustering algorithms"
+readme = "README.md"
+authors = [{name = "Collin Leiber", email = "leiber@dbs.ifi.lmu.de"}]
+license = {text = "BSD-3-Clause License"}
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "scipy",
+    "scikit-learn>=1.6",
+    "matplotlib",
+    "torch",
+    "pandas",
+    "tqdm",
+    "torchvision"
+]
+
+[project.optional-dependencies]
+full = ["Pillow", "nltk", "xlrd", "opencv-python", "requests"]
+
+[project.urls]
+Homepage = "https://clustpy.readthedocs.io/en/latest/"
+
+[tool.setuptools]
+packages = ["clustpy", "clustpy.*"]
+
+[tool.setuptools.package-data]
+clustpy = ["data/datasets/*.data"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["clustpy*"]
+exclude = ["*tests*", "docs*"]
+
+[tool.pytest.ini_options]
+# Merged from your pytest.ini
+markers = [
+    "data: marks tests concerning data loaders",
+    "largedata: marks tests concerning large data loaders (e.g. image data sets from torchvision)",
+    "timeseriesdata: marks tests concerning dataloader from www.timeseriesclassification.com"
+]
+
+[tool.coverage.run]
+source = ["clustpy"]
+omit = ["*/tests/*"]
+
+[tool.setuptools.dynamic]
+version = {attr = "clustpy.__version__"}

@@ -130,10 +130,10 @@ def load_video_weizmann(image_size: tuple = None, frame_sampling_ratio: float = 
     directory = _get_download_dir(downloads_path) + "/Video_Weizmann/"
     all_actions = ["walk", "run", "jump", "side", "bend", "wave1", "wave2", "pjump", "jack", "skip"]
     all_persons = ["daria", "denis", "eli", "ido", "ira", "lena", "lyova", "moshe", "shahar"]
-    all_data = np.zeros(
-        (0, 144 if image_size is None else image_size[0], 180 if image_size is None else image_size[1], 3),
-        dtype="uint8")
-    labels = np.zeros((0, 2), dtype="int32")
+    all_data_list = [] #np.zeros(
+       # (0, 144 if image_size is None else image_size[0], 180 if image_size is None else image_size[1], 3),
+       # dtype="uint8")
+    labels_list = [] #np.zeros((0, 2), dtype="int32")
     # Download data
     for action in all_actions:
         my_zip_file = action + ".zip"
@@ -168,8 +168,12 @@ def load_video_weizmann(image_size: tuple = None, frame_sampling_ratio: float = 
             # Downsample frames
             data_local, labels_local = _downsample_frames(data_local, labels_local, frame_sampling_ratio)
             # Update data and labels
-            all_data = np.append(all_data, data_local, axis=0)
-            labels = np.append(labels, labels_local, axis=0)
+            all_data_list.append(data_local) #= np.append(all_data, data_local, axis=0)
+            labels_list.append(labels_local) #= np.append(labels, labels_local, axis=0)
+    all_data = np.concatenate(all_data_list, axis=0)
+    labels = np.concatenate(labels_list, axis=0)
+    del all_data_list
+    del labels_list
     # Flatten data
     data_flatten = flatten_images(all_data, "HWC")
     # Return values
@@ -283,10 +287,10 @@ def load_video_keck_gesture(subset: str = "all", image_size: tuple = (200, 200),
         # Get Relevant frames
         _download_file("http://www.zhuolin.umiacs.io/PrototypeTree/sequences.txt", frames_file)
     # Load data and labels
-    all_data = np.zeros(
-        (0, 480 if image_size is None else image_size[0], 640 if image_size is None else image_size[1], 3),
-        dtype="uint8")
-    labels = np.zeros((0, 2), dtype="int32")
+    all_data_list = [] #np.zeros(
+        #(0, 480 if image_size is None else image_size[0], 640 if image_size is None else image_size[1], 3),
+        #dtype="uint8")
+    labels_list = [] #np.zeros((0, 2), dtype="int32")
     # Get frame limits from sequences file
     frames_train_dict, frames_test_dict = parse_frames_file(frames_file)
     # Get necessary directories
@@ -315,8 +319,12 @@ def load_video_keck_gesture(subset: str = "all", image_size: tuple = (200, 200),
             # Downsample frames
             data_local, labels_local = _downsample_frames(data_local, labels_local, frame_sampling_ratio)
             # Update data and labels
-            all_data = np.append(all_data, data_local, axis=0)
-            labels = np.append(labels, labels_local, axis=0)
+            all_data_list.append(data_local) #= np.append(all_data, data_local, axis=0)
+            labels_list.append(labels_local) #= np.append(labels, labels_local, axis=0)
+    all_data = np.concatenate(all_data_list, axis=0)
+    labels = np.concatenate(labels_list, axis=0)
+    del all_data_list
+    del labels_list
     # Flatten data
     data_flatten = flatten_images(all_data, "HWC")
     # Return values

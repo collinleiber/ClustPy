@@ -45,7 +45,7 @@ def _get_data_and_labels(dataset: torchvision.datasets.VisionDataset, image_size
             labels.append(label)
             image_data = _load_image_data(path, image_size, True)
             data_list.append(image_data)
-        # Convert data form list to numpy array
+        # Convert data from list to numpy array
         data = np.array(data_list)
         labels = np.array(labels)
     if type(data) is np.ndarray:
