@@ -1,7 +1,6 @@
 import torchvision
 import torch
 import numpy as np
-import ssl
 from clustpy.data._utils import _get_download_dir, _load_image_data, flatten_images
 from sklearn.datasets._base import Bunch
 
@@ -89,8 +88,6 @@ def _load_torch_image_data(data_source: torchvision.datasets.VisionDataset, subs
     assert subset in ["all", "train",
                       "test"], "subset must match 'all', 'train' or 'test'. Your input {0}".format(subset)
     # Get data from source
-    default_ssl = ssl._create_default_https_context
-    ssl._create_default_https_context = ssl._create_unverified_context
     if subset == "all" or subset == "train":
         # Load training data
         if uses_train_param:
@@ -117,7 +114,6 @@ def _load_torch_image_data(data_source: torchvision.datasets.VisionDataset, subs
     # Convert data to float and labels to int
     data = data.float()
     labels = labels.int()
-    ssl._create_default_https_context = default_ssl
     # Check data dimensions
     if data.dim() < 3 or data.dim() > 5:
         raise Exception(
@@ -137,7 +133,7 @@ def _load_torch_image_data(data_source: torchvision.datasets.VisionDataset, subs
         # Some dataset (e.g., SVHN) do not have the class information included
         if hasattr(dataset, "classes"):
             return Bunch(dataset_name=dataset.__class__.__name__, data=data_flatten, target=labels_numpy,
-                         images=data_image, image_format=image_format, classes=dataset.classes)
+                         images=data_image, image_format=image_format, classes=dataset.classes.copy())
         else:
             return Bunch(dataset_name=dataset.__class__.__name__, data=data_flatten, target=labels_numpy,
                          images=data_image, image_format=image_format)

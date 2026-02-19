@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "wheel", "Cython>=0.29", "numpy >= 1.15"]
+requires = ["setuptools", "wheel", "Cython>=3.0", "numpy>=2.0.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -22,21 +22,21 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-full = ["Pillow", "nltk", "xlrd", "opencv-python", "requests"]
+full = ["Pillow", "nltk", "xlrd", "requests", "opencv-python-headless<4.13"]
 
 [project.urls]
 Homepage = "https://clustpy.readthedocs.io/en/latest/"
 
 [tool.setuptools]
-packages = ["clustpy", "clustpy.*"]
-
-[tool.setuptools.package-data]
-clustpy = ["data/datasets/*.data"]
+package-data = {"clustpy" = ["data/datasets/*.data"]}
 
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["clustpy*"]
 exclude = ["*tests*", "docs*"]
+
+[tool.setuptools.dynamic]
+version = {attr = "clustpy.__version__"}
 
 [tool.pytest.ini_options]
 # Merged from your pytest.ini
@@ -49,6 +49,3 @@ markers = [
 [tool.coverage.run]
 source = ["clustpy"]
 omit = ["*/tests/*"]
-
-[tool.setuptools.dynamic]
-version = {attr = "clustpy.__version__"}

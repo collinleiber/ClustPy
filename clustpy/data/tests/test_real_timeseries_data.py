@@ -2,22 +2,22 @@ from clustpy.data.tests._helpers_for_tests import _helper_test_data_loader
 from clustpy.data import load_motestrain, load_proximal_phalanx_outline, load_diatom_size_reduction, load_symbols, \
     load_olive_oil, load_plane, load_sony_aibo_robot_surface, load_two_patterns, load_lsst
 from pathlib import Path
+import pytest
 import os
 import shutil
-import pytest
 
 TEST_DOWNLOAD_PATH = str(Path.home() / "Downloads/clustpy_testfiles_timeseries")
 
 
-@pytest.fixture(autouse=True, scope='function')
+@pytest.fixture(autouse=True, scope='module')
 def run_around_tests():
     # Code that will run before the tests
     if not os.path.isdir(TEST_DOWNLOAD_PATH):
-        os.makedirs(TEST_DOWNLOAD_PATH)
+        os.makedirs(TEST_DOWNLOAD_PATH, exist_ok=True)
     # Test functions will be run at this point
     yield
     # Code that will run after the tests
-    shutil.rmtree(TEST_DOWNLOAD_PATH)
+    shutil.rmtree(TEST_DOWNLOAD_PATH, ignore_errors=True)
 
 
 @pytest.mark.data

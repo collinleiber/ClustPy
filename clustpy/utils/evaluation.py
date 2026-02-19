@@ -361,16 +361,16 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
 
                         for eval_metric in evaluation_metrics:
                             df.at[str(element), (eval_algo.name, eval_metric.name)] = df.at[
-                                0, (eval_algo.name, eval_metric.name)]
+                                "0", (eval_algo.name, eval_metric.name)]
                             if X_test is not None:
                                 df.at[str(element), (eval_algo.name, eval_metric.name + "_TEST")] = df.at[
-                                    0, (eval_algo.name, eval_metric.name + "_TEST")]
+                                    "0", (eval_algo.name, eval_metric.name + "_TEST")]
                         if add_runtime:
                             df.at[str(element), (eval_algo.name, "runtime")] = df.at[
-                                0, (eval_algo.name, "runtime")]
+                                "0", (eval_algo.name, "runtime")]
                         if add_n_clusters:
                             df.at[str(element), (eval_algo.name, "n_clusters")] = df.at[
-                                0, (eval_algo.name, "n_clusters")]
+                                "0", (eval_algo.name, "n_clusters")]
                     break
         except Exception as e:
             if not quiet:

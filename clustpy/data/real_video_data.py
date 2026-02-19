@@ -2,7 +2,7 @@ try:
     import cv2
 except:
     print("[WARNING] Could not import cv2 in clustpy.data.real_video_data. Please install cv2 by 'pip install opencv-python' if necessary")
-from clustpy.data._utils import _download_file, _get_download_dir, _load_image_data, flatten_images
+from clustpy.data._utils import _download_file, _get_download_dir, flatten_images
 import numpy as np
 import os
 import zipfile
@@ -33,19 +33,26 @@ def _load_video(path: str, image_size: tuple) -> np.ndarray:
     """
     # Load video
     vid = cv2.VideoCapture(path)
+    if not vid.isOpened():
+        vid.release()
+        raise IOError(f"OpenCV could not open {path}. This usually indicates missing codecs (ffmpeg/libav).")
     video_array = []
     # Iterate over frames
-    successful = True
-    while successful:
-        successful, frame_array = vid.read()
-        if successful:
+    try:
+        while True:
+            successful, frame_array = vid.read()
+            if not successful:
+                break
             is_color_image = frame_array.ndim == 3 and frame_array.shape[2] == 3
             if is_color_image:
                 frame_array = cv2.cvtColor(frame_array, cv2.COLOR_BGR2RGB)
             if image_size is not None:
-                frame_array = _load_image_data(frame_array, image_size, is_color_image)
-            video_array.append(frame_array)
-    vid.release()
+                frame_array = cv2.resize(frame_array, image_size, interpolation=cv2.INTER_AREA)
+            video_array.append(frame_array.copy())
+    finally:
+        vid.release()
+    if len(video_array) == 0:
+        raise ValueError(f"Video at {path} yielded 0 frames. File might be corrupted.")
     # Transform list to numpy array
     video_array = np.array(video_array, dtype="uint8")
     return video_array
@@ -90,7 +97,8 @@ Actual datasets
 """
 
 
-def load_video_weizmann(image_size: tuple = None, frame_sampling_ratio: float = 1, return_X_y: bool = False,
+def load_video_weizmann(use_actions : tuple = None, use_persons : tuple = None, 
+                        image_size: tuple = None, frame_sampling_ratio: float = 1, return_X_y: bool = False,
                         downloads_path: str = None) -> Bunch:
     """
     Load the Weizmann video data set.
@@ -102,6 +110,10 @@ def load_video_weizmann(image_size: tuple = None, frame_sampling_ratio: float = 
 
     Parameters
     ----------
+    use_actions : tuple
+        Specify the actions. Can be None if all actions should be used (default: None)
+    use_persons : tuple
+        Specify the persons. Can be None if all persons should be used (default: None)
     image_size : tuple
         The single frames can be downsized. This is necessary for large datasets.
         The tuple equals (width, height) of the images.
@@ -129,13 +141,17 @@ def load_video_weizmann(image_size: tuple = None, frame_sampling_ratio: float = 
     """
     directory = _get_download_dir(downloads_path) + "/Video_Weizmann/"
     all_actions = ["walk", "run", "jump", "side", "bend", "wave1", "wave2", "pjump", "jack", "skip"]
+    if use_actions is None:
+        use_actions = all_actions.copy()
+    assert all([action in all_actions for action in use_actions])
     all_persons = ["daria", "denis", "eli", "ido", "ira", "lena", "lyova", "moshe", "shahar"]
-    all_data_list = [] #np.zeros(
-       # (0, 144 if image_size is None else image_size[0], 180 if image_size is None else image_size[1], 3),
-       # dtype="uint8")
-    labels_list = [] #np.zeros((0, 2), dtype="int32")
+    if use_persons is None:
+        use_persons = all_persons.copy()
+    assert all([person in all_persons for person in use_persons])
+    all_data_list = []
+    labels_list = []
     # Download data
-    for action in all_actions:
+    for action in use_actions:
         my_zip_file = action + ".zip"
         filename = directory + my_zip_file
         if not os.path.isfile(filename):
@@ -151,7 +167,6 @@ def load_video_weizmann(image_size: tuple = None, frame_sampling_ratio: float = 
     for v_file in os.listdir(directory):
         # Ignore zip files
         if v_file.endswith(".avi"):
-            data_local = _load_video(directory + "/" + v_file, image_size)
             # Get name of person and type of activity
             relevant_parts = v_file.split(".")[0]
             person = relevant_parts.split("_")[0]
@@ -161,15 +176,19 @@ def load_video_weizmann(image_size: tuple = None, frame_sampling_ratio: float = 
                 action = action[:-1]
             assert person in all_persons, "Wrong person. {0} is unknown".format(person)
             assert action in all_actions, "Wrong action. {0} is unknown".format(action)
+            if person not in use_persons or action not in use_actions:
+                continue
+            # Load video
+            data_local = _load_video(directory + "/" + v_file, image_size)
             # Transform string to label
-            label_person = all_persons.index(person)
-            label_action = all_actions.index(action)
+            label_person = use_persons.index(person)
+            label_action = use_actions.index(action)
             labels_local = np.array([[label_action, label_person]] * data_local.shape[0], dtype="int32")
             # Downsample frames
             data_local, labels_local = _downsample_frames(data_local, labels_local, frame_sampling_ratio)
             # Update data and labels
-            all_data_list.append(data_local) #= np.append(all_data, data_local, axis=0)
-            labels_list.append(labels_local) #= np.append(labels, labels_local, axis=0)
+            all_data_list.append(data_local)
+            labels_list.append(labels_local)
     all_data = np.concatenate(all_data_list, axis=0)
     labels = np.concatenate(labels_list, axis=0)
     del all_data_list
@@ -184,7 +203,7 @@ def load_video_weizmann(image_size: tuple = None, frame_sampling_ratio: float = 
         data_image = np.transpose(all_data, [0, 3, 1, 2])
         image_format = "CHW"
         return Bunch(dataset_name="VideoWeizmann", data=data_flatten, target=labels, images=data_image,
-                     image_format=image_format)
+                     image_format=image_format, classes=(use_actions, use_persons))
 
 
 def load_video_keck_gesture(subset: str = "all", image_size: tuple = (200, 200), frame_sampling_ratio: float = 1,
@@ -287,10 +306,8 @@ def load_video_keck_gesture(subset: str = "all", image_size: tuple = (200, 200),
         # Get Relevant frames
         _download_file("http://www.zhuolin.umiacs.io/PrototypeTree/sequences.txt", frames_file)
     # Load data and labels
-    all_data_list = [] #np.zeros(
-        #(0, 480 if image_size is None else image_size[0], 640 if image_size is None else image_size[1], 3),
-        #dtype="uint8")
-    labels_list = [] #np.zeros((0, 2), dtype="int32")
+    all_data_list = []
+    labels_list = []
     # Get frame limits from sequences file
     frames_train_dict, frames_test_dict = parse_frames_file(frames_file)
     # Get necessary directories
@@ -319,8 +336,8 @@ def load_video_keck_gesture(subset: str = "all", image_size: tuple = (200, 200),
             # Downsample frames
             data_local, labels_local = _downsample_frames(data_local, labels_local, frame_sampling_ratio)
             # Update data and labels
-            all_data_list.append(data_local) #= np.append(all_data, data_local, axis=0)
-            labels_list.append(labels_local) #= np.append(labels, labels_local, axis=0)
+            all_data_list.append(data_local)
+            labels_list.append(labels_local)
     all_data = np.concatenate(all_data_list, axis=0)
     labels = np.concatenate(labels_list, axis=0)
     del all_data_list

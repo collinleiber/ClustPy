@@ -2,22 +2,22 @@ from clustpy.data.tests._helpers_for_tests import _helper_test_data_loader
 from clustpy.data import load_iris, load_wine, load_breast_cancer, load_olivetti_faces, load_newsgroups, load_rcv1, \
     load_imagenet_dog, load_imagenet10, load_coil20, load_coil100, load_webkb
 from pathlib import Path
+import pytest
 import os
 import shutil
-import pytest
 
 TEST_DOWNLOAD_PATH = str(Path.home() / "Downloads/clustpy_testfiles_realworld")
 
 
-@pytest.fixture(autouse=True, scope='function')
+@pytest.fixture(autouse=True, scope='module')
 def run_around_tests():
     # Code that will run before the tests
     if not os.path.isdir(TEST_DOWNLOAD_PATH):
-        os.makedirs(TEST_DOWNLOAD_PATH)
+        os.makedirs(TEST_DOWNLOAD_PATH, exist_ok=True)
     # Test functions will be run at this point
     yield
     # Code that will run after the tests
-    shutil.rmtree(TEST_DOWNLOAD_PATH)
+    shutil.rmtree(TEST_DOWNLOAD_PATH, ignore_errors=True)
 
 
 @pytest.mark.data

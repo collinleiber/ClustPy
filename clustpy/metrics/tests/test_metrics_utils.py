@@ -11,11 +11,13 @@ def test_check_labels_arrays():
     with pytest.raises(ValueError):
         _check_labels_arrays(l1, l2[1:])
     l3 = np.c_[l1, l2]
-    l1, l3 =_check_labels_arrays(l1, l3)
+    with pytest.raises(ValueError):
+        _check_labels_arrays(l1, l3)
+    l1, l3 =_check_labels_arrays(l1, l3, allow_2d_labels = True)
     assert l1.shape == (10, ) and l3.shape == (10, 2)
-    l3, l1 =_check_labels_arrays(l3, l1)
+    l3, l1 =_check_labels_arrays(l3, l1, allow_2d_labels = True)
     assert l1.shape == (10, ) and l3.shape == (10, 2)
-    l3, l4 =_check_labels_arrays(l3, l3)
+    l3, l4 =_check_labels_arrays(l3, l3, allow_2d_labels = True)
     assert l3.shape == (10, 2) and l4.shape == (10, 2)
 
 

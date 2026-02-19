@@ -7,11 +7,14 @@ try:
 except:
     print(
         "[WARNING] Could not import nltk in clustpy.data.real_world_data to use the SnowballStemmer. Please install nltk by 'pip install nltk' if necessary")
+try:
+    from PIL import Image
+except:
+    print(
+        "[WARNING] Could not import PIL in clustpy.data.real_world_data. Please install PIL by 'pip install Pillow' if necessary")
 import numpy as np
-import urllib.request
 import os
 from pathlib import Path
-from PIL import Image
 from sklearn.feature_extraction.text import TfidfTransformer, CountVectorizer
 from sklearn.feature_selection import VarianceThreshold
 from sklearn.datasets import fetch_file
@@ -187,7 +190,7 @@ def _load_image_data(image: str, image_size: tuple, color_image: bool) -> np.nda
     image_data : np.ndarray
         The numpy array containing the image data
     """
-    if type(image) is str:
+    if isinstance(image, str):
         pil_image = Image.open(image)
     else:
         pil_image = Image.fromarray(np.uint8(image))
@@ -196,7 +199,8 @@ def _load_image_data(image: str, image_size: tuple, color_image: bool) -> np.nda
     # Convert to coherent size
     if image_size is not None:
         pil_image = pil_image.resize(image_size)
-    image_data = np.asarray(pil_image)
+    image_data = np.array(pil_image).copy()
+    pil_image.close()
     assert image_size is None or image_data.shape == (
         image_size[0], image_size[1], 3), "Size of image is not correct. Should be {0} but is {1}".format(image_size,
                                                                                                           image_data.shape)

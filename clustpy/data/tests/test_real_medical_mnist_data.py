@@ -4,22 +4,22 @@ from clustpy.data import load_path_mnist, load_chest_mnist, load_derma_mnist, lo
     load_organ_s_mnist, load_organ_mnist_3d, load_nodule_mnist_3d, load_adrenal_mnist_3d, load_fracture_mnist_3d, \
     load_vessel_mnist_3d, load_synapse_mnist_3d
 from pathlib import Path
+import pytest
 import os
 import shutil
-import pytest
 
 TEST_DOWNLOAD_PATH = str(Path.home() / "Downloads/clustpy_testfiles_medical_mnist")
 
 
-@pytest.fixture(autouse=True, scope='function')
+@pytest.fixture(autouse=True, scope='module')
 def run_around_tests():
     # Code that will run before the tests
     if not os.path.isdir(TEST_DOWNLOAD_PATH):
-        os.makedirs(TEST_DOWNLOAD_PATH)
+        os.makedirs(TEST_DOWNLOAD_PATH, exist_ok=True)
     # Test functions will be run at this point
     yield
     # Code that will run after the tests
-    shutil.rmtree(TEST_DOWNLOAD_PATH)
+    shutil.rmtree(TEST_DOWNLOAD_PATH, ignore_errors=True)
 
 
 @pytest.mark.data

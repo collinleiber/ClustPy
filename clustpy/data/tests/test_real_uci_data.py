@@ -5,22 +5,22 @@ from clustpy.data import load_banknotes, load_spambase, load_seeds, load_skin, l
     load_statlog_australian_credit_approval, load_breast_cancer_wisconsin_original, load_optdigits, load_semeion, \
     load_cmu_faces, load_gene_expression_cancer_rna_seq, load_sport_articles, load_wholesale_customers, load_reuters21578
 from pathlib import Path
+import pytest
 import os
 import shutil
-import pytest
 
 TEST_DOWNLOAD_PATH = str(Path.home() / "Downloads/clustpy_testfiles_uci")
 
 
-@pytest.fixture(autouse=True, scope='function')
+@pytest.fixture(autouse=True, scope='module')
 def run_around_tests():
     # Code that will run before the tests
     if not os.path.isdir(TEST_DOWNLOAD_PATH):
-        os.makedirs(TEST_DOWNLOAD_PATH)
+        os.makedirs(TEST_DOWNLOAD_PATH, exist_ok=True)
     # Test functions will be run at this point
     yield
     # Code that will run after the tests
-    shutil.rmtree(TEST_DOWNLOAD_PATH)
+    shutil.rmtree(TEST_DOWNLOAD_PATH, ignore_errors=True)
 
 
 @pytest.mark.data

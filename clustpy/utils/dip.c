@@ -45,6 +45,7 @@ Compile Windows: cc -fPIC -shared -std=c99 -o dip.dll dip.c
 Compile Linux: cc -fPIC -shared -o dip.so dip.c
 */
 
+#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #include <Python.h>
 #include <numpy/arrayobject.h>
 
@@ -306,13 +307,13 @@ static PyObject *method_c_diptest(PyObject *self, PyObject *args) {
     return NULL;
   }
   // Convert PyObjects to C arrays
-  c_x = (double*)py_x->data;
-  c_low_high = (int*)py_low_high->data;
-  c_modaltriangle = (int*)py_modaltriangle->data;
-  c_gcm = (int*)py_gcm->data;
-  c_lcm = (int*)py_lcm->data;
-  c_mn = (int*)py_mn->data;
-  c_mj = (int*)py_mj->data;
+  c_x = (double*)PyArray_DATA(py_x);
+  c_low_high = (int*)PyArray_DATA(py_low_high);
+  c_modaltriangle = (int*)PyArray_DATA(py_modaltriangle);
+  c_gcm = (int*)PyArray_DATA(py_gcm);
+  c_lcm = (int*)PyArray_DATA(py_lcm);
+  c_mn = (int*)PyArray_DATA(py_mn);
+  c_mj = (int*)PyArray_DATA(py_mj);
   // Execute C diptest method
   double dip_value = fast_diptest(c_x, c_low_high, c_modaltriangle, c_gcm, c_lcm, c_mn, c_mj, n, debug);
   // Return dip value
@@ -334,5 +335,8 @@ static struct PyModuleDef diptestModule = {
 
 PyMODINIT_FUNC PyInit_dipModule(void) {
   import_array();
+  if (PyErr_Occurred()) {
+      return NULL;
+  }
   return PyModule_Create(&diptestModule);
 };

@@ -42,7 +42,7 @@ jobs:
     needs: lint  # This job only starts if 'lint' passes
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: true # breaks 3.12 if 3.10 fails
+      fail-fast: false # don't break 3.12 if 3.10 fails
       matrix:
         python-version: ["3.12", "3.10"]
 
@@ -61,15 +61,15 @@ jobs:
           pip install pytest pytest-cov
           pip install -e .[full]
 
-      - name: Test with pytest (using data tests)
-        if: ${{ matrix.python-version == '3.10' }}
+      - name: Test with pytest (with codecov)
+        if: ${{ matrix.python-version == '3.12' }}
         run: |
           pytest -m "not largedata" --cov --cov-report=xml
 
-      - name: Test with pytest (not using data tests)
-        if: ${{ matrix.python-version != '3.10' }}
+      - name: Test with pytest (without codecov)
+        if: ${{ matrix.python-version != '3.12' }}
         run: |
-          pytest -m "not data"
+          pytest -m "not largedata"
 
       - name: Upload coverage reports to Codecov
         if: ${{ matrix.python-version == '3.10' }}

@@ -704,4 +704,4 @@ def load_webkb(use_universities: tuple = ("cornell", "texas", "washington", "wis
     if return_X_y:
         return data, labels
     else:
-        return Bunch(dataset_name="WebKB", data=data, target=labels, classes=[use_categories, use_universities])
+        return Bunch(dataset_name="WebKB", data=data, target=labels, classes=(use_categories, use_universities))

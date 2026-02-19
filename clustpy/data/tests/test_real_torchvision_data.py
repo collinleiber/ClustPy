@@ -3,22 +3,26 @@ from clustpy.data import load_usps, load_mnist, load_fmnist, load_kmnist, load_c
     load_gtsrb, load_cifar100
 import torchvision.datasets
 from pathlib import Path
+import pytest
 import os
 import shutil
-import pytest
+import gc
+import time
 
 TEST_DOWNLOAD_PATH = str(Path.home() / "Downloads/clustpy_testfiles_torchvision")
 
 
-@pytest.fixture(autouse=True, scope='function')
+@pytest.fixture(autouse=True, scope='module')
 def run_around_tests():
     # Code that will run before the tests
     if not os.path.isdir(TEST_DOWNLOAD_PATH):
-        os.makedirs(TEST_DOWNLOAD_PATH)
+        os.makedirs(TEST_DOWNLOAD_PATH, exist_ok=True)
     # Test functions will be run at this point
     yield
+    gc.collect()
+    time.sleep(0.2)
     # Code that will run after the tests
-    shutil.rmtree(TEST_DOWNLOAD_PATH)
+    shutil.rmtree(TEST_DOWNLOAD_PATH, ignore_errors=True)
 
 
 # Check if loading methods still exist (could be renamed/moved)

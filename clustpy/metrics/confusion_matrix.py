@@ -74,9 +74,9 @@ def _plot_confusion_matrix(confusion_matrix: np.ndarray, show_text: bool, row_na
         Used to choose the color from the colormap
     """
     if len(row_names) != confusion_matrix.shape[0]:
-        raise ValueError("Length of the ground_truth_names must match the number of rows (ground turth clusters) in the confusion matrix. Length is {0} and number of rows is {1}".format(row_names, confusion_matrix.shape[0]))
+        raise ValueError("Length of the row names list must match the number of rows (ground turth clusters) in the confusion matrix. Length is {0} and number of rows is {1}".format(len(row_names), confusion_matrix.shape[0]))
     if len(column_names) != confusion_matrix.shape[1]:
-        raise ValueError("Length of the ground_truth_names must match the number of rows (ground turth clusters) in the confusion matrix. Length is {0} and number of rows is {1}".format(column_names, confusion_matrix.shape[1]))
+        raise ValueError("Length of the column names list must match the number of columns (predicted clusters) in the confusion matrix. Length is {0} and number of columns is {1}".format(len(column_names), confusion_matrix.shape[1]))
     fig, ax = plt.subplots(figsize=figsize)
     # Plot confusion matrix using colors
     ax.imshow(confusion_matrix, cmap=cmap, vmin=vmin, vmax=vmax)
@@ -122,19 +122,19 @@ class ConfusionMatrix():
         self.true_clusters = true_clusters
         self.pred_clusters = pred_clusters
         if shape is None:
-            conf_matrix = np.zeros((len(true_clusters), len(pred_clusters)), dtype=int)
+            shape = (len(true_clusters), len(pred_clusters))
         else:
             if shape == "square":
                 max_labels = max(len(true_clusters), len(pred_clusters))
                 shape = (max_labels, max_labels)
             else:
                 assert len(shape) == 2 and shape[0] >= len(true_clusters) and shape[1] >= len(pred_clusters), f"Shape must be 'square' or a tuple containing two values such that shape[0] >= len(np.unique(labels_true)) and shape[1] >= len(np.unique(labels_pred)). Your values: shape = {shape}, len(np.unique(labels_true)) = {len(np.unique(labels_true))}, len(np.unique(labels_pred)) = {len(np.unique(labels_pred))}"
-            conf_matrix = np.zeros(shape, dtype=int)
             # Fill unique label information (self.true_clusters and self.pred_clusters) with -2 placeholders
             if shape[0] > len(true_clusters):
                 self.true_clusters = np.append(self.true_clusters, [-2] * (shape[0] - len(true_clusters)))
             if shape[1] > len(pred_clusters):
                 self.pred_clusters = np.append(self.pred_clusters, [-2] * (shape[1] - len(pred_clusters)))
+        conf_matrix = np.zeros(shape, dtype=int)
         np.add.at(conf_matrix, (true_clusters_idx, pred_clusters_idx), 1)
         self.confusion_matrix = conf_matrix
 

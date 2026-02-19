@@ -251,7 +251,7 @@ def _get_multiple_labelings_pair_counting_categories(labels_true: np.ndarray, la
         The number of false negatives,
         The number of true negatives
     """
-    labels_true, labels_pred = _check_labels_arrays(labels_true, labels_pred)
+    labels_true, labels_pred = _check_labels_arrays(labels_true, labels_pred, allow_2d_labels=True)
     if labels_true.ndim == 1:
         labels_true = labels_true.reshape((-1, 1))
     if labels_pred.ndim == 1:
@@ -393,7 +393,7 @@ class MultipleLabelingsConfusionMatrix(ConfusionMatrix):
 
     def __init__(self, labels_true: np.ndarray, labels_pred: np.ndarray, metric: Callable = nmi,
                  remove_noise_spaces: bool = True, metric_params: dict = {}):
-        labels_true, labels_pred = _check_labels_arrays(labels_true, labels_pred)
+        labels_true, labels_pred = _check_labels_arrays(labels_true, labels_pred, allow_2d_labels=True)
         assert type(metric_params) is dict, "metric_params must be a dict"
         assert callable(metric), "metric must be a method"
         # Reshape labels if we have only a single set of labels
@@ -556,7 +556,7 @@ def is_multi_labelings_n_clusters_correct(labels_true: np.ndarray, labels_pred: 
     is_equal : bool
         Boolean indicating if the number of clusters of labels_true and labels_pred matches
     """
-    labels_true, labels_pred = _check_labels_arrays(labels_true, labels_pred)
+    labels_true, labels_pred = _check_labels_arrays(labels_true, labels_pred, allow_2d_labels=True)
     if labels_true.ndim == 1:
         labels_true = labels_true.reshape((-1, 1))
     if labels_pred.ndim == 1:

@@ -1,9 +1,4 @@
-try:
-    from PIL import Image
-except:
-    print(
-        "[WARNING] Could not import PIL in clustpy.data.real_world_data. Please install PIL by 'pip install Pillow' if necessary")
-from clustpy.data._utils import _download_file, _get_download_dir, _decompress_z_file, _load_data_file, flatten_images, _transform_text_data
+from clustpy.data._utils import _download_file, _get_download_dir, _decompress_z_file, _load_data_file, flatten_images, _transform_text_data, _load_image_data
 import os
 import numpy as np
 import zipfile
@@ -1167,7 +1162,7 @@ def load_cmu_faces(return_X_y: bool = False, downloads_path: str = None) -> Bunc
             if not image.endswith("_4.pgm"):
                 continue
             # get image data
-            image_data = Image.open(path_images + "/" + image)
+            image_data = _load_image_data(path_images + "/" + image, None, False)
             image_array = np.array(image_data)
             # Get labels
             name_parts = image.split("_")
@@ -1188,7 +1183,7 @@ def load_cmu_faces(return_X_y: bool = False, downloads_path: str = None) -> Bunc
         return data_flatten, labels
     else:
         return Bunch(dataset_name="CMUFace", data=data_flatten, target=labels, images=data_image, image_format="HW",
-                     classes=[names, positions, expressions, eyes])
+                     classes=(names, positions, expressions, eyes))
 
 
 def load_gene_expression_cancer_rna_seq(return_X_y: bool = False, downloads_path: str = None):
