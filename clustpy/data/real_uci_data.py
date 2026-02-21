@@ -1162,8 +1162,7 @@ def load_cmu_faces(return_X_y: bool = False, downloads_path: str = None) -> Bunc
             if not image.endswith("_4.pgm"):
                 continue
             # get image data
-            image_data = _load_image_data(path_images + "/" + image, None, False)
-            image_array = np.array(image_data)
+            image_array = _load_image_data(path_images + "/" + image, None, False)
             # Get labels
             name_parts = image.split("_")
             user_id = np.argwhere(names == name_parts[0])[0][0]

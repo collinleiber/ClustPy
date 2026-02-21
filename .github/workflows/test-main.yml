@@ -62,12 +62,12 @@ jobs:
           pip install -e .[full]
 
       - name: Test with pytest (with codecov)
-        if: ${{ matrix.python-version == '3.12' }}
+        if: ${{ matrix.python-version == '3.10' }}
         run: |
           pytest -m "not largedata" --cov --cov-report=xml
 
       - name: Test with pytest (without codecov)
-        if: ${{ matrix.python-version != '3.12' }}
+        if: ${{ matrix.python-version != '3.10' }}
         run: |
           pytest -m "not largedata"
 

@@ -2,23 +2,18 @@ import numpy as np
 from clustpy.data.tests._helpers_for_tests import _helper_test_data_loader
 from clustpy.data import load_video_weizmann, load_video_keck_gesture
 from clustpy.data.real_video_data import _downsample_frames
-from pathlib import Path
 import pytest
-import os
 import shutil
 
-TEST_DOWNLOAD_PATH = str(Path.home() / "Downloads/clustpy_testfiles_video")
 
-
-@pytest.fixture(autouse=True, scope='module')
-def run_around_tests():
+@pytest.fixture(autouse=True, scope='function')
+def my_tmp_dir(tmp_path):
     # Code that will run before the tests
-    if not os.path.isdir(TEST_DOWNLOAD_PATH):
-        os.makedirs(TEST_DOWNLOAD_PATH, exist_ok=True)
+    tmp_dir = str(tmp_path)
     # Test functions will be run at this point
-    yield
+    yield tmp_dir
     # Code that will run after the tests
-    shutil.rmtree(TEST_DOWNLOAD_PATH, ignore_errors=True)
+    shutil.rmtree(tmp_dir)
 
 
 def test_downsample_frames():
@@ -41,10 +36,10 @@ def test_downsample_frames():
 
 
 @pytest.mark.data
-def test_load_video_weizmann():
+def test_load_video_weizmann(my_tmp_dir):
     dataset = _helper_test_data_loader(load_video_weizmann, None, 77760, [2, 2],
                                        dataloader_params={"use_actions": ["walk", "run"], "use_persons": ["daria", "denis"],
-                                                          "downloads_path": TEST_DOWNLOAD_PATH})  # N not always the same (5687)
+                                                          "downloads_path": my_tmp_dir})  # N not always the same (5687)
     # Non-flatten
     assert dataset.images.shape[1:] == (3, 144, 180)
     assert dataset.image_format == "CHW"
@@ -52,7 +47,7 @@ def test_load_video_weizmann():
     # Change image size and downsample
     dataset = _helper_test_data_loader(load_video_weizmann, None, 30000, [10, 9],
                                        dataloader_params={"image_size": (100, 100), "frame_sampling_ratio": 0.5,
-                                                          "downloads_path": TEST_DOWNLOAD_PATH})  # N not always the same (5687)
+                                                          "downloads_path": my_tmp_dir})  # N not always the same (5687)
     # Non-flatten
     assert dataset.images.shape[1:] == (3, 100, 100)
     assert dataset.image_format == "CHW"
@@ -65,17 +60,17 @@ def test_load_video_weizmann():
 
 @pytest.mark.largedata
 @pytest.mark.data
-def test_load_video_keck_gesture():
+def test_load_video_keck_gesture(my_tmp_dir):
     dataset = _helper_test_data_loader(load_video_keck_gesture, None, 120000, [15, 4],
                                        dataloader_params={"subset": "all",
-                                                          "downloads_path": TEST_DOWNLOAD_PATH})  # N not always the same (25457)
+                                                          "downloads_path": my_tmp_dir})  # N not always the same (25457)
     # Non-flatten
     assert dataset.images.shape[1:] == (3, 200, 200)
     assert dataset.image_format == "CHW"
     # Test data
     dataset = _helper_test_data_loader(load_video_keck_gesture, None, 120000, [15, 3],
                                        dataloader_params={"subset": "train",
-                                                          "downloads_path": TEST_DOWNLOAD_PATH})  # N not always the same (11911)
+                                                          "downloads_path": my_tmp_dir})  # N not always the same (11911)
     # Non-flatten
     assert dataset.images.shape[1:] == (3, 200, 200)
     assert dataset.image_format == "CHW"
@@ -83,7 +78,7 @@ def test_load_video_keck_gesture():
     dataset = _helper_test_data_loader(load_video_keck_gesture, None, 30000, [15, 4],
                                        dataloader_params={"image_size": (100, 100), "frame_sampling_ratio": 0.5,
                                                           "subset": "test",
-                                                          "downloads_path": TEST_DOWNLOAD_PATH})  # N not always the same (13546)
+                                                          "downloads_path": my_tmp_dir})  # N not always the same (13546)
     # Non-flatten
     assert dataset.images.shape[1:] == (3, 100, 100)
     assert dataset.image_format == "CHW"

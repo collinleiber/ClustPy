@@ -334,8 +334,6 @@ def _get_pair_counting_categories(labels_true: np.ndarray, labels_pred: np.ndarr
         The number of true negatives
     """
     labels_true, labels_pred = _check_labels_arrays(labels_true, labels_pred)
-    if labels_true.ndim != 1 or labels_pred.ndim != 1:
-        raise Exception("labels_true and labels_pred labels should just contain a single column.")
     n_tp = 0
     n_fp = 0
     n_fn = 0

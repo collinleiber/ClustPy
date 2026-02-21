@@ -1,7 +1,8 @@
 import numpy as np
 from clustpy.metrics import ConfusionMatrix
-from clustpy.metrics.confusion_matrix import _rearrange
+from clustpy.metrics.confusion_matrix import _rearrange, _plot_confusion_matrix
 from unittest.mock import patch
+import pytest
 
 
 def test_rearrange():
@@ -115,6 +116,19 @@ def test_confusion_matrix_rearrange():
     rearranged_cm = cm.rearrange(inplace=True)
     assert np.array_equal(cm.confusion_matrix, rearranged_cm)
     assert np.array_equal(cm.pred_clusters, np.array([-1, 2, 1, 3]))
+
+
+@patch("matplotlib.pyplot.show")  # Used to test plots (show will not be called)
+def test_plot_confusion_matrix(mock_fig):
+    cm = np.array([[1, 0, 1, 0],
+                    [1, 0, 1, 0],
+                    [0, 1, 0, 1],
+                    [0, 1, 0, 1]])
+    with pytest.raises(ValueError):
+        _plot_confusion_matrix(cm, True, ["One", "Two"], ["One", "Two", "Three", "Four"], (5,5), "YlGn", "red", "0", "100")
+    with pytest.raises(ValueError):
+        _plot_confusion_matrix(cm, True, ["One", "Two", "Three", "Four"], ["One", "Two"], (5,5), "YlGn", "red", "0", "100")
+    assert None == _plot_confusion_matrix(cm, True, ["One", "Two", "Three", "Four"], ["One", "Two", "Three", "Four"], (5,5), "YlGn", "red", "0", "100")
 
 
 @patch("matplotlib.pyplot.show")  # Used to test plots (show will not be called)

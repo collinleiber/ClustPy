@@ -1,23 +1,18 @@
 from clustpy.data.tests._helpers_for_tests import _helper_test_data_loader
 from clustpy.data import load_iris, load_wine, load_breast_cancer, load_olivetti_faces, load_newsgroups, load_rcv1, \
     load_imagenet_dog, load_imagenet10, load_coil20, load_coil100, load_webkb
-from pathlib import Path
 import pytest
-import os
 import shutil
 
-TEST_DOWNLOAD_PATH = str(Path.home() / "Downloads/clustpy_testfiles_realworld")
 
-
-@pytest.fixture(autouse=True, scope='module')
-def run_around_tests():
+@pytest.fixture(autouse=True, scope='function')
+def my_tmp_dir(tmp_path):
     # Code that will run before the tests
-    if not os.path.isdir(TEST_DOWNLOAD_PATH):
-        os.makedirs(TEST_DOWNLOAD_PATH, exist_ok=True)
+    tmp_dir = str(tmp_path)
     # Test functions will be run at this point
-    yield
+    yield tmp_dir
     # Code that will run after the tests
-    shutil.rmtree(TEST_DOWNLOAD_PATH, ignore_errors=True)
+    shutil.rmtree(tmp_dir)
 
 
 @pytest.mark.data
@@ -66,31 +61,31 @@ def test_load_rcv1():
 
 @pytest.mark.data
 @pytest.mark.largedata
-def test_load_imagenet_dog():
+def test_load_imagenet_dog(my_tmp_dir):
     # Full data set
     dataset = _helper_test_data_loader(load_imagenet_dog, 20580, 150528, 120,
-                                       dataloader_params={"subset": "all", "downloads_path": TEST_DOWNLOAD_PATH,
+                                       dataloader_params={"subset": "all", "downloads_path": my_tmp_dir,
                                                           "breeds": None})
     # Non-flatten
     assert dataset.images.shape == (20580, 3, 224, 224)
     assert dataset.image_format == "CHW"
     # Train data set
     dataset = _helper_test_data_loader(load_imagenet_dog, 12000, 150528, 120,
-                                       dataloader_params={"subset": "train", "downloads_path": TEST_DOWNLOAD_PATH,
+                                       dataloader_params={"subset": "train", "downloads_path": my_tmp_dir,
                                                           "breeds": None})
     # Non-flatten
     assert dataset.images.shape == (12000, 3, 224, 224)
     assert dataset.image_format == "CHW"
     # Test data set
     dataset = _helper_test_data_loader(load_imagenet_dog, 8580, 150528, 120,
-                                       dataloader_params={"subset": "test", "downloads_path": TEST_DOWNLOAD_PATH,
+                                       dataloader_params={"subset": "test", "downloads_path": my_tmp_dir,
                                                           "breeds": None})
     # Non-flatten
     assert dataset.images.shape == (8580, 3, 224, 224)
     assert dataset.image_format == "CHW"
     # Test default breeds and different image size
     dataset = _helper_test_data_loader(load_imagenet_dog, 2574, 3072, 15,
-                                       dataloader_params={"subset": "all", "downloads_path": TEST_DOWNLOAD_PATH,
+                                       dataloader_params={"subset": "all", "downloads_path": my_tmp_dir,
                                                           "image_size": (32, 32)})
     # Non-flatten
     assert dataset.images.shape == (2574, 3, 32, 32)
@@ -99,16 +94,16 @@ def test_load_imagenet_dog():
 
 @pytest.mark.data
 @pytest.mark.largedata
-def test_load_imagenet10():
+def test_load_imagenet10(my_tmp_dir):
     # Full data set
     dataset = _helper_test_data_loader(load_imagenet10, 13000, 150528, 10,
-                                       dataloader_params={"downloads_path": TEST_DOWNLOAD_PATH})
+                                       dataloader_params={"downloads_path": my_tmp_dir})
     # Non-flatten
     assert dataset.images.shape == (13000, 3, 224, 224)
     assert dataset.image_format == "CHW"
     # Test different image size
     dataset = _helper_test_data_loader(load_imagenet10, 13000, 27648, 10,
-                                       dataloader_params={"downloads_path": TEST_DOWNLOAD_PATH,
+                                       dataloader_params={"downloads_path": my_tmp_dir,
                                                           "use_224_size": False})
     # Non-flatten
     assert dataset.images.shape == (13000, 3, 96, 96)
@@ -116,23 +111,23 @@ def test_load_imagenet10():
 
 
 @pytest.mark.data
-def test_load_coil20():
+def test_load_coil20(my_tmp_dir):
     dataset = _helper_test_data_loader(load_coil20, 1440, 16384, 20,
-                                       dataloader_params={"downloads_path": TEST_DOWNLOAD_PATH})
+                                       dataloader_params={"downloads_path": my_tmp_dir})
     # Non-flatten
     assert dataset.images.shape == (1440, 128, 128)
     assert dataset.image_format == "HW"
 
 
 @pytest.mark.data
-def test_load_coil100():
-    dataset = _helper_test_data_loader(load_coil100, 7200, 49152, 100, dataloader_params={"downloads_path": TEST_DOWNLOAD_PATH})
+def test_load_coil100(my_tmp_dir):
+    dataset = _helper_test_data_loader(load_coil100, 7200, 49152, 100, dataloader_params={"downloads_path": my_tmp_dir})
     # Non-flatten
     assert dataset.images.shape == (7200, 3, 128, 128)
     assert dataset.image_format == "CHW"
 
 
 @pytest.mark.data
-def test_load_webkb():
-    _helper_test_data_loader(load_webkb, 1041, 323, [4, 4], dataloader_params={"downloads_path": TEST_DOWNLOAD_PATH})
-    _helper_test_data_loader(load_webkb, 8282, 761, [7, 5], dataloader_params={"downloads_path": TEST_DOWNLOAD_PATH, "use_categories": None, "use_universities": None})
+def test_load_webkb(my_tmp_dir):
+    _helper_test_data_loader(load_webkb, 1041, 323, [4, 4], dataloader_params={"downloads_path": my_tmp_dir})
+    _helper_test_data_loader(load_webkb, 8282, 761, [7, 5], dataloader_params={"downloads_path": my_tmp_dir, "use_categories": None, "use_universities": None})

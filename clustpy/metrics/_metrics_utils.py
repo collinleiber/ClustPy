@@ -71,10 +71,6 @@ def _check_length_data_and_labels(X: np.ndarray, labels: np.ndarray) -> (np.ndar
     X, labels = check_X_y(X, labels)
     labels = labels.astype(int)
     n_pred_clusters = len(np.unique(labels))
-    if X.shape[0] != labels.shape[0]:
-        raise ValueError(
-            "Number of data objects and predicted labels are not equal.\nNumber of data objects: " + str(
-                X.shape[0]) + "\nNumber of predicted labels: " + str(labels.shape[0]))
     if n_pred_clusters == 1 or n_pred_clusters == X.shape[0]:
         raise ValueError("The number of different labels must be within [2, n_samples -1]")
     return X, labels
