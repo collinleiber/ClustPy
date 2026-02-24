@@ -1,7 +1,29 @@
-from clustpy.metrics import dendrogram_purity, leaf_purity
+from clustpy.metrics import dendrogram_purity, leaf_purity, node_purity
 from clustpy.metrics.hierarchical_metrics import _get_parent_matrix
 from clustpy.hierarchical._cluster_tree import BinaryClusterTree
 import numpy as np
+
+
+def test_node_purity():
+    bct = BinaryClusterTree()
+    node_023, node_145 = bct.split_cluster(0)
+    node_03, node_2 = bct.split_cluster(0)
+    node_0, node_3 = bct.split_cluster(0)
+    node_15, node_4 = bct.split_cluster(1)
+    node_1, node_5 = bct.split_cluster(1)
+    l1 = np.array([0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4])
+    l2 = np.array([1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 0, 0, 0])
+    assert node_purity(bct.root_node_, l1, l2) == 1/5
+    assert node_purity(node_023, l1, l2) == 1/3
+    assert node_purity(node_145, l1, l2) == 1/2
+    assert node_purity(node_03, l1, l2) == 1/2
+    assert node_purity(node_2, l1, l2) == 1.
+    assert node_purity(node_0, l1, l2) == 1.
+    assert node_purity(node_3, l1, l2) == 1.
+    assert node_purity(node_15, l1, l2) == 1.
+    assert node_purity(node_4, l1, l2) == 1.
+    assert node_purity(node_1, l1, l2) == 1.
+    assert node_purity(node_5, l1, l2) == 0.
 
 
 def test_leaf_purity():

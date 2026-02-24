@@ -82,9 +82,9 @@ def test_is_multi_labelings_n_clusters_correct():
     labels_true = np.array([[0, 0, 0, 0, 1],
                             [0, 0, -1, 1, 2],
                             [0, 0, 0, 0, 0]]).T
-    labels_pred = np.array([[[0, 0, -1, 0, 1],
+    labels_pred = np.array([[0, 0, -1, 0, 1],
                              [0, 0, 0, 1, 2],
-                             [0, 0, 1, 2, 3]]]).T
+                             [0, 0, 1, 2, 3]]).T
     assert is_multi_labelings_n_clusters_correct(labels_true, labels_pred, check_subset=True,
                                                  remove_noise_spaces=True) == True
     assert is_multi_labelings_n_clusters_correct(labels_true, labels_pred, check_subset=True,

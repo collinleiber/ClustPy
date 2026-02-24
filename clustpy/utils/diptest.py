@@ -107,15 +107,18 @@ def _dip_c_impl(X: np.ndarray, debug: bool) -> (float, tuple, tuple, np.ndarray,
         The minorant values,
         The majorant values
     """
+    # Ensure X is float64 and contiguous
+    X_input = np.ascontiguousarray(X, dtype=np.float64)
+    n = X_input.shape[0]
     # Create reference numpy arrays
-    modal_interval = np.zeros(2, dtype=np.int32)
-    modal_triangle = -np.ones(3, dtype=np.int32)
-    gcm = np.zeros(X.shape, dtype=np.int32)
-    lcm = np.zeros(X.shape, dtype=np.int32)
-    mj = np.zeros(X.shape, dtype=np.int32)
-    mn = np.zeros(X.shape, dtype=np.int32)
+    modal_interval = np.zeros(2, dtype=np.int32, order='C')
+    modal_triangle = -np.ones(3, dtype=np.int32, order='C')
+    gcm = np.zeros(n, dtype=np.int32, order='C')
+    lcm = np.zeros(n, dtype=np.int32, order='C')
+    mj = np.zeros(n, dtype=np.int32, order='C')
+    mn = np.zeros(n, dtype=np.int32, order='C')
     # Execute C function
-    dip_value = c_diptest(X.astype(np.float64), modal_interval, modal_triangle, gcm, lcm, mn, mj, X.shape[0],
+    dip_value = c_diptest(X_input, modal_interval, modal_triangle, gcm, lcm, mn, mj, n,
                           1 if debug else 0)
     return dip_value, (modal_interval[0], modal_interval[1]), (
         modal_triangle[0], modal_triangle[1], modal_triangle[2]), gcm, lcm, mn, mj

@@ -7,14 +7,17 @@ try:
 except:
     print(
         "[WARNING] Could not import nltk in clustpy.data.real_world_data to use the SnowballStemmer. Please install nltk by 'pip install nltk' if necessary")
+try:
+    from PIL import Image
+except:
+    print(
+        "[WARNING] Could not import PIL in clustpy.data.real_world_data. Please install PIL by 'pip install Pillow' if necessary")
 import numpy as np
-import urllib.request
 import os
 from pathlib import Path
-import ssl
-from PIL import Image
 from sklearn.feature_extraction.text import TfidfTransformer, CountVectorizer
 from sklearn.feature_selection import VarianceThreshold
+from sklearn.datasets import fetch_file
 
 
 DEFAULT_DOWNLOAD_PATH = str(Path.home() / "Downloads/clustpy_datafiles")
@@ -63,11 +66,11 @@ def _download_file(file_url: str, filename_local: str) -> None:
     filename_local : str
         local name of the file after it has been downloaded
     """
+    local_path = Path(filename_local)
+    local_dir = local_path.parent
+    local_filename = local_path.name
     print("Downloading data set from {0} to {1}".format(file_url, filename_local))
-    default_ssl = ssl._create_default_https_context
-    ssl._create_default_https_context = ssl._create_unverified_context
-    urllib.request.urlretrieve(file_url, filename_local)
-    ssl._create_default_https_context = default_ssl
+    fetch_file(file_url, folder=local_dir, local_filename=local_filename)
 
 
 def _download_file_from_google_drive(file_id: str, filename_local: str, chunk_size: int = 32768) -> None:
@@ -187,7 +190,7 @@ def _load_image_data(image: str, image_size: tuple, color_image: bool) -> np.nda
     image_data : np.ndarray
         The numpy array containing the image data
     """
-    if type(image) is str:
+    if isinstance(image, str):
         pil_image = Image.open(image)
     else:
         pil_image = Image.fromarray(np.uint8(image))
@@ -196,7 +199,8 @@ def _load_image_data(image: str, image_size: tuple, color_image: bool) -> np.nda
     # Convert to coherent size
     if image_size is not None:
         pil_image = pil_image.resize(image_size)
-    image_data = np.asarray(pil_image)
+    image_data = np.array(pil_image).copy()
+    pil_image.close()
     assert image_size is None or image_data.shape == (
         image_size[0], image_size[1], 3), "Size of image is not correct. Should be {0} but is {1}".format(image_size,
                                                                                                           image_data.shape)

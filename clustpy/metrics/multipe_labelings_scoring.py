@@ -1,5 +1,5 @@
 import numpy as np
-from clustpy.metrics._metrics_utils import _check_number_of_points
+from clustpy.metrics._metrics_utils import _check_labels_arrays
 from clustpy.metrics.pair_counting_scores import PairCountingScores, _f1_score, _recall_score, _precision_score, \
     _rand_score, _jaccard_score
 from sklearn.metrics import normalized_mutual_info_score as nmi
@@ -251,7 +251,7 @@ def _get_multiple_labelings_pair_counting_categories(labels_true: np.ndarray, la
         The number of false negatives,
         The number of true negatives
     """
-    _check_number_of_points(labels_true, labels_pred)
+    labels_true, labels_pred = _check_labels_arrays(labels_true, labels_pred, allow_2d_labels=True)
     if labels_true.ndim == 1:
         labels_true = labels_true.reshape((-1, 1))
     if labels_pred.ndim == 1:
@@ -393,7 +393,7 @@ class MultipleLabelingsConfusionMatrix(ConfusionMatrix):
 
     def __init__(self, labels_true: np.ndarray, labels_pred: np.ndarray, metric: Callable = nmi,
                  remove_noise_spaces: bool = True, metric_params: dict = {}):
-        _check_number_of_points(labels_true, labels_pred)
+        labels_true, labels_pred = _check_labels_arrays(labels_true, labels_pred, allow_2d_labels=True)
         assert type(metric_params) is dict, "metric_params must be a dict"
         assert callable(metric), "metric must be a method"
         # Reshape labels if we have only a single set of labels
@@ -413,8 +413,11 @@ class MultipleLabelingsConfusionMatrix(ConfusionMatrix):
             for j in range(labels_pred.shape[1]):
                 confusion_matrix[i, j] = metric(labels_true[:, i], labels_pred[:, j], **metric_params)
         self.confusion_matrix = confusion_matrix
+        self.true_clusters = np.arange(labels_true.shape[1])
+        self.pred_clusters = np.arange(labels_pred.shape[1])
 
-    def plot(self, show_text: bool = True, figsize: tuple = (10, 10), cmap: str = "YlGn", textcolor: str = "black",
+    def plot(self, show_text: bool = True, ground_truth_names: list | None = None, 
+            figsize: tuple = (10, 10), cmap: str = "YlGn", textcolor: str = "black",
              vmin: float = 0.0, vmax: float = 1.0) -> None:
         """
         Plot the Multiple Labelings Confusion Matrix.
@@ -424,6 +427,8 @@ class MultipleLabelingsConfusionMatrix(ConfusionMatrix):
         ----------
         show_text : bool
             Show the value in each cell as text (default: True)
+        ground_truth_names : list | None
+            List of containing the names of the ground truth cluster sets
         figsize : tuple
             Tuple indicating the height and width of the plot (default: (10, 10))
         cmap : str
@@ -439,7 +444,9 @@ class MultipleLabelingsConfusionMatrix(ConfusionMatrix):
             If None, it will be set as the maximum value within the confusion matrix.
             Used to choose the color from the colormap (default: 1.0)
         """
-        _plot_confusion_matrix(self.confusion_matrix, show_text, figsize, cmap, textcolor, vmin=vmin, vmax=vmax)
+        if ground_truth_names is None:
+            ground_truth_names = self.true_clusters
+        _plot_confusion_matrix(self.confusion_matrix, show_text, ground_truth_names, self.pred_clusters, figsize, cmap, textcolor, vmin=vmin, vmax=vmax)
 
     def aggregate(self, aggregation_strategy: str = "max") -> float:
         """
@@ -488,9 +495,9 @@ class MultipleLabelingsConfusionMatrix(ConfusionMatrix):
             if aggregation_strategy == "permut-max":
                 # Linear sum assignment tries to minimize the diagonal sum -> use negative confusion_matrix
                 rearranged_confusion_matrix[:self.confusion_matrix.shape[0],
-                :self.confusion_matrix.shape[1]] = -self.confusion_matrix
-                indices = linear_sum_assignment(rearranged_confusion_matrix)
-                rearranged_confusion_matrix = -rearranged_confusion_matrix[:, indices[1]]
+                :self.confusion_matrix.shape[1]] = self.confusion_matrix
+                indices = linear_sum_assignment(-rearranged_confusion_matrix)
+                rearranged_confusion_matrix = rearranged_confusion_matrix[:, indices[1]]
             else:
                 rearranged_confusion_matrix[:self.confusion_matrix.shape[0],
                 :self.confusion_matrix.shape[1]] = self.confusion_matrix
@@ -536,9 +543,9 @@ def is_multi_labelings_n_clusters_correct(labels_true: np.ndarray, labels_pred: 
     Parameters
     ----------
     labels_true : np.ndarray
-        The true set of labelings. Shape must match (n_samples, n_subspaces)
+        The true set of labelings. Shape must match (n_samples, n_labelings)
     labels_pred : np.ndarray
-        The predicted set of labelings. Shape must match (n_samples, n_subspaces)
+        The predicted set of labelings. Shape must match (n_samples, n_labelings)
     check_subset : bool
         Boolean defines if it is sufficient if a subset of n_clusters_pred is equal to n_clusters_true (default: True)
     remove_noise_spaces : bool
@@ -549,7 +556,7 @@ def is_multi_labelings_n_clusters_correct(labels_true: np.ndarray, labels_pred: 
     is_equal : bool
         Boolean indicating if the number of clusters of labels_true and labels_pred matches
     """
-    _check_number_of_points(labels_true, labels_pred)
+    labels_true, labels_pred = _check_labels_arrays(labels_true, labels_pred, allow_2d_labels=True)
     if labels_true.ndim == 1:
         labels_true = labels_true.reshape((-1, 1))
     if labels_pred.ndim == 1:
