@@ -469,7 +469,7 @@ class _DipDECK_Module(torch.nn.Module):
         loss = ssl_loss_weight * ssl_loss + clustering_loss_weight * cluster_loss
         return loss
 
-    def fit(self, X, neural_network: torch.nn.Module, trainloader: torch.utils.data.DataLoader, 
+    def fit(self, X, val_set: np.ndarray | None, neural_network: torch.nn.Module, trainloader: torch.utils.data.DataLoader, 
             testloader: torch.utils.data.DataLoader, n_epochs: int,
             device: torch.device, optimizer: torch.optim.Optimizer, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss,
             clustering_loss_weight: float, ssl_loss_weight: float, debug: bool) -> '_DipDECK_Module':

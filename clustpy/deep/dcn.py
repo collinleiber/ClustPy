@@ -15,14 +15,15 @@ import tqdm
 from collections.abc import Callable
 
 
-def _dcn(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_params: dict,
+def _dcn(X: np.ndarray, val_Set: np.ndarray | None, n_clusters: int, batch_size: int, pretrain_optimizer_params: dict,
          clustering_optimizer_params: dict, pretrain_epochs: int, clustering_epochs: int,
          optimizer_class: torch.optim.Optimizer, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss,
          neural_network: torch.nn.Module | tuple, neural_network_weights: str,
          embedding_size: int, clustering_loss_weight: float, ssl_loss_weight: float,
          custom_dataloaders: tuple, augmentation_invariance: bool, initial_clustering_class: ClusterMixin,
          initial_clustering_params: dict, device: torch.device,
-         random_state: np.random.RandomState) -> (np.ndarray, np.ndarray, np.ndarray, np.ndarray, torch.nn.Module):
+         random_state: np.random.RandomState,
+         log_fn: Callable | None) -> (np.ndarray, np.ndarray, np.ndarray, np.ndarray, torch.nn.Module):
     """
     Start the actual DCN clustering procedure on the input data set.
 
@@ -32,6 +33,8 @@ def _dcn(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_par
         the given data set. Can be a np.ndarray or a torch.Tensor
     n_clusters : int
         number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN
+    val_set : np.ndarray | None
+        Optional validation set for early stopping. If not None, Early stopping will be used    
     batch_size : int
         size of the data batches
     pretrain_optimizer_params : dict
@@ -71,6 +74,8 @@ def _dcn(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_par
         parameters for the initial clustering class
     device : torch.device
         The device on which to perform the computations
+    log_fn : Callable | None
+        function for logging training history values (e.g. loss values) during training
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution
 
@@ -85,11 +90,11 @@ def _dcn(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_par
     """
     # Get initial setting (device, dataloaders, pretrained AE and initial clustering result)
     device, trainloader, testloader, _, neural_network, _, n_clusters, init_labels, init_centers, _ = get_default_deep_clustering_initialization(
-        X, n_clusters, batch_size, pretrain_optimizer_params, pretrain_epochs, optimizer_class, ssl_loss_fn,
+        X, val_set, n_clusters, batch_size, pretrain_optimizer_params, pretrain_epochs, optimizer_class, ssl_loss_fn,
         neural_network, embedding_size, custom_dataloaders, initial_clustering_class, initial_clustering_params, device,
-        random_state, neural_network_weights=neural_network_weights)
+        random_state, log_fn=log_fn, neural_network_weights=neural_network_weights)
     # Setup DCN Module
-    dcn_module = _DCN_Module(init_labels, init_centers, augmentation_invariance).to_device(device)
+    dcn_module = _DCN_Module(init_labels, init_centers, augmentation_invariance,log_fn).to_device(device)
     # Use DCN optimizer parameters (usually learning rate is reduced by a magnitude of 10)
     optimizer = optimizer_class(list(neural_network.parameters()), **clustering_optimizer_params)
     # DEC Training loop
@@ -152,6 +157,8 @@ class _DCN_Module(torch.nn.Module):
     augmentation_invariance : bool
         If True, augmented samples provided in custom_dataloaders[0] will be used to learn
         cluster assignments that are invariant to the augmentation transformations (default: False)
+    log_fn : Callable | None
+        function for logging training history values (e.g. loss values) during training
 
     Attributes
     ----------
@@ -163,7 +170,7 @@ class _DCN_Module(torch.nn.Module):
         Is augmentation invariance used
     """
 
-    def __init__(self, init_np_labels: np.ndarray, init_np_centers: np.ndarray, augmentation_invariance: bool = False):
+    def __init__(self, init_np_labels: np.ndarray, init_np_centers: np.ndarray, augmentation_invariance: bool = False,log_fn: Callable | None=None):
         super().__init__()
         self.augmentation_invariance = augmentation_invariance
         self.labels = torch.from_numpy(init_np_labels)
@@ -171,6 +178,7 @@ class _DCN_Module(torch.nn.Module):
         # Init for count from original DCN code (not reported in Paper)
         # This means centroid learning rate at the beginning is scaled by a hundred
         self.counts = torch.ones(self.centers.shape[0], dtype=torch.int32) * 100
+        self.log_fn = log_fn
 
     def dcn_loss(self, embedded: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
         """
@@ -188,7 +196,7 @@ class _DCN_Module(torch.nn.Module):
         loss: torch.Tensor
             the final DCN loss
         """
-        loss = (embedded - self.centers[labels]).pow(2).sum() / embedded.shape[0]
+        loss = (embedded - self.centers[labels.long()]).pow(2).sum() / embedded.shape[0]
         return loss
 
     def predict_hard(self, embedded: torch.Tensor) -> torch.Tensor:
@@ -266,6 +274,8 @@ class _DCN_Module(torch.nn.Module):
             weight of the clustering loss
         ssl_loss_weight : float
             weight of the self-supervised learning (ssl) loss
+        log_fn : Callable | None
+            function for logging training history values (e.g. loss values) during training
         device : torch.device
             device to be trained on
 
@@ -290,8 +300,7 @@ class _DCN_Module(torch.nn.Module):
 
         # compute total loss
         loss = ssl_loss_weight * ssl_loss + 0.5 * clustering_loss_weight * cluster_loss
-
-        return loss
+        return loss, ssl_loss, cluster_loss
 
     def fit(self, neural_network: torch.nn.Module, trainloader: torch.utils.data.DataLoader,
             testloader: torch.utils.data.DataLoader, n_epochs: int, device: torch.device,
@@ -331,13 +340,17 @@ class _DCN_Module(torch.nn.Module):
         for _ in tbar:
             # Update Network
             total_loss = 0
+            ssl_loss = 0 
+            clustering_loss = 0
             for batch in trainloader:
                 loss = self._loss(batch, neural_network, ssl_loss_fn, ssl_loss_weight, clustering_loss_weight,
                                   device)
-                total_loss += loss.item()
+                total_loss += loss[0].item()
+                ssl_loss += loss[1].item()
+                clustering_loss += loss[2].item()
                 # Backward pass - update weights
                 optimizer.zero_grad()
-                loss.backward()
+                loss[0].backward()
                 optimizer.step()
                 # Update Assignments and Centroids
                 with torch.no_grad():
@@ -362,6 +375,10 @@ class _DCN_Module(torch.nn.Module):
                     self.counts = counts
             postfix_str = {"Loss": total_loss}
             tbar.set_postfix(postfix_str)
+            if self.log_fn is not None:
+                self.log_fn("total_loss", total_loss)
+                self.log_fn("ssl_loss", ssl_loss)
+                self.log_fn("clustering_loss", clustering_loss)
         return self
 
 
@@ -473,7 +490,7 @@ class DCN(_AbstractDeepClusteringAlgo):
         self.initial_clustering_class = initial_clustering_class
         self.initial_clustering_params = initial_clustering_params
 
-    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DCN':
+    def fit(self, X: np.ndarray, val_set: np.ndarray = None, y: np.ndarray = None) -> 'DCN':
         """
         Initiate the actual clustering process on the input data set.
         The resulting cluster labels will be stored in the labels_ attribute.
@@ -491,7 +508,7 @@ class DCN(_AbstractDeepClusteringAlgo):
             this instance of the DCN algorithm
         """
         X, _, random_state, pretrain_optimizer_params, clustering_optimizer_params, initial_clustering_params = self._check_parameters(X, y=y)
-        kmeans_labels, kmeans_centers, dcn_labels, dcn_centers, neural_network = _dcn(X, self.n_clusters,
+        kmeans_labels, kmeans_centers, dcn_labels, dcn_centers, neural_network = _dcn(X, val_Set, self.n_clusters,
                                                                                       self.batch_size,
                                                                                       pretrain_optimizer_params,
                                                                                       clustering_optimizer_params,
@@ -509,7 +526,8 @@ class DCN(_AbstractDeepClusteringAlgo):
                                                                                       self.initial_clustering_class,
                                                                                       initial_clustering_params,
                                                                                       self.device,
-                                                                                      random_state)
+                                                                                      random_state,
+                                                                                      log_fn=self._log_history)
         self.labels_ = kmeans_labels
         self.cluster_centers_ = kmeans_centers
         self.dcn_labels_ = dcn_labels

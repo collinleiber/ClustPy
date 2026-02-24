@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+testing_preprocessing.py
 # C extensions
 *.so
 *.dll

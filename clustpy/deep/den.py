@@ -229,7 +229,7 @@ class DEN(_AbstractDeepClusteringAlgo):
         # Calculate group sparsity constraint
         group_sparsity_loss = self._group_sparsity_loss(embedded, group_size)
         loss = ssl_loss + self.weight_locality_constraint * locality_preserving_loss + self.weight_sparsity_constraint * group_sparsity_loss
-        return loss
+        return loss, ssl_loss, locality_preserving_loss, group_sparsity_loss
 
 
     def _get_nearest_neighbors(self, X: np.ndarray) -> list:
@@ -294,15 +294,25 @@ class DEN(_AbstractDeepClusteringAlgo):
         for _ in tbar:
             # Update Network
             total_loss = 0
+            total_ssl_loss = 0
+            total_locality_loss = 0
+            total_sparsity_loss = 0
             for batch in trainloader:
                 loss = self._loss(batch, group_size, neural_network, device)
-                total_loss += loss.item()
+                total_loss += loss[0].item()
+                total_ssl_loss += loss[1].item()
+                total_locality_loss += loss[2].item()
+                total_sparsity_loss += loss[3].item()
                 # Backward pass - update weights
                 optimizer.zero_grad()
-                loss.backward()
+                loss[0].backward()
                 optimizer.step()
             postfix_str = {"Loss": total_loss}
             tbar.set_postfix(postfix_str)
+            self._log_history("Total Loss", total_loss)
+            self._log_history("SSL Loss", total_ssl_loss)
+            self._log_history("Locality Loss", total_locality_loss)
+            self._log_history("Sparsity Loss", total_sparsity_loss)
         # Execute clustering with Kmeans
         embedded_data = encode_batchwise(testloader, neural_network)
         kmeans = KMeans(n_clusters=self.n_clusters, random_state=random_state)
@@ -312,4 +322,5 @@ class DEN(_AbstractDeepClusteringAlgo):
         self.cluster_centers_ = kmeans.cluster_centers_
         self.neural_network_trained_ = neural_network
         self.set_n_featrues_in(X)
+
         return self

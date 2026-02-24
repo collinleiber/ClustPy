@@ -118,6 +118,9 @@ class _AbstractAutoencoder(torch.nn.Module):
         self.random_state = random_state
         self.fitted = False
         self.allow_nd_input = False
+        rs = check_random_state(self.random_state)
+        set_torch_seed(rs)
+        print("Ich bin da _AbstractAutoencoder")
 
     def encode(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -266,7 +269,7 @@ class _AbstractAutoencoder(torch.nn.Module):
         """
         with torch.no_grad():
             self.eval()
-            loss = torch.tensor(0.)
+            loss = torch.tensor(0.0,device=device)
             for batch in dataloader:
                 new_loss, _, _ = self.loss(batch, ssl_loss_fn, device)
                 loss += new_loss
@@ -279,7 +282,7 @@ class _AbstractAutoencoder(torch.nn.Module):
             optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
             ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error, patience: int = 5,
             scheduler: torch.optim.lr_scheduler = None, scheduler_params: dict = {},
-            corruption_fn: Callable = None, model_path: str = None) -> '_AbstractAutoencoder':
+            corruption_fn: Callable = None, model_path: str = None,log_fn: Callable[[str, float], None] = None) -> '_AbstractAutoencoder':
         """
         Trains the autoencoder in place.
 
@@ -316,7 +319,8 @@ class _AbstractAutoencoder(torch.nn.Module):
             For example, if the data is normalized, this may have to be taken into account in the corruption function - e.g. in case of salt and pepper noise (default: None)
         model_path : str
             if specified will save the trained model to the location. If evalloader is used, then only the best model w.r.t. evaluation loss is saved (default: None)
-
+        log_fn : Callable[[str, float], None]
+            function that takes a string and a float as input and logs the training process (default: None)
         Returns
         -------
         self : _AbstractAutoencoder
@@ -355,6 +359,7 @@ class _AbstractAutoencoder(torch.nn.Module):
         # training loop
         device = get_device_from_module(self)
         tbar = tqdm.trange(n_epochs, desc="AE training")
+
         for epoch_i in tbar:
             self.train()
             total_loss = 0
@@ -382,8 +387,16 @@ class _AbstractAutoencoder(torch.nn.Module):
                         self.save_parameters(model_path)
                 if early_stopping.early_stop:
                     print(f"Stop training at epoch {best_epoch}. Best Loss: {best_loss:.6f}, Last Loss: {val_loss:.6f}")
+                    break
                 if scheduler is not None and eval_step_scheduler:
                     scheduler.step(val_loss)
+                if log_fn is not None:
+                    log_fn("pretrain/Eval Loss", val_loss.item())
+            if log_fn is not None:
+                if evalloader is not None:
+                    log_fn("pretrain/Eval Loss", val_loss.item())
+                log_fn("pretrain/Train Loss", total_loss)
+
             tbar.set_postfix(postfix_str)
         # change to eval mode after training
         self.eval()

@@ -6,7 +6,7 @@ Collin Leiber
 import torch
 import numpy as np
 from clustpy.deep._utils import detect_device, encode_batchwise, run_initial_clustering, mean_squared_error
-from clustpy.deep._data_utils import get_train_and_test_dataloader
+from clustpy.deep._data_utils import get_train_and_test_dataloader, get_dataloader
 from clustpy.deep._train_utils import get_trained_network
 from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
 from sklearn.manifold import TSNE
@@ -18,13 +18,13 @@ from collections.abc import Callable
 from clustpy.utils.checks import check_parameters
 
 
-def _manifold_based_sequential_dc(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_params: dict,
+def _manifold_based_sequential_dc(X: np.ndarray, val_set: np.ndarray | None, n_clusters: int, batch_size: int, pretrain_optimizer_params: dict,
                                   pretrain_epochs: int, optimizer_class: torch.optim.Optimizer,
                                   ssl_loss_fn: Callable | torch.nn.modules.loss._Loss, neural_network: torch.nn.Module | tuple,
                                   neural_network_weights: str, embedding_size: int, custom_dataloaders: tuple,
                                   manifold_class: TransformerMixin, manifold_params: dict,
                                   clustering_class: ClusterMixin, clustering_params: dict, device: torch.device,
-                                  random_state: np.random.RandomState) -> (
+                                  random_state: np.random.RandomState, log_fn: Callable | None ) -> (
         int, np.ndarray, np.ndarray, torch.nn.Module, TransformerMixin):
     """
     Execute a manifold-based sequential deep clustering procedure on the input data set.
@@ -33,6 +33,8 @@ def _manifold_based_sequential_dc(X: np.ndarray, n_clusters: int, batch_size: in
     ----------
     X : np.ndarray / torch.Tensor
         the given data set. Can be a np.ndarray or a torch.Tensor
+    val_set : np.ndarray / torch.Tensor | None
+        validation set (can be ignored)
     n_clusters : int
         number of clusters (can be None)
     batch_size : int
@@ -69,6 +71,8 @@ def _manifold_based_sequential_dc(X: np.ndarray, n_clusters: int, batch_size: in
         The device on which to perform the computations
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution
+    log_fn : Callable | None
+        function for logging training history values (e.g. loss values) during training
 
     Returns
     -------
@@ -83,12 +87,16 @@ def _manifold_based_sequential_dc(X: np.ndarray, n_clusters: int, batch_size: in
     # Get the device to train on
     device = detect_device(device)
     trainloader, testloader, _ = get_train_and_test_dataloader(X, batch_size, custom_dataloaders)
+    if val_set is not None:
+        valloader = get_dataloader(val_set, batch_size, shuffle=False)
+    else:
+        valloader = None
     # Get initial AE
-    neural_network = get_trained_network(trainloader, n_epochs=pretrain_epochs,
+    neural_network = get_trained_network(trainloader,valloader, n_epochs=pretrain_epochs,
                                          optimizer_params=pretrain_optimizer_params, optimizer_class=optimizer_class,
                                          device=device, ssl_loss_fn=ssl_loss_fn, embedding_size=embedding_size,
                                          neural_network=neural_network, neural_network_weights=neural_network_weights,
-                                         random_state=random_state)
+                                         log_fn=log_fn, random_state=random_state)
     # Encode data
     X_embed = encode_batchwise(testloader, neural_network)
     # Get possible input parameters of the manifold class
@@ -135,7 +143,7 @@ class DDC_density_peak_clustering(ClusterMixin, BaseEstimator):
     def __init__(self, ratio: float):
         self.ratio = ratio
 
-    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DDC_density_peak_clustering':
+    def fit(self, X: np.ndarray, val_set: np.ndarray = None, y: np.ndarray = None) -> 'DDC_density_peak_clustering':
         """
         Initiate the actual clustering process on the input data set.
         The resulting cluster labels will be stored in the labels_ attribute.
@@ -308,13 +316,14 @@ class DDC(_AbstractDeepClusteringAlgo):
     Knowledge-Based Systems 197 (2020): 105841.
     """
 
-    def __init__(self, ratio: float = 0.1, batch_size: int = 256, pretrain_optimizer_params: dict = None,
+    def __init__(self,n_clusters: int = None, ratio: float = 0.1, batch_size: int = 256, pretrain_optimizer_params: dict = None,
                  pretrain_epochs: int = 100, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error,
                  neural_network: torch.nn.Module | tuple = None, neural_network_weights: str = None,
                  embedding_size: int = 10, custom_dataloaders: tuple = None, tsne_params: dict = None,
                  device: torch.device = None, random_state: np.random.RandomState | int = None):
         super().__init__(batch_size, neural_network, neural_network_weights, embedding_size, device, random_state)
+        self.n_clusters = n_clusters
         self.ratio = ratio
         self.pretrain_optimizer_params = pretrain_optimizer_params
         self.pretrain_epochs = pretrain_epochs
@@ -323,7 +332,7 @@ class DDC(_AbstractDeepClusteringAlgo):
         self.custom_dataloaders = custom_dataloaders
         self.tsne_params = tsne_params
 
-    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DDC':
+    def fit(self, X: np.ndarray, val_set: np.ndarray = None, y: np.ndarray = None) -> 'DDC':
         """
         Initiate the actual clustering process on the input data set.
         The resulting cluster labels will be stored in the labels_ attribute.
@@ -344,7 +353,7 @@ class DDC(_AbstractDeepClusteringAlgo):
         tsne_params = {"n_components": 2} if self.tsne_params is None else self.tsne_params
         if self.ratio > 1:
             print("[WARNING] ratio for DDC algorithm has been set to a value > 1 which can cause poor results")
-        n_clusters, labels, centers_ae, _, neural_network, tsne = _manifold_based_sequential_dc(X, None, self.batch_size,
+        n_clusters, labels, centers_ae, _, neural_network, tsne = _manifold_based_sequential_dc(X,val_set, self.n_clusters, self.batch_size,
                                                                                     pretrain_optimizer_params,
                                                                                     self.pretrain_epochs,
                                                                                     self.optimizer_class,
@@ -356,7 +365,7 @@ class DDC(_AbstractDeepClusteringAlgo):
                                                                                     tsne_params,
                                                                                     DDC_density_peak_clustering,
                                                                                     {"ratio": self.ratio}, self.device,
-                                                                                    random_state)
+                                                                                    random_state,self._log_history)
         self.labels_ = labels
         self.n_clusters_ = n_clusters
         self.cluster_centers_ = centers_ae
@@ -470,7 +479,7 @@ class N2D(_AbstractDeepClusteringAlgo):
         self.manifold_params = manifold_params
         self.initial_clustering_params = initial_clustering_params
 
-    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'N2D':
+    def fit(self, X: np.ndarray, val_set: np.ndarray = None, y: np.ndarray = None) -> 'N2D':
         """
         Initiate the actual clustering process on the input data set.
         The resulting cluster labels will be stored in the labels_ attribute.
@@ -479,6 +488,8 @@ class N2D(_AbstractDeepClusteringAlgo):
         ----------
         X : np.ndarray
             the given data set
+        val_set : np.ndarray
+            validation set (can be ignored)
         y : np.ndarray
             the labels (can be ignored)
 
@@ -489,7 +500,7 @@ class N2D(_AbstractDeepClusteringAlgo):
         """
         X, _, random_state, pretrain_optimizer_params, _, initial_clustering_params = self._check_parameters(X, y=y)
         manifold_params = {"n_components": self.n_clusters} if self.manifold_params is None else self.manifold_params
-        _, labels, centers_ae, centers_manifold, neural_network, manifold = _manifold_based_sequential_dc(X, self.n_clusters,
+        _, labels, centers_ae, centers_manifold, neural_network, manifold = _manifold_based_sequential_dc(X, val_set, self.n_clusters,
                                                                                               self.batch_size,
                                                                                               pretrain_optimizer_params,
                                                                                               self.pretrain_epochs,
@@ -503,7 +514,8 @@ class N2D(_AbstractDeepClusteringAlgo):
                                                                                               manifold_params,
                                                                                               GMM, initial_clustering_params, 
                                                                                               self.device,
-                                                                                              random_state)
+                                                                                              random_state,
+                                                                                              self._log_history)
         self.labels_ = labels.astype(np.int32)
         self.cluster_centers_manifold_ = centers_manifold
         self.cluster_centers_ = centers_ae

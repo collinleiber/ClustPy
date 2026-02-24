@@ -14,14 +14,14 @@ import tqdm
 from collections.abc import Callable
 
 
-def _aec(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_params: dict,
+def _aec(X: np.ndarray, val_set: np.ndarray | None, n_clusters: int, batch_size: int, pretrain_optimizer_params: dict,
          clustering_optimizer_params: dict, pretrain_epochs: int, clustering_epochs: int,
          optimizer_class: torch.optim.Optimizer, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss,
          neural_network: torch.nn.Module | tuple, neural_network_weights: str,
          embedding_size: int, clustering_loss_weight: float, ssl_loss_weight: float,
          custom_dataloaders: tuple, augmentation_invariance: bool, initial_clustering_class: ClusterMixin,
          initial_clustering_params: dict, device: torch.device,
-         random_state: np.random.RandomState) -> (np.ndarray, np.ndarray, np.ndarray, np.ndarray, torch.nn.Module):
+         log_fn: Callable | None,random_state: np.random.RandomState) -> (np.ndarray, np.ndarray, np.ndarray, np.ndarray, torch.nn.Module):
     """
     Start the actual AEC clustering procedure on the input data set.
 
@@ -31,6 +31,8 @@ def _aec(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_par
         the given data set. Can be a np.ndarray or a torch.Tensor
     n_clusters : int
         number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN
+    val_set : np.ndarray | None
+        Optional validation set for early stopping. If not None, Early stopping will be used    
     batch_size : int
         size of the data batches
     pretrain_optimizer_params : dict
@@ -70,8 +72,12 @@ def _aec(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_par
         parameters for the initial clustering class
     device : torch.device
         The device on which to perform the computations
+    log_fn : Callable | None
+        function for logging training history values (e.g. loss values) during training
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution
+
+
 
     Returns
     -------
@@ -82,11 +88,11 @@ def _aec(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_par
     """
     # Get initial setting (device, dataloaders, pretrained AE and initial clustering result)
     device, trainloader, testloader, _, neural_network, _, n_clusters, init_labels, init_centers, _ = get_default_deep_clustering_initialization(
-        X, n_clusters, batch_size, pretrain_optimizer_params, pretrain_epochs, optimizer_class, ssl_loss_fn,
+        X, val_set, n_clusters, batch_size, pretrain_optimizer_params, pretrain_epochs, optimizer_class, ssl_loss_fn,
         neural_network, embedding_size, custom_dataloaders, initial_clustering_class, initial_clustering_params, device,
-        random_state, neural_network_weights=neural_network_weights)
+        random_state, log_fn=log_fn, neural_network_weights=neural_network_weights)
     # Setup AEC Module
-    aec_module = _AEC_Module(init_labels, init_centers, augmentation_invariance).to_device(device)
+    aec_module = _AEC_Module(init_labels, init_centers, augmentation_invariance,log_fn).to_device(device)
     # Use AEC optimizer parameters (usually learning rate is reduced by a magnitude of 10)
     optimizer = optimizer_class(list(neural_network.parameters()), **clustering_optimizer_params)
     # AEC Training loop
@@ -120,11 +126,13 @@ class _AEC_Module(_DCN_Module):
         the cluster centers
     augmentation_invariance : bool
         Is augmentation invariance used
+    log_fn : Callable | None
+        function for logging training history values (e.g. loss values) during training
     """
 
     def __init__(self, init_np_labels: np.ndarray, init_np_centers: np.ndarray,
-                 augmentation_invariance: bool = False):
-        super().__init__(init_np_labels, init_np_centers, augmentation_invariance)
+                 augmentation_invariance: bool = False, log_fn: Callable | None = None):
+        super().__init__(init_np_labels, init_np_centers, augmentation_invariance,log_fn)
 
     def update_centroids(self, embedded: np.ndarray, labels: np.ndarray) -> torch.Tensor:
         """
@@ -188,14 +196,18 @@ class _AEC_Module(_DCN_Module):
         for _ in tbar:
             # Update Network
             total_loss = 0
+            total_ssl_loss = 0 
+            total_clustering_loss = 0
             for batch in trainloader:
                 # Beware that the clustering loss of DCN is divided by 2, therefore we use 2 * clustering_loss_weight
                 loss = self._loss(batch, neural_network, ssl_loss_fn, ssl_loss_weight,
                                   2 * clustering_loss_weight, device)
-                total_loss += loss.item()
+                total_loss += loss[0].item()
+                total_ssl_loss += loss[1].item()
+                total_clustering_loss += loss[2].item()
                 # Backward pass - update weights
                 optimizer.zero_grad()
-                loss.backward()
+                loss[0].backward()
                 optimizer.step()
             postfix_str = {"Loss": total_loss}
             tbar.set_postfix(postfix_str)
@@ -207,6 +219,10 @@ class _AEC_Module(_DCN_Module):
             # update assignments
             labels = self.predict_hard(torch.tensor(embedded).to(device))
             self.labels = labels.to(device)
+            if self.log_fn is not None:
+                self.log_fn("Total Loss", total_loss)
+                self.log_fn("SSL Loss", total_ssl_loss)
+                self.log_fn("Clustering Loss", total_clustering_loss)
         return self
 
 
@@ -315,7 +331,7 @@ class AEC(_AbstractDeepClusteringAlgo):
         self.initial_clustering_class = initial_clustering_class
         self.initial_clustering_params = initial_clustering_params
 
-    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'AEC':
+    def fit(self, X: np.ndarray, val_set: np.ndarray = None, y: np.ndarray = None) -> 'AEC':
         """
         Initiate the actual clustering process on the input data set.
         The resulting cluster labels will be stored in the labels_ attribute.
@@ -333,7 +349,7 @@ class AEC(_AbstractDeepClusteringAlgo):
             this instance of the AEC algorithm
         """
         X, _, random_state, pretrain_optimizer_params, clustering_optimizer_params, initial_clustering_params = self._check_parameters(X, y=y)
-        aec_labels, aec_centers, neural_network = _aec(X, self.n_clusters, self.batch_size,
+        aec_labels, aec_centers, neural_network = _aec(X, val_set, self.n_clusters, self.batch_size,
                                                        pretrain_optimizer_params,
                                                        clustering_optimizer_params,
                                                        self.pretrain_epochs,
@@ -349,6 +365,7 @@ class AEC(_AbstractDeepClusteringAlgo):
                                                        self.initial_clustering_class,
                                                        initial_clustering_params,
                                                        self.device,
+                                                       self._log_history,
                                                        random_state)
         self.labels_ = aec_labels
         self.cluster_centers_ = aec_centers

@@ -16,13 +16,14 @@ import tqdm
 from collections.abc import Callable#
 
 
-def _dec(X: np.ndarray, n_clusters: int, alpha: float, batch_size: int, pretrain_optimizer_params: dict,
+def _dec(X: np.ndarray,val_set: np.ndarray | None, n_clusters: int, alpha: float, batch_size: int, pretrain_optimizer_params: dict,
          clustering_optimizer_params: dict, pretrain_epochs: int, clustering_epochs: int,
          optimizer_class: torch.optim.Optimizer, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss,
          neural_network: torch.nn.Module | tuple, neural_network_weights: str, embedding_size: int,
          clustering_loss_weight: float, ssl_loss_weight: float, custom_dataloaders: tuple,
          augmentation_invariance: bool, initial_clustering_class: ClusterMixin, initial_clustering_params: dict,
-         device: torch.device, random_state: np.random.RandomState) -> (
+         device: torch.device, random_state: np.random.RandomState,
+         log_fn: Callable | None) -> (
         np.ndarray, np.ndarray, np.ndarray, np.ndarray, torch.nn.Module):
     """
     Start the actual DEC clustering procedure on the input data set.
@@ -31,6 +32,8 @@ def _dec(X: np.ndarray, n_clusters: int, alpha: float, batch_size: int, pretrain
     ----------
     X : np.ndarray / torch.Tensor
         the given data set. Can be a np.ndarray or a torch.Tensor
+    val_set : np.ndarray | None
+        Optional validation set for early stopping. If not None, Early stopping will be used
     n_clusters : int
         number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN
     alpha : float
@@ -88,11 +91,11 @@ def _dec(X: np.ndarray, n_clusters: int, alpha: float, batch_size: int, pretrain
     """
     # Get initial setting (device, dataloaders, pretrained AE and initial clustering result)
     device, trainloader, testloader, _, neural_network, _, n_clusters, _, init_centers, _ = get_default_deep_clustering_initialization(
-        X, n_clusters, batch_size, pretrain_optimizer_params, pretrain_epochs, optimizer_class, ssl_loss_fn,
+        X, val_set, n_clusters, batch_size, pretrain_optimizer_params, pretrain_epochs, optimizer_class, ssl_loss_fn,
         neural_network, embedding_size, custom_dataloaders, initial_clustering_class, initial_clustering_params, device,
-        random_state, neural_network_weights=neural_network_weights)
+        random_state, log_fn=log_fn, neural_network_weights=neural_network_weights)
     # Setup DEC Module
-    dec_module = _DEC_Module(init_centers, alpha, augmentation_invariance).to(device)
+    dec_module = _DEC_Module(init_centers, alpha, augmentation_invariance,log_fn).to(device)
     # Use DEC optimizer parameters (usually learning rate is reduced by a magnitude of 10)
     optimizer = optimizer_class(list(neural_network.parameters()) + list(dec_module.parameters()),
                                 **clustering_optimizer_params)
@@ -205,10 +208,11 @@ class _DEC_Module(torch.nn.Module):
         Is augmentation invariance used
     """
 
-    def __init__(self, init_centers: np.ndarray, alpha: float, augmentation_invariance: bool = False):
+    def __init__(self, init_centers: np.ndarray, alpha: float, augmentation_invariance: bool = False,log_fn: Callable | None = None):
         super().__init__()
         self.alpha = alpha
         self.augmentation_invariance = augmentation_invariance
+        self.log_fn = log_fn
         # Centers are learnable parameters
         self.centers = torch.nn.Parameter(torch.tensor(init_centers), requires_grad=True)
 
@@ -331,6 +335,8 @@ class _DEC_Module(torch.nn.Module):
             the final DEC loss
         """
         loss = torch.tensor(0.).to(device)
+        ssl_loss = torch.tensor(0.).to(device)
+        cluster_loss = torch.tensor(0.).to(device)
         # Reconstruction loss is not included in DEC
         if ssl_loss_weight != 0:
             if self.augmentation_invariance:
@@ -355,7 +361,7 @@ class _DEC_Module(torch.nn.Module):
             cluster_loss = self.dec_loss(embedded)
         loss += cluster_loss * clustering_loss_weight
 
-        return loss
+        return loss, ssl_loss, cluster_loss
 
     def fit(self, neural_network: torch.nn.Module, trainloader: torch.utils.data.DataLoader, n_epochs: int,
             device: torch.device, optimizer: torch.optim.Optimizer, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss,
@@ -390,16 +396,26 @@ class _DEC_Module(torch.nn.Module):
         tbar = tqdm.trange(n_epochs, desc="DEC training")
         for _ in tbar:
             total_loss = 0
+            total_ssl_loss = 0
+            total_cluster_loss = 0
             for batch in trainloader:
                 loss = self._loss(batch, neural_network, clustering_loss_weight, ssl_loss_weight, ssl_loss_fn,
                                   device)
-                total_loss += loss.item()
+                total_loss += loss[0].item()
+                total_ssl_loss += loss[1].item() if ssl_loss_weight != 0 else 0
+                total_cluster_loss += loss[2].item()
+
                 # Backward pass
                 optimizer.zero_grad()
-                loss.backward()
+                loss[0].backward()
                 optimizer.step()
             postfix_str = {"Loss": total_loss}
             tbar.set_postfix(postfix_str)
+            if self.log_fn is not None:
+                self.log_fn("Total Loss", total_loss)
+                if ssl_loss_weight != 0:
+                    self.log_fn("SSL Loss", total_ssl_loss)
+                    self.log_fn("Clustering Loss", total_cluster_loss)
         return self
 
 
@@ -511,7 +527,7 @@ class DEC(_AbstractDeepClusteringAlgo):
         self.initial_clustering_class = initial_clustering_class
         self.initial_clustering_params = initial_clustering_params
 
-    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DEC':
+    def fit(self, X: np.ndarray,val_set: np.ndarray | None = None, y: np.ndarray = None) -> 'DEC':
         """
         Initiate the actual clustering process on the input data set.
         The resulting cluster labels will be stored in the labels_ attribute.
@@ -520,6 +536,9 @@ class DEC(_AbstractDeepClusteringAlgo):
         ----------
         X : np.ndarray
             the given data set
+        val_set : np.ndarray | None
+            optional validation set for monitoring purposes (can be ignored)
+
         y : np.ndarray
             the labels (can be ignored)
 
@@ -530,7 +549,7 @@ class DEC(_AbstractDeepClusteringAlgo):
         """
         ssl_loss_weight = self.ssl_loss_weight if hasattr(self, "ssl_loss_weight") else 0 # DEC does not use ssl loss when clustering
         X, _, random_state, pretrain_optimizer_params, clustering_optimizer_params, initial_clustering_params = self._check_parameters(X, y=y)
-        kmeans_labels, kmeans_centers, dec_labels, dec_centers, neural_network = _dec(X, self.n_clusters, self.alpha,
+        kmeans_labels, kmeans_centers, dec_labels, dec_centers, neural_network = _dec(X,val_set, self.n_clusters, self.alpha,
                                                                                       self.batch_size,
                                                                                       pretrain_optimizer_params,
                                                                                       clustering_optimizer_params,
@@ -547,7 +566,8 @@ class DEC(_AbstractDeepClusteringAlgo):
                                                                                       self.augmentation_invariance,
                                                                                       self.initial_clustering_class,
                                                                                       initial_clustering_params,
-                                                                                      self.device, random_state)
+                                                                                      self.device, random_state,
+                                                                                      log_fn=self._log_history)
         self.labels_ = kmeans_labels
         self.cluster_centers_ = kmeans_centers
         self.dec_labels_ = dec_labels

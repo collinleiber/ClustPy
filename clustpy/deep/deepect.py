@@ -79,10 +79,12 @@ class _DeepECT_Module(torch.nn.Module):
     augmentation_invariance : bool
         If True, augmented samples provided in custom_dataloaders[0] will be used to learn
         cluster assignments that are invariant to the augmentation transformations (default: False)
+    log_fn : Callable | None
+        function for logging training history values (e.g. loss values) during training
     """
 
     def __init__(self, cluster_tree: BinaryClusterTree, max_n_leaf_nodes: int, grow_interval: int,
-                 pruning_threshold: float, augmentation_invariance: bool = False):
+                 pruning_threshold: float, augmentation_invariance: bool = False,log_fn: Callable | None = None):
         super().__init__()
         # Create initial cluster tree
         self.cluster_tree = cluster_tree
@@ -90,6 +92,7 @@ class _DeepECT_Module(torch.nn.Module):
         self.grow_interval = grow_interval
         self.pruning_threshold = pruning_threshold
         self.augmentation_invariance = augmentation_invariance
+        self.log_fn = log_fn
 
     def predict_hard(self, embedded: torch.Tensor) -> torch.Tensor:
         """
@@ -137,7 +140,7 @@ class _DeepECT_Module(torch.nn.Module):
         leaf_labels = torch.stack([leaf.torch_labels[0] for leaf in leaf_nodes])
         # Get distances between points and centers. Get nearest center
         squared_diffs = squared_euclidean_distance(embedded, leaf_centers)
-        cluster_center_assignments = (squared_diffs.min(dim=1)[1]).int()
+        cluster_center_assignments = (squared_diffs.min(dim=1)[1]).long()
         labels = leaf_labels[cluster_center_assignments]
         return leaf_centers, cluster_center_assignments, labels
 
@@ -372,7 +375,7 @@ class _DeepECT_Module(torch.nn.Module):
         dc_loss = self._data_compression_loss(embedded, split_nodes, labels, device, embedded_aug)
         # Combine losses
         loss = clustering_loss_weight * (nc_loss + dc_loss) + ssl_loss_weight * ssl_loss
-        return loss, labels
+        return (loss, ssl_loss, nc_loss+dc_loss), labels
 
     def fit(self, neural_network: torch.nn.Module, trainloader: torch.utils.data.DataLoader,
             testloader: torch.utils.data.DataLoader, n_epochs: int, device: torch.device,
@@ -415,6 +418,8 @@ class _DeepECT_Module(torch.nn.Module):
         for epoch in tbar:
             # Update Network
             total_loss = 0
+            total_ssl_loss = 0
+            total_clust_loss = 0
             with torch.no_grad():
                 # Grow tree
                 if (epoch % self.grow_interval == 0 or self.cluster_tree.n_leaf_nodes_ < 2) and len(
@@ -426,10 +431,12 @@ class _DeepECT_Module(torch.nn.Module):
                 # Calculate loss
                 loss, labels = self._loss(batch, neural_network, ssl_loss_fn, clustering_loss_weight, ssl_loss_weight,
                                           leaf_nodes, split_nodes, device)
-                total_loss += loss.item()
+                total_loss += loss[0].item()
+                total_ssl_loss += loss[1].item()
+                total_clust_loss += loss[2].item()
                 # Backward pass - update weights
                 optimizer.zero_grad()
-                loss.backward()
+                loss[0].backward()
                 optimizer.step()
                 # Adapt centers and weights of split nodes analytically
                 with torch.no_grad():
@@ -440,16 +447,20 @@ class _DeepECT_Module(torch.nn.Module):
                         leaf_nodes, split_nodes = self.cluster_tree.get_leaf_and_split_nodes()
             postfix_str = {"Loss": total_loss}
             tbar.set_postfix(postfix_str)
+            if self.log_fn is not None:
+                self.log_fn("Total Loss", total_loss)
+                self.log_fn("SSL Loss", total_ssl_loss)
+                self.log_fn("Clustering Loss", total_clust_loss)
         return self
 
 
-def _deep_ect(X: np.ndarray, max_n_leaf_nodes: int, batch_size: int, pretrain_optimizer_params: dict,
+def _deep_ect(X: np.ndarray, val_set: np.ndarray | None, max_n_leaf_nodes: int, batch_size: int, pretrain_optimizer_params: dict,
               clustering_optimizer_params: dict, pretrain_epochs: int, clustering_epochs: int, grow_interval: int,
               pruning_threshold: float, optimizer_class: torch.optim.Optimizer,
               ssl_loss_fn: Callable | torch.nn.modules.loss._Loss, neural_network: torch.nn.Module | tuple,
               neural_network_weights: str, embedding_size: int, clustering_loss_weight: float, ssl_loss_weight: float,
               custom_dataloaders: tuple, augmentation_invariance: bool, device: torch.device,
-              random_state: np.random.RandomState) -> (np.ndarray, np.ndarray, torch.nn.Module):
+              log_fn: Callable | None,random_state: np.random.RandomState) -> (np.ndarray, np.ndarray, torch.nn.Module):
     """
     Start the actual DeepECT clustering procedure on the input data set.
 
@@ -457,6 +468,8 @@ def _deep_ect(X: np.ndarray, max_n_leaf_nodes: int, batch_size: int, pretrain_op
     ----------
     X : np.ndarray
         The given data set. Can be a np.ndarray or a torch.Tensor
+    val_set : np.ndarray
+        validation set (can be ignored)
     max_n_leaf_nodes : int
         Maximum number of leaf nodes in the cluster tree
     batch_size : int
@@ -497,6 +510,8 @@ def _deep_ect(X: np.ndarray, max_n_leaf_nodes: int, batch_size: int, pretrain_op
         If True, augmented samples provided in custom_dataloaders[0] will be used to learn cluster assignments that are invariant to the augmentation transformations
     device : torch.device
         The device on which to perform the computations
+    log_fn : Callable | None
+        function for logging training history values (e.g. loss values) during training
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution
 
@@ -509,13 +524,13 @@ def _deep_ect(X: np.ndarray, max_n_leaf_nodes: int, batch_size: int, pretrain_op
     """
     # Get initial setting (device, dataloaders, pretrained AE and initial clustering result)
     device, trainloader, testloader, _, neural_network, _, _, _, init_leafnode_centers, _ = get_default_deep_clustering_initialization(
-        X, 2, batch_size, pretrain_optimizer_params, pretrain_epochs, optimizer_class, ssl_loss_fn,
+        X, val_set, 2, batch_size, pretrain_optimizer_params, pretrain_epochs, optimizer_class, ssl_loss_fn,
         neural_network, embedding_size, custom_dataloaders, KMeans, {"n_init": 20}, device,
-        random_state, neural_network_weights=neural_network_weights)
+        random_state, log_fn=log_fn, neural_network_weights=neural_network_weights)
     cluster_tree = BinaryClusterTree(_DeepECT_ClusterTreeNode)
     # Setup DeepECT Module
     deepect_module = _DeepECT_Module(cluster_tree, max_n_leaf_nodes, grow_interval, pruning_threshold,
-                                     augmentation_invariance).to(device)
+                                     augmentation_invariance,log_fn).to(device)
     # Use DeepECT optimizer parameters (usually learning rate is reduced by a magnitude of 10)
     optimizer = optimizer_class(list(neural_network.parameters()), **clustering_optimizer_params)
     # DeepECT Training loop
@@ -626,7 +641,7 @@ class DeepECT(_AbstractDeepClusteringAlgo):
         self.custom_dataloaders = custom_dataloaders
         self.augmentation_invariance = augmentation_invariance
 
-    def fit(self, X: np.ndarray, y: np.ndarray = None) -> "DeepECT":
+    def fit(self, X: np.ndarray, val_set: np.ndarray = None, y: np.ndarray = None) -> "DeepECT":
         """
         Initiate the actual clustering process on the input data set.
         The resulting cluster labels will be stored in the labels_ attribute.
@@ -635,6 +650,8 @@ class DeepECT(_AbstractDeepClusteringAlgo):
         ----------
         X : np.ndarray
             the given data set
+        val_set : np.ndarray
+            validation set (can be ignored)
         y : np.ndarray
             the labels (can be ignored)
 
@@ -644,14 +661,14 @@ class DeepECT(_AbstractDeepClusteringAlgo):
             This instance of the DeepECT algorithm
         """
         X, _, random_state, pretrain_optimizer_params, clustering_optimizer_params, _ = self._check_parameters(X, y=y)
-        tree, labels, neural_network = _deep_ect(X, self.max_n_leaf_nodes, self.batch_size,
+        tree, labels, neural_network = _deep_ect(X, val_set, self.max_n_leaf_nodes, self.batch_size,
                                                  pretrain_optimizer_params, clustering_optimizer_params,
                                                  self.pretrain_epochs, self.clustering_epochs, self.grow_interval,
                                                  self.pruning_threshold, self.optimizer_class, self.ssl_loss_fn,
                                                  self.neural_network, self.neural_network_weights, self.embedding_size,
                                                  self.clustering_loss_weight, self.ssl_loss_weight,
                                                  self.custom_dataloaders, self.augmentation_invariance, self.device,
-                                                 random_state)
+                                                 self._log_history, random_state)
         self.tree_ = tree
         self.labels_ = labels
         self.neural_network_trained_ = neural_network

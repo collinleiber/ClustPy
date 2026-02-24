@@ -17,13 +17,14 @@ import tqdm
 from collections.abc import Callable
 
 
-def _vade(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_params: dict,
+def _vade(X: np.ndarray, val_set: np.ndarray | None, n_clusters: int, batch_size: int, pretrain_optimizer_params: dict,
           clustering_optimizer_params: dict, pretrain_epochs: int, clustering_epochs: int,
           optimizer_class: torch.optim.Optimizer, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss,
           neural_network: torch.nn.Module | tuple, neural_network_weights: str,
           embedding_size: int, clustering_loss_weight: float, ssl_loss_weight: float,
           custom_dataloaders: tuple, initial_clustering_class: ClusterMixin, initial_clustering_params: dict,
-          device: torch.device, random_state: np.random.RandomState) -> (
+          device: torch.device, random_state: np.random.RandomState,
+          log_fn: Callable | None) -> (
         np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, torch.nn.Module):
     """
     Start the actual VaDE clustering procedure on the input data set.
@@ -32,6 +33,8 @@ def _vade(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_pa
     ----------
     X : np.ndarray / torch.Tensor
         the given data set. Can be a np.ndarray or a torch.Tensor
+    val_set : np.ndarray / torch.Tensor | None
+        validation set (can be ignored)
     n_clusters : int
         number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN
     batch_size : int
@@ -86,15 +89,15 @@ def _vade(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_pa
     """
     # Get initial setting (device, dataloaders, pretrained AE and initial clustering result)
     device, trainloader, testloader, _, neural_network, _, n_clusters, init_labels, init_means, init_clustering_algo = get_default_deep_clustering_initialization(
-        X, n_clusters, batch_size, pretrain_optimizer_params, pretrain_epochs, optimizer_class, ssl_loss_fn,
+        X, val_set, n_clusters, batch_size, pretrain_optimizer_params, pretrain_epochs, optimizer_class, ssl_loss_fn,
         neural_network, embedding_size, custom_dataloaders, initial_clustering_class, initial_clustering_params, device,
-        random_state, _VaDE_VAE, neural_network_weights=neural_network_weights)
+        random_state, _VaDE_VAE, log_fn=log_fn, neural_network_weights=neural_network_weights)
     # Get parameters from initial clustering algorithm
     init_weights = None if not hasattr(init_clustering_algo, "weights_") else init_clustering_algo.weights_
     init_covs = None if not hasattr(init_clustering_algo, "covariances_") else init_clustering_algo.covariances_
     # Initialize VaDE
     vade_module = _VaDE_Module(n_clusters=n_clusters, embedding_size=embedding_size, weights=init_weights,
-                               means=init_means, variances=init_covs).to(device)
+                               means=init_means, variances=init_covs,log_fn=log_fn).to(device)
     # Use vade learning_rate (usually pretrain_optimizer_params reduced by a magnitude of 10)
     optimizer = optimizer_class(list(neural_network.parameters()) + list(vade_module.parameters()),
                                 **clustering_optimizer_params)
@@ -238,7 +241,7 @@ class _VaDE_Module(torch.nn.Module):
     """
 
     def __init__(self, n_clusters: int, embedding_size: int, weights: torch.Tensor = None, means: torch.Tensor = None,
-                 variances: torch.Tensor = None):
+                 variances: torch.Tensor = None, log_fn: Callable | None = None):
         super(_VaDE_Module, self).__init__()
         if weights is None:
             # if not initialized then use uniform distribution
@@ -254,7 +257,7 @@ class _VaDE_Module(torch.nn.Module):
                                    embedding_size), "Shape of the initial variances for the Vade_Module must be (n_clusters, embedding_size)"
         self.p_log_var = torch.nn.Parameter(torch.log(torch.tensor(variances)), requires_grad=True)
         self.normalize_prob = torch.nn.Softmax(dim=0)
-
+        self.log_fn = log_fn
     def predict(self, q_mean: torch.Tensor, q_logvar: torch.Tensor) -> torch.Tensor:
         """
         Predict the labels given the specific means and variances of given samples.
@@ -305,9 +308,9 @@ class _VaDE_Module(torch.nn.Module):
         z, q_mean, q_logvar, reconstruction = neural_network.forward(batch_data)
         pi_normalized = self.normalize_prob(self.pi)
         p_c_z = _get_gamma(pi_normalized, self.p_mean, self.p_log_var, z)
-        loss = _compute_vade_loss(pi_normalized, self.p_mean, self.p_log_var, q_mean, q_logvar, batch_data, p_c_z,
+        loss, ssl_loss = _compute_vade_loss(pi_normalized, self.p_mean, self.p_log_var, q_mean, q_logvar, batch_data, p_c_z,
                                   reconstruction, ssl_loss_fn, clustering_loss_weight, ssl_loss_weight)
-        return loss
+        return loss, ssl_loss
 
     def fit(self, neural_network: VariationalAutoencoder, testloader: torch.utils.data.DataLoader,
             trainloader: torch.utils.data.DataLoader, n_epochs: int, device: torch.device,
@@ -348,16 +351,21 @@ class _VaDE_Module(torch.nn.Module):
         for _ in tbar:
             self.train()
             total_loss = 0
+            total_ssl_loss = 0
             for batch in trainloader:
                 # load batch on device
                 batch_data = batch[1].to(device)
                 loss = self.vade_loss(neural_network, batch_data, ssl_loss_fn, clustering_loss_weight,
                                       ssl_loss_weight)
-                total_loss += loss.item()
+                total_loss += loss[0].item()
+                total_ssl_loss += loss[1].item()
                 optimizer.zero_grad()
-                loss.backward()
+                loss[0].backward()
                 optimizer.step()
             postfix_str = {"Loss": total_loss}
+            if self.log_fn is not None:
+                self.log_fn("Total Loss", total_loss)
+                self.log_fn("SSL Loss", total_ssl_loss)
             tbar.set_postfix(postfix_str)
         return self
 
@@ -478,7 +486,7 @@ def _compute_vade_loss(pi: torch.Tensor, p_mean: torch.Tensor, p_log_var: torch.
     loss = p_z_c - p_c - q_z_x + q_c_x
     loss /= batch_data.size(0)
     loss = clustering_loss_weight * loss + ssl_loss_weight * p_x_z  # Beware that we do not divide two times by number of samples
-    return loss
+    return loss, p_x_z
 
 
 class VaDE(_AbstractDeepClusteringAlgo):
@@ -589,7 +597,7 @@ class VaDE(_AbstractDeepClusteringAlgo):
         self.initial_clustering_class = initial_clustering_class
         self.initial_clustering_params = initial_clustering_params
 
-    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'VaDE':
+    def fit(self, X: np.ndarray, val_set: np.ndarray = None, y: np.ndarray = None) -> 'VaDE':
         """
         Initiate the actual clustering process on the input data set.
         The resulting cluster labels will be stored in the labels_ attribute.
@@ -598,6 +606,8 @@ class VaDE(_AbstractDeepClusteringAlgo):
         ----------
         X : np.ndarray
             the given data set
+        val_set : np.ndarray
+            validation set (can be ignored)
         y : np.ndarray
             the labels (can be ignored)
 
@@ -613,6 +623,7 @@ class VaDE(_AbstractDeepClusteringAlgo):
                                           "covariance_type": "diag"} if self.initial_clustering_params is None else self.initial_clustering_params
         gmm_labels, gmm_means, gmm_covariances, gmm_weights, vade_labels, vade_centers, vade_covariances, neural_network = _vade(
             X,
+            val_set,
             self.n_clusters,
             self.batch_size,
             pretrain_optimizer_params,
@@ -630,7 +641,8 @@ class VaDE(_AbstractDeepClusteringAlgo):
             self.initial_clustering_class,
             initial_clustering_params,
             self.device,
-            random_state)
+            random_state,
+            self._log_history)
         self.labels_ = gmm_labels
         self.cluster_centers_ = gmm_means
         self.covariances_ = gmm_covariances

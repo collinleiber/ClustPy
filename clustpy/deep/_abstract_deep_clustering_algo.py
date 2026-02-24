@@ -1,3 +1,4 @@
+from collections import defaultdict
 from clustpy.deep._utils import set_torch_seed
 from sklearn.base import TransformerMixin, BaseEstimator, ClusterMixin
 import numpy as np
@@ -37,6 +38,20 @@ class _AbstractDeepClusteringAlgo(TransformerMixin, ClusterMixin, BaseEstimator)
         self.embedding_size = embedding_size
         self.device = device
         self.random_state = random_state
+        self.history_ = defaultdict(list)
+    
+    def _log_history(self, key: str, value) -> None:
+        """
+        Log pretraining and clustering history values (e.g. loss values) during training.
+
+        Parameters
+        ----------
+        key : str
+            the key under which to store the value
+        value : float
+
+        """
+        self.history_[key].append(float(value))
 
     def _check_parameters(self, X: np.ndarray, *, y: np.ndarray=None) -> (np.ndarray, np.ndarray, np.random.RandomState, dict, dict, dict):
         """

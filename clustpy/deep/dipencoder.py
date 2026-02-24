@@ -785,7 +785,7 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
         self.initial_clustering_class = initial_clustering_class
         self.initial_clustering_params = initial_clustering_params
 
-    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DipEncoder':
+    def fit(self, X: np.ndarray, val_set: np.ndarray = None, y: np.ndarray = None) -> 'DipEncoder':
         """
         Initiate the actual clustering/dimensionality reduction process on the input data set.
         If no ground truth labels are given, the resulting cluster labels will be stored in the labels_ attribute.
@@ -794,6 +794,8 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
         ----------
         X : np.ndarray
             The given (training) data set
+        val_set : np.ndarray
+            The validation data set (not used in DipEncoder, included for compatibility reasons) (default: None)
         y : np.ndarray
             The ground truth labels. If None, the DipEncoder will be used for clustering (default: None)
 
@@ -807,7 +809,7 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
         batch_size = 25 * self.n_clusters if self.batch_size is None else self.batch_size
         # Get initial setting (device, dataloaders, pretrained AE and initial clustering result)
         device, trainloader, testloader, _, neural_network, X_embed, n_clusters, init_labels, init_centers, _ = get_default_deep_clustering_initialization(
-            X, self.n_clusters, batch_size, pretrain_optimizer_params, self.pretrain_epochs, self.optimizer_class, self.ssl_loss_fn,
+            X, val_set, self.n_clusters, batch_size, pretrain_optimizer_params, self.pretrain_epochs, self.optimizer_class, self.ssl_loss_fn,
             self.neural_network, self.embedding_size, self.custom_dataloaders, self.initial_clustering_class if y is None else None, 
             initial_clustering_params, self.device, random_state, neural_network_weights=self.neural_network_weights)
         if y is not None:
