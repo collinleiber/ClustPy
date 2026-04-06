@@ -1,2 +1,22 @@
 ignore:
-  - ".*/tests"  # ignore folders and all its contents
+  - "**/tests/**/*"
+  - "setup.py"
+  - "**/__init__.py"
+
+coverage:
+  status:
+    project:
+      default:
+        # 'auto' compares coverage against the base branch. 
+        # It ensures coverage doesn't drop.
+        target: auto 
+        threshold: 1% # Allows a 1% drop before turning the check red
+    patch:
+      default:
+        target: 85%   # New code in the PR should have at least 80% coverage
+        base: auto
+
+comment:
+  layout: "reach, diff, flags, files"
+  behavior: default
+  require_changes: true  # Only comment if coverage actually changes

@@ -139,12 +139,12 @@ def test_evaluate_dataset_with_neural_networks_as_iteration_parameters():
                           labels_true=L, n_repetitions=n_repetitions, add_runtime=False, add_n_clusters=False,
                           save_path=None, random_state=1)
     # Check if scores are equal
-    assert abs(df.at[0, ("DEC1", "nmi")] - df.at[0, ("DEC2", "nmi")]) < 1e-8  # is equal
-    assert abs(df.at[0, ("DEC1", "silhouette")] - df.at[0, ("DEC2", "silhouette")]) < 1e-8  # is equal
-    assert abs(df.at[1, ("DEC1", "nmi")] - df.at[1, ("DEC2", "nmi")]) < 1e-8  # is equal
-    assert abs(df.at[1, ("DEC1", "silhouette")] - df.at[1, ("DEC2", "silhouette")]) < 1e-8  # is equal
-    assert abs(df.at[0, ("DEC1", "nmi")] - df.at[1, ("DEC1", "nmi")]) > 1e-2  # is not equal
-    assert abs(df.at[0, ("DEC1", "silhouette")] - df.at[1, ("DEC1", "silhouette")]) > 1e-2  # is not equal
+    assert abs(df.at["0", ("DEC1", "nmi")] - df.at["0", ("DEC2", "nmi")]) < 1e-8  # is equal
+    assert abs(df.at["0", ("DEC1", "silhouette")] - df.at["0", ("DEC2", "silhouette")]) < 1e-8  # is equal
+    assert abs(df.at["1", ("DEC1", "nmi")] - df.at["1", ("DEC2", "nmi")]) < 1e-8  # is equal
+    assert abs(df.at["1", ("DEC1", "silhouette")] - df.at["1", ("DEC2", "silhouette")]) < 1e-8  # is equal
+    assert abs(df.at["0", ("DEC1", "nmi")] - df.at["1", ("DEC1", "nmi")]) > 1e-2  # is not equal
+    assert abs(df.at["0", ("DEC1", "silhouette")] - df.at["1", ("DEC1", "silhouette")]) > 1e-2  # is not equal
 
 
 @pytest.fixture
@@ -292,14 +292,14 @@ def test_evaluation_df_to_latex_table_single_dataset():
     df = evaluate_dataset(X=X, evaluation_algorithms=algorithms, evaluation_metrics=metrics, labels_true=L,
                           n_repetitions=n_repetitions, add_runtime=False,
                           add_n_clusters=False, save_path="df.csv", random_state=1, aggregation_functions=[np.max, np.std])
-    output_str1 = evaluation_df_to_latex_table(df, 1, "latex1.txt", None, None, False, False, False, None, None, None, 0)
+    output_str1 = evaluation_df_to_latex_table(df, "1", "latex1.txt", None, None, False, False, False, None, None, None, 0)
     output_str1 = output_str1.split("\n")
     assert os.path.isfile("latex1.txt")
     read_file1 = open("latex1.txt", "r").readlines()
     assert len(output_str1) == len(read_file1)
     assert all([output_str1[i] + "\n" == read_file1[i] for i in range(len(output_str1) - 1)] + [output_str1[-1] == read_file1[-1]])
     # Test with input file
-    output_str2 = evaluation_df_to_latex_table("df.csv", 1, "latex2.txt", "std", "max", True, True, True, "red", [True, True, False],
+    output_str2 = evaluation_df_to_latex_table("df.csv", "1", "latex2.txt", "std", "max", True, True, True, "red", [True, True, False],
                                                 100, 2)
     output_str2 = output_str2.split("\n")
     assert os.path.isfile("latex2.txt")
