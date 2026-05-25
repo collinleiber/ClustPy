@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 from clustpy.utils import plot_scatter_matrix
 import tqdm
 from collections.abc import Callable
+from pathlib import Path
 
 """
 Dip module - holds backward functions
@@ -699,7 +700,7 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
     neural_network : torch.nn.Module | tuple
         the input neural network. If None, a new FeedforwardAutoencoder will be created.
         Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict) (default: None)
-    neural_network_weights : str
+    neural_network_weights : str | Path
         Path to a file containing the state_dict of the neural_network (default: None)
     embedding_size : int
         size of the embedding within the neural network (default: 10)
@@ -763,7 +764,7 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
                  clustering_optimizer_params: dict = None, pretrain_epochs: int = 100,
                  clustering_epochs: int = 150, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error,
-                 neural_network: torch.nn.Module | tuple = None, neural_network_weights: str = None,
+                 neural_network: torch.nn.Module | tuple = None, neural_network_weights: str | Path = None,
                  embedding_size: int = 10, max_cluster_size_diff_factor: float = 3,
                  clustering_loss_weight: float = 1., ssl_loss_weight: float = None,
                  custom_dataloaders: tuple = None, augmentation_invariance: bool = False,

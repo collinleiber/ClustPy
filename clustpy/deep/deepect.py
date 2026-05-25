@@ -15,6 +15,7 @@ import tqdm
 import copy
 from collections.abc import Callable
 from sklearn.utils.validation import check_is_fitted
+from pathlib import Path
 
 
 class _DeepECT_ClusterTreeNode(_ClusterTreeNode):
@@ -447,7 +448,7 @@ def _deep_ect(X: np.ndarray, max_n_leaf_nodes: int, batch_size: int, pretrain_op
               clustering_optimizer_params: dict, pretrain_epochs: int, clustering_epochs: int, grow_interval: int,
               pruning_threshold: float, optimizer_class: torch.optim.Optimizer,
               ssl_loss_fn: Callable | torch.nn.modules.loss._Loss, neural_network: torch.nn.Module | tuple,
-              neural_network_weights: str, embedding_size: int, clustering_loss_weight: float, ssl_loss_weight: float,
+              neural_network_weights: str | Path, embedding_size: int, clustering_loss_weight: float, ssl_loss_weight: float,
               custom_dataloaders: tuple, augmentation_invariance: bool, device: torch.device,
               random_state: np.random.RandomState) -> (np.ndarray, np.ndarray, torch.nn.Module):
     """
@@ -480,7 +481,7 @@ def _deep_ect(X: np.ndarray, max_n_leaf_nodes: int, batch_size: int, pretrain_op
     neural_network : torch.nn.Module | tuple
         the input neural network.
         Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict)
-    neural_network_weights : str
+    neural_network_weights : str | Path
         Path to a file containing the state_dict of the neural_network.
     embedding_size : int
         size of the embedding within the neural network
@@ -564,7 +565,7 @@ class DeepECT(_AbstractDeepClusteringAlgo):
     neural_network : torch.nn.Module | tuple
         the input neural network. If None, a new FeedforwardAutoencoder will be created.
         Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict) (default: None)
-    neural_network_weights : str
+    neural_network_weights : str | Path
         Path to a file containing the state_dict of the neural_network (default: None)
     embedding_size : int
         Size of the embedding within the neural network (default: 10)
@@ -607,7 +608,7 @@ class DeepECT(_AbstractDeepClusteringAlgo):
                  grow_interval: int = 2, pruning_threshold: float = 0.1,
                  optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error,
-                 neural_network: torch.nn.Module | tuple = None, neural_network_weights: str = None,
+                 neural_network: torch.nn.Module | tuple = None, neural_network_weights: str | Path = None,
                  embedding_size: int = 10, clustering_loss_weight: float = 1., ssl_loss_weight: float = 1.,
                  custom_dataloaders: tuple = None, augmentation_invariance: bool = False,
                  device: torch.device = None, random_state: np.random.RandomState | int = None):

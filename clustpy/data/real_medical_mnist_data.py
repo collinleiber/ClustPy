@@ -1,11 +1,11 @@
 import numpy as np
 from clustpy.data._utils import _get_download_dir, _download_file, flatten_images
-import os
 from sklearn.datasets._base import Bunch
+from pathlib import Path
 
 
 def _load_medical_mnist_data(dataset_name: str, subset: str, colored: bool, multiple_labelings: bool,
-                             return_X_y: bool, downloads_path: str) -> Bunch:
+                             return_X_y: bool, downloads_path: str | Path) -> Bunch:
     """
     Helper function to load medical MNIST data from https://medmnist.com/.
 
@@ -21,7 +21,7 @@ def _load_medical_mnist_data(dataset_name: str, subset: str, colored: bool, mult
         specifies if the data set contains multiple labelings (for alternative clusterings)
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored. If input was None this will be equal to
         '[USER]/Downloads/clustpy_datafiles'
 
@@ -38,8 +38,8 @@ def _load_medical_mnist_data(dataset_name: str, subset: str, colored: bool, mult
     assert subset in ["all", "train",
                       "test", "val"], "subset must match 'all', 'train', 'test' or 'val'. Your input {0}".format(subset)
     # Check if data exists
-    filename = _get_download_dir(downloads_path) + "/" + dataset_name + ".npz"
-    if not os.path.isfile(filename):
+    filename = _get_download_dir(downloads_path) / (dataset_name + ".npz")
+    if not filename.is_file():
         _download_file("https://zenodo.org/record/6496656/files/" + dataset_name + ".npz?download=1", filename)
     # Load data
     dataset = np.load(filename)
@@ -104,7 +104,7 @@ Actual datasets
 """
 
 
-def load_path_mnist(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_path_mnist(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the PathMNIST data set. It consists of 107180 28x28 colored images belonging to one of 9 classes.
     The data set is composed of 89996 training, 10004 validation and 7180 test samples.
@@ -116,7 +116,7 @@ def load_path_mnist(subset: str = "all", return_X_y: bool = False, downloads_pat
         can be 'all', 'test', 'train' or 'val'. 'all' combines test, train and validation data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -138,7 +138,7 @@ def load_path_mnist(subset: str = "all", return_X_y: bool = False, downloads_pat
     return _load_medical_mnist_data("pathmnist", subset, True, False, return_X_y, downloads_path)
 
 
-def load_chest_mnist(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_chest_mnist(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the ChestMNIST data set. It consists of 112120 28x28 grayscale images.
     The ground truth labels consist of 14 labelings with 2 clusters each.
@@ -151,7 +151,7 @@ def load_chest_mnist(subset: str = "all", return_X_y: bool = False, downloads_pa
         can be 'all', 'test', 'train' or 'val'. 'all' combines test, train and validation data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -173,7 +173,7 @@ def load_chest_mnist(subset: str = "all", return_X_y: bool = False, downloads_pa
     return _load_medical_mnist_data("chestmnist", subset, False, True, return_X_y, downloads_path)
 
 
-def load_derma_mnist(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_derma_mnist(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the DermaMNIST data set. It consists of 10015 28x28 colored images belonging to one of 7 classes.
     The data set is composed of 7007 training, 1003 validation and 2005 test samples.
@@ -185,7 +185,7 @@ def load_derma_mnist(subset: str = "all", return_X_y: bool = False, downloads_pa
         can be 'all', 'test', 'train' or 'val'. 'all' combines test, train and validation data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -210,7 +210,7 @@ def load_derma_mnist(subset: str = "all", return_X_y: bool = False, downloads_pa
     return _load_medical_mnist_data("dermamnist", subset, True, False, return_X_y, downloads_path)
 
 
-def load_oct_mnist(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_oct_mnist(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the OCTMNIST data set. It consists of 109309 28x28 grayscale images belonging to one of 4 classes.
     The data set is composed of 97477 training, 10832 validation and 1000 test samples.
@@ -222,7 +222,7 @@ def load_oct_mnist(subset: str = "all", return_X_y: bool = False, downloads_path
         can be 'all', 'test', 'train' or 'val'. 'all' combines test, train and validation data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -244,7 +244,7 @@ def load_oct_mnist(subset: str = "all", return_X_y: bool = False, downloads_path
     return _load_medical_mnist_data("octmnist", subset, False, False, return_X_y, downloads_path)
 
 
-def load_pneumonia_mnist(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_pneumonia_mnist(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the PneumoniaMNIST data set. It consists of 5856 28x28 grayscale images belonging to one of 2 classes.
     The data set is composed of 4708 training, 524 validation and 624 test samples.
@@ -256,7 +256,7 @@ def load_pneumonia_mnist(subset: str = "all", return_X_y: bool = False, download
         can be 'all', 'test', 'train' or 'val'. 'all' combines test, train and validation data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -278,7 +278,7 @@ def load_pneumonia_mnist(subset: str = "all", return_X_y: bool = False, download
     return _load_medical_mnist_data("pneumoniamnist", subset, False, False, return_X_y, downloads_path)
 
 
-def load_retina_mnist(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_retina_mnist(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the RetinaMNIST data set. It consists of 1600 28x28 colored images belonging to one of 5 classes.
     The data set is composed of 1080 training, 120 validation and 400 test samples.
@@ -290,7 +290,7 @@ def load_retina_mnist(subset: str = "all", return_X_y: bool = False, downloads_p
         can be 'all', 'test', 'train' or 'val'. 'all' combines test, train and validation data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -312,7 +312,7 @@ def load_retina_mnist(subset: str = "all", return_X_y: bool = False, downloads_p
     return _load_medical_mnist_data("retinamnist", subset, True, False, return_X_y, downloads_path)
 
 
-def load_breast_mnist(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_breast_mnist(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the BreastMNIST data set. It consists of 780 28x28 grayscale images belonging to one of 2 classes.
     The data set is composed of 546 training, 78 validation and 156 test samples.
@@ -324,7 +324,7 @@ def load_breast_mnist(subset: str = "all", return_X_y: bool = False, downloads_p
         can be 'all', 'test', 'train' or 'val'. 'all' combines test, train and validation data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -346,7 +346,7 @@ def load_breast_mnist(subset: str = "all", return_X_y: bool = False, downloads_p
     return _load_medical_mnist_data("breastmnist", subset, False, False, return_X_y, downloads_path)
 
 
-def load_blood_mnist(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_blood_mnist(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the BloodMNIST data set. It consists of 17092 28x28 colored images belonging to one of 8 classes.
     The data set is composed of 11959 training, 1712 validation and 3421 test samples.
@@ -358,7 +358,7 @@ def load_blood_mnist(subset: str = "all", return_X_y: bool = False, downloads_pa
         can be 'all', 'test', 'train' or 'val'. 'all' combines test, train and validation data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -380,7 +380,7 @@ def load_blood_mnist(subset: str = "all", return_X_y: bool = False, downloads_pa
     return _load_medical_mnist_data("bloodmnist", subset, True, False, return_X_y, downloads_path)
 
 
-def load_tissue_mnist(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_tissue_mnist(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the TissueMNIST data set. It consists of 236386 28x28 grayscale images belonging to one of 8 classes.
     The data set is composed of 165466 training, 23640 validation and 47280 test samples.
@@ -392,7 +392,7 @@ def load_tissue_mnist(subset: str = "all", return_X_y: bool = False, downloads_p
         can be 'all', 'test', 'train' or 'val'. 'all' combines test, train and validation data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -414,7 +414,7 @@ def load_tissue_mnist(subset: str = "all", return_X_y: bool = False, downloads_p
     return _load_medical_mnist_data("tissuemnist", subset, False, False, return_X_y, downloads_path)
 
 
-def load_organ_a_mnist(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_organ_a_mnist(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the OrganAMNIST data set. It consists of 58850 28x28 grayscale images belonging to one of 11 classes.
     The data set is composed of 34581 training, 6491 validation and 17778 test samples.
@@ -426,7 +426,7 @@ def load_organ_a_mnist(subset: str = "all", return_X_y: bool = False, downloads_
         can be 'all', 'test', 'train' or 'val'. 'all' combines test, train and validation data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -451,7 +451,7 @@ def load_organ_a_mnist(subset: str = "all", return_X_y: bool = False, downloads_
     return _load_medical_mnist_data("organamnist", subset, False, False, return_X_y, downloads_path)
 
 
-def load_organ_c_mnist(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_organ_c_mnist(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the OrganCMNIST data set. It consists of 23660 28x28 grayscale images belonging to one of 11 classes.
     The data set is composed of 13000 training, 2392 validation and 8268 test samples.
@@ -463,7 +463,7 @@ def load_organ_c_mnist(subset: str = "all", return_X_y: bool = False, downloads_
         can be 'all', 'test', 'train' or 'val'. 'all' combines test, train and validation data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -488,7 +488,7 @@ def load_organ_c_mnist(subset: str = "all", return_X_y: bool = False, downloads_
     return _load_medical_mnist_data("organcmnist", subset, False, False, return_X_y, downloads_path)
 
 
-def load_organ_s_mnist(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_organ_s_mnist(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the OrganSMNIST data set. It consists of 25221 28x28 grayscale images belonging to one of 11 classes.
     The data set is composed of 13940 training, 2452 validation and 8829 test samples.
@@ -500,7 +500,7 @@ def load_organ_s_mnist(subset: str = "all", return_X_y: bool = False, downloads_
         can be 'all', 'test', 'train' or 'val'. 'all' combines test, train and validation data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -525,7 +525,7 @@ def load_organ_s_mnist(subset: str = "all", return_X_y: bool = False, downloads_
     return _load_medical_mnist_data("organsmnist", subset, False, False, return_X_y, downloads_path)
 
 
-def load_organ_mnist_3d(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_organ_mnist_3d(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the OrganMNIST3D data set. It consists of 1743 28x28x28 grayscale images belonging to one of 11 classes.
     The data set is composed of 972 training, 161 validation and 610 test samples.
@@ -537,7 +537,7 @@ def load_organ_mnist_3d(subset: str = "all", return_X_y: bool = False, downloads
         can be 'all', 'test', 'train' or 'val'. 'all' combines test, train and validation data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -562,7 +562,7 @@ def load_organ_mnist_3d(subset: str = "all", return_X_y: bool = False, downloads
     return _load_medical_mnist_data("organmnist3d", subset, False, False, return_X_y, downloads_path)
 
 
-def load_nodule_mnist_3d(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_nodule_mnist_3d(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the NoduleMNIST3D data set. It consists of 1633 28x28x28 grayscale images belonging to one of 2 classes.
     The data set is composed of 1158 training, 165 validation and 310 test samples.
@@ -574,7 +574,7 @@ def load_nodule_mnist_3d(subset: str = "all", return_X_y: bool = False, download
         can be 'all', 'test', 'train' or 'val'. 'all' combines test, train and validation data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -596,7 +596,7 @@ def load_nodule_mnist_3d(subset: str = "all", return_X_y: bool = False, download
     return _load_medical_mnist_data("nodulemnist3d", subset, False, False, return_X_y, downloads_path)
 
 
-def load_adrenal_mnist_3d(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_adrenal_mnist_3d(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the AdrenalMNIST3D data set. It consists of 1584 28x28x28 grayscale images belonging to one of 2 classes.
     The data set is composed of 1188 training, 98 validation and 298 test samples.
@@ -608,7 +608,7 @@ def load_adrenal_mnist_3d(subset: str = "all", return_X_y: bool = False, downloa
         can be 'all', 'test', 'train' or 'val'. 'all' combines test, train and validation data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -627,7 +627,7 @@ def load_adrenal_mnist_3d(subset: str = "all", return_X_y: bool = False, downloa
     return _load_medical_mnist_data("adrenalmnist3d", subset, False, False, return_X_y, downloads_path)
 
 
-def load_fracture_mnist_3d(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_fracture_mnist_3d(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the FractureMNIST3D data set. It consists of 1370 28x28x28 grayscale images belonging to one of 3 classes.
     The data set is composed of 1027 training, 103 validation and 240 test samples.
@@ -639,7 +639,7 @@ def load_fracture_mnist_3d(subset: str = "all", return_X_y: bool = False, downlo
         can be 'all', 'test', 'train' or 'val'. 'all' combines test, train and validation data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -661,7 +661,7 @@ def load_fracture_mnist_3d(subset: str = "all", return_X_y: bool = False, downlo
     return _load_medical_mnist_data("fracturemnist3d", subset, False, False, return_X_y, downloads_path)
 
 
-def load_vessel_mnist_3d(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_vessel_mnist_3d(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the VesselMNIST3D data set. It consists of 1909 28x28x28 grayscale images belonging to one of 2 classes.
     The data set is composed of 1335 training, 192 validation and 382 test samples.
@@ -673,7 +673,7 @@ def load_vessel_mnist_3d(subset: str = "all", return_X_y: bool = False, download
         can be 'all', 'test', 'train' or 'val'. 'all' combines test, train and validation data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -695,7 +695,7 @@ def load_vessel_mnist_3d(subset: str = "all", return_X_y: bool = False, download
     return _load_medical_mnist_data("vesselmnist3d", subset, False, False, return_X_y, downloads_path)
 
 
-def load_synapse_mnist_3d(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_synapse_mnist_3d(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the SynapseMNIST3D data set. It consists of 1759 28x28x28 grayscale images belonging to one of 2 classes.
     The data set is composed of 1230 training, 177 validation and 352 test samples.
@@ -707,7 +707,7 @@ def load_synapse_mnist_3d(subset: str = "all", return_X_y: bool = False, downloa
         can be 'all', 'test', 'train' or 'val'. 'all' combines test, train and validation data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns

@@ -1,12 +1,12 @@
 import numpy as np
 from clustpy.data._utils import _get_download_dir, _download_file
 from sklearn.datasets._base import Bunch
-import os
 import zipfile
+from pathlib import Path
 
 
 def _load_timeseries_classification_data(dataset_name: str, subset: str, labels_minus_one: bool, file_type: str,
-                                         last_column_are_labels: bool, return_X_y: bool, downloads_path: str) -> Bunch:
+                                         last_column_are_labels: bool, return_X_y: bool, downloads_path: str | Path) -> Bunch:
     """
     Helper function to load timeseries data from www.timeseriesclassification.com.
 
@@ -24,7 +24,7 @@ def _load_timeseries_classification_data(dataset_name: str, subset: str, labels_
         specifies if the last column contains the labels. If false labels should be contained in the first column
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored. If input was None this will be equal to
         '[USER]/Downloads/clustpy_datafiles'
 
@@ -38,11 +38,10 @@ def _load_timeseries_classification_data(dataset_name: str, subset: str, labels_
     subset = subset.lower()
     assert subset in ["all", "train",
                       "test"], "subset must match 'all', 'train' or 'test'. Your input {0}".format(subset)
-    directory = _get_download_dir(downloads_path) + "/" + dataset_name + "/"
-    filename = directory + dataset_name + ".zip"
-    if not os.path.isfile(filename):
-        if not os.path.isdir(directory):
-            os.mkdir(directory)
+    directory = _get_download_dir(downloads_path) / dataset_name
+    filename = directory / (dataset_name + ".zip")
+    if not filename.is_file():
+        directory.mkdir(parents=False, exist_ok=True)
         _download_file("http://www.timeseriesclassification.com/aeon-toolkit/" + dataset_name + ".zip",
                        filename)
         # Unpack zipfile
@@ -52,10 +51,10 @@ def _load_timeseries_classification_data(dataset_name: str, subset: str, labels_
     if subset == "all" or subset == "train":
         # Normally we have txt files
         if file_type == "txt":
-            dataset = np.genfromtxt(directory + dataset_name + "_TRAIN.txt")
+            dataset = np.genfromtxt(directory / (dataset_name + "_TRAIN.txt"))
         elif file_type == "ts":
             # Ts files must be changed first
-            with open(directory + dataset_name + "_TRAIN.ts", "rb") as f:
+            with open(directory / (dataset_name + "_TRAIN.ts"), "rb") as f:
                 clean_lines = (line.replace(b":", b",").replace(b"@", b"#") for line in f)
                 dataset = np.genfromtxt(clean_lines, delimiter=",", comments="#")
         # Are labels in first or last column?
@@ -68,10 +67,10 @@ def _load_timeseries_classification_data(dataset_name: str, subset: str, labels_
     if subset == "all" or subset == "test":
         # Normally we have txt files
         if file_type == "txt":
-            test_dataset = np.genfromtxt(directory + dataset_name + "_TEST.txt")
+            test_dataset = np.genfromtxt(directory / (dataset_name + "_TEST.txt"))
         elif file_type == "ts":
             # Ts files must be changed first
-            with open(directory + dataset_name + "_TEST.ts", "rb") as f:
+            with open(directory / (dataset_name + "_TEST.ts"), "rb") as f:
                 clean_lines = (line.replace(b":", b",").replace(b"@", b"#") for line in f)
                 test_dataset = np.genfromtxt(clean_lines, delimiter=",", comments="#")
         # Are labels in first or last column?
@@ -101,7 +100,7 @@ def _load_timeseries_classification_data(dataset_name: str, subset: str, labels_
         return Bunch(dataset_name=dataset_name, data=data, target=labels)
 
 
-def load_motestrain(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_motestrain(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the motestrain data set. It consists of 1272 samples belonging to one of 2 classes.
     The data set is composed of 20 training and 1252 test samples.
@@ -113,7 +112,7 @@ def load_motestrain(subset: str = "all", return_X_y: bool = False, downloads_pat
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -130,7 +129,7 @@ def load_motestrain(subset: str = "all", return_X_y: bool = False, downloads_pat
     return _load_timeseries_classification_data("MoteStrain", subset, True, "txt", False, return_X_y, downloads_path)
 
 
-def load_proximal_phalanx_outline(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_proximal_phalanx_outline(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the proximal phalanx outline data set. It consists of 876 samples belonging to one of 2 classes.
     The data set is composed of 600 training and 276 test samples.
@@ -142,7 +141,7 @@ def load_proximal_phalanx_outline(subset: str = "all", return_X_y: bool = False,
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -160,7 +159,7 @@ def load_proximal_phalanx_outline(subset: str = "all", return_X_y: bool = False,
                                                 return_X_y, downloads_path)
 
 
-def load_diatom_size_reduction(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_diatom_size_reduction(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the diatom size reduction data set. It consists of 322 samples belonging to one of 4 classes.
     The data set is composed of 16 training and 306 test samples.
@@ -172,7 +171,7 @@ def load_diatom_size_reduction(subset: str = "all", return_X_y: bool = False, do
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -190,7 +189,7 @@ def load_diatom_size_reduction(subset: str = "all", return_X_y: bool = False, do
                                                 return_X_y, downloads_path)
 
 
-def load_symbols(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_symbols(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the symbols data set. It consists of 1020 samples belonging to one of 6 classes.
     The data set is composed of 25 training and 995 test samples.
@@ -202,7 +201,7 @@ def load_symbols(subset: str = "all", return_X_y: bool = False, downloads_path: 
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -219,7 +218,7 @@ def load_symbols(subset: str = "all", return_X_y: bool = False, downloads_path: 
     return _load_timeseries_classification_data("Symbols", subset, True, "txt", False, return_X_y, downloads_path)
 
 
-def load_olive_oil(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_olive_oil(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the OliveOil data set. It consists of 60 samples belonging to one of 4 classes.
     The data set is composed of 30 training and 30 test samples.
@@ -231,7 +230,7 @@ def load_olive_oil(subset: str = "all", return_X_y: bool = False, downloads_path
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -248,7 +247,7 @@ def load_olive_oil(subset: str = "all", return_X_y: bool = False, downloads_path
     return _load_timeseries_classification_data("OliveOil", subset, True, "txt", False, return_X_y, downloads_path)
 
 
-def load_plane(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_plane(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the plane data set. It consists of 210 samples belonging to one of 7 classes.
     The data set is composed of 105 training and 105 test samples.
@@ -260,7 +259,7 @@ def load_plane(subset: str = "all", return_X_y: bool = False, downloads_path: st
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -277,7 +276,7 @@ def load_plane(subset: str = "all", return_X_y: bool = False, downloads_path: st
     return _load_timeseries_classification_data("Plane", subset, True, "txt", False, return_X_y, downloads_path)
 
 
-def load_sony_aibo_robot_surface(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_sony_aibo_robot_surface(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the Sony AIBO Robot Surface 1 data set. It consists of 621 samples belonging to one of 2 classes.
     The data set is composed of 20 training and 601 test samples.
@@ -289,7 +288,7 @@ def load_sony_aibo_robot_surface(subset: str = "all", return_X_y: bool = False, 
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -307,7 +306,7 @@ def load_sony_aibo_robot_surface(subset: str = "all", return_X_y: bool = False, 
                                                 return_X_y, downloads_path)
 
 
-def load_two_patterns(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_two_patterns(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the two patterns data set. It consists of 5000 samples belonging to one of 4 classes.
     The data set is composed of 1000 training and 4000 test samples.
@@ -319,7 +318,7 @@ def load_two_patterns(subset: str = "all", return_X_y: bool = False, downloads_p
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -336,7 +335,7 @@ def load_two_patterns(subset: str = "all", return_X_y: bool = False, downloads_p
     return _load_timeseries_classification_data("TwoPatterns", subset, True, "txt", False, return_X_y, downloads_path)
 
 
-def load_lsst(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_lsst(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the LSST data set. It consists of 4925 samples belonging to one of 14 classes.
     The data set is composed of 2459 training and 2466 test samples.
@@ -348,7 +347,7 @@ def load_lsst(subset: str = "all", return_X_y: bool = False, downloads_path: str
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns

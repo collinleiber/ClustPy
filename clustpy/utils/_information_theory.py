@@ -33,7 +33,7 @@ def bic_costs(n_points: int, use_log2: bool = False) -> float:
     return bic_costs
 
 
-def integer_costs(integer: int) -> float:
+def integer_costs(integer: int, use_log2: bool = False) -> float:
     """
     Calculate the costs to encode an integer value. Uses following formula:
     log(integer) + log(log(integer)) + log(log(log(integer))) + ... + log(const), where const = 2.865064.
@@ -42,22 +42,24 @@ def integer_costs(integer: int) -> float:
     ----------
     integer : int
         The integer value to encode
+    use_log2 : bool
+        Defines whether log2 should be used instead of ln (default: False)
 
     Returns
     -------
     costs : float
         The encoding costs of the integer
     """
-    assert type(integer) is int or type(integer) is np.int32 or type(
-        integer) is np.int64, "The input to calculate the mdl costs of must be an integer. Your input:\n{0} (type: {1})".format(
+    assert isinstance(integer, (int, np.integer)), "The input to calculate the mdl costs of must be an integer. Your input:\n{0} (type: {1})".format(
         integer, type(integer))
     costs = 0
-    if integer != 0:
-        last_interim_result = np.log2(integer)
+    if integer > 0:
+        last_interim_result = np.log2(integer) if use_log2 else np.log(integer)
         while last_interim_result > 0:
             costs += last_interim_result
-            last_interim_result = np.log2(last_interim_result)
-    costs = costs + np.log2(2.865064)
+            last_interim_result = np.log2(last_interim_result) if use_log2 else np.log(last_interim_result)
+    const = np.log2(2.865064) if use_log2 else np.log(2.865064)
+    costs = costs + const
     return costs
 
 

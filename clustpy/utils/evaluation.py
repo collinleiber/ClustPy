@@ -4,10 +4,10 @@ import time
 from sklearn.utils import check_random_state
 from sklearn.base import ClusterMixin
 from collections.abc import Callable
-import os
 import inspect
 from sklearn.datasets._base import Bunch
 import sys
+from pathlib import Path, PurePath
 
 
 def _preprocess_dataset(X: np.ndarray, preprocess_methods: list, preprocess_params: list) -> np.ndarray:
@@ -113,7 +113,7 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
                      labels_true: np.ndarray = None, n_repetitions: int = 10,
                      X_test: np.ndarray = None, labels_true_test: np.ndarray = None,
                      aggregation_functions: tuple = (np.mean, np.std), add_runtime: bool = True,
-                     add_n_clusters: bool = False, save_path: str = None, save_labels_path: str = None,
+                     add_n_clusters: bool = False, save_path: str | Path = None, save_labels_path: str | Path = None,
                      ignore_algorithms: tuple = (), dataset_name: str = None,
                      random_state: np.random.RandomState | int | list = None, quiet: bool = False) -> pd.DataFrame:
     """
@@ -143,10 +143,10 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
         Add runtime of each execution to the final table (default: True)
     add_n_clusters : bool
         Add the resulting number of clusters to the final table (default: False)
-    save_path : str
-        The path where the final DataFrame should be saved as csv. If None, the DataFrame will not be saved (default: None)
-    save_labels_path : str
-        The path where the clustering labels should be saved as csv. If None, the labels will not be saved (default: None)
+    save_path : str | Path
+        The path where the final DataFrame should be saved. If None, the DataFrame will not be saved (default: None)
+    save_labels_path : str | Path
+        The path where the clustering labels should be saved. If None, the labels will not be saved (default: None)
     ignore_algorithms : tuple
         List of algorithm names (as specified in the EvaluationAlgorithm object) that should be ignored for this specific data set (default: [])
     dataset_name : str
@@ -195,14 +195,16 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
         evaluation_algorithms = [evaluation_algorithms]
     if type(evaluation_metrics) is not list and evaluation_metrics is not None:
         evaluation_metrics = [evaluation_metrics]
-    if save_labels_path is not None and "." not in save_labels_path:
-        save_labels_path = save_labels_path + ".csv"
-    assert save_labels_path is None or len(
-        save_labels_path.split(".")) == 2, "save_labels_path must only contain a single dot. E.g., NAME.csv"
-    if save_path is not None and "." not in save_path:
-        save_path = save_path + ".csv"
-    assert save_path is None or len(
-        save_path.split(".")) == 2, "save_path must only contain a single dot. E.g., NAME.csv"
+    if save_labels_path is not None:
+        if isinstance(save_labels_path, str):
+            save_labels_path = Path(save_labels_path)
+        if save_labels_path.suffix == "":
+            save_labels_path.with_suffix(".csv")
+    if save_path is not None:
+        if isinstance(save_path, str):
+            save_path = Path(save_path)
+        if save_path.suffix == "":
+            save_path = save_path.with_suffix(".csv")
     seeds = _get_fixed_seed_for_each_run(n_repetitions, random_state)
     algo_names = [a.name for a in evaluation_algorithms]
     assert max(
@@ -300,17 +302,14 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
                 runtime = time.time() - start_time
                 # Optional: Save labels
                 if save_labels_path is not None:
-                    save_labels_path_algo = None if save_labels_path is None else "{0}_{1}_{2}.{3}".format(
-                        save_labels_path.split(".")[0], eval_algo.name, rep, save_labels_path.split(".")[1])
+                    save_labels_path_algo = save_labels_path.with_name("{0}_{1}_{2}".format(save_labels_path.name,
+                                                                                               eval_algo.name, rep))
                     # Check if directory exists
-                    parent_directory = os.path.dirname(save_labels_path_algo)
-                    if parent_directory != "" and not os.path.isdir(parent_directory):
-                        os.makedirs(parent_directory)
+                    save_labels_path_algo.parent.mkdir(parents=True, exist_ok=True)
                     np.savetxt(save_labels_path_algo, algo_obj.labels_)
                     # Also save predict labels
                     if X_test is not None and labels_predicted_test is not None:
-                        save_labels_path_algo_test = "{0}_TEST.{1}".format(save_labels_path_algo.split(".")[0],
-                                                                           save_labels_path_algo.split(".")[1])
+                        save_labels_path_algo_test = save_labels_path_algo.with_name("{0}_TEST".format(save_labels_path_algo.name))
                         np.savetxt(save_labels_path_algo_test, labels_predicted_test)
                 # Get result of all metrics
                 if evaluation_metrics is not None:
@@ -386,17 +385,15 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
             print("-> Aggregation {0}: {1}".format(agg.__name__, aggregated_results))
     if save_path is not None:
         # Check if directory exists
-        parent_directory = os.path.dirname(save_path)
-        if parent_directory != "" and not os.path.isdir(parent_directory):
-            os.makedirs(parent_directory)
+        save_path.parent.mkdir(parents=True, exist_ok=True)
         df.to_csv(save_path)
     return df
 
 
 def evaluate_multiple_datasets(evaluation_datasets: list, evaluation_algorithms: list, evaluation_metrics: list = None,
                                n_repetitions: int = 10, aggregation_functions: tuple = (np.mean, np.std),
-                               add_runtime: bool = True, add_n_clusters: bool = False, save_path: str = None,
-                               save_intermediate_results: bool = False, save_labels_path: str = None,
+                               add_runtime: bool = True, add_n_clusters: bool = False, save_path: str | Path = None,
+                               save_intermediate_results: bool = False, save_labels_path: str | Path = None,
                                random_state: np.random.RandomState | int | list = None, quiet: bool = False) -> pd.DataFrame:
     """
     Evaluate the clustering result of different clustering algorithms (as specified by evaluation_algorithms) on a set of data sets (as specified by evaluation_datasets) using different metrics (as specified by evaluation_metrics).
@@ -419,15 +416,15 @@ def evaluate_multiple_datasets(evaluation_datasets: list, evaluation_algorithms:
         Add runtime of each execution to the final table (default: True)
     add_n_clusters : bool
         Add the resulting number of clusters to the final table (default: False)
-    save_path : str
-        The path where the final DataFrame should be saved as csv. If None, the DataFrame will not be saved (default: None)
+    save_path : str | Path
+        The path where the final DataFrame should be saved. If None, the DataFrame will not be saved (default: None)
     save_intermediate_results : bool
         Defines whether the result of each data set should be separately saved. 
         Useful if the evaluation takes a lot of time.
         The files will be saved as [save_path]_[DATASET_NAME]. 
         This implies that save_path has to be defined if save_intermediate_results is set to True (default: False)
-    save_labels_path : str
-        The path where the clustering labels should be saved as csv. If None, the labels will not be saved (default: None)
+    save_labels_path : str | Path
+        The path where the clustering labels should be saved. If None, the labels will not be saved (default: None)
     random_state : np.random.RandomState | int | list
         use a fixed random state to get a repeatable solution. Can also be of type int.
         Furthermore, if can be a list containing an int for each repetition (default: None)
@@ -477,14 +474,16 @@ def evaluate_multiple_datasets(evaluation_datasets: list, evaluation_algorithms:
                                                                    "save_intermediate_results is True"
     if type(evaluation_datasets) is not list:
         evaluation_datasets = [evaluation_datasets]
-    if save_labels_path is not None and "." not in save_labels_path:
-        save_labels_path = save_labels_path + ".csv"
-    assert save_labels_path is None or len(
-        save_labels_path.split(".")) == 2, "save_labels_path must only contain a single dot. E.g., NAME.csv"
-    if save_path is not None and "." not in save_path:
-        save_path = save_path + ".csv"
-    assert save_path is None or len(
-        save_path.split(".")) == 2, "save_path must only contain a single dot. E.g., NAME.csv"
+    if save_labels_path is not None:
+        if isinstance(save_labels_path, str):
+            save_labels_path = Path(save_labels_path)
+        if save_labels_path.suffix == "":
+            save_labels_path.with_suffix(".csv")
+    if save_path is not None:
+        if isinstance(save_path, str):
+            save_path = Path(save_path)
+        if save_path.suffix == "":
+            save_path = save_path.with_suffix(".csv")
     data_names = [d.name for d in evaluation_datasets]
     assert max(
         np.unique(data_names, return_counts=True)[1]) == 1, "Some names of your datasets do not seem to be unique!"
@@ -506,11 +505,10 @@ def evaluate_multiple_datasets(evaluation_datasets: list, evaluation_algorithms:
                 X = _preprocess_dataset(X, eval_data.preprocess_methods, eval_data.preprocess_params)
                 if X_test is not None:
                     X_test = _preprocess_dataset(X_test, eval_data.preprocess_methods, eval_data.preprocess_params)
-            inner_save_path = None if not save_intermediate_results else "{0}_{1}.{2}".format(save_path.split(".")[0],
-                                                                                              eval_data.name,
-                                                                                              save_path.split(".")[1])
-            inner_save_labels_path = None if save_labels_path is None else "{0}_{1}.{2}".format(
-                save_labels_path.split(".")[0], eval_data.name, save_labels_path.split(".")[1])
+            inner_save_path = None if not save_intermediate_results else save_path.with_name("{0}_{1}".format(save_path.name,
+                                                                                              eval_data.name))
+            inner_save_labels_path = None if save_labels_path is None else save_labels_path.with_name("{0}_{1}".format(
+                save_labels_path.name, eval_data.name))
             df = evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=evaluation_metrics,
                                   labels_true=labels_true,
                                   n_repetitions=n_repetitions, X_test=X_test, labels_true_test=labels_true_test,
@@ -527,9 +525,7 @@ def evaluate_multiple_datasets(evaluation_datasets: list, evaluation_algorithms:
     all_dfs = pd.concat(df_list, keys=data_names)
     if save_path is not None:
         # Check if directory exists
-        parent_directory = os.path.dirname(save_path)
-        if parent_directory != "" and not os.path.isdir(parent_directory):
-            os.makedirs(parent_directory)
+        save_path.parent.mkdir(parents=True, exist_ok=True)
         all_dfs.to_csv(save_path)
     return all_dfs
 
@@ -543,7 +539,7 @@ def _get_data_and_labels_from_evaluation_dataset(data_input: np.ndarray, data_lo
 
     Parameters
     ----------
-    data_input : np.ndarray
+    data_input : np.ndarray | str | Path | Callable
         The actual data set. Can be a np.ndarray, a path to a data file (of type str) or a callable (e.g. a method from clustpy.data)
     data_loader_params_input : dict
         Dictionary containing the information necessary to load data from a function or file. Only relevant if data is of type callable or str
@@ -567,7 +563,7 @@ def _get_data_and_labels_from_evaluation_dataset(data_input: np.ndarray, data_lo
     labels_true = None
     X_test = None
     labels_true_test = None
-    if type(data_input) is str:
+    if isinstance(data_input, (str, PurePath)):
         X = np.genfromtxt(data_input, **data_loader_params_input)
     elif type(data_input) is np.ndarray:
         X = data_input
@@ -607,7 +603,7 @@ def _get_data_and_labels_from_evaluation_dataset(data_input: np.ndarray, data_lo
     return X, labels_true, X_test, labels_true_test
 
 
-def evaluation_df_to_latex_table(df: pd.DataFrame | str, relevant_row : str = "mean", output_path: str = None, pm_row: str | None = "std", 
+def evaluation_df_to_latex_table(df: pd.DataFrame | str | Path, relevant_row : str = "mean", output_path: str | Path = None, pm_row: str | None = "std", 
                                  bracket_row: str | None = None, best_in_bold: bool = True, second_best_underlined: bool = True, 
                                  third_best_dashed_underlined: bool = False, color_by_value: str = None, higher_is_better: list = None, 
                                  multiplier: int | float | list | None = 100, decimal_places: int = 1, color_min_max: tuple = (5, 70)) -> str:
@@ -620,11 +616,11 @@ def evaluation_df_to_latex_table(df: pd.DataFrame | str, relevant_row : str = "m
 
     Parameters
     ----------
-    df : pd.DataFrame | str
-        The pandas dataframe. Can also be a string that contains the path to the saved dataframe
+    df : pd.DataFrame | str | Path
+        The pandas dataframe. Can also be a string/path that contains the path to the saved dataframe
     relevant_row : str
         The name of the row in the df that is used to create the latex table (default: "mean")
-    output_path : str
+    output_path : str | Path
         The path were the resulting latex table text file will be stored (default: None)
     pm_row : str
         The name of the row in the df that should be added to the latex table after the value from relevant_row separated by plus-minus (default: "std")
@@ -662,8 +658,8 @@ def evaluation_df_to_latex_table(df: pd.DataFrame | str, relevant_row : str = "m
         The created latex string
     """
     # Load dataframe
-    assert type(df) == pd.DataFrame or type(df) == str, "Type of df must be pandas DataFrame or string (path to file)"
-    if type(df) == str:
+    assert isinstance(df, (pd.DataFrame, str, PurePath)), "Type of df must be pandas DataFrame, Path or string (path to file)"
+    if isinstance(df, (str, PurePath)):
         df_file = open(df, "r").readlines()
         multiple_datasets = df_file[2].split(",")[0] != "0"
         df = pd.read_csv(df, index_col=[0, 1] if multiple_datasets else [0], header=[0, 1])
@@ -814,8 +810,8 @@ class EvaluationDataset():
     ----------
     name : str
         Name of the data set. Can be chosen freely
-    data : np.ndarray
-        The actual data set. Can be a np.ndarray, a path to a data file (of type str) or a callable (e.g. a method from clustpy.data)
+    data : np.ndarray | str | Path | Callable
+        The actual data set. Can be a np.ndarray, a path to a data fileor a callable (e.g. a method from clustpy.data)
     labels_true : np.ndarray
         The ground truth labels. Can be a np.ndarray, an int or list specifying which columns of the data contain the labels or None if no ground truth labels are present.
         If data is a callable, the ground truth labels can also be obtained by that function and labels_true can be None (default: None)
@@ -846,13 +842,13 @@ class EvaluationDataset():
     >>> ed2 = EvaluationDataset(name="wine", data=X, labels_true=L)
     """
 
-    def __init__(self, name: str, data: np.ndarray, labels_true: np.ndarray = None, data_loader_params: dict = None,
+    def __init__(self, name: str, data: np.ndarray | str | Path | Callable, labels_true: np.ndarray = None, data_loader_params: dict = None,
                  train_test_split: bool = None, preprocess_methods: list = None, preprocess_params: list = None,
                  ignore_algorithms: tuple = ()):
         assert type(name) is str, "name must be a string"
         self.name = name
         assert "." not in name, "name must not contain a dot"
-        assert type(data) is np.ndarray or type(data) is str or callable(data), "data must be a numpy array, a string " \
+        assert isinstance(data, (np.ndarray, str, PurePath)) or callable(data), "data must be a numpy array, a string " \
                                                                                 "containing the path to a data file or a " \
                                                                                 "function returning a data and a labels array"
         self.data = data

@@ -4,22 +4,23 @@ except:
     print("[WARNING] Could not import cv2 in clustpy.data.real_video_data. Please install cv2 by 'pip install opencv-python' if necessary")
 from clustpy.data._utils import _download_file, _get_download_dir, flatten_images
 import numpy as np
-import os
 import zipfile
 from sklearn.datasets._base import Bunch
+from pathlib import Path
+
 
 """
 Helpers
 """
 
 
-def _load_video(path: str, image_size: tuple) -> np.ndarray:
+def _load_video(path: str | Path, image_size: tuple) -> np.ndarray:
     """
     Load a video by saving each frame within a numpy array.
 
     Parameters
     ----------
-    path : str
+    path : Path | Path
         Path to the video
     image_size : tuple
         The single frames can be downsized. This is necessary for large datasets.
@@ -99,7 +100,7 @@ Actual datasets
 
 def load_video_weizmann(use_actions : tuple = None, use_persons : tuple = None, 
                         image_size: tuple = None, frame_sampling_ratio: float = 1, return_X_y: bool = False,
-                        downloads_path: str = None) -> Bunch:
+                        downloads_path: str | Path = None) -> Bunch:
     """
     Load the Weizmann video data set.
     It consists of 93 videos showing 9 different persons performing 10 different activities.
@@ -123,7 +124,7 @@ def load_video_weizmann(use_actions : tuple = None, use_persons : tuple = None,
         Can take values within (0, 1] (default: 1)
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -139,7 +140,7 @@ def load_video_weizmann(use_actions : tuple = None, use_persons : tuple = None,
     -------
     https://www.wisdom.weizmann.ac.il/~vision/SpaceTimeActions.html
     """
-    directory = _get_download_dir(downloads_path) + "/Video_Weizmann/"
+    directory = _get_download_dir(downloads_path) / "Video_Weizmann"
     all_actions = ["walk", "run", "jump", "side", "bend", "wave1", "wave2", "pjump", "jack", "skip"]
     if use_actions is None:
         use_actions = all_actions.copy()
@@ -153,10 +154,9 @@ def load_video_weizmann(use_actions : tuple = None, use_persons : tuple = None,
     # Download data
     for action in use_actions:
         my_zip_file = action + ".zip"
-        filename = directory + my_zip_file
-        if not os.path.isfile(filename):
-            if not os.path.isdir(directory):
-                os.mkdir(directory)
+        filename = directory / my_zip_file
+        if not filename.is_file():
+            directory.mkdir(parents=False, exist_ok=True)
             _download_file(
                 "https://www.wisdom.weizmann.ac.il/~vision/VideoAnalysis/Demos/SpaceTimeActions/DB/" + my_zip_file,
                 filename)
@@ -164,11 +164,11 @@ def load_video_weizmann(use_actions : tuple = None, use_persons : tuple = None,
             with zipfile.ZipFile(filename, 'r') as zipf:
                 zipf.extractall(directory)
     # Load data, iterate over all video files
-    for v_file in os.listdir(directory):
+    for v_file in directory.iterdir():
         # Ignore zip files
-        if v_file.endswith(".avi"):
+        if v_file.suffix == ".avi":
             # Get name of person and type of activity
-            relevant_parts = v_file.split(".")[0]
+            relevant_parts = v_file.name.split(".")[0]
             person = relevant_parts.split("_")[0]
             action = relevant_parts.split("_")[1]
             # Sometimes a person performs an action twice. In that case a 1/2 is appended to the action
@@ -179,7 +179,7 @@ def load_video_weizmann(use_actions : tuple = None, use_persons : tuple = None,
             if person not in use_persons or action not in use_actions:
                 continue
             # Load video
-            data_local = _load_video(directory + "/" + v_file, image_size)
+            data_local = _load_video(directory / v_file, image_size)
             # Transform string to label
             label_person = use_persons.index(person)
             label_action = use_actions.index(action)
@@ -207,7 +207,7 @@ def load_video_weizmann(use_actions : tuple = None, use_persons : tuple = None,
 
 
 def load_video_keck_gesture(subset: str = "all", image_size: tuple = (200, 200), frame_sampling_ratio: float = 1,
-                            return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+                            return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the Keck Gesture video data set.
     It consists of 42 training and 56 testing videos showing 4 different persons performing 14 different gestures.
@@ -234,7 +234,7 @@ def load_video_keck_gesture(subset: str = "all", image_size: tuple = (200, 200),
         Can take values within (0, 1] (default: 1)
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -293,12 +293,11 @@ def load_video_keck_gesture(subset: str = "all", image_size: tuple = (200, 200),
     subset = subset.lower()
     assert subset in ["all", "train",
                       "test"], "subset must match 'all', 'train' or 'test'. Your input {0}".format(subset)
-    directory = _get_download_dir(downloads_path) + "/Video_Keck_Gesture/"
-    filename = directory + "Keck_Dataset.zip"
-    frames_file = directory + "sequences.txt"
-    if not os.path.isfile(filename):
-        if not os.path.isdir(directory):
-            os.mkdir(directory)
+    directory = _get_download_dir(downloads_path) / "Video_Keck_Gesture"
+    filename = directory / "Keck_Dataset.zip"
+    frames_file = directory / "sequences.txt"
+    if not filename.is_file():
+        directory.mkdir(parents=False, exist_ok=True)
         _download_file("http://www.zhuolin.umiacs.io/PrototypeTree/Keck_Dataset.zip", filename)
         # Unpack zipfile
         with zipfile.ZipFile(filename, 'r') as zipf:
@@ -318,13 +317,14 @@ def load_video_keck_gesture(subset: str = "all", image_size: tuple = (200, 200),
         file_directories.append((False, "testingfiles/"))
     # load videos
     for train_data, file_directory in file_directories:
-        directory_files = directory + "Keck Dataset/" + file_directory
+        directory_files = directory / "Keck Dataset" / file_directory
         # Iterate over all video files
-        for v_file in os.listdir(directory_files):
-            data_local = _load_video(directory_files + v_file, image_size)
+        for v_file in directory_files.iterdir():
+            v_file_str = v_file.name
+            data_local = _load_video(v_file, image_size)
             # Transform string to label
-            label_gesture = int(v_file.split("_")[1].replace("gesture", ""))
-            label_person = int(v_file.split("_")[0].replace("person", "")) - 1
+            label_gesture = int(v_file_str.split("_")[1].replace("gesture", ""))
+            label_person = int(v_file_str.split("_")[0].replace("person", "")) - 1
             labels_local = np.array([[0, label_person]] * data_local.shape[0], dtype="int32")
             # Use frames_dicts to set gestures correctly
             if train_data:

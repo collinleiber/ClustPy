@@ -1,6 +1,5 @@
 from clustpy.data._utils import _download_file, _get_download_dir, _download_file_from_google_drive, _load_image_data, \
     flatten_images, _transform_text_data
-import os
 import numpy as np
 import zipfile
 import tarfile
@@ -10,6 +9,8 @@ from sklearn.datasets import fetch_20newsgroups, fetch_rcv1, load_iris as sk_loa
 from scipy.io import loadmat
 import re
 from sklearn.datasets._base import Bunch
+from pathlib import Path
+
 
 # More datasets https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/multiclass.html#usps
 
@@ -189,12 +190,12 @@ def load_newsgroups(subset: str = "all", use_tfidf: bool = True, use_stemming: b
     data_raw = newsgroups.data
     # Get all data so that transformations can be applied to all possible subsets
     data_all = fetch_20newsgroups(subset="all", remove=('headers', 'footers', 'quotes')).data if subset != "all" else data_raw
-    data = _transform_text_data(data_raw, use_tfidf, use_stemming, use_stop_words, max_df, min_df, max_features, min_variance, 
+    data, vocabulary = _transform_text_data(data_raw, use_tfidf, use_stemming, use_stop_words, max_df, min_df, max_features, min_variance, 
                                 sublinear_tf, data_all)
     if return_X_y:
         return data, newsgroups.target
     else:
-        return Bunch(dataset_name="20Newsgroups", data=data, target=newsgroups.target)
+        return Bunch(dataset_name="20Newsgroups", data=data, target=newsgroups.target, columns=vocabulary)
 
 
 def load_rcv1(subset: str = "all", n_features: int = 2000, categories: tuple = ("CCAT", "GCAT", "MCAT", "ECAT"),
@@ -286,7 +287,7 @@ def load_imagenet_dog(subset: str = "all",
                                       "n02102177-Welsh_springer_spaniel", "n02105056-groenendael", "n02105412-kelpie",
                                       "n02105855-Shetland_sheepdog", "n02107142-Doberman", "n02110958-pug",
                                       "n02112137-chow"],
-                      return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+                      return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the ImageNet Dog data set. It consists of 20580 color images of different sizes showing 120 breeds of dogs.
     The data set is composed of 12000 training and 8580 test images.
@@ -308,7 +309,7 @@ def load_imagenet_dog(subset: str = "all",
         Usually, a subset consisting of 15 breeds is extracted (default: list with 15 dog breeds)
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : bool
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -333,19 +334,18 @@ def load_imagenet_dog(subset: str = "all",
     subset = subset.lower()
     assert subset in ["all", "train",
                       "test"], "subset must match 'all', 'train' or 'test'. Your input {0}".format(subset)
-    directory = _get_download_dir(downloads_path) + "/ImageNetDog/"
-    filename = directory + "images.tar"
-    if not os.path.isfile(filename):
-        if not os.path.isdir(directory):
-            os.mkdir(directory)
+    directory = _get_download_dir(downloads_path) / "ImageNetDog"
+    filename = directory / "images.tar"
+    if not filename.is_file():
+        directory.mkdir(parents=False, exist_ok=True)
         _download_file("http://vision.stanford.edu/aditya86/ImageNetDogs/images.tar",
                        filename)
         # Unpack zipfile
         with tarfile.open(filename, "r") as tar:
             tar.extractall(directory)
     # Get files for test/train split
-    train_test_filename = directory + "lists.tar"
-    if not os.path.isfile(train_test_filename):
+    train_test_filename = directory / "lists.tar"
+    if not train_test_filename.is_file():
         _download_file("http://vision.stanford.edu/aditya86/ImageNetDogs/lists.tar",
                        train_test_filename)
         # Unpack zipfile
@@ -353,15 +353,15 @@ def load_imagenet_dog(subset: str = "all",
             tar.extractall(directory)
     # Check breeds list
     if breeds is None:
-        breeds = os.listdir(directory + "/Images")
+        breeds = [br.name for br in (directory / "Images").iterdir()]
     # Load data lists
     data_list = []
     if subset == "train":
-        object_list = loadmat(directory + "/train_list.mat")
+        object_list = loadmat(directory / "train_list.mat")
     elif subset == "test":
-        object_list = loadmat(directory + "/test_list.mat")
+        object_list = loadmat(directory / "test_list.mat")
     else:
-        object_list = loadmat(directory + "/file_list.mat")
+        object_list = loadmat(directory / "file_list.mat")
     labels = object_list["labels"]
     file_list = object_list["file_list"]
     # get image data
@@ -369,7 +369,7 @@ def load_imagenet_dog(subset: str = "all",
     for i, file in enumerate(file_list):
         file = file[0][0]
         if file.split("/")[0] in breeds:
-            image_data = _load_image_data(directory + "/Images/" + file, image_size, True)
+            image_data = _load_image_data(directory / "Images" / file, image_size, True)
             data_list.append(image_data)
         else:
             use_image[i] = False
@@ -392,7 +392,7 @@ def load_imagenet_dog(subset: str = "all",
                      images=data_image, image_format=image_format, classes=breeds)
 
 
-def load_imagenet10(use_224_size: bool = True, return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_imagenet10(use_224_size: bool = True, return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the ImageNet-10 data set. This is a subset of the well-known ImageNet data set with only 10 classes.
     It consists of 13000 224x224 (or 96x96) color images showing different objects.
@@ -404,7 +404,7 @@ def load_imagenet10(use_224_size: bool = True, return_X_y: bool = False, downloa
         defines wheter the images should be loaded in the size (224 x 224) or (96 x 96) (default: True)
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -425,23 +425,22 @@ def load_imagenet10(use_224_size: bool = True, return_X_y: bool = False, downloa
     Russakovsky, Olga, et al. "Imagenet large scale visual recognition challenge."
     International journal of computer vision 115 (2015): 211-252.
     """
-    directory = _get_download_dir(downloads_path) + "/ImageNet10"
-    if not os.path.isdir(directory):
-        os.mkdir(directory)
+    directory = _get_download_dir(downloads_path) / "ImageNet10"
+    directory.mkdir(parents=False, exist_ok=True)
     # Source: https://drive.google.com/drive/folders/1XL0Nohi4vO2f1I4znf388n2pMP8PiKFd
     if use_224_size:
-        filename_data = directory + "/data_224.npy"
-        if not os.path.isfile(filename_data):
+        filename_data = directory / "data_224.npy"
+        if not filename_data.is_file():
             _download_file_from_google_drive("1sLfA0U9s9Q5Cf8o32GxYoyiyrzZN1K_6", filename_data)
-        filename_labels = directory + "/labels_224.npy"
-        if not os.path.isfile(filename_labels):
+        filename_labels = directory / "labels_224.npy"
+        if not filename_labels.is_file():
             _download_file_from_google_drive("1OjAQwaGnAfJBW66HFkR7yODLFxnTZWWI", filename_labels)
     else:
-        filename_data = directory + "/data_96.npy"
-        if not os.path.isfile(filename_data):
+        filename_data = directory / "data_96.npy"
+        if not filename_data.is_file():
             _download_file_from_google_drive("13VbP1qYz6bSeibnoR-w0J_jL9bQf6tGX", filename_data)
-        filename_labels = directory + "/labels_96.npy"
-        if not os.path.isfile(filename_labels):
+        filename_labels = directory / "labels_96.npy"
+        if not filename_labels.is_file():
             _download_file_from_google_drive("1uiuYUdjyCITLURc5eo8ByP9b51MK_Uk6", filename_labels)
     # Load data and labels
     data_image = np.load(filename_data)
@@ -460,7 +459,7 @@ def load_imagenet10(use_224_size: bool = True, return_X_y: bool = False, downloa
                      images=data_image, image_format=image_format)
 
 
-def load_coil20(return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_coil20(return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the COIL-20 data set.
     It consists of 1440 128x128 gray-scale images of 20 objects photographed from 72 different angles.
@@ -470,7 +469,7 @@ def load_coil20(return_X_y: bool = False, downloads_path: str = None) -> Bunch:
     ----------
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -485,11 +484,10 @@ def load_coil20(return_X_y: bool = False, downloads_path: str = None) -> Bunch:
     -------
     https://www.cs.columbia.edu/CAVE/software/softlib/coil-20.php
     """
-    directory = _get_download_dir(downloads_path) + "/COIL20/"
-    filename = directory + "coil-20-proc.zip"
-    if not os.path.isfile(filename):
-        if not os.path.isdir(directory):
-            os.mkdir(directory)
+    directory = _get_download_dir(downloads_path) / "COIL20"
+    filename = directory / "coil-20-proc.zip"
+    if not filename.is_file():
+        directory.mkdir(parents=False, exist_ok=True)
         _download_file("https://cave.cs.columbia.edu/old/databases/SLAM_coil-20_coil-100/coil-20/coil-20-proc.zip",
                        filename)
         # Unpack zipfile
@@ -500,7 +498,7 @@ def load_coil20(return_X_y: bool = False, downloads_path: str = None) -> Bunch:
     labels = np.zeros(1440, dtype=np.int32)
     for i in range(20):
         for j in range(72):
-            image_data = _load_image_data(directory + "coil-20-proc/obj{0}__{1}.png".format(i + 1, j), None, False)
+            image_data = _load_image_data(directory / "coil-20-proc" / "obj{0}__{1}.png".format(i + 1, j), None, False)
             assert image_data.shape == (
                 128, 128), "Shape of image obj{0}__{1}.png is not correct. Mest be (128, 128) but is {2}".format(i + 1,
                                                                                                                  j,
@@ -518,7 +516,7 @@ def load_coil20(return_X_y: bool = False, downloads_path: str = None) -> Bunch:
         return Bunch(dataset_name="COIL20", data=data_flatten, target=labels, images=data_image, image_format="HW")
 
 
-def load_coil100(return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_coil100(return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the COIL-100 data set.
     It consists of 7200 128x128 color images of 100 objects photographed from 72 different angles.
@@ -528,7 +526,7 @@ def load_coil100(return_X_y: bool = False, downloads_path: str = None) -> Bunch:
     ----------
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -544,11 +542,10 @@ def load_coil100(return_X_y: bool = False, downloads_path: str = None) -> Bunch:
     -------
     https://www.cs.columbia.edu/CAVE/software/softlib/coil-100.php
     """
-    directory = _get_download_dir(downloads_path) + "/COIL100/"
-    filename = directory + "coil-100.zip"
-    if not os.path.isfile(filename):
-        if not os.path.isdir(directory):
-            os.mkdir(directory)
+    directory = _get_download_dir(downloads_path) / "COIL100"
+    filename = directory / "coil-100.zip"
+    if not filename.is_file():
+        directory.mkdir(parents=False, exist_ok=True)
         _download_file("http://cave.cs.columbia.edu/old/databases/SLAM_coil-20_coil-100/coil-100/coil-100.zip",
                        filename)
         # Unpack zipfile
@@ -559,7 +556,7 @@ def load_coil100(return_X_y: bool = False, downloads_path: str = None) -> Bunch:
     labels = np.zeros(7200, dtype=np.int32)
     for i in range(100):
         for j in range(72):
-            image_data = _load_image_data(directory + "coil-100/obj{0}__{1}.png".format(i + 1, j * 5), None, True)
+            image_data = _load_image_data(directory / "coil-100" / "obj{0}__{1}.png".format(i + 1, j * 5), None, True)
             assert image_data.shape == (
                 128, 128, 3), "Shape of image obj{0}__{1}.png is not correct. Mest be (128, 128, 3) but is {2}".format(
                 i + 1, j, image_data.shape)
@@ -587,16 +584,16 @@ Load WebKB
 def load_webkb(use_universities: tuple = ("cornell", "texas", "washington", "wisconsin"),
                use_categories: tuple = ("course", "faculty", "project", "student"), use_tfidf: bool = True, 
                use_stemming: bool = True, use_stop_words: bool = True, max_df: float | int = 1., 
-               min_df: float | int = 0.01, max_features: int = None, min_variance : float = 0.25, 
+               min_df: float | int = 1, max_features: int = 2000, min_variance : float = 0., 
                sublinear_tf: bool = False, remove_headers: bool = True, return_X_y: bool = False, 
-               downloads_path: str = None) -> Bunch:
+               downloads_path: str | Path = None) -> Bunch:
     """
     Load the WebKB data set. It consists of 8282 Html documents from different universities ("wisconsin", "washington", "texas", "cornell", "misc").
     These web pages have a specified category ("student", "staff", "project", "faculty", "department", "course", "other").
     The first column of the labels contains the category information and the second the university information.
     For more information see the references website.
     The data is usually preprocessed by using stemming and removing stop words. Furthermore, words with a document frequency
-    smaller than min_df or with a variance smaller than min_variance are usually removed and tf-idf is applied.
+    smaller than min_df or with a variance smaller than min_variance are often removed and tf-idf is applied.
     N=1041, d=323, k=[4,4] using the default settings.
 
     Parameters
@@ -616,20 +613,20 @@ def load_webkb(use_universities: tuple = ("cornell", "texas", "washington", "wis
         If float, the parameter represents a proportion of documents, integer corresponds to absolute counts (see sklearn CountVectorizer) (default: 1.0)
     min_df : float | int
         Ignore words that have a document frequency strictly lower than min_df.
-        If float, the parameter represents a proportion of documents, integer corresponds to absolute counts (see sklearn CountVectorizer) (default: 0.01)
+        If float, the parameter represents a proportion of documents, integer corresponds to absolute counts (see sklearn CountVectorizer) (default: 1)
     max_features : int
         If not None, the resulting count matric will ony contain the top max_features ordered by term frequency across the corpus (see sklearn CountVectorizer).
-        Note that this value could be further reduced if min_variance is smaller than one (default: None)
+        Note that this value could be further reduced if min_variance is smaller than one (default: 2000)
     min_variance : float
         Features with a variance lower than min_variance will be removed (see sklearn VarianceThreshold). 
-        The default is to keep all features with non-zero variance, i.e. remove only the features that have the same value in all samples (default: 0.25)
+        The default is to keep all features with non-zero variance, i.e. remove only the features that have the same value in all samples (default: 0.)
     sublinear_tf : bool
         Apply sublinear term frequency scaling, i.e. replace tf with 1 + log(tf) (see sklearn TfidfTransformer) (default: False)
     remove_headers : bool
         Specifies if the headers of the Html files should be removed (default: True)
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -652,11 +649,10 @@ def load_webkb(use_universities: tuple = ("cornell", "texas", "washington", "wis
         use_categories = possible_categories.copy()
     assert all([cat in possible_categories for cat in use_categories])
     # Check if data is already downloaded
-    directory = _get_download_dir(downloads_path) + "/WebKB/"
-    filename = directory + "webkb-data.gtar.gz"
-    if not os.path.isfile(filename):
-        if not os.path.isdir(directory):
-            os.mkdir(directory)
+    directory = _get_download_dir(downloads_path) / "WebKB"
+    filename = directory / "webkb-data.gtar.gz"
+    if not filename.is_file():
+        directory.mkdir(parents=False, exist_ok=True)
         _download_file("http://www.cs.cmu.edu/afs/cs.cmu.edu/project/theo-20/www/data/webkb-data.gtar.gz",
                        filename)
         # Unpack zipfile
@@ -673,7 +669,7 @@ def load_webkb(use_universities: tuple = ("cornell", "texas", "washington", "wis
                     f = tar.extractfile(obj)
                     lines = f.readlines()
                     # Write file
-                    with open(directory + new_name, "wb") as output:
+                    with open(directory / new_name, "wb") as output:
                         for line in lines:
                             output.write(line)
     texts = []
@@ -684,10 +680,9 @@ def load_webkb(use_universities: tuple = ("cornell", "texas", "washington", "wis
     # Read files
     for i, category in enumerate(use_categories):
         for j, univerity in enumerate(use_universities):
-            inner_directory = "{0}webkb/{1}/{2}/".format(directory, category, univerity)
-            files = os.listdir(inner_directory)
-            for file in files:
-                with open(inner_directory + file, "r", encoding='latin-1') as f:
+            inner_directory = directory / "webkb" / category / univerity
+            for file in inner_directory.iterdir():
+                with open(file, "r", encoding='latin-1') as f:
                     lines = f.read()
                     if remove_headers:
                         # Remove header
@@ -698,10 +693,171 @@ def load_webkb(use_universities: tuple = ("cornell", "texas", "washington", "wis
                     texts.append(lines)
                     labels = np.r_[labels, [[i, j]]]
     # Transform raw data
-    data = _transform_text_data(texts, use_tfidf, use_stemming, use_stop_words, max_df, min_df, max_features, min_variance, 
+    data, vocabulary = _transform_text_data(texts, use_tfidf, use_stemming, use_stop_words, max_df, min_df, max_features, min_variance, 
                                 sublinear_tf)
     # Return values
     if return_X_y:
         return data, labels
     else:
-        return Bunch(dataset_name="WebKB", data=data, target=labels, classes=(use_categories, use_universities))
+        return Bunch(dataset_name="WebKB", data=data, target=labels, classes=(use_categories, use_universities), columns=vocabulary)
+
+
+"""
+BBC Data
+"""
+
+
+def load_bbcsport(use_tfidf: bool = True, use_stemming: bool = True, use_stop_words: bool = True, max_df: float | int = 1., 
+               min_df: float | int = 1, max_features: int = 2000, min_variance : float = 0., sublinear_tf: bool = False, 
+               return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+    """
+    Load the BBC Sport data set. It consists of a collection of 18846 BBC sport documents, partitioned
+    into the topics "athletics", "cricket", "football", "rugby", and "tennis". 
+    The documents are usually converted into feature vectors using tf-idf.
+    N=737, d=2000, k=5 using the default settings.
+
+    Parameters
+    ----------
+    use_tfidf : bool
+        If true, tf-idf will be applied as the last step of the pipeline (default: True)
+    use_stemming : bool
+        If true, the SnowballStemmer from nltk will be used when creating the count matrix (default: True)
+    use_stop_words : bool
+        If true, the list of English stopwords from sklearn CountVectorizer will be used (default: True)
+    max_df : float | int
+        Ignore words that have a document frequency strictly higher than max_df.
+        If float, the parameter represents a proportion of documents, integer corresponds to absolute counts (see sklearn CountVectorizer) (default: 1.0)
+    min_df : float | int
+        Ignore words that have a document frequency strictly lower than min_df.
+        If float, the parameter represents a proportion of documents, integer corresponds to absolute counts (see sklearn CountVectorizer) (default: 1)
+    max_features : int
+        If not None, the resulting count matric will ony contain the top max_features ordered by term frequency across the corpus (see sklearn CountVectorizer).
+        Note that this value could be further reduced if min_variance is smaller than one (default: 2000)
+    min_variance : float
+        Features with a variance lower than min_variance will be removed (see sklearn VarianceThreshold).
+        The default is to keep all features with non-zero variance, i.e. remove only the features that have the same value in all samples (default: 0.)
+    sublinear_tf : bool
+        Apply sublinear term frequency scaling, i.e. replace tf with 1 + log(tf) (see sklearn TfidfTransformer) (default: False)
+    return_X_y : bool
+        If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
+    downloads_path : str | Path
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
+
+    Returns
+    -------
+    bunch : Bunch
+        A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
+        Alternatively, if return_X_y is True two arrays will be returned:
+        the data numpy array (737 x 2000 - using the default settings), the labels numpy array (737)
+
+    References
+    -------
+    http://mlg.ucd.ie/datasets/bbc.html
+    """
+    # Check if data is already downloaded
+    directory = _get_download_dir(downloads_path) / "bbcsport"
+    filename = directory / "bbcsport-fulltext.zip"
+    if not filename.is_file():
+        directory.mkdir(parents=False, exist_ok=True)
+        _download_file("http://mlg.ucd.ie/files/datasets/bbcsport-fulltext.zip", filename)
+        # Unpack zipfile
+        with zipfile.ZipFile(filename, 'r') as zipf:
+            zipf.extractall(directory)
+    directory = directory / "bbcsport"
+    labels = []
+    texts = []
+    topics = ["athletics", "cricket", "football", "rugby", "tennis"]
+    for i, topic in enumerate(topics):
+        inner_directory = directory / topic
+        for file in inner_directory.iterdir():
+            with open(file, "r") as f:
+                lines = f.read()
+                texts.append(lines)
+                labels.append(i)
+    # Transform raw data
+    data, vocabulary = _transform_text_data(texts, use_tfidf, use_stemming, use_stop_words, max_df, min_df, max_features, min_variance, 
+                                sublinear_tf)
+    labels = np.array(labels)
+    # Return values
+    if return_X_y:
+        return data, labels
+    else:
+        return Bunch(dataset_name="BBCSport", data=data, target=labels, classes=topics, columns=vocabulary)
+    
+
+def load_bbcnews(use_tfidf: bool = True, use_stemming: bool = True, use_stop_words: bool = True, max_df: float | int = 1., 
+               min_df: float | int = 1, max_features: int = 2000, min_variance : float = 0., sublinear_tf: bool = False, 
+               return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+    """
+    Load the BBC News data set. It consists of a collection of 2225 BBC news documents, partitioned
+    into the topics "business", "entertainment", "politics", "sport", and "tech". 
+    The documents are usually converted into feature vectors using tf-idf.
+    N=2225, d=2000, k=5 using the default settings.
+
+    Parameters
+    ----------
+    use_tfidf : bool
+        If true, tf-idf will be applied as the last step of the pipeline (default: True)
+    use_stemming : bool
+        If true, the SnowballStemmer from nltk will be used when creating the count matrix (default: True)
+    use_stop_words : bool
+        If true, the list of English stopwords from sklearn CountVectorizer will be used (default: True)
+    max_df : float | int
+        Ignore words that have a document frequency strictly higher than max_df.
+        If float, the parameter represents a proportion of documents, integer corresponds to absolute counts (see sklearn CountVectorizer) (default: 1.0)
+    min_df : float | int
+        Ignore words that have a document frequency strictly lower than min_df.
+        If float, the parameter represents a proportion of documents, integer corresponds to absolute counts (see sklearn CountVectorizer) (default: 1)
+    max_features : int
+        If not None, the resulting count matric will ony contain the top max_features ordered by term frequency across the corpus (see sklearn CountVectorizer).
+        Note that this value could be further reduced if min_variance is smaller than one (default: 2000)
+    min_variance : float
+        Features with a variance lower than min_variance will be removed (see sklearn VarianceThreshold).
+        The default is to keep all features with non-zero variance, i.e. remove only the features that have the same value in all samples (default: 0.)
+    sublinear_tf : bool
+        Apply sublinear term frequency scaling, i.e. replace tf with 1 + log(tf) (see sklearn TfidfTransformer) (default: False)
+    return_X_y : bool
+        If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
+    downloads_path : str | Path
+        path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
+
+    Returns
+    -------
+    bunch : Bunch
+        A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
+        Alternatively, if return_X_y is True two arrays will be returned:
+        the data numpy array (2225 x 2000 - using the default settings), the labels numpy array (2225)
+
+    References
+    -------
+    http://mlg.ucd.ie/datasets/bbc.html
+    """
+    # Check if data is already downloaded
+    directory = _get_download_dir(downloads_path) / "bbcnews"
+    filename = directory / "bbc-fulltext.zip"
+    if not filename.is_file():
+        directory.mkdir(parents=False, exist_ok=True)
+        _download_file("http://mlg.ucd.ie/files/datasets/bbc-fulltext.zip", filename)
+        # Unpack zipfile
+        with zipfile.ZipFile(filename, 'r') as zipf:
+            zipf.extractall(directory)
+    directory = directory / "bbc"
+    labels = []
+    texts = []
+    topics = ["business", "entertainment", "politics", "sport", "tech"]
+    for i, topic in enumerate(topics):
+        inner_directory = directory / topic
+        for file in inner_directory.iterdir():
+            with open(file, "r") as f:
+                lines = f.read()
+                texts.append(lines)
+                labels.append(i)
+    # Transform raw data
+    data, vocabulary = _transform_text_data(texts, use_tfidf, use_stemming, use_stop_words, max_df, min_df, max_features, min_variance, 
+                                sublinear_tf)
+    labels = np.array(labels)
+    # Return values
+    if return_X_y:
+        return data, labels
+    else:
+        return Bunch(dataset_name="BBCNews", data=data, target=labels, classes=topics, columns=vocabulary)

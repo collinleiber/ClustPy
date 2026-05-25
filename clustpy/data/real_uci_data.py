@@ -1,14 +1,14 @@
 from clustpy.data._utils import _download_file, _get_download_dir, _decompress_z_file, _load_data_file, flatten_images, _transform_text_data, _load_image_data
-import os
 import numpy as np
 import zipfile
 import tarfile
 from sklearn.preprocessing import LabelEncoder
 import pandas as pd
 from sklearn.datasets._base import Bunch
+from pathlib import Path
 
 
-def load_banknotes(return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_banknotes(return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the banknote authentication data set. It consists of 1372 genuine and forged banknote samples.
     N=1372, d=4, k=2.
@@ -17,7 +17,7 @@ def load_banknotes(return_X_y: bool = False, downloads_path: str = None) -> Bunc
     ----------
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -31,7 +31,7 @@ def load_banknotes(return_X_y: bool = False, downloads_path: str = None) -> Bunc
     -------
     https://archive.ics.uci.edu/ml/datasets/banknote+authentication
     """
-    filename = _get_download_dir(downloads_path) + "/data_banknote_authentication.txt"
+    filename = _get_download_dir(downloads_path) / "data_banknote_authentication.txt"
     data, labels = _load_data_file(filename,
                                    "https://archive.ics.uci.edu/ml/machine-learning-databases/00267/data_banknote_authentication.txt")
     # Return values
@@ -41,7 +41,7 @@ def load_banknotes(return_X_y: bool = False, downloads_path: str = None) -> Bunc
         return Bunch(dataset_name="Banknotes", data=data, target=labels)
 
 
-def load_spambase(return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_spambase(return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the spambase data set. It consists of 4601 spam and non-spam mails.
     N=4601, d=57, k=2.
@@ -50,7 +50,7 @@ def load_spambase(return_X_y: bool = False, downloads_path: str = None) -> Bunch
     ----------
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -64,7 +64,7 @@ def load_spambase(return_X_y: bool = False, downloads_path: str = None) -> Bunch
     -------
     https://archive.ics.uci.edu/ml/datasets/spambase
     """
-    filename = _get_download_dir(downloads_path) + "/spambase.data"
+    filename = _get_download_dir(downloads_path) / "spambase.data"
     data, labels = _load_data_file(filename,
                                    "https://archive.ics.uci.edu/ml/machine-learning-databases/spambase/spambase.data")
     # Return values
@@ -74,7 +74,7 @@ def load_spambase(return_X_y: bool = False, downloads_path: str = None) -> Bunch
         return Bunch(dataset_name="Spambase", data=data, target=labels)
 
 
-def load_seeds(return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_seeds(return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the seeds data set. It consists of 210 samples belonging to one of three varieties of wheat.
     N=210, d=7, k=3.
@@ -83,7 +83,7 @@ def load_seeds(return_X_y: bool = False, downloads_path: str = None) -> Bunch:
     ----------
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -97,7 +97,7 @@ def load_seeds(return_X_y: bool = False, downloads_path: str = None) -> Bunch:
     -------
     https://archive.ics.uci.edu/ml/datasets/seeds
     """
-    filename = _get_download_dir(downloads_path) + "/seeds_dataset.txt"
+    filename = _get_download_dir(downloads_path) / "seeds_dataset.txt"
     data, labels = _load_data_file(filename,
                                    "https://archive.ics.uci.edu/ml/machine-learning-databases/00236/seeds_dataset.txt",
                                    delimiter=None)
@@ -110,7 +110,7 @@ def load_seeds(return_X_y: bool = False, downloads_path: str = None) -> Bunch:
         return Bunch(dataset_name="Seeds", data=data, target=labels)
 
 
-def load_skin(return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_skin(return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the Skin Segmentation data set. It consists of 245057 skin- and non-skin samples with their B, G, R color
     information.
@@ -120,7 +120,7 @@ def load_skin(return_X_y: bool = False, downloads_path: str = None) -> Bunch:
     ----------
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -134,7 +134,7 @@ def load_skin(return_X_y: bool = False, downloads_path: str = None) -> Bunch:
     -------
     https://archive.ics.uci.edu/ml/datasets/skin+segmentation
     """
-    filename = _get_download_dir(downloads_path) + "/Skin_NonSkin.txt"
+    filename = _get_download_dir(downloads_path) / "Skin_NonSkin.txt"
     data, labels = _load_data_file(filename,
                                    "https://archive.ics.uci.edu/ml/machine-learning-databases/00229/Skin_NonSkin.txt",
                                    delimiter=None)
@@ -147,7 +147,7 @@ def load_skin(return_X_y: bool = False, downloads_path: str = None) -> Bunch:
         return Bunch(dataset_name="SkinSegmentation", data=data, target=labels)
 
 
-def load_soybean_small(return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_soybean_small(return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the small version of the soybean data set. It is a small subset of the original soybean data set.
     It consists of 47 samples belonging to one of 4 classes.
@@ -157,7 +157,7 @@ def load_soybean_small(return_X_y: bool = False, downloads_path: str = None) -> 
     ----------
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -171,8 +171,8 @@ def load_soybean_small(return_X_y: bool = False, downloads_path: str = None) -> 
     -------
     https://archive.ics.uci.edu/ml/datasets/soybean+(small)
     """
-    filename = _get_download_dir(downloads_path) + "/soybean-small.data"
-    if not os.path.isfile(filename):
+    filename = _get_download_dir(downloads_path) / "soybean-small.data"
+    if not filename.is_file():
         _download_file(
             "https://archive.ics.uci.edu/ml/machine-learning-databases/soybean/soybean-small.data",
             filename)
@@ -189,7 +189,7 @@ def load_soybean_small(return_X_y: bool = False, downloads_path: str = None) -> 
         return Bunch(dataset_name="SoybeanSmall", data=data, target=labels)
 
 
-def load_soybean_large(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_soybean_large(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the large version of the soybean data set. It consists of 562 samples belonging to one of 15 classes.
     Originally, the data set would have samples and 19 classes but some samples have attributes showing '?' values. Those
@@ -203,7 +203,7 @@ def load_soybean_large(subset: str = "all", return_X_y: bool = False, downloads_
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -221,8 +221,8 @@ def load_soybean_large(subset: str = "all", return_X_y: bool = False, downloads_
     assert subset in ["all", "train",
                       "test"], "subset must match 'all', 'train' or 'test'. Your input {0}".format(subset)
     if subset == "all" or subset == "train":
-        filename = _get_download_dir(downloads_path) + "/soybean-large.data"
-        if not os.path.isfile(filename):
+        filename = _get_download_dir(downloads_path) / "soybean-large.data"
+        if not filename.is_file():
             _download_file(
                 "https://archive.ics.uci.edu/ml/machine-learning-databases/soybean/soybean-large.data",
                 filename)
@@ -232,8 +232,8 @@ def load_soybean_large(subset: str = "all", return_X_y: bool = False, downloads_
         labels_raw = df_train.pop(0)
         data = df_train.values
     if subset == "all" or subset == "test":
-        filename = _get_download_dir(downloads_path) + "/soybean-large.test"
-        if not os.path.isfile(filename):
+        filename = _get_download_dir(downloads_path) / "soybean-large.test"
+        if not filename.is_file():
             _download_file(
                 "https://archive.ics.uci.edu/ml/machine-learning-databases/soybean/soybean-large.test",
                 filename)
@@ -257,7 +257,7 @@ def load_soybean_large(subset: str = "all", return_X_y: bool = False, downloads_
         return Bunch(dataset_name="SoybeanLarge", data=data, target=labels)
 
 
-def load_pendigits(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_pendigits(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the pendigits data set. It consists of 10992 vectors of length 16, representing 8 coordinates. The coordinates
     were taken from the task of writing digits (0 to 9) on a tablet.
@@ -270,7 +270,7 @@ def load_pendigits(subset: str = "all", return_X_y: bool = False, downloads_path
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -288,11 +288,11 @@ def load_pendigits(subset: str = "all", return_X_y: bool = False, downloads_path
     assert subset in ["all", "train",
                       "test"], "subset must match 'all', 'train' or 'test'. Your input {0}".format(subset)
     if subset == "all" or subset == "train":
-        filename = _get_download_dir(downloads_path) + "/pendigits.tra"
+        filename = _get_download_dir(downloads_path) / "pendigits.tra"
         data, labels = _load_data_file(filename,
                                        "https://archive.ics.uci.edu/ml/machine-learning-databases/pendigits/pendigits.tra")
     if subset == "all" or subset == "test":
-        filename = _get_download_dir(downloads_path) + "/pendigits.tes"
+        filename = _get_download_dir(downloads_path) / "pendigits.tes"
         test_data, test_labels = _load_data_file(filename,
                                                  "https://archive.ics.uci.edu/ml/machine-learning-databases/pendigits/pendigits.tes")
         if subset == "all":
@@ -308,7 +308,7 @@ def load_pendigits(subset: str = "all", return_X_y: bool = False, downloads_path
         return Bunch(dataset_name="Pendigits", data=data, target=labels)
 
 
-def load_ecoli(ignore_small_clusters: bool = False, return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_ecoli(ignore_small_clusters: bool = False, return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the ecoli data set. It consists of 336 samples belonging to one of 8 classes.
     N=336, d=7, k=8.
@@ -319,7 +319,7 @@ def load_ecoli(ignore_small_clusters: bool = False, return_X_y: bool = False, do
         specify if the three small clusters with size 2, 2 and 5 should be ignored (default: False)
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -333,8 +333,8 @@ def load_ecoli(ignore_small_clusters: bool = False, return_X_y: bool = False, do
     -------
     https://archive.ics.uci.edu/ml/datasets/ecoli
     """
-    filename = _get_download_dir(downloads_path) + "/ecoli.data"
-    if not os.path.isfile(filename):
+    filename = _get_download_dir(downloads_path) / "ecoli.data"
+    if not filename.is_file():
         _download_file(
             "https://archive.ics.uci.edu/ml/machine-learning-databases/ecoli/ecoli.data",
             filename)
@@ -361,7 +361,7 @@ def load_ecoli(ignore_small_clusters: bool = False, return_X_y: bool = False, do
         return Bunch(dataset_name="Ecoli", data=data, target=labels)
 
 
-def load_htru2(return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_htru2(return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the HTRU2 data set. It consists of 17898 samples belonging to the pulsar or non-pulsar class.
     A special property is that more than 90% of the data belongs to class 0.
@@ -371,7 +371,7 @@ def load_htru2(return_X_y: bool = False, downloads_path: str = None) -> Bunch:
     ----------
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -385,18 +385,17 @@ def load_htru2(return_X_y: bool = False, downloads_path: str = None) -> Bunch:
     -------
     https://archive.ics.uci.edu/ml/datasets/HTRU2
     """
-    directory = _get_download_dir(downloads_path) + "/htru2/"
-    filename = directory + "HTRU2.zip"
-    if not os.path.isfile(filename):
-        if not os.path.isdir(directory):
-            os.mkdir(directory)
+    directory = _get_download_dir(downloads_path) / "htru2"
+    filename = directory / "HTRU2.zip"
+    if not filename.is_file():
+        directory.mkdir(parents=False, exist_ok=True)
         _download_file("https://archive.ics.uci.edu/ml/machine-learning-databases/00372/HTRU2.zip",
                        filename)
         # Unpack zipfile
         with zipfile.ZipFile(filename, 'r') as zipf:
             zipf.extractall(directory)
     # Load data and labels
-    dataset = np.genfromtxt(directory + "HTRU_2.csv", delimiter=",")
+    dataset = np.genfromtxt(directory / "HTRU_2.csv", delimiter=",")
     data = dataset[:, :-1]
     labels = dataset[:, -1]
     # Convert labels to int32 format
@@ -408,7 +407,7 @@ def load_htru2(return_X_y: bool = False, downloads_path: str = None) -> Bunch:
         return Bunch(dataset_name="HTRU2", data=data, target=labels)
 
 
-def load_letterrecognition(return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_letterrecognition(return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the Letter Recognition data set. It consists of 20000 samples where each sample represents one of the 26 capital
     letters in the English alphabet. All samples are composed of 16 numerical stimuli describing the respective letter.
@@ -418,7 +417,7 @@ def load_letterrecognition(return_X_y: bool = False, downloads_path: str = None)
     ----------
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -432,8 +431,8 @@ def load_letterrecognition(return_X_y: bool = False, downloads_path: str = None)
     -------
     https://archive.ics.uci.edu/ml/datasets/letter+recognition
     """
-    filename = _get_download_dir(downloads_path) + "/letter-recognition.data"
-    if not os.path.isfile(filename):
+    filename = _get_download_dir(downloads_path) / "letter-recognition.data"
+    if not filename.is_file():
         _download_file(
             "https://archive.ics.uci.edu/ml/machine-learning-databases/letter-recognition/letter-recognition.data",
             filename)
@@ -460,7 +459,7 @@ def load_letterrecognition(return_X_y: bool = False, downloads_path: str = None)
         return Bunch(dataset_name="Letterrecognition", data=data, target=labels)
 
 
-def load_har(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_har(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the Human Activity Recognition data set. It consists of 10299 samples each representing sensor data of a person
     performing an activity. The six activities are walking, walking_upstairs, walking_downstairs, sitting, standing and
@@ -474,7 +473,7 @@ def load_har(subset: str = "all", return_X_y: bool = False, downloads_path: str 
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -491,11 +490,10 @@ def load_har(subset: str = "all", return_X_y: bool = False, downloads_path: str 
     subset = subset.lower()
     assert subset in ["all", "train",
                       "test"], "subset must match 'all', 'train' or 'test'. Your input {0}".format(subset)
-    directory = _get_download_dir(downloads_path) + "/har/"
-    filename = directory + "UCI HAR Dataset.zip"
-    if not os.path.isfile(filename):
-        if not os.path.isdir(directory):
-            os.mkdir(directory)
+    directory = _get_download_dir(downloads_path) / "har"
+    filename = directory / "UCI HAR Dataset.zip"
+    if not filename.is_file():
+        directory.mkdir(parents=False, exist_ok=True)
         _download_file("https://archive.ics.uci.edu/ml/machine-learning-databases/00240/UCI%20HAR%20Dataset.zip",
                        filename)
         # Unpack zipfile
@@ -503,11 +501,11 @@ def load_har(subset: str = "all", return_X_y: bool = False, downloads_path: str 
             zipf.extractall(directory)
     # Load data and labels
     if subset == "all" or subset == "train":
-        data = np.genfromtxt(directory + "UCI HAR Dataset/train/X_train.txt")
-        labels = np.genfromtxt(directory + "UCI HAR Dataset/train/y_train.txt")
+        data = np.genfromtxt(directory / "UCI HAR Dataset/train/X_train.txt")
+        labels = np.genfromtxt(directory / "UCI HAR Dataset/train/y_train.txt")
     if subset == "all" or subset == "test":
-        test_data = np.genfromtxt(directory + "UCI HAR Dataset/test/X_test.txt")
-        test_labels = np.genfromtxt(directory + "UCI HAR Dataset/test/y_test.txt")
+        test_data = np.genfromtxt(directory / "UCI HAR Dataset/test/X_test.txt")
+        test_labels = np.genfromtxt(directory / "UCI HAR Dataset/test/y_test.txt")
         if subset == "all":
             data = np.r_[data, test_data]
             labels = np.r_[labels, test_labels]
@@ -525,7 +523,7 @@ def load_har(subset: str = "all", return_X_y: bool = False, downloads_path: str 
         return Bunch(dataset_name="HAR", data=data, target=labels)
 
 
-def load_statlog_shuttle(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_statlog_shuttle(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the statlog shuttle data set. It consists of 58000 samples belonging to one of 7 classes. A special property is
     that about 80% of the data belongs to class 0.
@@ -538,7 +536,7 @@ def load_statlog_shuttle(subset: str = "all", return_X_y: bool = False, download
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -555,30 +553,29 @@ def load_statlog_shuttle(subset: str = "all", return_X_y: bool = False, download
     subset = subset.lower()
     assert subset in ["all", "train",
                       "test"], "subset must match 'all', 'train' or 'test'. Your input {0}".format(subset)
-    directory = _get_download_dir(downloads_path) + "/shuttle/"
+    directory = _get_download_dir(downloads_path) / "shuttle"
     if subset == "all" or subset == "train":
-        filename = directory + "shuttle.trn.Z"
-        if not os.path.isfile(filename):
-            if not os.path.isdir(directory):
-                os.mkdir(directory)
+        filename = directory / "shuttle.trn.Z"
+        if not filename.is_file():
+            directory.mkdir(parents=False, exist_ok=True)
             _download_file("https://archive.ics.uci.edu/ml/machine-learning-databases/statlog/shuttle/shuttle.trn.Z",
                            filename)
             # Unpack z-file
             success = _decompress_z_file(filename, directory)
             if not success:
-                os.remove(filename)
+                filename.unlink()
                 return (None, None) if return_X_y else None
         # Load data and labels
-        dataset = np.genfromtxt(directory + "shuttle.trn")
+        dataset = np.genfromtxt(directory / "shuttle.trn")
         data = dataset[:, :-1]
         labels = dataset[:, -1]
     if subset == "all" or subset == "test":
-        filename = directory + "shuttle.tst"
-        if not os.path.isfile(filename):
+        filename = directory / "shuttle.tst"
+        if not filename.is_file():
             _download_file(
                 "https://archive.ics.uci.edu/ml/machine-learning-databases/statlog/shuttle/shuttle.tst",
                 filename)
-        test_dataset = np.genfromtxt(directory + "shuttle.tst")
+        test_dataset = np.genfromtxt(directory / "shuttle.tst")
         test_data = test_dataset[:, :-1]
         test_labels = test_dataset[:, -1]
         if subset == "all":
@@ -599,7 +596,7 @@ def load_statlog_shuttle(subset: str = "all", return_X_y: bool = False, download
 
 
 def load_mice_protein(return_additional_labels: bool = False, return_X_y: bool = False,
-                      downloads_path: str = None) -> Bunch:
+                      downloads_path: str | Path = None) -> Bunch:
     """
     Load the Mice Protein Expression data set. It consists of 1077 samples belonging to one of 8 classes.
     Each feature represents the expression level of one of 77 proteins.
@@ -615,7 +612,7 @@ def load_mice_protein(return_additional_labels: bool = False, return_X_y: bool =
         return additional labels (default: False)
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -629,8 +626,8 @@ def load_mice_protein(return_additional_labels: bool = False, return_X_y: bool =
     -------
     https://archive.ics.uci.edu/ml/datasets/Mice+Protein+Expression
     """
-    filename = _get_download_dir(downloads_path) + "/Data_Cortex_Nuclear.xls"
-    if not os.path.isfile(filename):
+    filename = _get_download_dir(downloads_path) / "Data_Cortex_Nuclear.xls"
+    if not filename.is_file():
         _download_file("https://archive.ics.uci.edu/ml/machine-learning-databases/00342/Data_Cortex_Nuclear.xls",
                        filename)
     xls = pd.ExcelFile(filename)
@@ -674,7 +671,7 @@ def load_mice_protein(return_additional_labels: bool = False, return_X_y: bool =
         return Bunch(dataset_name="MiceProtein", data=data, target=labels)
 
 
-def load_user_knowledge(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_user_knowledge(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the user knowledge data set. It consists of 403 samples belonging to one of 4 classes.
     The 4 classes are the knowledge levels 'very low', 'low', 'middle' and 'high'.
@@ -687,7 +684,7 @@ def load_user_knowledge(subset: str = "all", return_X_y: bool = False, downloads
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -704,8 +701,8 @@ def load_user_knowledge(subset: str = "all", return_X_y: bool = False, downloads
     subset = subset.lower()
     assert subset in ["all", "train",
                       "test"], "subset must match 'all', 'train' or 'test'. Your input {0}".format(subset)
-    filename = _get_download_dir(downloads_path) + "/Data_User_Modeling_Dataset_Hamdi Tolga KAHRAMAN.xls"
-    if not os.path.isfile(filename):
+    filename = _get_download_dir(downloads_path) / "Data_User_Modeling_Dataset_Hamdi Tolga KAHRAMAN.xls"
+    if not filename.is_file():
         _download_file(
             "https://archive.ics.uci.edu/ml/machine-learning-databases/00257/Data_User_Modeling_Dataset_Hamdi%20Tolga%20KAHRAMAN.xls",
             filename)
@@ -743,7 +740,7 @@ def load_user_knowledge(subset: str = "all", return_X_y: bool = False, downloads
         return Bunch(dataset_name="UserKnowledge", data=data, target=labels)
 
 
-def load_breast_tissue(return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_breast_tissue(return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the breast tissue data set. It consists of 106 samples belonging to one of 6 classes.
     N=106, d=9, k=6.
@@ -752,7 +749,7 @@ def load_breast_tissue(return_X_y: bool = False, downloads_path: str = None) -> 
     ----------
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -766,8 +763,8 @@ def load_breast_tissue(return_X_y: bool = False, downloads_path: str = None) -> 
     -------
     http://archive.ics.uci.edu/ml/datasets/breast+tissue
     """
-    filename = _get_download_dir(downloads_path) + "/BreastTissue.xls"
-    if not os.path.isfile(filename):
+    filename = _get_download_dir(downloads_path) / "BreastTissue.xls"
+    if not filename.is_file():
         _download_file("http://archive.ics.uci.edu/ml/machine-learning-databases/00192/BreastTissue.xls",
                        filename)
     xls = pd.ExcelFile(filename)
@@ -786,7 +783,7 @@ def load_breast_tissue(return_X_y: bool = False, downloads_path: str = None) -> 
         return Bunch(dataset_name="BreastTissue", data=data, target=labels)
 
 
-def load_forest_types(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_forest_types(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the forest type mapping data set. It consists of 523 samples belonging to one of 4 classes.
     The data set is composed of 198 training and 325 test samples.
@@ -798,7 +795,7 @@ def load_forest_types(subset: str = "all", return_X_y: bool = False, downloads_p
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -815,11 +812,10 @@ def load_forest_types(subset: str = "all", return_X_y: bool = False, downloads_p
     subset = subset.lower()
     assert subset in ["all", "train",
                       "test"], "subset must match 'all', 'train' or 'test'. Your input {0}".format(subset)
-    directory = _get_download_dir(downloads_path) + "/ForestTypes/"
-    filename = directory + "ForestTypes.zip"
-    if not os.path.isfile(filename):
-        if not os.path.isdir(directory):
-            os.mkdir(directory)
+    directory = _get_download_dir(downloads_path) / "ForestTypes"
+    filename = directory / "ForestTypes.zip"
+    if not filename.is_file():
+        directory.mkdir(parents=False, exist_ok=True)
         _download_file("https://archive.ics.uci.edu/ml/machine-learning-databases/00333/ForestTypes.zip",
                        filename)
         # Unpack zipfile
@@ -827,11 +823,11 @@ def load_forest_types(subset: str = "all", return_X_y: bool = False, downloads_p
             zipf.extractall(directory)
     # Load data and labels
     if subset == "all" or subset == "train":
-        df_train = pd.read_csv(directory + "/training.csv", delimiter=",")
+        df_train = pd.read_csv(directory / "training.csv", delimiter=",")
         labels_raw = df_train.pop("class")
         data = df_train.values
     if subset == "all" or subset == "test":
-        df_test = pd.read_csv(directory + "/testing.csv", delimiter=",")
+        df_test = pd.read_csv(directory / "testing.csv", delimiter=",")
         labels_test = df_test.pop("class")
         if subset == "all":
             data = np.r_[data, df_test.values]
@@ -849,7 +845,7 @@ def load_forest_types(subset: str = "all", return_X_y: bool = False, downloads_p
         return Bunch(dataset_name="ForestTypes", data=data, target=labels)
 
 
-def load_dermatology(return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_dermatology(return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the dermatology data set. It consists of 366 samples belonging to one of 6 classes.
     8 samples contain '?' values and are therefore removed.
@@ -859,7 +855,7 @@ def load_dermatology(return_X_y: bool = False, downloads_path: str = None) -> Bu
     ----------
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -873,7 +869,7 @@ def load_dermatology(return_X_y: bool = False, downloads_path: str = None) -> Bu
     -------
     https://archive.ics.uci.edu/ml/datasets/dermatology
     """
-    filename = _get_download_dir(downloads_path) + "/dermatology.data"
+    filename = _get_download_dir(downloads_path) / "dermatology.data"
     data, labels = _load_data_file(filename,
                                    "https://archive.ics.uci.edu/ml/machine-learning-databases/dermatology/dermatology.data",
                                    delimiter=",")
@@ -890,7 +886,7 @@ def load_dermatology(return_X_y: bool = False, downloads_path: str = None) -> Bu
         return Bunch(dataset_name="Dermatology", data=data, target=labels)
 
 
-def load_multiple_features(return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_multiple_features(return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the multiple features data set. It consists of 2000 samples belonging to one of 10 classes.
     Each class corresponds to handwritten numerals (0-9) extracted from a collection of Dutch utility maps.
@@ -900,7 +896,7 @@ def load_multiple_features(return_X_y: bool = False, downloads_path: str = None)
     ----------
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -914,14 +910,13 @@ def load_multiple_features(return_X_y: bool = False, downloads_path: str = None)
     -------
     https://archive.ics.uci.edu/ml/datasets/Multiple+Features
     """
-    directory = _get_download_dir(downloads_path) + "/MultipleFeatures/"
-    if not os.path.isdir(directory):
-        os.mkdir(directory)
+    directory = _get_download_dir(downloads_path) / "MultipleFeatures"
+    directory.mkdir(parents=False, exist_ok=True)
     data = np.zeros((2000, 0))
     # Dataset consists of multiple .xls files
     for file in ["mfeat-fac", "mfeat-fou", "mfeat-kar", "mfeat-mor", "mfeat-pix", "mfeat-zer"]:
-        filename = directory + file + ".xls"
-        if not os.path.isfile(filename):
+        filename = directory / (file + ".xls")
+        if not filename.is_file():
             _download_file("https://archive.ics.uci.edu/ml/machine-learning-databases/mfeat/" + file,
                            filename)
         data_tmp = np.genfromtxt(filename, delimiter=None)
@@ -935,7 +930,7 @@ def load_multiple_features(return_X_y: bool = False, downloads_path: str = None)
         return Bunch(dataset_name="MultipleFeatures", data=data, target=labels)
 
 
-def load_statlog_australian_credit_approval(return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_statlog_australian_credit_approval(return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the statlog Australian Credit Approval data set. It consists of 690 samples belonging to one of 2 classes.
     N=690, d=14, k=2.
@@ -944,7 +939,7 @@ def load_statlog_australian_credit_approval(return_X_y: bool = False, downloads_
     ----------
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -958,7 +953,7 @@ def load_statlog_australian_credit_approval(return_X_y: bool = False, downloads_
     -------
     https://archive.ics.uci.edu/ml/datasets/statlog+(australian+credit+approval)
     """
-    filename = _get_download_dir(downloads_path) + "/australian.dat"
+    filename = _get_download_dir(downloads_path) / "australian.dat"
     data, labels = _load_data_file(filename,
                                    "https://archive.ics.uci.edu/ml/machine-learning-databases/statlog/australian/australian.dat",
                                    delimiter=None)
@@ -969,7 +964,7 @@ def load_statlog_australian_credit_approval(return_X_y: bool = False, downloads_
         return Bunch(dataset_name="StatlogAustralianCreditApproval", data=data, target=labels)
 
 
-def load_breast_cancer_wisconsin_original(return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_breast_cancer_wisconsin_original(return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the original breast cancer Wisconsin data set. It consists of 699 samples belonging to one of 2 classes.
     16 samples contain '?' values and will be removed.
@@ -979,7 +974,7 @@ def load_breast_cancer_wisconsin_original(return_X_y: bool = False, downloads_pa
     ----------
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -993,7 +988,7 @@ def load_breast_cancer_wisconsin_original(return_X_y: bool = False, downloads_pa
     -------
     https://archive.ics.uci.edu/ml/datasets/breast+cancer+wisconsin+%28original%29
     """
-    filename = _get_download_dir(downloads_path) + "/breast-cancer-wisconsin.data"
+    filename = _get_download_dir(downloads_path) / "breast-cancer-wisconsin.data"
     data, labels = _load_data_file(filename,
                                    "https://archive.ics.uci.edu/ml/machine-learning-databases/breast-cancer-wisconsin/breast-cancer-wisconsin.data",
                                    delimiter=",")
@@ -1014,7 +1009,7 @@ def load_breast_cancer_wisconsin_original(return_X_y: bool = False, downloads_pa
         return Bunch(dataset_name="BreastCancerWisconsin", data=data, target=labels)
 
 
-def load_optdigits(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_optdigits(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the optdigits data set. It consists of 5620 8x8 grayscale images, each representing a digit (0 to 9).
     Each pixel depicts the number of marked pixel within a 4x4 block of the original 32x32 bitmaps.
@@ -1027,7 +1022,7 @@ def load_optdigits(subset: str = "all", return_X_y: bool = False, downloads_path
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -1046,11 +1041,11 @@ def load_optdigits(subset: str = "all", return_X_y: bool = False, downloads_path
     assert subset in ["all", "train",
                       "test"], "subset must match 'all', 'train' or 'test'. Your input {0}".format(subset)
     if subset == "all" or subset == "train":
-        filename = _get_download_dir(downloads_path) + "/optdigits.tra"
+        filename = _get_download_dir(downloads_path) / "optdigits.tra"
         data, labels = _load_data_file(filename,
                                        "https://archive.ics.uci.edu/ml/machine-learning-databases/optdigits/optdigits.tra")
     if subset == "all" or subset == "test":
-        filename = _get_download_dir(downloads_path) + "/optdigits.tes"
+        filename = _get_download_dir(downloads_path) / "optdigits.tes"
         test_data, test_labels = _load_data_file(filename,
                                                  "https://archive.ics.uci.edu/ml/machine-learning-databases/optdigits/optdigits.tes")
         if subset == "all":
@@ -1067,7 +1062,7 @@ def load_optdigits(subset: str = "all", return_X_y: bool = False, downloads_path
         return Bunch(dataset_name="Optdigits", data=data, target=labels, images=data_image, image_format="HW")
 
 
-def load_semeion(return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_semeion(return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the semeion data set. It consists of 1593 samples belonging to one of 10 classes.
     Each sample corresponds to a grayscale 16x16 scan of handwritten digits originating from about 80 different persons.
@@ -1078,7 +1073,7 @@ def load_semeion(return_X_y: bool = False, downloads_path: str = None) -> Bunch:
     ----------
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -1093,8 +1088,8 @@ def load_semeion(return_X_y: bool = False, downloads_path: str = None) -> Bunch:
     -------
     https://archive.ics.uci.edu/ml/datasets/semeion+handwritten+digit
     """
-    filename = _get_download_dir(downloads_path) + "/semeion.data"
-    if not os.path.isfile(filename):
+    filename = _get_download_dir(downloads_path) / "semeion.data"
+    if not filename.is_file():
         _download_file("https://archive.ics.uci.edu/ml/machine-learning-databases/semeion/semeion.data",
                        filename)
     datafile = np.genfromtxt(filename)
@@ -1111,19 +1106,19 @@ def load_semeion(return_X_y: bool = False, downloads_path: str = None) -> Bunch:
         return Bunch(dataset_name="Semeion", data=data, target=labels, images=data_image, image_format="HW")
 
 
-def load_cmu_faces(return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_cmu_faces(return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the CMU Face Images data set. It consists of 640 30x32 grayscale images showing 20 persons in different poses
     (up, straight, left, right) and with different expressions (neutral, happy, sad, angry). Additionally, the persons
     can wear sunglasses or not.
     16 images show glitches which is why the final data set only contains 624 images.
-    N=624, d=400, k=[20,4,4,2].
+    N=624, d=960, k=[20,4,4,2].
 
     Parameters
     -------
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -1132,17 +1127,16 @@ def load_cmu_faces(return_X_y: bool = False, downloads_path: str = None) -> Bunc
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Furthermore, the original images are contained in the 'images' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
-        the data numpy array (624 x 400), the labels numpy array (624 x 4)
+        the data numpy array (624 x 960), the labels numpy array (624 x 4)
 
     References
     -------
     http://archive.ics.uci.edu/ml/datasets/cmu+face+images
     """
-    directory = _get_download_dir(downloads_path) + "/cmufaces/"
-    filename = directory + "faces_4.tar.gz"
-    if not os.path.isfile(filename):
-        if not os.path.isdir(directory):
-            os.mkdir(directory)
+    directory = _get_download_dir(downloads_path) / "cmufaces"
+    filename = directory / "faces_4.tar.gz"
+    if not filename.is_file():
+        directory.mkdir(parents=False, exist_ok=True)
         _download_file("http://archive.ics.uci.edu/ml/machine-learning-databases/faces-mld/faces_4.tar.gz",
                        filename)
         # Unpack zipfile
@@ -1157,14 +1151,15 @@ def load_cmu_faces(return_X_y: bool = False, downloads_path: str = None) -> Bunc
     data_list = []
     label_list = []
     for name in names:
-        path_images = directory + "/faces_4/" + name
-        for image in os.listdir(path_images):
-            if not image.endswith("_4.pgm"):
+        path_images = directory / "faces_4" / name
+        for image in path_images.iterdir():
+            image_str = image.name
+            if not image_str.endswith("_4.pgm"):
                 continue
             # get image data
-            image_array = _load_image_data(path_images + "/" + image, None, False)
+            image_array = _load_image_data(image, None, False)
             # Get labels
-            name_parts = image.split("_")
+            name_parts = image_str.split("_")
             user_id = np.argwhere(names == name_parts[0])[0][0]
             position = np.argwhere(positions == name_parts[1])[0][0]
             expression = np.argwhere(expressions == name_parts[2])[0][0]
@@ -1185,7 +1180,7 @@ def load_cmu_faces(return_X_y: bool = False, downloads_path: str = None) -> Bunc
                      classes=(names, positions, expressions, eyes))
 
 
-def load_gene_expression_cancer_rna_seq(return_X_y: bool = False, downloads_path: str = None):
+def load_gene_expression_cancer_rna_seq(return_X_y: bool = False, downloads_path: str | Path = None):
     """
     Load the Gene Expression Cancer RNA-SEQ data set. It consists of 801 samples belonging to one of 5 classes.
     N=801, d=20531, k=5.
@@ -1194,7 +1189,7 @@ def load_gene_expression_cancer_rna_seq(return_X_y: bool = False, downloads_path
     ----------
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -1208,21 +1203,20 @@ def load_gene_expression_cancer_rna_seq(return_X_y: bool = False, downloads_path
     -------
     https://archive.ics.uci.edu/dataset/401/gene+expression+cancer+rna+seq
     """
-    directory = _get_download_dir(downloads_path) + "/GeneExpressionRNASEQ/"
-    filename = directory + "gene+expression+cancer+rna+seq.zip"
-    if not os.path.isfile(filename):
-        if not os.path.isdir(directory):
-            os.mkdir(directory)
+    directory = _get_download_dir(downloads_path) / "GeneExpressionRNASEQ"
+    filename = directory / "gene+expression+cancer+rna+seq.zip"
+    if not filename.is_file():
+        directory.mkdir(parents=False, exist_ok=True)
         _download_file("https://archive.ics.uci.edu/static/public/401/gene+expression+cancer+rna+seq.zip",
                        filename)
         # Unpack zipfile
         with zipfile.ZipFile(filename, 'r') as zipf:
             zipf.extractall(directory)
-        with tarfile.open(directory + "TCGA-PANCAN-HiSeq-801x20531.tar.gz", "r:gz") as tar:
+        with tarfile.open(directory / "TCGA-PANCAN-HiSeq-801x20531.tar.gz", "r:gz") as tar:
             tar.extractall(directory)
     # Load data and labels
-    data = np.genfromtxt(directory + "TCGA-PANCAN-HiSeq-801x20531/data.csv", delimiter=",")[1:,1:]
-    labels_raw = np.genfromtxt(directory + "TCGA-PANCAN-HiSeq-801x20531/labels.csv", delimiter=",", dtype=str)[1:,1]
+    data = np.genfromtxt(directory / "TCGA-PANCAN-HiSeq-801x20531" / "data.csv", delimiter=",")[1:,1:]
+    labels_raw = np.genfromtxt(directory / "TCGA-PANCAN-HiSeq-801x20531" / "labels.csv", delimiter=",", dtype=str)[1:,1]
     LE = LabelEncoder()
     labels = LE.fit_transform(labels_raw)
     # Return values
@@ -1232,7 +1226,7 @@ def load_gene_expression_cancer_rna_seq(return_X_y: bool = False, downloads_path
         return Bunch(dataset_name="GeneExpressionCancerRNA-SEQ", data=data, target=labels)
 
 
-def load_sport_articles(return_X_y: bool = False, downloads_path: str = None):
+def load_sport_articles(return_X_y: bool = False, downloads_path: str | Path = None):
     """
     Load the Sport Articles data set. It consists of 1000 samples belonging to one of 2 classes (objective or subjective).
     We only consider features that correspond to specific frequencies and, therefore, ignore the attributes 
@@ -1243,7 +1237,7 @@ def load_sport_articles(return_X_y: bool = False, downloads_path: str = None):
     ----------
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -1257,11 +1251,10 @@ def load_sport_articles(return_X_y: bool = False, downloads_path: str = None):
     -------
     https://archive.ics.uci.edu/dataset/450/sports+articles+for+objectivity+analysis
     """
-    directory = _get_download_dir(downloads_path) + "/SportArticles/"
-    filename = directory + "sports+articles+for+objectivity+analysis.zip"
-    if not os.path.isfile(filename):
-        if not os.path.isdir(directory):
-            os.mkdir(directory)
+    directory = _get_download_dir(downloads_path) / "SportArticles"
+    filename = directory / "sports+articles+for+objectivity+analysis.zip"
+    if not filename.is_file():
+        directory.mkdir(parents=False, exist_ok=True)
         _download_file("https://archive.ics.uci.edu/static/public/450/sports+articles+for+objectivity+analysis.zip",
                        filename)
         # Unpack zipfile
@@ -1272,7 +1265,7 @@ def load_sport_articles(return_X_y: bool = False, downloads_path: str = None):
     labels = np.zeros(1000, dtype=np.int32)
     row = -2 # first row is the header and should be skipped
     column = 0
-    with open(directory + "features.xls", "r") as f:
+    with open(directory / "features.xls", "r") as f:
         for _, line in enumerate(f.readlines()):
             if "</Table>" in line:
                 # Next table is not relevant for the data
@@ -1295,7 +1288,7 @@ def load_sport_articles(return_X_y: bool = False, downloads_path: str = None):
         return Bunch(dataset_name="SportArticles", data=data, target=labels)
 
 
-def load_wholesale_customers(return_X_y: bool = False, downloads_path: str = None):
+def load_wholesale_customers(return_X_y: bool = False, downloads_path: str | Path = None):
     """
     Load the Wholesale Customers data set. It consists of 440 samples and can be grouped in two different ways:
     Either two classes based on the channel (Horeca or Retail) or three classes based on the region (Lisbon, Oporto or Other region).
@@ -1305,7 +1298,7 @@ def load_wholesale_customers(return_X_y: bool = False, downloads_path: str = Non
     ----------
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -1319,17 +1312,16 @@ def load_wholesale_customers(return_X_y: bool = False, downloads_path: str = Non
     -------
     https://archive.ics.uci.edu/dataset/292/wholesale+customers
     """
-    directory = _get_download_dir(downloads_path) + "/WholeCustomers/"
-    filename = directory + "wholesale+customers.zip"
-    if not os.path.isfile(filename):
-        if not os.path.isdir(directory):
-            os.mkdir(directory)
+    directory = _get_download_dir(downloads_path) / "WholeCustomers"
+    filename = directory / "wholesale+customers.zip"
+    if not filename.is_file():
+        directory.mkdir(parents=False, exist_ok=True)
         _download_file("https://archive.ics.uci.edu/static/public/292/wholesale+customers.zip",
                        filename)
         # Unpack zipfile
         with zipfile.ZipFile(filename, 'r') as zipf:
             zipf.extractall(directory)
-    wholesale = np.genfromtxt(directory + "Wholesale customers data.csv", delimiter=",", skip_header=True)
+    wholesale = np.genfromtxt(directory / "Wholesale customers data.csv", delimiter=",", skip_header=True)
     labels = wholesale[:,:2] - 1
     data = wholesale[:,2:]
     # Convert labels to int32 format
@@ -1340,10 +1332,11 @@ def load_wholesale_customers(return_X_y: bool = False, downloads_path: str = Non
     else:
         return Bunch(dataset_name="WholesaleCustomers", data=data, target=labels)
 
+
 def load_reuters21578(subset: str = "all", categories: tuple = ("grain", "money-fx", "earn", "acq", "crude"),
                use_tfidf: bool = True, use_stemming: bool = True, use_stop_words: bool = True, max_df: float | int = 1., 
                min_df: float | int = 1, max_features: int = 2000, min_variance : float = 0., 
-               sublinear_tf: bool = False, return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+               sublinear_tf: bool = False, return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the Reuters21578 data set. It consists of 21578 Reuters newswire artices divided into different categories.
     When loading the artices, the title will be included in the text.
@@ -1382,7 +1375,7 @@ def load_reuters21578(subset: str = "all", categories: tuple = ("grain", "money-
         Apply sublinear term frequency scaling, i.e. replace tf with 1 + log(tf) (see sklearn TfidfTransformer) (default: False)
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -1400,27 +1393,26 @@ def load_reuters21578(subset: str = "all", categories: tuple = ("grain", "money-
     assert subset in ["all", "train",
                       "test", "test-cgi", "train-cgi"], "subset must match 'all', 'train', 'test', 'train-cgi' or 'test-cgi'. Your input {0}".format(subset)
     # Check if data is already downloaded
-    directory = _get_download_dir(downloads_path) + "/Reuters21578/"
-    filename = directory + "reuters+21578+text+categorization+collection.zip"
-    if not os.path.isfile(filename):
-        if not os.path.isdir(directory):
-            os.mkdir(directory)
+    directory = _get_download_dir(downloads_path) / "Reuters21578"
+    filename = directory / "reuters+21578+text+categorization+collection.zip"
+    if not filename.is_file():
+        directory.mkdir(parents=False, exist_ok=True)
         _download_file("https://archive.ics.uci.edu/static/public/137/reuters+21578+text+categorization+collection.zip",
                        filename)
         # Unpack zipfile
         with zipfile.ZipFile(filename, 'r') as zipf:
             zipf.extractall(directory)
-        with tarfile.open(directory + "reuters21578.tar.gz", "r:gz") as tar:
+        with tarfile.open(directory / "reuters21578.tar.gz", "r:gz") as tar:
             tar.extractall(directory)
     # Load actual articles into arrays
     all_topics = []
     all_bodies = []
     all_lewis_splits = []
     all_cgi_splits = []
-    for file in os.listdir(directory):
-        if file.endswith(".sgm"):
+    for file in directory.iterdir():
+        if file.suffix == ".sgm":
             in_body = False
-            with open(directory + file, "rb") as f:
+            with open(file, "rb") as f:
                 for line in f.readlines():
                     # Needed so that reut2-017.sgm is not crashing due to encoding
                     line = line.decode('utf-8','ignore')
@@ -1482,7 +1474,7 @@ def load_reuters21578(subset: str = "all", categories: tuple = ("grain", "money-
         else:
             all_topics[i] = new_topic
     # Transform raw data
-    data = _transform_text_data(all_bodies, use_tfidf, use_stemming, use_stop_words, max_df, min_df, max_features, min_variance, 
+    data, vocabulary = _transform_text_data(all_bodies, use_tfidf, use_stemming, use_stop_words, max_df, min_df, max_features, min_variance, 
                                 sublinear_tf)
     # Get labels
     LE = LabelEncoder()
@@ -1503,4 +1495,4 @@ def load_reuters21578(subset: str = "all", categories: tuple = ("grain", "money-
     if return_X_y:
         return data, labels
     else:
-        return Bunch(dataset_name="Reuters21578", data=data, target=labels, classes=categories)
+        return Bunch(dataset_name="Reuters21578", data=data, target=labels, classes=categories, columns=vocabulary)

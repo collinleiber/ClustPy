@@ -18,6 +18,7 @@ from clustpy.utils.plots import plot_scatter_matrix
 from clustpy.alternative.nrkmeans import _get_total_cost_function
 import tqdm
 from collections.abc import Callable
+from pathlib import Path
 
 
 class _ENRC_Module(torch.nn.Module):
@@ -1722,7 +1723,7 @@ def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers
           pretrain_optimizer_params: dict, clustering_optimizer_params: dict, pretrain_epochs: int,
           clustering_epochs: int, optimizer_class: torch.optim.Optimizer, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss,
           clustering_loss_weight: float, ssl_loss_weight: float, neural_network: torch.nn.Module | tuple,
-          neural_network_weights: str, embedding_size: int, init: str, random_state: np.random.RandomState,
+          neural_network_weights: str | Path, embedding_size: int, init: str, random_state: np.random.RandomState,
           device: torch.device, scheduler: torch.optim.lr_scheduler, scheduler_params: dict, tolerance_threshold: float,
           init_kwargs: dict, init_subsample_size: int, custom_dataloaders: tuple, augmentation_invariance: bool,
           final_reclustering: bool, debug: bool) -> (
@@ -1763,7 +1764,7 @@ def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers
     neural_network : torch.nn.Module | tuple
         the input neural network.
         Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict)
-    neural_network_weights : str
+    neural_network_weights : str | Path
         Path to a file containing the state_dict of the neural_network.
     embedding_size : int
         size of the embedding within the neural network. Only used if neural_network is None
@@ -1948,7 +1949,7 @@ class ENRC(_AbstractDeepClusteringAlgo):
     neural_network : torch.nn.Module | tuple
         the input neural network. If None, a new FeedforwardAutoencoder will be created.
         Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict) (default: None)
-    neural_network_weights : str
+    neural_network_weights : str | Path
         Path to a file containing the state_dict of the neural_network (default: None)
     embedding_size : int
         size of the embedding within the neural network. Only used if neural_network is None (default: 20)
@@ -2007,7 +2008,7 @@ class ENRC(_AbstractDeepClusteringAlgo):
                  tolerance_threshold: float = None, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error,
                  clustering_loss_weight: float = 1.0, ssl_loss_weight: float = 1.0,
-                 neural_network: torch.nn.Module | tuple = None, neural_network_weights: str = None,
+                 neural_network: torch.nn.Module | tuple = None, neural_network_weights: str | Path = None,
                  embedding_size: int = 20, init: str = "nrkmeans",
                  device: torch.device = None, scheduler: torch.optim.lr_scheduler = None,
                  scheduler_params: dict = None, init_kwargs: dict = None, init_subsample_size: int = 10000,
@@ -2289,7 +2290,7 @@ class ACeDeC(ENRC):
     neural_network : torch.nn.Module | tuple
         the input neural network. If None, a new FeedforwardAutoencoder will be created.
         Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict) (default: None)
-    neural_network_weights : str
+    neural_network_weights : str | Path
         Path to a file containing the state_dict of the neural_network (default: None)
     embedding_size : int
         size of the embedding within the neural network. Only used if neural_network is None (default: 20)
@@ -2348,7 +2349,7 @@ class ACeDeC(ENRC):
                  tolerance_threshold: float = None, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error,
                  clustering_loss_weight: float = 1.0, ssl_loss_weight: float = 1.0,
-                 neural_network: torch.nn.Module | tuple = None, neural_network_weights: str = None,
+                 neural_network: torch.nn.Module | tuple = None, neural_network_weights: str | Path = None,
                  embedding_size: int = 20, init: str = "acedec",
                  device: torch.device = None, scheduler: torch.optim.lr_scheduler = None,
                  scheduler_params: dict = None, init_kwargs: dict = None, init_subsample_size: int = 10000,
