@@ -1,7 +1,7 @@
 import numpy as np
-import os
 from sklearn.datasets._base import Bunch
 from clustpy.data._utils import unflatten_images
+from pathlib import Path
 
 
 def _load_nr_data(file_name: str, n_labels: int) -> (np.ndarray, np.ndarray):
@@ -21,7 +21,7 @@ def _load_nr_data(file_name: str, n_labels: int) -> (np.ndarray, np.ndarray):
     data, labels : (np.ndarray, np.ndarray)
         the data numpy array, the labels numpy array
     """
-    path = os.path.dirname(__file__) + "/datasets/" + file_name
+    path = Path(__file__).parent / "datasets" / file_name
     dataset = np.genfromtxt(path, delimiter=",")
     data = dataset[:, n_labels:]
     labels = dataset[:, :n_labels]

@@ -1,6 +1,6 @@
 from .synthetic_data_creator import create_subspace_data, create_nr_data
 from .real_world_data import load_newsgroups, load_iris, load_wine, load_breast_cancer, load_rcv1, load_imagenet_dog, \
-    load_imagenet10, load_coil20, load_coil100, load_olivetti_faces, load_webkb
+    load_imagenet10, load_coil20, load_coil100, load_olivetti_faces, load_webkb, load_bbcnews, load_bbcsport
 from .real_uci_data import load_har, load_letterrecognition, load_optdigits, load_pendigits, load_banknotes, load_htru2, \
     load_mice_protein, load_ecoli, load_spambase, load_seeds, load_statlog_shuttle, load_forest_types, \
     load_breast_tissue, load_soybean_large, load_soybean_small, load_skin, load_user_knowledge, load_dermatology, \
@@ -105,4 +105,6 @@ __all__ = ['create_subspace_data',
            'load_gene_expression_cancer_rna_seq',
            'load_sport_articles',
            'load_wholesale_customers',
-           'load_reuters21578']
+           'load_reuters21578',
+           'load_bbcsport',
+           'load_bbcnews']

@@ -1,6 +1,6 @@
 from clustpy.data.tests._helpers_for_tests import _helper_test_data_loader
 from clustpy.data import load_iris, load_wine, load_breast_cancer, load_olivetti_faces, load_newsgroups, load_rcv1, \
-    load_imagenet_dog, load_imagenet10, load_coil20, load_coil100, load_webkb
+    load_imagenet_dog, load_imagenet10, load_coil20, load_coil100, load_webkb, load_bbcnews, load_bbcsport
 import pytest
 import shutil
 
@@ -129,5 +129,15 @@ def test_load_coil100(my_tmp_dir):
 
 @pytest.mark.data
 def test_load_webkb(my_tmp_dir):
-    _helper_test_data_loader(load_webkb, 1041, 323, [4, 4], dataloader_params={"downloads_path": my_tmp_dir})
-    _helper_test_data_loader(load_webkb, 8282, 761, [7, 5], dataloader_params={"downloads_path": my_tmp_dir, "use_categories": None, "use_universities": None})
+    _helper_test_data_loader(load_webkb, 1041, 2000, [4, 4], dataloader_params={"downloads_path": my_tmp_dir})
+    _helper_test_data_loader(load_webkb, 1041, 323, [4, 4], dataloader_params={"downloads_path": my_tmp_dir, "min_df": 0.01, "max_features": None, "min_variance": 0.25})
+    _helper_test_data_loader(load_webkb, 8282, 2000, [7, 5], dataloader_params={"downloads_path": my_tmp_dir, "use_categories": None, "use_universities": None})
+
+
+@pytest.mark.data
+def test_load_bbcsport(my_tmp_dir):
+    _helper_test_data_loader(load_bbcsport, 737, 2000, 5, dataloader_params={"downloads_path": my_tmp_dir})
+
+@pytest.mark.data
+def test_load_bbcnews(my_tmp_dir):
+    _helper_test_data_loader(load_bbcnews, 2225, 2000, 5, dataloader_params={"downloads_path": my_tmp_dir})

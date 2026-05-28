@@ -8,13 +8,13 @@ import numpy as np
 from clustpy.deep._early_stopping import EarlyStopping
 from clustpy.deep._data_utils import get_dataloader
 from clustpy.deep._utils import get_device_from_module, mean_squared_error
-import os
 import tqdm
 from collections.abc import Callable
 from sklearn.utils import check_random_state
 from clustpy.deep._utils import set_torch_seed
 from collections.abc import Callable
 from clustpy.utils.checks import check_parameters
+from pathlib import Path
 
 
 class FullyConnectedBlock(torch.nn.Module):
@@ -394,28 +394,28 @@ class _AbstractAutoencoder(torch.nn.Module):
         self.fitted = True
         return self
 
-    def save_parameters(self, path: str) -> None:
+    def save_parameters(self, path: str | Path) -> None:
         """
         Save the current state_dict of the model.
 
         Parameters
         ----------
-        path : str
+        path : str | Path
             Path where the state_dict should be stored
         """
         # Check if directory exists
-        parent_directory = os.path.dirname(path)
-        if parent_directory != "" and not os.path.isdir(parent_directory):
-            os.makedirs(parent_directory)
+        if isinstance(path, str):
+            path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
         torch.save(self.state_dict(), path)
 
-    def load_parameters(self, path: str) -> '_AbstractAutoencoder':
+    def load_parameters(self, path: str | Path) -> '_AbstractAutoencoder':
         """
         Load a state_dict into the current model to set its parameters.
 
         Parameters
         ----------
-        path : str
+        path : str | Path
             Path from where the state_dict should be loaded
 
         Returns

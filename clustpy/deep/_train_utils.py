@@ -6,6 +6,7 @@ from sklearn.base import ClusterMixin
 from clustpy.deep._data_utils import get_dataloader, get_train_and_test_dataloader, get_data_dim_from_dataloader
 from clustpy.deep._utils import run_initial_clustering, detect_device, encode_batchwise, mean_squared_error
 from collections.abc import Callable
+from pathlib import Path
 
 
 def _get_default_layers(input_dim: int, embedding_size: int) -> list:
@@ -31,7 +32,7 @@ def _get_default_layers(input_dim: int, embedding_size: int) -> list:
 
 def get_neural_network(input_dim: int, embedding_size: int = 10, neural_network: torch.nn.Module | tuple = None,
                         neural_network_class: torch.nn.Module = FeedforwardAutoencoder,
-                        neural_network_params: dict = None, neural_network_weights: str = None, device : torch.device = None,
+                        neural_network_params: dict = None, neural_network_weights: str | Path = None, device : torch.device = None,
                         random_state: np.random.RandomState | int = None) -> torch.nn.Module:
     """This function returns a new neural_network.
     - If neural_network is already a torch.nn.module, nothing will happen.
@@ -52,7 +53,7 @@ def get_neural_network(input_dim: int, embedding_size: int = 10, neural_network:
         The neural network class that should be used (default: FeedforwardAutoencoder)
     neural_network_params : dict
         Parameters to be used when creating a new neural network using the neural_network_class (default: None)
-    neural_network_weights : str
+    neural_network_weights : str | Path
         Path to a file containing the state_dict of the neural_network (default: None)
     device : torch.device
         The device on which to perform the computations.
@@ -111,7 +112,7 @@ def get_trained_network(trainloader: torch.utils.data.DataLoader = None, data: n
                         ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error, embedding_size: int = 10,
                         neural_network: torch.nn.Module | tuple = None,
                         neural_network_class: torch.nn.Module = FeedforwardAutoencoder,
-                        neural_network_params: dict = None, neural_network_weights: str = None,
+                        neural_network_params: dict = None, neural_network_weights: str | Path = None,
                         random_state: np.random.RandomState | int = None) -> torch.nn.Module:
     """This function returns a trained neural network. The following cases are considered
        - If the neural network is initialized and trained (neural_network.fitted==True), then return input neural network without training it again.
@@ -147,7 +148,7 @@ def get_trained_network(trainloader: torch.utils.data.DataLoader = None, data: n
         The neural network class that should be used (default: FeedforwardAutoencoder)
     neural_network_params : dict
         Parameters to be used when creating a new neural network using the neural_network_class (default: None)
-    neural_network_weights : str
+    neural_network_weights : str | Path
         Path to a file containing the state_dict of the neural_network (default: None)
     random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
@@ -185,7 +186,7 @@ def get_default_deep_clustering_initialization(X: np.ndarray | torch.Tensor, n_c
                                                random_state: np.random.RandomState,
                                                neural_network_class: torch.nn.Module = FeedforwardAutoencoder,
                                                neural_network_params: dict = None,
-                                               neural_network_weights: str = None) -> (
+                                               neural_network_weights: str | Path = None) -> (
         torch.device, torch.utils.data.DataLoader, torch.utils.data.DataLoader, int, torch.nn.Module, np.ndarray, int,
         np.ndarray, np.ndarray, ClusterMixin):
     """
@@ -231,7 +232,7 @@ def get_default_deep_clustering_initialization(X: np.ndarray | torch.Tensor, n_c
         The neural network class that should be used (default: FeedforwardAutoencoder)
     neural_network_params : dict
         Parameters to be used when creating a new neural network using the neural_network_class (default: None)
-    neural_network_weights : str
+    neural_network_weights : str | Path
         Path to a file containing the state_dict of the neural_network (default: None)
 
     Returns

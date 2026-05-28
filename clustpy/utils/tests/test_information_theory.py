@@ -89,8 +89,10 @@ def test_bic_costs():
 
 
 def test_integer_costs():
-    costs = integer_costs(77)
+    costs = integer_costs(77, True)
     assert abs(costs - 12.328150766) < 1e-9
+    costs = integer_costs(77, False)
+    assert abs(costs - 7.24955913584) < 1e-9
 
 
 def test_mdl_costs_probability():

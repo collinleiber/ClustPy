@@ -2,6 +2,7 @@ import torch
 import torchvision
 import numpy as np
 from typing import Callable, List
+from pathlib import PurePath
 
 
 class _ClustpyDataset(torch.utils.data.Dataset):
@@ -287,9 +288,9 @@ def get_train_and_test_dataloader(X: np.ndarray | torch.Tensor, batch_size: int 
     else:
         trainloader, testloader = custom_dataloaders
         # If train-/testloader is string, it can be loaded from a file
-        if type(trainloader) is str:
+        if isinstance(trainloader, (str, PurePath)):
             trainloader = torch.load(trainloader, weights_only=False)
-        if type(testloader) is str:
+        if isinstance(testloader, (str, PurePath)):
             testloader = torch.load(testloader, weights_only=False)
         if trainloader.batch_size != testloader.batch_size:
             print(
@@ -312,7 +313,6 @@ def get_default_augmented_dataloaders(X: np.ndarray | torch.Tensor, batch_size: 
     torchvision.transforms.RandomAffine(degrees=(-16, +16), translate=(0.1, 0.1), shear=(-8, 8), fill=0) and
     a channel-wise z-transformation.
     Optionally, the images can be flatten afterward.
-
 
     Parameters
     ----------
