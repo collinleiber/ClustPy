@@ -2,6 +2,7 @@ from clustpy.deep.neural_networks import ConvolutionalAutoencoder
 from clustpy.deep import DCN
 import torch
 import numpy as np
+import pytest
 
 
 def test_convolutional_autoencoder_resnet18():
@@ -13,9 +14,13 @@ def test_convolutional_autoencoder_resnet18():
     # Test encoding
     embedded = autoencoder.encode(data_batch)
     assert embedded.shape == (batch_size, embedding_dim)
+    embedded_solo = autoencoder.encode(data_batch[0])
+    assert embedded_solo.shape == (embedding_dim, )
     # Test decoding
     decoded = autoencoder.decode(embedded)
     assert decoded.shape == (batch_size, 3, 32, 32)
+    decoded_solo = autoencoder.decoded(embedded[0])
+    assert decoded_solo.shape == (3, 32, 32)
     # Test forwarding
     forwarded = autoencoder.forward(data_batch)
     assert torch.equal(decoded, forwarded)
@@ -34,9 +39,13 @@ def test_convolutional_autoencoder_resnet_50():
     # Test encoding
     embedded = autoencoder.encode(data_batch)
     assert embedded.shape == (batch_size, embedding_dim)
+    embedded_solo = autoencoder.encode(data_batch[0])
+    assert embedded_solo.shape == (embedding_dim, )
     # Test decoding
     decoded = autoencoder.decode(embedded)
     assert decoded.shape == (batch_size, 3, 32, 32)
+    decoded_solo = autoencoder.decoded(embedded[0])
+    assert decoded_solo.shape == (3, 32, 32)
     # Test forwarding
     forwarded = autoencoder.forward(data_batch)
     assert torch.equal(decoded, forwarded)
@@ -52,9 +61,13 @@ def test_mixed_convolutional_autoencoder():
     # Test encoding
     embedded = autoencoder.encode(data_batch)
     assert embedded.shape == (batch_size, embedding_dim)
+    embedded_solo = autoencoder.encode(data_batch[0])
+    assert embedded_solo.shape == (embedding_dim, )
     # Test decoding
     decoded = autoencoder.decode(embedded)
     assert decoded.shape == (batch_size, 3, 32, 32)
+    decoded_solo = autoencoder.decoded(embedded[0])
+    assert decoded_solo.shape == (3, 32, 32)
     # Test forwarding
     forwarded = autoencoder.forward(data_batch)
     assert torch.equal(decoded, forwarded)
@@ -71,3 +84,15 @@ def test_convolutional_autoencoder_in_deep_clustering():
     assert dcn.labels_.shape == (100,)
     X_embed = dcn.transform(data)
     assert X_embed.shape == (data.shape[0], dcn.embedding_size)
+
+
+def test_convolutional_autoencoder_errors():
+    with pytest.raises(ValueError):
+        # Wrong input height (must be 32 x X)
+        ConvolutionalAutoencoder(16, [512, 10])
+    with pytest.raises(ValueError):
+        # Wrong fc_layers for resnet 18
+        ConvolutionalAutoencoder(32, conv_encoder_name="resnet18", fc_layers=[2048, 10])
+    with pytest.raises(ValueError):
+        # Wrong fc_layers for resnet 50
+        ConvolutionalAutoencoder(32, conv_encoder_name="resnet50", fc_layers=[512, 10])

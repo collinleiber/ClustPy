@@ -185,7 +185,7 @@ def encode_batchwise(dataloader: torch.utils.data.DataLoader, neural_network: to
         if type(embedded_data) is tuple:
             embedded_data = embedded_data[0]
         if embeddings_numpy is None:
-            embeddings_numpy = np.zeros((len(dataloader.dataset), embedded_data.shape[1]), dtype=float)
+            embeddings_numpy = np.zeros([len(dataloader.dataset)] + list(embedded_data.shape[1:]), dtype=float)
         embeddings_numpy[batch[0]] = embedded_data.detach().cpu().numpy()
     return embeddings_numpy
 
@@ -218,7 +218,7 @@ def decode_batchwise(dataloader: torch.utils.data.DataLoader, neural_network: to
         else:
             decoded_data = neural_network.decode(embedded_data)
         if decodings_numpy is None:
-            decodings_numpy = np.zeros((len(dataloader.dataset), decoded_data.shape[1]), dtype=float)
+            decodings_numpy = np.zeros([len(dataloader.dataset)] + list(decoded_data.shape[1:]), dtype=float)
         decodings_numpy[batch[0]] = decoded_data.detach().cpu().numpy()
     return decodings_numpy
 
@@ -255,8 +255,8 @@ def encode_decode_batchwise(dataloader: torch.utils.data.DataLoader, neural_netw
         else:
             decoded_data = neural_network.decode(embedded_data)
         if embeddings_numpy is None:
-            embeddings_numpy = np.zeros((len(dataloader.dataset), embedded_data.shape[1]), dtype=float)
-            decodings_numpy = np.zeros((len(dataloader.dataset), decoded_data.shape[1]), dtype=float)
+            embeddings_numpy = np.zeros([len(dataloader.dataset)] + list(embedded_data.shape[1:]), dtype=float)
+            decodings_numpy = np.zeros([len(dataloader.dataset)] + list(decoded_data.shape[1:]), dtype=float)
         embeddings_numpy[batch[0]] = embedded_data.detach().cpu().numpy()
         decodings_numpy[batch[0]] = decoded_data.detach().cpu().numpy()
     return embeddings_numpy, decodings_numpy
