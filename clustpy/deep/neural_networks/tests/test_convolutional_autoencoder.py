@@ -11,6 +11,7 @@ def test_convolutional_autoencoder_resnet18():
     data_batch = torch.Tensor(data[:batch_size])
     embedding_dim = 10
     autoencoder = ConvolutionalAutoencoder(32, [512, embedding_dim])
+    autoencoder.eval()
     # Test encoding
     embedded = autoencoder.encode(data_batch)
     assert embedded.shape == (batch_size, embedding_dim)
@@ -19,7 +20,7 @@ def test_convolutional_autoencoder_resnet18():
     # Test decoding
     decoded = autoencoder.decode(embedded)
     assert decoded.shape == (batch_size, 3, 32, 32)
-    decoded_solo = autoencoder.decoded(embedded[0])
+    decoded_solo = autoencoder.decode(embedded[0])
     assert decoded_solo.shape == (3, 32, 32)
     # Test forwarding
     forwarded = autoencoder.forward(data_batch)
@@ -36,6 +37,7 @@ def test_convolutional_autoencoder_resnet_50():
     data_batch = torch.Tensor(data[:batch_size])
     embedding_dim = 10
     autoencoder = ConvolutionalAutoencoder(32, [2048, embedding_dim], conv_encoder_name="resnet50")
+    autoencoder.eval()
     # Test encoding
     embedded = autoencoder.encode(data_batch)
     assert embedded.shape == (batch_size, embedding_dim)
@@ -44,7 +46,7 @@ def test_convolutional_autoencoder_resnet_50():
     # Test decoding
     decoded = autoencoder.decode(embedded)
     assert decoded.shape == (batch_size, 3, 32, 32)
-    decoded_solo = autoencoder.decoded(embedded[0])
+    decoded_solo = autoencoder.decode(embedded[0])
     assert decoded_solo.shape == (3, 32, 32)
     # Test forwarding
     forwarded = autoencoder.forward(data_batch)
@@ -58,6 +60,7 @@ def test_mixed_convolutional_autoencoder():
     embedding_dim = 10
     autoencoder = ConvolutionalAutoencoder(32, [2048, embedding_dim], fc_decoder_layers=[embedding_dim, 512],
                                            conv_encoder_name="resnet50", conv_decoder_name="resnet18")
+    autoencoder.eval()
     # Test encoding
     embedded = autoencoder.encode(data_batch)
     assert embedded.shape == (batch_size, embedding_dim)
@@ -66,7 +69,7 @@ def test_mixed_convolutional_autoencoder():
     # Test decoding
     decoded = autoencoder.decode(embedded)
     assert decoded.shape == (batch_size, 3, 32, 32)
-    decoded_solo = autoencoder.decoded(embedded[0])
+    decoded_solo = autoencoder.decode(embedded[0])
     assert decoded_solo.shape == (3, 32, 32)
     # Test forwarding
     forwarded = autoencoder.forward(data_batch)

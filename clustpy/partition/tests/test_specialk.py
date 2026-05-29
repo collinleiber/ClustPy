@@ -5,7 +5,6 @@ from sklearn.datasets import make_blobs
 from clustpy.utils.checks import check_clustpy_estimator
 import pytest
 
-#@pytest.mark.skip(reason="There seems to be a non-trivial error. Needs to be fixed.")
 def test_specialk_estimator():
     check_clustpy_estimator(SpecialK(), ("check_complex_data"))
 

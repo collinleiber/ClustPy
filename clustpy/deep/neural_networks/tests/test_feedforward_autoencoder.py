@@ -27,7 +27,7 @@ def test_feedforward_autoencoder():
     # Test decoding
     decoded = autoencoder.decode(embedded)
     assert decoded.shape == (batch_size, data.shape[1])
-    decoded_solo = autoencoder.decoded(embedded[0])
+    decoded_solo = autoencoder.decode(embedded[0])
     assert decoded_solo.shape == (data.shape[1], )
     # Test forwarding
     forwarded = autoencoder.forward(data_batch)
