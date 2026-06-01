@@ -8,6 +8,7 @@ from sklearn.cluster import KMeans, DBSCAN
 from sklearn.mixture import GaussianMixture
 from clustpy.partition import XMeans
 from clustpy.deep.tests._helpers_for_tests import _get_dc_test_data
+from clustpy.deep.neural_networks import ConvolutionalAutoencoder
 
 
 def test_mean_squared_error():
@@ -71,6 +72,15 @@ def test_encode_batchwise():
     desired = np.sum(data, axis=1).reshape((-1, 1))
     desired = np.tile(desired, embedding_size)
     assert np.allclose(encoded, desired, atol=1e-5)
+    # Test for Conv
+    X_images = np.array([[[[11] * 32] * 32, [[12] * 32] * 32, [[13] * 32] * 32],
+                         [[[10] * 32] * 32, [[20] * 32] * 32, [[30] * 32] * 32],
+                         [[[10] * 32] * 32, [[40] * 32] * 32, [[70] * 32] * 32],
+                         [[[1] * 32] * 32, [[1] * 32] * 32, [[1] * 32] * 32]])
+    dataloader_images = _get_test_dataloader(X_images, 2, False, False)
+    autoencoder_images = ConvolutionalAutoencoder(32, [512, 10])
+    encoded_images = encode_batchwise(dataloader_images, autoencoder_images)
+    assert encoded_images.shape == (4, 10)
 
 
 def test_predict_batchwise():
@@ -95,6 +105,15 @@ def test_decode_batchwise():
     autoencoder = _TestAutoencoder(data.shape[1], embedding_size)
     decoded = decode_batchwise(dataloader, autoencoder)
     assert data.shape == decoded.shape
+    # Test for Conv
+    X_images = np.array([[[[11] * 32] * 32, [[12] * 32] * 32, [[13] * 32] * 32],
+                         [[[10] * 32] * 32, [[20] * 32] * 32, [[30] * 32] * 32],
+                         [[[10] * 32] * 32, [[40] * 32] * 32, [[70] * 32] * 32],
+                         [[[1] * 32] * 32, [[1] * 32] * 32, [[1] * 32] * 32]])
+    dataloader_images = _get_test_dataloader(X_images, 2, False, False)
+    autoencoder_images = ConvolutionalAutoencoder(32, [512, 10])
+    decoded_images = decode_batchwise(dataloader_images, autoencoder_images)
+    assert X_images.shape == decoded_images.shape
 
 
 def test_encode_decode_batchwise():
@@ -109,6 +128,16 @@ def test_encode_decode_batchwise():
     desired = np.tile(desired, embedding_size)
     assert np.allclose(encoded, desired, atol=1e-5)
     assert data.shape == decoded.shape
+    # Test for Conv
+    X_images = np.array([[[[11] * 32] * 32, [[12] * 32] * 32, [[13] * 32] * 32],
+                         [[[10] * 32] * 32, [[20] * 32] * 32, [[30] * 32] * 32],
+                         [[[10] * 32] * 32, [[40] * 32] * 32, [[70] * 32] * 32],
+                         [[[1] * 32] * 32, [[1] * 32] * 32, [[1] * 32] * 32]])
+    dataloader_images = _get_test_dataloader(X_images, 2, False, False)
+    autoencoder_images = ConvolutionalAutoencoder(32, [512, 10])
+    encoded_images, decoded_images = encode_decode_batchwise(dataloader_images, autoencoder_images)
+    assert encoded_images.shape == (4, 10)
+    assert X_images.shape == decoded_images.shape
 
 
 def test_int_to_one_hot():

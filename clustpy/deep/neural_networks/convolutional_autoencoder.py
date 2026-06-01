@@ -68,7 +68,23 @@ class ConvolutionalAutoencoder(_AbstractAutoencoder):
         indicates whether the autoencoder is already fitted
     work_on_copy : bool
         indicates whether deep clustering algorithms should work on a copy of the original autoencoder
-        
+
+    Examples
+    ----------
+    >>> from clustpy.deep.neural_networks import ConvolutionalAutoencoder
+    >>> from clustpy.data import load_usps
+    >>> from clustpy.utils import plot_image
+    >>> import torchvision
+    >>> dataset = load_usps()
+    >>> X = dataset.images
+    >>> X = X / 255.
+    >>> X = X.reshape(-1, 1, X.shape[1], X.shape[1])
+    >>> X = np.tile(X, (1, 3, 1, 1))
+    >>> X = torchvision.transforms.Resize((32, 32))(torch.from_numpy(X).float()).numpy()
+    >>> cae = ConvolutionalAutoencoder(X.shape[2], [512, 10]).fit(data=X[:500], n_epochs=100)
+    >>> Z = cae.decode(cae.encode(torch.from_numpy(X[0]).float())).detach().numpy()
+    >>> plot_image(Z, image_shape=(16, 16), min_value=0, max_value=1)
+
     References
     ----------
     He, Kaiming, et al. "Deep residual learning for image recognition."
@@ -87,6 +103,8 @@ class ConvolutionalAutoencoder(_AbstractAutoencoder):
                  work_on_copy: bool = True, random_state: np.random.RandomState | int = None, **fc_kwargs):
         super().__init__(work_on_copy, random_state)
         self.allow_nd_input = True
+        if input_height % 32 != 0:
+            raise ValueError(f"Input_height has to be a multiple of 32. Your input: {input_height}")
         self.input_height = input_height
 
         # Check if layers match
@@ -141,8 +159,14 @@ class ConvolutionalAutoencoder(_AbstractAutoencoder):
         embedded : torch.Tensor
             the embedded data point with dimensionality embedding_size
         """
-        embedded = self.conv_encoder(x)
+        x_adj = x.reshape(1, x.shape[0], x.shape[1] ,x.shape[2]) if x.ndim == 3 else x
+        if x_adj.shape[1:] != (3, self.input_height, self.input_height):
+            raise ValueError("Input layer of the encoder ({0}) does not match shape of the input sample ({1})".format((3, self.input_height, self.input_height),
+                                                                                            x_adj.shape[1:]))
+        embedded = self.conv_encoder(x_adj)
         embedded = self.fc_encoder(embedded)
+        if x.ndim == 3:
+            embedded = embedded[0]
         return embedded
 
     def decode(self, embedded: torch.Tensor) -> torch.Tensor:
@@ -159,6 +183,11 @@ class ConvolutionalAutoencoder(_AbstractAutoencoder):
         decoded : torch.Tensor
             returns the reconstruction of embedded
         """
-        decoded = self.fc_decoder(embedded)
+        embedded_adj = embedded.reshape((1, -1)) if embedded.ndim == 1 else embedded
+        if embedded_adj.shape[1] != self.fc_decoder.layers[0]:
+            raise ValueError("Input layer of the decoder does not match input sample")
+        decoded = self.fc_decoder(embedded_adj)
         decoded = self.conv_decoder(decoded)
+        if embedded.ndim == 1:
+            decoded = decoded[0]
         return decoded

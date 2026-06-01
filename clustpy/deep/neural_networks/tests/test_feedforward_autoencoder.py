@@ -22,9 +22,13 @@ def test_feedforward_autoencoder():
     # Test encoding
     embedded = autoencoder.encode(data_batch)
     assert embedded.shape == (batch_size, embedding_dim)
+    embedded_solo = autoencoder.encode(data_batch[0])
+    assert embedded_solo.shape == (embedding_dim, )
     # Test decoding
     decoded = autoencoder.decode(embedded)
     assert decoded.shape == (batch_size, data.shape[1])
+    decoded_solo = autoencoder.decode(embedded[0])
+    assert decoded_solo.shape == (data.shape[1], )
     # Test forwarding
     forwarded = autoencoder.forward(data_batch)
     assert torch.equal(decoded, forwarded)
