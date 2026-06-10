@@ -100,11 +100,6 @@ class _AbstractDeepClusteringAlgo(TransformerMixin, ClusterMixin, BaseEstimator)
         """
         check_is_fitted(self, ["labels_", "neural_network_trained_", "n_features_in_"])
         X, _, _ = check_parameters(X, allow_size_1=True, allow_nd=self.neural_network_trained_.allow_nd_input, estimator_obj=self)
-        if X.shape[1] != self.n_features_in_:
-            raise ValueError(
-            f"X has {X.shape[1]} features, but {self.__class__.__name__} "
-            f"is expecting {self.n_features_in_} features as input."
-        )
         X_embed = self.neural_network_trained_.transform(X)
         return X_embed
 
