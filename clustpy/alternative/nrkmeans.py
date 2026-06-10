@@ -1292,7 +1292,7 @@ def _mdl_m_dependant_subspace_costs(X: np.ndarray, V: np.ndarray, cluster_index:
     # ==== Costs of cluster space ====
     cropped_V_cluster = V[:, P_cluster]
     # Costs for cluster dimensionality
-    cluster_costs = mdl.integer_costs(m_cluster)
+    cluster_costs = mdl.integer_costs(m_cluster, use_log2=True)
     # Costs for centers
     cluster_costs += n_clusters[cluster_index] * _mdl_reference_vector(m_cluster, max_distance, precision)
     # Costs for point encoding
@@ -1306,7 +1306,7 @@ def _mdl_m_dependant_subspace_costs(X: np.ndarray, V: np.ndarray, cluster_index:
     # ==== Costs of noise space ====
     cropped_V_noise = V[:, P_noise]
     # Costs for noise dimensionality
-    noise_costs = mdl.integer_costs(m_noise)
+    noise_costs = mdl.integer_costs(m_noise, use_log2=True)
     # Costs for centers
     noise_costs += n_clusters[noise_index] * _mdl_reference_vector(m_noise, max_distance, precision)
     # Costs for point encoding
@@ -1443,7 +1443,7 @@ def _mdl_costs(X: np.ndarray, n_clusters: list, m: list, P: list, V: np.ndarray,
     # Costs of matrix V
     # global_costs += mdl.mdl_costs_orthogonal_matrix(n_points, mdl.mdl_costs_float_value(n_points))
     # Costs of number of subspaces
-    global_costs += mdl.integer_costs(subspaces)
+    global_costs += mdl.integer_costs(subspaces, use_log2=True)
     # Costs for each subspace
     all_subspace_costs = []
     for subspace in range(subspaces):
@@ -1451,9 +1451,9 @@ def _mdl_costs(X: np.ndarray, n_clusters: list, m: list, P: list, V: np.ndarray,
         # Calculate costs
         model_costs = 0
         # Costs for dimensionality
-        model_costs += mdl.integer_costs(m[subspace])
+        model_costs += mdl.integer_costs(m[subspace], use_log2=True)
         # Number of clusters in this subspace
-        model_costs += mdl.integer_costs(n_clusters[subspace])
+        model_costs += mdl.integer_costs(n_clusters[subspace], use_log2=True)
         # Costs for cluster centers
         model_costs += n_clusters[subspace] * \
                        _mdl_reference_vector(m[subspace], max_distance, precision)
@@ -1462,7 +1462,7 @@ def _mdl_costs(X: np.ndarray, n_clusters: list, m: list, P: list, V: np.ndarray,
         if outliers:
             # Encode number of outliers
             n_outliers = len(labels[:, subspace][labels[:, subspace] == -1])
-            model_costs += mdl.integer_costs(n_outliers)
+            model_costs += mdl.integer_costs(n_outliers, use_log2=True)
             # Encode coding costs of outliers
             outlier_costs += n_outliers * np.log2(n_points)
             outlier_costs += n_outliers * _mdl_costs_uniform_pdf(m[subspace], max_distance)

@@ -15,6 +15,7 @@ from sklearn.base import ClusterMixin
 import tqdm
 from collections.abc import Callable
 from sklearn.utils.validation import check_is_fitted
+from pathlib import Path
 
 
 def _merge_by_dip_value(X: np.ndarray, embedded_data: np.ndarray, cluster_labels_cpu: np.ndarray,
@@ -102,7 +103,6 @@ def _force_merge(X: np.ndarray, embedded_data: np.ndarray, cluster_labels_cpu: n
     First strategy is to delete the smallest cluster if it is smaller than 0.2 * the average cluster size.
     In this case, the samples in this cluster will be assigned to the clostest remaining cluster.
     If there is no cluster that is sufficiently small, the cluster-combination with the largest dip-value will be merged.
-
     
     Parameters
     ----------
@@ -617,7 +617,7 @@ class DipDECK(_AbstractDeepClusteringAlgo):
     neural_network : torch.nn.Module | tuple
         the input neural network. If None, a new FeedforwardAutoencoder will be created.
         Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict) (default: None)
-    neural_network_weights : str
+    neural_network_weights : str | Path
         Path to a file containing the state_dict of the neural_network (default: None)
     embedding_size : int
         size of the embedding within the neural network (default: 5)
@@ -647,7 +647,6 @@ class DipDECK(_AbstractDeepClusteringAlgo):
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
     debug : bool
         If true, additional information will be printed to the console (default: False)
-
 
     Attributes
     ----------
@@ -682,7 +681,7 @@ class DipDECK(_AbstractDeepClusteringAlgo):
                  clustering_optimizer_params: dict = None, pretrain_epochs: int = 100, clustering_epochs: int = 50,
                  optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error,
-                 neural_network: torch.nn.Module | tuple = None, neural_network_weights: str = None,
+                 neural_network: torch.nn.Module | tuple = None, neural_network_weights: str | Path = None,
                  embedding_size: int = 5, max_cluster_size_diff_factor: float = 2, pval_strategy: str = "table",
                  n_boots: int = 1000, custom_dataloaders: tuple = None, augmentation_invariance: bool = False,
                  initial_clustering_class: ClusterMixin = KMeans, initial_clustering_params: dict = None,

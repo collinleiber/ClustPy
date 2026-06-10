@@ -7,15 +7,16 @@ https://github.com/Sibylse/SpecialK/blob/master/SpecialK.ipynb
 """
 
 import numpy as np
-from scipy.spatial.distance import pdist, squareform
 from sklearn.neighbors import radius_neighbors_graph, kneighbors_graph
 from sklearn.cluster import KMeans
 from sklearn.base import BaseEstimator, ClusterMixin
 from clustpy.utils.checks import check_parameters
 import scipy
+from sklearn.neighbors import NearestNeighbors
 
 
-def _specialk(X: np.ndarray, significance: float, n_dimensions: int, similarity_matrix: str, n_neighbors: int,
+def _specialk(X: np.ndarray, significance: float, n_dimensions: int,
+              similarity_matrix: str | np.ndarray | scipy.sparse.csr_matrix, n_neighbors: int,
               percentage: float, n_cluster_pairs_to_consider: int, max_n_clusters: int,
               random_state: np.random.RandomState, debug: bool) -> (int, np.ndarray):
     """
@@ -29,7 +30,7 @@ def _specialk(X: np.ndarray, significance: float, n_dimensions: int, similarity_
         Threshold to decide if the samples originate from a single distribution or two distributions
     n_dimensions : int
         Dimensionality of the embedding
-    similarity_matrix : str
+    similarity_matrix : str | np.ndarray | scipy.sparse.csr_matrix
         Defines the similarity matrix to use. Can be one of the following strings or a numpy array / scipy sparse csr matrix.
         If 'NAM', a neighborhood adjacency matrix is used.
         If 'SAM' a symmetrically normalized adjacency matrix is used
@@ -56,7 +57,7 @@ def _specialk(X: np.ndarray, significance: float, n_dimensions: int, similarity_
         The labels as identified by DipMeans,
     """
     assert significance >= 0 and significance <= 1, "significance must be a value in the range [0, 1]"
-    assert percentage >= 0 and percentage <= 1, "percentage must be a value in the range [0, 1]"
+    assert percentage > 0 and percentage <= 1, "percentage must be a value in the range (0, 1]"
     if type(similarity_matrix) is str and similarity_matrix == 'NAM':
         final_similarity_matrix = _get_neighborhood_adjacency_matrix(X, percentage, n_neighbors)
     elif type(similarity_matrix) is str and similarity_matrix == 'SAM':
@@ -73,7 +74,8 @@ def _specialk(X: np.ndarray, significance: float, n_dimensions: int, similarity_
     # Initial values
     n_clusters = 2
     stop_search = False
-    best_labels = np.zeros(X.shape[0])
+    best_labels = np.zeros(X.shape[0], dtype=np.int32)
+    log_significance = np.log(significance)
     while n_clusters <= max_n_clusters:
         if debug:
             print("=== n_clusters={0} ===".format(n_clusters))
@@ -105,11 +107,12 @@ def _specialk(X: np.ndarray, significance: float, n_dimensions: int, similarity_
             ids_in_cluster_1 = ids_in_each_cluster[c1]
             ids_in_cluster_2 = ids_in_each_cluster[c2]
             # Calculate bound
-            t_total = _zz_top_bound(D, ids_in_cluster_1, ids_in_cluster_2, debug)
+            t_total = _log_zz_top_bound(D, ids_in_cluster_1, ids_in_cluster_2, debug)
             if debug:
                 print("ZZ top:", t_total)
-            if t_total > significance:
+            if t_total > log_significance:
                 # Stop execution -> return n_clusters - 1
+                n_clusters = n_clusters - 1
                 stop_search = True
                 break
         if stop_search:
@@ -120,13 +123,13 @@ def _specialk(X: np.ndarray, significance: float, n_dimensions: int, similarity_
             n_clusters += 1
     # Return number of clusters and labels
     if debug:
-        print("Final n_clusters={0}".format(n_clusters - 1))
-    return n_clusters - 1, best_labels
+        print("Final n_clusters={0}".format(n_clusters))
+    return n_clusters, best_labels
 
 
-def _zz_top_bound(D: np.ndarray, ids_in_cluster_1: np.ndarray, ids_in_cluster_2: np.ndarray, debug: bool) -> float:
+def _log_zz_top_bound(D: np.ndarray, ids_in_cluster_1: np.ndarray, ids_in_cluster_2: np.ndarray, debug: bool) -> float:
     """
-    Calculate the ZZ Top bound
+    Calculate the log ZZ Top bound.
 
     Parameters
     ----------
@@ -154,7 +157,8 @@ def _zz_top_bound(D: np.ndarray, ids_in_cluster_1: np.ndarray, ids_in_cluster_2:
     t = max(t1, t2) - sigma2 * Dj.shape[1]
     if debug:
         print("sigma={0} / t={1}".format(sigma2, t))
-    t_total = Dj.shape[0] * np.exp(-0.5 * t ** 2 / (Dj.shape[1] * sigma2 + t / 3))
+    t_total = np.log(Dj.shape[0]) - 0.5 * t ** 2 / (Dj.shape[1] * sigma2 + t / 3)
+    t_total = min(t_total, 0.0)
     return t_total
 
 
@@ -179,14 +183,15 @@ def _get_neighborhood_adjacency_matrix(X: np.ndarray, percentage: float = 0.99,
         The resulting similarity matrix
     """
     # Get pairwise distances
-    dist_matrix = squareform(pdist(X, 'euclidean'))
-    # Get kNN distances (+1 because self is not included in n_neighbors)
-    knn_distances = np.sort(dist_matrix, axis=1)[:, n_neighbors + 1]
+    neighbors = NearestNeighbors(n_neighbors=n_neighbors)
+    neighbors.fit(X)
+    knn_distances, _ = neighbors.kneighbors()
     # Get knn dist so that more than 'percentage' points have 'n_neighbors' neighbors
-    knn_dist_sorted = np.sort(knn_distances)
-    eps = knn_dist_sorted[int((X.shape[0] - 1) * percentage)]
+    knn_dist_sorted = np.sort(knn_distances[:, -1])
+    percentage_idx = int(np.ceil(X.shape[0] * percentage))
+    eps = knn_dist_sorted[percentage_idx - 1]
     # Get neighbor graph
-    similarity_matrix = radius_neighbors_graph(X, radius=eps)
+    similarity_matrix = radius_neighbors_graph(X, radius=eps, mode="distance", include_self=False)
     return similarity_matrix
 
 
@@ -232,7 +237,7 @@ class SpecialK(ClusterMixin, BaseEstimator):
         Threshold to decide if the samples originate from a single distribution or two distributions (default: 0.01)
     n_dimensions : int
         Dimensionality of the embedding (default: 200)
-    similarity_matrix : str
+    similarity_matrix : str | np.ndarray | scipy.sparse.csr_matrix
         Defines the similarity matrix to use. Can be one of the following strings or a numpy array / scipy sparse csr matrix.
         If 'NAM', a neighborhood adjacency matrix is used.
         If 'SAM' a symmetrically normalized adjacency matrix is used (default: 'NAM')
@@ -267,7 +272,8 @@ class SpecialK(ClusterMixin, BaseEstimator):
     Machine Learning and Knowledge Discovery in Databases: European Conference, ECML PKDD 2019, Würzburg, Germany, September 16–20, 2019, Proceedings, Part I. Springer International Publishing, 2020.
     """
 
-    def __init__(self, significance: float = 0.01, n_dimensions: int = 200, similarity_matrix: str = 'NAM',
+    def __init__(self, significance: float = 0.01, n_dimensions: int = 200,
+                 similarity_matrix: str | np.ndarray | scipy.sparse.csr_matrix = 'NAM',
                  n_neighbors: int = 5, percentage: float = 0.99, n_cluster_pairs_to_consider: int = 10,
                  max_n_clusters: int = np.inf, random_state: np.random.RandomState | int = None, debug: bool = False):
         self.significance = significance
@@ -298,10 +304,11 @@ class SpecialK(ClusterMixin, BaseEstimator):
             this instance of the SpecialK algorithm
         """
         X, _, random_state = check_parameters(X=X, y=y, random_state=self.random_state)
-        n_clusters, labels = _specialk(X, self.significance, self.n_dimensions, self.similarity_matrix,
+        n_dimensions = min(self.n_dimensions, X.shape[0] - 1)
+        n_clusters, labels = _specialk(X, self.significance, n_dimensions, self.similarity_matrix,
                                        self.n_neighbors, self.percentage, self.n_cluster_pairs_to_consider,
                                        self.max_n_clusters, random_state, self.debug)
         self.n_clusters_ = n_clusters
         self.labels_ = labels
-        self.features_in_ = X.shape[1]
+        self.n_features_in_ = X.shape[1]
         return self

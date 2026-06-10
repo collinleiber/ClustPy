@@ -12,12 +12,13 @@ from sklearn.base import ClusterMixin
 from clustpy.deep.dcn import _DCN_Module
 import tqdm
 from collections.abc import Callable
+from pathlib import Path
 
 
 def _aec(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_params: dict,
          clustering_optimizer_params: dict, pretrain_epochs: int, clustering_epochs: int,
          optimizer_class: torch.optim.Optimizer, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss,
-         neural_network: torch.nn.Module | tuple, neural_network_weights: str,
+         neural_network: torch.nn.Module | tuple, neural_network_weights: str | Path,
          embedding_size: int, clustering_loss_weight: float, ssl_loss_weight: float,
          custom_dataloaders: tuple, augmentation_invariance: bool, initial_clustering_class: ClusterMixin,
          initial_clustering_params: dict, device: torch.device,
@@ -48,7 +49,7 @@ def _aec(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_par
     neural_network : torch.nn.Module | tuple
         the input neural network.
         Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict)
-    neural_network_weights : str
+    neural_network_weights : str | Path
         Path to a file containing the state_dict of the neural_network.
     embedding_size : int
         size of the embedding within the neural network
@@ -242,7 +243,7 @@ class AEC(_AbstractDeepClusteringAlgo):
     neural_network : torch.nn.Module | tuple
         the input neural network. If None, a new FeedforwardAutoencoder will be created.
         Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict) (default: None)
-    neural_network_weights : str
+    neural_network_weights : str | Path
         Path to a file containing the state_dict of the neural_network (default: None)
     embedding_size : int
         size of the embedding within the neural network (default: 10)
@@ -296,7 +297,7 @@ class AEC(_AbstractDeepClusteringAlgo):
                  clustering_epochs: int = 150, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error, clustering_loss_weight: float = 0.1,
                  ssl_loss_weight: float = 1.0, neural_network: torch.nn.Module | tuple = None,
-                 neural_network_weights: str = None, embedding_size: int = 10, custom_dataloaders: tuple = None,
+                 neural_network_weights: str | Path = None, embedding_size: int = 10, custom_dataloaders: tuple = None,
                  augmentation_invariance: bool = False, initial_clustering_class: ClusterMixin = None,
                  initial_clustering_params: dict = None, device: torch.device = None,
                  random_state: np.random.RandomState | int = None):

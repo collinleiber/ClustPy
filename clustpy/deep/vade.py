@@ -15,12 +15,13 @@ from sklearn.mixture import GaussianMixture
 from sklearn.base import ClusterMixin
 import tqdm
 from collections.abc import Callable
+from pathlib import Path
 
 
 def _vade(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_params: dict,
           clustering_optimizer_params: dict, pretrain_epochs: int, clustering_epochs: int,
           optimizer_class: torch.optim.Optimizer, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss,
-          neural_network: torch.nn.Module | tuple, neural_network_weights: str,
+          neural_network: torch.nn.Module | tuple, neural_network_weights: str | Path,
           embedding_size: int, clustering_loss_weight: float, ssl_loss_weight: float,
           custom_dataloaders: tuple, initial_clustering_class: ClusterMixin, initial_clustering_params: dict,
           device: torch.device, random_state: np.random.RandomState) -> (
@@ -51,7 +52,7 @@ def _vade(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_pa
     neural_network : torch.nn.Module | tuple
         the input neural network.
         Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict)
-    neural_network_weights : str
+    neural_network_weights : str | Path
         Path to a file containing the state_dict of the neural_network.
     embedding_size : int
         size of the embedding within the neural network (central layer with mean and variance)
@@ -513,7 +514,7 @@ class VaDE(_AbstractDeepClusteringAlgo):
     neural_network : torch.nn.Module | tuple
         the input neural network. If None, a new VariationalAutoencoder will be created.
         Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict) (default: None)
-    neural_network_weights : str
+    neural_network_weights : str | Path
         Path to a file containing the state_dict of the neural_network (default: None)
     embedding_size : int
         size of the embedding within the neural network (central layer with mean and variance) (default: 10)
@@ -571,7 +572,7 @@ class VaDE(_AbstractDeepClusteringAlgo):
                  clustering_epochs: int = 150, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = torch.nn.BCELoss(reduction='sum'),
                  clustering_loss_weight: float = 1.0, ssl_loss_weight: float = 1.0,
-                 neural_network: torch.nn.Module | tuple = None, neural_network_weights: str = None,
+                 neural_network: torch.nn.Module | tuple = None, neural_network_weights: str | Path = None,
                  embedding_size: int = 10, custom_dataloaders: tuple = None,
                  initial_clustering_class: ClusterMixin = GaussianMixture, initial_clustering_params: dict = None,
                  device: torch.device = None, random_state: np.random.RandomState | int = None):

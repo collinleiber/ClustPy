@@ -14,23 +14,24 @@ except:
         "[WARNING] Could not import PIL in clustpy.data.real_world_data. Please install PIL by 'pip install Pillow' if necessary")
 import numpy as np
 import os
-from pathlib import Path
+from pathlib import Path, PurePath
 from sklearn.feature_extraction.text import TfidfTransformer, CountVectorizer
 from sklearn.feature_selection import VarianceThreshold
 from sklearn.datasets import fetch_file
+import subprocess
 
 
-DEFAULT_DOWNLOAD_PATH = str(Path.home() / "Downloads/clustpy_datafiles")
+DEFAULT_DOWNLOAD_PATH = Path.home() / "Downloads" / "clustpy_datafiles"
 
 
-def _get_download_dir(downloads_path: str) -> str:
+def _get_download_dir(downloads_path: str | Path) -> Path:
     """
     Helper function to define the path where the data files should be stored. If downloads_path is None then default path
     '[USER]/Downloads/clustpy_datafiles' will be used. If the directory does not exists it will be created.
 
     Parameters
     ----------
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data will be stored. Can be None
 
     Returns
@@ -44,10 +45,13 @@ def _get_download_dir(downloads_path: str) -> str:
         if env_data_path is None:
             downloads_path = DEFAULT_DOWNLOAD_PATH
         else:
-            downloads_path = env_data_path
-    if not os.path.isdir(downloads_path):
-        os.makedirs(downloads_path)
-        with open(downloads_path + "/info.txt", "w") as f:
+            downloads_path = Path(env_data_path)
+    elif isinstance(downloads_path, str):
+        # Cast str to Path
+        downloads_path = Path(downloads_path)
+    if not downloads_path.is_dir():
+        downloads_path.mkdir(parents=True, exist_ok=False)
+        with open(downloads_path / "info.txt", "w") as f:
             f.write("This directory was created by the ClustPy python package to store real world data sets.\n"
                     "The default directory is '[USER]/Downloads/clustpy_datafiles' and can be changed with the "
                     "'downloads_path' parameter when loading a data set.\n"
@@ -55,7 +59,7 @@ def _get_download_dir(downloads_path: str) -> str:
     return downloads_path
 
 
-def _download_file(file_url: str, filename_local: str) -> None:
+def _download_file(file_url: str, filename_local: str | Path) -> None:
     """
     Helper function to download a file into a specified location.
 
@@ -63,17 +67,18 @@ def _download_file(file_url: str, filename_local: str) -> None:
     ----------
     file_url : str
         URL of the file
-    filename_local : str
+    filename_local : str | Path
         local name of the file after it has been downloaded
     """
-    local_path = Path(filename_local)
-    local_dir = local_path.parent
-    local_filename = local_path.name
+    if isinstance(filename_local, str):
+        filename_local = Path(filename_local)
+    local_dir = filename_local.parent
+    local_filename = filename_local.name
     print("Downloading data set from {0} to {1}".format(file_url, filename_local))
     fetch_file(file_url, folder=local_dir, local_filename=local_filename)
 
 
-def _download_file_from_google_drive(file_id: str, filename_local: str, chunk_size: int = 32768) -> None:
+def _download_file_from_google_drive(file_id: str, filename_local: str | Path, chunk_size: int = 32768) -> None:
     """
     Download a file from google drive.
     Code taken from:
@@ -83,7 +88,7 @@ def _download_file_from_google_drive(file_id: str, filename_local: str, chunk_si
     ----------
     file_id : str
         ID of the file on google drive
-    filename_local : str
+    filename_local : str | Path
         local name of the file after it has been downloaded
     chunk_size : int
         chink size when downloading the file (default: 32768)
@@ -107,8 +112,8 @@ def _download_file_from_google_drive(file_id: str, filename_local: str, chunk_si
     session.close()
 
 
-def _load_data_file(filename_local: str, file_url: str, delimiter: str = ",", last_column_are_labels: bool = True) -> (
-        np.ndarray, np.ndarray):
+def _load_data_file(filename_local: Path, file_url: str, delimiter: str = ",", last_column_are_labels: bool = True) -> tuple[
+        np.ndarray, np.ndarray]:
     """
     Helper function to load a data file. Either the first or last column, depending on last_column_are_labels, of the
     data file is used as the label column.
@@ -116,7 +121,7 @@ def _load_data_file(filename_local: str, file_url: str, delimiter: str = ",", la
 
     Parameters
     ----------
-    filename_local : str
+    filename_local : Path
         local name of the file after it has been downloaded
     file_url : str
         URL of the file
@@ -127,10 +132,10 @@ def _load_data_file(filename_local: str, file_url: str, delimiter: str = ",", la
 
     Returns
     -------
-    data, labels : (np.ndarray, np.ndarray)
+    data, labels : tuple[np.ndarray, np.ndarray]
         the data numpy array, the labels numpy array
     """
-    if not os.path.isfile(filename_local):
+    if not filename_local.is_file():
         _download_file(file_url, filename_local)
     datafile = np.genfromtxt(filename_local, delimiter=delimiter)
     if last_column_are_labels:
@@ -144,7 +149,7 @@ def _load_data_file(filename_local: str, file_url: str, delimiter: str = ",", la
     return data, labels
 
 
-def _decompress_z_file(filename: str, directory: str) -> bool:
+def _decompress_z_file(filename: str | Path, directory: str | Path) -> bool:
     """
     Helper function to decompress a 7z file. The function uses an installed version of 7zip to decompress the file.
     If 7zip is not installed on this machine, the function will return False and a warning is printed.
@@ -161,22 +166,30 @@ def _decompress_z_file(filename: str, directory: str) -> bool:
     successful : bool
         True if decompression was successful, else False
     """
-    os.system("7z x {0} -o{1}".format(filename.replace("\\", "/"), directory.replace("\\", "/")))
-    successful = True
-    if not os.path.isfile(filename[:-2]):
+    if isinstance(filename, str):
+        filename = Path(filename)
+    if isinstance(directory, str):
+        directory = Path(directory)
+    cmd = ["7z", "x", filename.as_posix(), f"-o{directory.as_posix()}"]
+    try:
+        subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        print("[WARNING] 7Zip extraction failed or 7z executable is missing!")
+        return False
+    if not filename.with_suffix('').is_file():
         # If no file without .z exists, decompression was not successful
-        successful = False
-        print("[WARNING] 7Zip is needed to uncompress *.Z files!")
-    return successful
+        print("[WARNING] Decompression check failed: expected file not found.")
+        return False
+    return True
 
 
-def _load_image_data(image: str, image_size: tuple, color_image: bool) -> np.ndarray:
+def _load_image_data(image: str | Path | np.ndarray, image_size: tuple, color_image: bool) -> np.ndarray:
     """
     Load image and convert it into a coherent size. Returns a numpy array containing the image data.
 
     Parameters
     ----------
-    image : str
+    image : str | Path | np.ndarray
         Path to the image. Can also be a numpy array containing the specific pixels
     image_size : tuple
         images of various sizes can be converted into a coherent size.
@@ -190,7 +203,7 @@ def _load_image_data(image: str, image_size: tuple, color_image: bool) -> np.nda
     image_data : np.ndarray
         The numpy array containing the image data
     """
-    if isinstance(image, str):
+    if isinstance(image, (str, PurePath)):
         pil_image = Image.open(image)
     else:
         pil_image = Image.fromarray(np.uint8(image))
@@ -231,7 +244,7 @@ class _StemmedCountVectorizer(CountVectorizer):
 
 def _transform_text_data(data: np.ndarray, use_tfidf: bool, use_stemming: bool, use_stop_words: bool, max_df: float | int, 
                          min_df: float | int, max_features: int, min_variance : float, sublinear_tf: bool, 
-                         data_all: np.ndarray = None) -> np.ndarray:
+                         data_all: np.ndarray | None = None) -> tuple[np.ndarray, list[str]]:
     """
     Transform a set of texts into a data matrix.
     Result can be either a raw count matrix or the result of tf-idf.
@@ -261,13 +274,14 @@ def _transform_text_data(data: np.ndarray, use_tfidf: bool, use_stemming: bool, 
         The default is to keep all features with non-zero variance, i.e. remove only the features that have the same value in all samples 
     sublinear_tf : bool
         Apply sublinear term frequency scaling, i.e. replace tf with 1 + log(tf) (see sklearn TfidfTransformer)
-    data_all : np.ndarray
+    data_all : np.ndarray | None
         The complete data set, i.e., if no subset is used. If it is None, it will be equal to data (default: None)
 
     Returns
     -------
-    data : np.ndarray
-        The resulting data array
+    tuple : tuple[np.ndarray, list[str]]
+        The resulting data array,
+        The vocabulary of the data output
     """
     if data_all is None:
         data_all = data
@@ -278,18 +292,21 @@ def _transform_text_data(data: np.ndarray, use_tfidf: bool, use_stemming: bool, 
         vectorizer = CountVectorizer(dtype=np.float64, stop_words="english" if use_stop_words else None, min_df=min_df, max_df=max_df, max_features=max_features)
     data_sparse_all = vectorizer.fit_transform(data_all)
     data_sparse = vectorizer.transform(data)
+    vocabulary = vectorizer.get_feature_names_out()
     # (Optional) Check for variance threshold
     if min_variance != 0:
         selector = VarianceThreshold(min_variance)
         data_sparse_all = selector.fit_transform(data_sparse_all)
         data_sparse = selector.transform(data_sparse)
+        vocabulary_mask = selector._get_support_mask()
+        vocabulary = vocabulary[vocabulary_mask]
     # (Optional) Apply tf-idf
     if use_tfidf:
         tfidf = TfidfTransformer(sublinear_tf=sublinear_tf)
         tfidf.fit(data_sparse_all)
         data_sparse = tfidf.transform(data_sparse)
     data = np.asarray(data_sparse.todense())
-    return data
+    return data, vocabulary
 
 
 def flatten_images(data: np.ndarray, format: str) -> np.ndarray:
@@ -313,11 +330,11 @@ def flatten_images(data: np.ndarray, format: str) -> np.ndarray:
     format_possibilities = ["HW", "HWD", "CHW", "CHWD", "HWC", "HWDC"]
     assert format in format_possibilities, "Format must be within {0}".format(format_possibilities)
     if format == "HW":
-        assert data.ndim == 3
+        assert data.ndim == 3, f"ndim has to be 3 but is {data.ndim}"
     elif format in ["HWD", "CHW", "HWC"]:
-        assert data.ndim == 4
+        assert data.ndim == 4, f"ndim has to be 4 but is {data.ndim}"
     elif format in ["CHWD", "HWDC"]:
-        assert data.ndim == 5
+        assert data.ndim == 5, f"ndim has to be 5 but is {data.ndim}"
     # Flatten shape
     if format != "HW" and format != "HWD":
         if format == "CHW":

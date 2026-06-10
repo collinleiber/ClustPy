@@ -16,12 +16,13 @@ from sklearn.mixture import GaussianMixture as GMM
 import inspect
 from collections.abc import Callable
 from clustpy.utils.checks import check_parameters
+from pathlib import Path
 
 
 def _manifold_based_sequential_dc(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_params: dict,
                                   pretrain_epochs: int, optimizer_class: torch.optim.Optimizer,
                                   ssl_loss_fn: Callable | torch.nn.modules.loss._Loss, neural_network: torch.nn.Module | tuple,
-                                  neural_network_weights: str, embedding_size: int, custom_dataloaders: tuple,
+                                  neural_network_weights: str | Path, embedding_size: int, custom_dataloaders: tuple,
                                   manifold_class: TransformerMixin, manifold_params: dict,
                                   clustering_class: ClusterMixin, clustering_params: dict, device: torch.device,
                                   random_state: np.random.RandomState) -> (
@@ -48,7 +49,7 @@ def _manifold_based_sequential_dc(X: np.ndarray, n_clusters: int, batch_size: in
     neural_network : torch.nn.Module | tuple
         the input neural network.
         Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict)
-    neural_network_weights : str
+    neural_network_weights : str | Path
         Path to a file containing the state_dict of the neural_network.
     embedding_size : int
         size of the embedding within the neural network
@@ -261,7 +262,7 @@ class DDC(_AbstractDeepClusteringAlgo):
     neural_network : torch.nn.Module | tuple
         the input neural network. If None, a new FeedforwardAutoencoder will be created.
         Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict) (default: None)
-    neural_network_weights : str
+    neural_network_weights : str | Path
         Path to a file containing the state_dict of the neural_network (default: None)
     embedding_size : int
         size of the embedding within the neural network (default: 10)
@@ -311,7 +312,7 @@ class DDC(_AbstractDeepClusteringAlgo):
     def __init__(self, ratio: float = 0.1, batch_size: int = 256, pretrain_optimizer_params: dict = None,
                  pretrain_epochs: int = 100, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error,
-                 neural_network: torch.nn.Module | tuple = None, neural_network_weights: str = None,
+                 neural_network: torch.nn.Module | tuple = None, neural_network_weights: str | Path = None,
                  embedding_size: int = 10, custom_dataloaders: tuple = None, tsne_params: dict = None,
                  device: torch.device = None, random_state: np.random.RandomState | int = None):
         super().__init__(batch_size, neural_network, neural_network_weights, embedding_size, device, random_state)
@@ -409,7 +410,7 @@ class N2D(_AbstractDeepClusteringAlgo):
     neural_network : torch.nn.Module | tuple
         the input neural network. If None, a new FeedforwardAutoencoder will be created.
         Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict) (default: None)
-    neural_network_weights : str
+    neural_network_weights : str | Path
         Path to a file containing the state_dict of the neural_network (default: None)
     embedding_size : int
         size of the embedding within the neural network (default: 10)
@@ -455,7 +456,7 @@ class N2D(_AbstractDeepClusteringAlgo):
     def __init__(self, n_clusters: int = 8, batch_size: int = 256, pretrain_optimizer_params: dict = None,
                  pretrain_epochs: int = 100, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
                  ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error,
-                 neural_network: torch.nn.Module | tuple = None, neural_network_weights: str = None,
+                 neural_network: torch.nn.Module | tuple = None, neural_network_weights: str | Path = None,
                  embedding_size: int = 10, custom_dataloaders: tuple = None, manifold_class: TransformerMixin = TSNE,
                  manifold_params: dict = None, initial_clustering_params: dict = None, device: torch.device = None,
                  random_state: np.random.RandomState | int = None):

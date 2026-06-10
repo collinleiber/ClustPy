@@ -3,6 +3,8 @@ import torch
 import numpy as np
 from clustpy.data._utils import _get_download_dir, _load_image_data, flatten_images
 from sklearn.datasets._base import Bunch
+from pathlib import Path
+
 
 """
 Torchvision datasets helpers
@@ -55,7 +57,7 @@ def _get_data_and_labels(dataset: torchvision.datasets.VisionDataset, image_size
 
 
 def _load_torch_image_data(data_source: torchvision.datasets.VisionDataset, subset: str, uses_train_param: bool,
-                           image_format: str, return_X_y: bool, downloads_path: str, image_size: tuple = None) -> Bunch:
+                           image_format: str, return_X_y: bool, downloads_path: str | Path, image_size: tuple = None) -> Bunch:
     """
     Helper function to load a data set from the torchvision package.
     All data sets will be returned as a two-dimensional tensor, created out of the HWC (height, width, color channels) image representation.
@@ -73,7 +75,7 @@ def _load_torch_image_data(data_source: torchvision.datasets.VisionDataset, subs
         Abbreviations stand for: H: Height, W: Width, D: Depth, C: Color-channels
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored
     image_size : tuple
         for some datasets (e.g., GTSRB) the images of various sizes must be converted into a coherent size.
@@ -144,7 +146,7 @@ Actual datasets
 """
 
 
-def load_mnist(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_mnist(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the MNIST data set. It consists of 70000 28x28 grayscale images showing handwritten digits (0 to 9).
     The data set is composed of 60000 training and 10000 test images.
@@ -156,7 +158,7 @@ def load_mnist(subset: str = "all", return_X_y: bool = False, downloads_path: st
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : bool
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -180,7 +182,7 @@ def load_mnist(subset: str = "all", return_X_y: bool = False, downloads_path: st
     return _load_torch_image_data(torchvision.datasets.MNIST, subset, True, "HW", return_X_y, downloads_path)
 
 
-def load_kmnist(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_kmnist(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the Kuzushiji-MNIST data set. It consists of 70000 28x28 grayscale images showing Kanji characters.
     It is composed of 10 different characters, each representing one column of hiragana.
@@ -193,7 +195,7 @@ def load_kmnist(subset: str = "all", return_X_y: bool = False, downloads_path: s
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -217,7 +219,7 @@ def load_kmnist(subset: str = "all", return_X_y: bool = False, downloads_path: s
     return _load_torch_image_data(torchvision.datasets.KMNIST, subset, True, "HW", return_X_y, downloads_path)
 
 
-def load_fmnist(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_fmnist(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the Fashion-MNIST data set. It consists of 70000 28x28 grayscale images showing articles from the Zalando online store.
     Each sample belongs to one of 10 product groups.
@@ -230,7 +232,7 @@ def load_fmnist(subset: str = "all", return_X_y: bool = False, downloads_path: s
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -254,7 +256,7 @@ def load_fmnist(subset: str = "all", return_X_y: bool = False, downloads_path: s
     return _load_torch_image_data(torchvision.datasets.FashionMNIST, subset, True, "HW", return_X_y, downloads_path)
 
 
-def load_usps(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_usps(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the USPS data set. It consists of 9298 16x16 grayscale images showing handwritten digits (0 to 9).
     The data set is composed of 7291 training and 2007 test images.
@@ -266,7 +268,7 @@ def load_usps(subset: str = "all", return_X_y: bool = False, downloads_path: str
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -290,7 +292,7 @@ def load_usps(subset: str = "all", return_X_y: bool = False, downloads_path: str
     return _load_torch_image_data(torchvision.datasets.USPS, subset, True, "HW", return_X_y, downloads_path)
 
 
-def load_cifar10(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_cifar10(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the CIFAR10 data set. It consists of 60000 32x32 color images showing different objects.
     The classes are airplane, automobile, bird, cat, deer, dog, frog, horse, ship and truck.
@@ -303,7 +305,7 @@ def load_cifar10(subset: str = "all", return_X_y: bool = False, downloads_path: 
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -327,7 +329,7 @@ def load_cifar10(subset: str = "all", return_X_y: bool = False, downloads_path: 
 
 
 def load_cifar100(subset: str = "all", use_superclasses: bool = False, return_X_y: bool = False,
-                  downloads_path: str = None) -> Bunch:
+                  downloads_path: str | Path = None) -> Bunch:
     """
     Load the CIFAR100 data set. It consists of 60000 32x32 color images showing different objects.
     A total of 100 classes are included, each depicting a specific of objects. Each class contains 600 objects.
@@ -343,7 +345,7 @@ def load_cifar100(subset: str = "all", use_superclasses: bool = False, return_X_
         If set to True, the 20 superclasses are used instead of the 100 regular classes (default: False)
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -395,7 +397,7 @@ def load_cifar100(subset: str = "all", use_superclasses: bool = False, return_X_
         return dataset
 
 
-def load_svhn(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_svhn(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the SVHN data set. It consists of 99289 32x32 color images showing house numbers (0 to 9).
     The data set is composed of 73257 training and 26032 test images.
@@ -407,7 +409,7 @@ def load_svhn(subset: str = "all", return_X_y: bool = False, downloads_path: str
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -430,7 +432,7 @@ def load_svhn(subset: str = "all", return_X_y: bool = False, downloads_path: str
     return _load_torch_image_data(torchvision.datasets.SVHN, subset, False, "CHW", return_X_y, downloads_path)
 
 
-def load_stl10(subset: str = "all", return_X_y: bool = False, downloads_path: str = None) -> Bunch:
+def load_stl10(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
     """
     Load the STL10 data set. It consists of 13000 96x96 color images showing different objects.
     The classes are airplane, bird, car, cat, deer, dog, horse, monkey, ship and truck.
@@ -443,7 +445,7 @@ def load_stl10(subset: str = "all", return_X_y: bool = False, downloads_path: st
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
@@ -468,7 +470,7 @@ def load_stl10(subset: str = "all", return_X_y: bool = False, downloads_path: st
 
 
 def load_gtsrb(subset: str = "all", image_size: tuple = (32, 32), return_X_y: bool = False,
-               downloads_path: str = None) -> Bunch:
+               downloads_path: str | Path = None) -> Bunch:
     """
     Load the GTSRB (German Traffic Sign Recognition Benchmark) data set. It consists of 39270 color images showing 43 different traffic signs.
     Example classes are: stop sign, speed limit 50 sign, speed limit 70 sign, construction site sign and many others.
@@ -484,7 +486,7 @@ def load_gtsrb(subset: str = "all", image_size: tuple = (32, 32), return_X_y: bo
         The tuple equals (width, height) of the images (default: (32, 32))
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str
+    downloads_path : str | Path
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns

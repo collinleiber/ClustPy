@@ -4,11 +4,12 @@ Collin Leiber
 """
 
 import numpy as np
-from sklearn.mixture import GaussianMixture as GMM
 from scipy.stats import ks_2samp
 from sklearn.base import BaseEstimator, ClusterMixin
-from clustpy.utils.checks import check_parameters
+from sklearn.mixture import GaussianMixture as GMM
 from sklearn.utils.validation import check_is_fitted
+
+from clustpy.utils.checks import check_parameters
 
 
 def _pgmeans(X, significance, n_projections, n_samples, n_new_centers, amount_random_centers, n_clusters_init,
@@ -62,7 +63,8 @@ def _pgmeans(X, significance, n_projections, n_samples, n_new_centers, amount_ra
         gmm_matches = True
         for _ in range(n_projections):
             # Get random projection
-            projection_vector = random_state.rand(X.shape[1])
+            projection_vector = random_state.randn(X.shape[1])
+            projection_vector /= np.linalg.norm(projection_vector)
             # Project data
             projected_X = np.matmul(X, projection_vector)
             # Project model - Alternative: Sample directly from model and project samples (should be slower)
@@ -150,12 +152,11 @@ def _update_gmm_with_new_center(X: np.ndarray, n_clusters: int, current_gmm: GMM
         The updated GMM with an additional center added
     """
     best_gmm = None
-    best_log_likelihood = np.inf
+    best_log_likelihood = -np.inf
     if n_new_non_random_centers > 0:
-        # Non-random centers are chosen through lowest probability regarding current GMM
-        max_probability_densities = np.max(current_gmm.predict_proba(X), axis=1)
-        # Get minimum max probabilities
-        possible_non_random_samples = np.argsort(max_probability_densities)
+        pointwise_log_likelihood = current_gmm.score_samples(X)
+        # Get lowest fit point (lowest log likelihood)
+        possible_non_random_samples = np.argsort(pointwise_log_likelihood)
     for c in range(n_new_non_random_centers + n_new_random_centers):
         if c < n_new_non_random_centers:
             # Add non random centers
@@ -166,9 +167,10 @@ def _update_gmm_with_new_center(X: np.ndarray, n_clusters: int, current_gmm: GMM
         new_gmm = GMM(n_components=n_clusters, n_init=1, means_init=np.r_[current_gmm.means_, [new_center]],
                       random_state=random_state)
         new_gmm.fit(X)
+        new_avg_log_likelihood = new_gmm.score(X)
         # Check error of new GMM
-        if new_gmm.lower_bound_ < best_log_likelihood:
-            best_log_likelihood = new_gmm.lower_bound_
+        if new_avg_log_likelihood > best_log_likelihood:
+            best_log_likelihood = new_avg_log_likelihood
             best_gmm = new_gmm
     return best_gmm
 
@@ -296,16 +298,27 @@ class PGMeans(ClusterMixin, BaseEstimator):
             this instance of the PGMeans algorithm
         """
         X, _, random_state = check_parameters(X=X, y=y, random_state=self.random_state)
+        n, _ = X.shape
+
+        alpha = self.significance
+
         if self.n_projections is None:
             n_projections = int(-2.6198 * np.log(self.significance)) + 1
         else:
             n_projections = self.n_projections
         if self.n_samples is None:
-            n_samples = int(3 / self.significance) + 1
+            n_prime = 3 / alpha
+            n_samples = int(n_prime) + 1
         else:
             n_samples = self.n_samples
+
+        if n_samples < n:
+                # scale the significance level if using less than n generated points for KS test
+                alpha = np.sqrt(n_samples / n) * alpha
+        
+
         n_samples = min(n_samples, X.shape[0])
-        n_clusters, labels, centers, gmm = _pgmeans(X, self.significance, n_projections, n_samples,
+        n_clusters, labels, centers, gmm = _pgmeans(X, alpha, n_projections, n_samples,
                                                self.n_new_centers, self.amount_random_centers, self.n_clusters_init,
                                                self.max_n_clusters, random_state)
         self.n_clusters_ = n_clusters
