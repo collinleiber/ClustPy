@@ -100,8 +100,8 @@ def test_dc_tree_min():
     for i, node in enumerate(all_nodes):
         assert node.id == i
     # Test repr
-    assert type(dctree.__repr__) is str
-    assert type(node.__repr__) is str
+    assert type(dctree.__repr__()) is str
+    assert type(node.__repr__()) is str
 
 
 def test_reachability_distances():
