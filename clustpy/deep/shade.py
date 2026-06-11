@@ -16,6 +16,7 @@ from clustpy.utils.checks import check_parameters
 import tqdm
 from typing import Callable, Optional, Tuple
 from sklearn.utils.validation import check_is_fitted
+from sklearn.base import ClusterMixin
 
 
 class SHADE(_AbstractDeepClusteringAlgo):
