@@ -59,7 +59,7 @@ def _gmeans(X: np.ndarray, significance: float, n_clusters_init: int, max_n_clus
             projected_data = np.dot(X[ids_in_cluster], projection_vector)
             projected_data = (projected_data - projected_data.mean()) / projected_data.std()
             # Use Anderson Darling to test if data is Gaussian
-            ad_result = anderson(projected_data, "norm", method="interpolated")
+            ad_result = anderson(projected_data, "norm", method="interpolate")
             p_value = ad_result.pvalue
             if p_value < significance:
                 # If data is not Gaussian, keep the newly created cluster centers

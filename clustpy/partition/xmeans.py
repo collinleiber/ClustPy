@@ -146,7 +146,8 @@ def _xmeans(X: np.ndarray, n_clusters_init: int, max_n_clusters: int, check_glob
     n_split_trials : int
         Number tries to split a cluster. For each try 2-KMeans is executed with different cluster centers
     split_criterion : str
-        The split criterion. Can be "original", "corrected", or "aic"
+        The split criterion. Can be "bic-original" (BIC), "bic-corrected" (corrected BIC), 
+        "aic-original" (AIC), or "aic-corrected" (corrected AIC) 
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution
 
@@ -258,7 +259,8 @@ def _merge_clusters(X: np.ndarray, n_clusters: int, labels: np.ndarray, centers:
     cluster_inertias : np.ndarray
         The inertias of the clusters
     split_criterion : str
-        The split criterion. Can be "original", "corrected", or "aic"
+        The split criterion. Can be "bic-original" (BIC), "bic-corrected" (corrected BIC), 
+        "aic-original" (AIC), or "aic-corrected" (corrected AIC) 
 
     Returns
     -------
