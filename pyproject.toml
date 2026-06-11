@@ -12,7 +12,7 @@ license = {text = "BSD-3-Clause License"}
 requires-python = ">=3.10"
 dependencies = [
     "numpy",
-    "scipy",
+    "scipy>=1.17.0",
     "scikit-learn>=1.6",
     "matplotlib",
     "torch",
