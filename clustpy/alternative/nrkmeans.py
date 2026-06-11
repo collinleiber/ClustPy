@@ -69,19 +69,19 @@ def _kmeans_plus_plus(X: np.ndarray, n_clusters: int, x_squared_norms: np.ndarra
     return centers
 
 
-def check_n_clusters_for_nr(n_clusters_in: list | tuple) -> list:
+def check_n_clusters_for_nr(n_clusters_in: list[int] | tuple[int, ...]) -> list[int]:
     """
     Check if n_clusters correctly defined as a list/tuple for non-redundant clustering.
 
 
     Parameters
     ----------
-    n_clusters_in : list | tuple
+    n_clusters_in : list[int] | tuple[int, ...]
         list containing the number of clusters for each subspace
 
     Returns
     -------
-    n_clusters : list
+    n_clusters : list[int]
         The checked n_clusters value
     """
     if type(n_clusters_in) is int:
@@ -98,10 +98,10 @@ Defines the numerical error that is accepted to consider a matrix as orthogonal 
 _ACCEPTED_NUMERICAL_ERROR = 1e-6
 
 
-def _nrkmeans(X: np.ndarray, n_clusters: list, V: np.ndarray, m: list, P: list, centers: list, mdl_for_noisespace: bool,
+def _nrkmeans(X: np.ndarray, n_clusters: list[int], V: np.ndarray, m: list[int], P: list[np.ndarray], centers: list[np.ndarray], mdl_for_noisespace: bool,
               outliers: bool, max_iter: int, threshold_negative_eigenvalue: float, max_distance: float,
-              precision: float, random_state: np.random.RandomState, debug: bool) -> (
-        np.ndarray, list, np.ndarray, list, list, list, list, int):
+              precision: float, random_state: np.random.RandomState, debug: bool) -> tuple[
+                  np.ndarray, list[np.ndarray], np.ndarray, list[int], list[np.ndarray], list[int], list[np.ndarray], int]:
     """
     Start the actual NrKmeans clustering procedure on the input data set.
 
@@ -109,15 +109,15 @@ def _nrkmeans(X: np.ndarray, n_clusters: list, V: np.ndarray, m: list, P: list, 
     ----------
     X : np.ndarray
         the given data set
-    n_clusters : list
+    n_clusters : list[int]
         list containing number of clusters for each subspace
     V : np.ndarray
         the orthonormal rotation matrix. Can be None
-    m : list
+    m : list[int]
         list containing the dimensionalities for each subspace. Can be None
-    P : list
+    P : list[np.ndarray]
         list containing projections (ids of corresponding dimensions) for each subspace. Can be None
-    centers : list
+    centers : list[np.ndarray]
         list containing the cluster centers for each subspace. Can be None
     mdl_for_noisespace : bool
         defines if MDL should be used to identify noise space dimensions instead of only considering negative eigenvalues
@@ -138,7 +138,7 @@ def _nrkmeans(X: np.ndarray, n_clusters: list, V: np.ndarray, m: list, P: list, 
 
     Returns
     -------
-    tuple : (np.ndarray, list, np.ndarray, list, list, list, list, int)
+    tuple : tuple[np.ndarray, list[np.ndarray], np.ndarray, list[int], list[np.ndarray], list[int], list[np.ndarray], int]
         The labels,
         The cluster centers,
         The orthonormal rotation matrix,
@@ -203,10 +203,10 @@ def _nrkmeans(X: np.ndarray, n_clusters: list, V: np.ndarray, m: list, P: list, 
     return labels, centers, V, m, P, n_clusters, scatter_matrices, iteration + 1
 
 
-def _initialize_nrkmeans_parameters(X: np.ndarray, n_clusters: list, V: np.ndarray, m: list, P: list, centers: list,
+def _initialize_nrkmeans_parameters(X: np.ndarray, n_clusters: list[int], V: np.ndarray, m: list[int], P: list[np.ndarray], centers: list[np.ndarray],
                                     mdl_for_noisespace: bool, outliers: bool, max_iter: int,
-                                    random_state: np.random.RandomState) -> (
-        np.ndarray, list, list, list, np.random.RandomState, int, np.ndarray, list, float, float):
+                                    random_state: np.random.RandomState) -> tuple[
+                                        np.ndarray, list[int], list[np.ndarray], list[np.ndarray], np.random.RandomState, int, np.ndarray, list[np.ndarray], float, float]:
     """
     Initialize the input parameters of NrKmeans. This means that all input values which are None must be defined.
     Also all input parameters which are not None must be checked, if a correct execution is possible.
@@ -215,15 +215,15 @@ def _initialize_nrkmeans_parameters(X: np.ndarray, n_clusters: list, V: np.ndarr
     ----------
     X : np.ndarray
         the given data set
-    n_clusters : list
+    n_clusters : list[int]
         list containing number of clusters for each subspace
     V : np.ndarray
         the orthonormal rotation matrix. Can be None
-    m : list
+    m : list[int]
         list containing the dimensionalities for each subspace. Can be None
-    P : list
+    P : list[np.ndarray]
         list containing projections (ids of corresponding dimensions) for each subspace. Can be None
-    centers : list
+    centers : list[np.ndarray]
         list containing the cluster centers for each subspace. Can be None
     mdl_for_noisespace : bool
         defines if MDL should be used to identify noise space dimensions instead of only considering negative eigenvalues
@@ -236,7 +236,7 @@ def _initialize_nrkmeans_parameters(X: np.ndarray, n_clusters: list, V: np.ndarr
 
     Returns
     -------
-    tuple : (np.ndarray, list, list, list, np.random.RandomState, int, np.ndarray, list, float, float)
+    tuple : tuple[np.ndarray, list[int], list[np.ndarray], list[np.ndarray], np.random.RandomState, int, np.ndarray, list[np.ndarray], float, float]
         The initial orthonormal rotation matrix,
         The initial dimensionalities of the subpsaces,
         The initial projections,
@@ -387,8 +387,8 @@ def _assign_labels(X: np.ndarray, V: np.ndarray, centers_subspace: np.ndarray, P
     return labels
 
 
-def _update_centers_and_scatter_matrix(X: np.ndarray, n_clusters_subspace: int, labels_subspace: np.ndarray) -> (
-        np.ndarray, np.ndarray):
+def _update_centers_and_scatter_matrix(X: np.ndarray, n_clusters_subspace: int, labels_subspace: np.ndarray) -> tuple[
+        np.ndarray, np.ndarray]:
     """
     Update the cluster centers within this subspace depending on the labels of the data points. Also updates the
     scatter matrix by summing up the outer product of the distance between each point and its center.
@@ -404,7 +404,7 @@ def _update_centers_and_scatter_matrix(X: np.ndarray, n_clusters_subspace: int, 
 
     Returns
     -------
-    tuple : (np.ndarray, np.ndarray)
+    tuple : tuple[np.ndarray, np.ndarray]
         The updated cluster centers,
         The updated scatter matrix
     """
@@ -417,7 +417,7 @@ def _update_centers_and_scatter_matrix(X: np.ndarray, n_clusters_subspace: int, 
 
 
 def _remove_empty_cluster(n_clusters_subspace: int, centers_subspace: np.ndarray,
-                          labels_subspace: np.ndarray, debug: bool) -> (int, np.ndarray, np.ndarray):
+                          labels_subspace: np.ndarray, debug: bool) -> tuple[int, np.ndarray, np.ndarray]:
     """
     Check if a cluster got lost after label assignment and center update. Empty clusters will be
     removed for the following rotation. Therefore, all necessary lists will be updated.
@@ -435,7 +435,7 @@ def _remove_empty_cluster(n_clusters_subspace: int, centers_subspace: np.ndarray
 
     Returns
     -------
-    tuple : (int, np.ndarray, np.ndarray)
+    tuple : tuple[int, np.ndarray, np.ndarray]
         The updated number of clusters,
         The updated cluster centers.
         The updated cluster labels
@@ -457,10 +457,10 @@ def _remove_empty_cluster(n_clusters_subspace: int, centers_subspace: np.ndarray
     return n_clusters_subspace, centers_subspace, labels_subspace
 
 
-def _update_rotation(X: np.ndarray, V: np.ndarray, first_index: int, second_index: int, n_clusters: list, P: list,
-                     scatter_matrices: list, threshold_negative_eigenvalue: float,
+def _update_rotation(X: np.ndarray, V: np.ndarray, first_index: int, second_index: int, n_clusters: list[int], P: list[np.ndarray],
+                     scatter_matrices: list[np.ndarray], threshold_negative_eigenvalue: float,
                      mdl_for_noisespace: bool, outliers: bool, n_outliers: np.ndarray, max_distance: float,
-                     precision: float) -> (np.ndarray, np.ndarray, np.ndarray):
+                     precision: float) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Update the orthonormal rotation matrix and the subspace projections.
     This happens in a pairwise fashion by considering just two subspaces at a time.
@@ -475,11 +475,11 @@ def _update_rotation(X: np.ndarray, V: np.ndarray, first_index: int, second_inde
         index of the first subspace
     second_index : int
         index of the second subspace (in contrast to the first_index this can be the noise space)
-    n_clusters : list
+    n_clusters : list[int]
         list containing number of clusters for each subspace
-    P : list
+    P : list[np.ndarray]
         list containing projections (ids of corresponding dimensions) for each subspace
-    scatter_matrices : list
+    scatter_matrices : list[np.ndarray]
         the scatter matrix of each subspace
     threshold_negative_eigenvalue : float
         threshold to consider an eigenvalue as negative. Used for the update of the subspace dimensions
@@ -496,7 +496,7 @@ def _update_rotation(X: np.ndarray, V: np.ndarray, first_index: int, second_inde
 
     Returns
     -------
-    tuple : (np.ndarray, np.ndarray, np.ndarray)
+    tuple : tuple[np.ndarray, np.ndarray, np.ndarray]
         The new projections for the first subspace,
         The new projections for the second subspace,
         The new orthonormal rotation matrix
@@ -576,7 +576,7 @@ def _get_cost_function_of_subspace(cropped_V: np.ndarray, scatter_matrix_subspac
     return costs
 
 
-def _get_total_cost_function(V: np.ndarray, P: list, scatter_matrices: list) -> float:
+def _get_total_cost_function(V: np.ndarray, P: list[np.ndarray], scatter_matrices: list[np.ndarray]) -> float:
     """
     Calculate the sum of the results of the NrKmeans cost function for each subspaces.
     Calls _get_cost_function_of_subspace for each subspace and sums up the results.
@@ -587,9 +587,9 @@ def _get_total_cost_function(V: np.ndarray, P: list, scatter_matrices: list) -> 
     ----------
     V : np.ndarray
         the orthonormal rotation matrix
-    P : list
+    P : list[np.ndarray]
         list containing projections (ids of corresponding dimensions) for each subspace
-    scatter_matrices : list
+    scatter_matrices : list[np.ndarray]
         the scatter matrix of each subspace
 
     Returns
@@ -626,7 +626,7 @@ def _create_full_rotation_matrix(dimensionality: int, P_combined: np.ndarray, V_
     return V_F
 
 
-def _update_projections(P_combined: np.ndarray, n_negative_e: int) -> (np.ndarray, np.ndarray):
+def _update_projections(P_combined: np.ndarray, n_negative_e: int) -> tuple[np.ndarray, np.ndarray]:
     """
     Create the new projections for the two subspaces. First subspace gets as many projections as there are negative
     eigenvalues. Second subspace gets all other projections in reversed order.
@@ -640,7 +640,7 @@ def _update_projections(P_combined: np.ndarray, n_negative_e: int) -> (np.ndarra
 
     Returns
     -------
-    tuple : (np.ndarray, np.ndarray)
+    tuple : tuple[np.ndarray, np.ndarray]
         The new projections for the first subspace,
         The new projections for the second subspace
     """
@@ -649,31 +649,32 @@ def _update_projections(P_combined: np.ndarray, n_negative_e: int) -> (np.ndarra
     return P_1_new, P_2_new
 
 
-def _remove_empty_subspace(n_clusters: list, m: list, P: list, centers: list, labels: np.ndarray,
-                           scatter_matrices: list, debug: bool) -> (int, list, list, list, list, np.ndarray, list):
+def _remove_empty_subspace(n_clusters: list[int], m: list[int], P: list[np.ndarray], centers: list[np.ndarray], labels: np.ndarray,
+                           scatter_matrices: list[np.ndarray], debug: bool) -> tuple[
+                               int, list[int], list[int], list[np.ndarray], list[np.ndarray], np.ndarray, list[np.ndarray]]:
     """
     Check if any empty subspaces occurre after rotating and rearranging the dimensionalities. Empty subspaces will be
     removed for the next iteration. Therefore all necessary lists will be updated.
 
     Parameters
     ----------
-    n_clusters : list
+    n_clusters : list[int]
         list containing number of clusters for each subspace
-    m : list
+    m : list[int]
         list containing the dimensionalities for each subspace
-    P : list
+    P : list[np.ndarray]
         list containing projections (ids of corresponding dimensions) for each subspace
-    centers : list
+    centers : list[np.ndarray]
         list containing the cluster centers for each subspace
     labels : np.ndarray
         the cluster labels of each subspace
-    scatter_matrices : list
+    scatter_matrices : list[np.ndarray]
         the scatter matrix of each subspace
     debug : bool
 
     Returns
     -------
-    tuple : (int, list, list, list, list, np.ndarray, list)
+    tuple : tuple[int, list[int], list[int], list[np.ndarray], list[np.ndarray], np.ndarray, list[np.ndarray]]
         The number of subspaces,
         The number of clusters per subspace,
         The dimensionality of each subspace,
@@ -781,15 +782,15 @@ class NrKmeans(TransformerMixin, ClusterMixin, BaseEstimator):
 
     Parameters
     ----------
-    n_clusters : list | tuple
+    n_clusters : list[int] | tuple[int, ...]
         list containing number of clusters for each subspace (default: (3, 3))
     V_init : np.ndarray
         the initial orthonormal rotation matrix (default: None)
-    m_init : list
+    m_init : list[int]
         list containing the initial dimensionalities for each subspace (default: None)
-    P_init : list
+    P_init : list[np.ndarray]
         list containing the initial projections (ids of corresponding dimensions) for each subspace (default: None)
-    cluster_centers_init : list
+    cluster_centers_init : list[np.ndarray]
         list containing the initial cluster centers for each subspace (default: None)
     mdl_for_noisespace : bool
         defines if MDL should be used to identify noise space dimensions instead of only considering negative eigenvalues (default: False)
@@ -818,9 +819,9 @@ class NrKmeans(TransformerMixin, ClusterMixin, BaseEstimator):
     ----------
     labels_ : np.ndarray
         The final labels. Shape equals (n_samples x n_subspaces)
-    scatter_matrices_ : list
+    scatter_matrices_ : list[np.ndarray]
         The final scatter matrix of each subspace
-    n_iter_ : list
+    n_iter_ : int
         The number of iterations used to achieve the result
     n_features_in_ : int
         the number of features used for the fitting
@@ -837,8 +838,8 @@ class NrKmeans(TransformerMixin, ClusterMixin, BaseEstimator):
     Society for Industrial and Applied Mathematics, 2022.
     """
 
-    def __init__(self, n_clusters: list | tuple = (3, 3), V_init: np.ndarray = None, m_init: list = None, P_init: list = None,
-                 cluster_centers_init: list = None, mdl_for_noisespace: bool = False, outliers: bool = False,
+    def __init__(self, n_clusters: list[int] | tuple[int, ...] = (3, 3), V_init: np.ndarray = None, m_init: list[int] = None, P_init: list[np.ndarray] = None,
+                 cluster_centers_init: list[np.ndarray] = None, mdl_for_noisespace: bool = False, outliers: bool = False,
                  max_iter: int = 300, n_init: int = 1, cost_type: str = "default",
                  threshold_negative_eigenvalue: float = -1e-7, max_distance: float = None, precision: float = None,
                  random_state: np.random.RandomState | int = None, debug: bool = False):
@@ -1070,7 +1071,7 @@ class NrKmeans(TransformerMixin, ClusterMixin, BaseEstimator):
                             self.transform_subspace(self.cluster_centers_[subspace_index], subspace_index) if
                             plot_centers else None, true_labels=gt, equal_axis=equal_axis)
 
-    def calculate_mdl_costs(self, X: np.ndarray) -> (float, float, list):
+    def calculate_mdl_costs(self, X: np.ndarray) -> tuple[float, float, list[float]]:
         """
         Calculate the Mdl Costs of this NrKmeans result.
 
@@ -1081,7 +1082,7 @@ class NrKmeans(TransformerMixin, ClusterMixin, BaseEstimator):
 
         Returns
         -------
-        tuple : (float, float, list)
+        tuple : tuple[float, float, list[float]]
             The total costs (global costs + sum of subspace costs),
             The global costs,
             The subspace specific costs (one entry for each subspace)
@@ -1108,7 +1109,7 @@ class NrKmeans(TransformerMixin, ClusterMixin, BaseEstimator):
         costs = _get_total_cost_function(self.V_, self.P_, self.scatter_matrices_)
         return costs
 
-    def dissolve_noise_space(self, X: np.ndarray = None, random_feature_assignment: bool = True) -> 'NrKmeans':
+    def dissolve_noise_space(self, X: np.ndarray | None = None, random_feature_assignment: bool = True) -> 'NrKmeans':
         """
         Using this method an optional noise space (n_clusters=1) can be removed.
         This is useful if the noise space is no longer relevant for subsequent processing steps.
@@ -1120,7 +1121,7 @@ class NrKmeans(TransformerMixin, ClusterMixin, BaseEstimator):
 
         Parameters
         ----------
-        X : np.ndarray
+        X : np.ndarray | None
             the given data set. Only used to calculate MDL costs. Therefore, can be None if random_feature_assignment is True (default: None)
         random_feature_assignment : bool
             If true, the random strategy to distribute the noise space features is used (default: True)
@@ -1180,9 +1181,9 @@ class NrKmeans(TransformerMixin, ClusterMixin, BaseEstimator):
 
 
 def _compare_possible_splits(X: np.ndarray, V: np.ndarray, cluster_index: int, noise_index: int, n_negative_e: int,
-                             P_combined: np.ndarray, n_clusters: list, scatter_matrices: list,
+                             P_combined: np.ndarray, n_clusters: list[int], scatter_matrices: list[np.ndarray],
                              outliers: bool, n_outliers: np.ndarray, max_distance: float,
-                             precision: float) -> (np.ndarray, np.ndarray):
+                             precision: float) -> tuple[np.ndarray, np.ndarray]:
     """
     Use MDL to find the best combination of cluster and noise space dimensionality. Try raising number of cluster space
     dimensions until MDL costs increase.
@@ -1202,9 +1203,9 @@ def _compare_possible_splits(X: np.ndarray, V: np.ndarray, cluster_index: int, n
         number of negative eigenvalues
     P_combined : np.ndarray
         combined projections of the two subspaces
-    n_clusters : list
+    n_clusters : list[int]
         list containing number of clusters for each subspace
-    scatter_matrices : list
+    scatter_matrices : list[np.ndarray]
         the scatter matrix of each subspace
     outliers : bool
         defines if outliers should be identified through MDL
@@ -1217,7 +1218,7 @@ def _compare_possible_splits(X: np.ndarray, V: np.ndarray, cluster_index: int, n
 
     Returns
     -------
-    tuple : (np.ndarray, np.ndarray)
+    tuple : tuple[np.ndarray, np.ndarray]
         The new projections for the cluster space,
         The new projections for the noise space
     """
@@ -1244,7 +1245,7 @@ def _compare_possible_splits(X: np.ndarray, V: np.ndarray, cluster_index: int, n
 
 def _mdl_m_dependant_subspace_costs(X: np.ndarray, V: np.ndarray, cluster_index: int, noise_index: int, m_cluster: int,
                                     m_noise: int, P_cluster: np.ndarray, P_noise: np.ndarray,
-                                    scatter_matrices: list, n_clusters: list, outliers: bool, n_outliers: np.ndarray,
+                                    scatter_matrices: list[np.ndarray], n_clusters: list[int], outliers: bool, n_outliers: np.ndarray,
                                     max_distance: float, precision: float) -> float:
     """
     Get the total costs depending on the subspace dimensions for one cluster space and the noise space.
@@ -1270,9 +1271,9 @@ def _mdl_m_dependant_subspace_costs(X: np.ndarray, V: np.ndarray, cluster_index:
         projections of the cluster space
     P_noise : np.ndarray
         projections of the noise space
-    scatter_matrices : list
+    scatter_matrices : list[np.ndarray]
         the scatter matrix of each subspace
-    n_clusters : list
+    n_clusters : list[int]
         list containing number of clusters for each subspace
     outliers : bool
         defines if outliers should be identified through MDL
@@ -1323,7 +1324,7 @@ def _mdl_m_dependant_subspace_costs(X: np.ndarray, V: np.ndarray, cluster_index:
 
 def _check_for_outliers(X: np.ndarray, V: np.ndarray, centers_subspace: np.ndarray, labels_subspace: np.ndarray,
                         scatter_matrix_subspace: np.ndarray, m_subspace: int, P_subspace: np.ndarray,
-                        n_points: int, max_distance: float) -> (np.ndarray, int):
+                        n_points: int, max_distance: float) -> tuple[np.ndarray, int]:
     """
     Check for each point if it should be interpreted as an outlier in this subspace. Outliers are defined by the cost
     difference when this point is removed from its cluster. If it is cheaper to encode the point separately it is an outlier.
@@ -1354,7 +1355,7 @@ def _check_for_outliers(X: np.ndarray, V: np.ndarray, centers_subspace: np.ndarr
 
     Returns
     -------
-    tuple : (np.ndarray, int)
+    tuple : tuple[np.ndarray, int]
         The new cluster labels for this subspace,
         The number of outliers in this subspace
     """
@@ -1391,8 +1392,8 @@ def _check_for_outliers(X: np.ndarray, V: np.ndarray, centers_subspace: np.ndarr
     return labels_subspace_copy, n_outliers_total
 
 
-def _mdl_costs(X: np.ndarray, n_clusters: list, m: list, P: list, V: np.ndarray, scatter_matrices: list,
-               labels: np.ndarray, outliers: bool, max_distance: float, precision: float) -> (float, float, list):
+def _mdl_costs(X: np.ndarray, n_clusters: list[int], m: list[int], P: list[np.ndarray], V: np.ndarray, scatter_matrices: list[np.ndarray],
+               labels: np.ndarray, outliers: bool, max_distance: float, precision: float) -> tuple[float, float, list[float]]:
     """
     Calculate the total mdl costs of a non-redundant clustering found by NrKmeans.
     Total costs consists of global costs which describe the whole system (e.g. number of subspaces)
@@ -1405,15 +1406,15 @@ def _mdl_costs(X: np.ndarray, n_clusters: list, m: list, P: list, V: np.ndarray,
     ----------
     X : np.ndarray
         the given data set
-    n_clusters : list
+    n_clusters : list[int]
         list containing number of clusters for each subspace
-    m : list
+    m : list[int]
         list containing number of dimensionalities for each subspace
-    P : list
+    P : list[np.ndarray]
         list containing projections (ids of corresponding dimensions) for each subspace
     V : np.ndarray
         the orthonormal rotation matrix
-    scatter_matrices : list
+    scatter_matrices : list[np.ndarray]
         list containing all scatter matrices of the subspaces
     labels : np.ndarray
         the cluster labels of each subspace. -1 equals outlier
@@ -1426,7 +1427,7 @@ def _mdl_costs(X: np.ndarray, n_clusters: list, m: list, P: list, V: np.ndarray,
 
     Returns
     -------
-    tuple : (float, float, list)
+    tuple : tuple[float, float, list[float]]
         The total costs (global costs + sum of subspace costs),
         The global costs,
         The subspace specific costs (one entry for each subspace)

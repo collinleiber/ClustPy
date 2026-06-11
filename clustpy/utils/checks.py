@@ -4,7 +4,7 @@ import numpy as np
 from sklearn.utils import check_X_y, check_array, check_random_state
 
 
-def check_clustpy_estimator(estimator_obj: BaseEstimator, checks_to_ignore: tuple | list = ("check_complex_data")):
+def check_clustpy_estimator(estimator_obj: BaseEstimator, checks_to_ignore: tuple[str, ...] | list[str] = ("check_complex_data")) -> None:
     """
     Run the check_estimator function from sklearn ignoring the check for complex data.
     For more information, check: https://github.com/scikit-learn/scikit-learn/blob/main/sklearn/utils/estimator_checks.py
@@ -13,7 +13,7 @@ def check_clustpy_estimator(estimator_obj: BaseEstimator, checks_to_ignore: tupl
     ----------
     estimator_obj : BaseEstimator
         Initialization of the tested BaseEstimator
-    checks_to_ignore : tuple | list
+    checks_to_ignore : tuple[str, ....] | list[str]
         List containing the names of checks to ignore (default: ("check_complex_data"))
     """
     all_checks = estimator_checks_generator(estimator_obj)
@@ -29,8 +29,9 @@ def check_clustpy_estimator(estimator_obj: BaseEstimator, checks_to_ignore: tupl
             print("Skip check:", check_name)
 
 
-def check_parameters(X: np.ndarray, *, y: np.ndarray=None, random_state: np.random.RandomState | int=None,
-                     allow_nd: bool=False, allow_size_1: bool=False, estimator_obj: BaseEstimator = None) -> (np.ndarray, np.ndarray, np.random.RandomState):
+def check_parameters(X: np.ndarray, *, y: np.ndarray | None = None, random_state: np.random.RandomState | int | None = None,
+                     allow_nd: bool=False, allow_size_1: bool=False, estimator_obj: BaseEstimator | None = None) -> tuple[
+                         np.ndarray, np.ndarray, np.random.RandomState]:
     """
     Check if parameters for X, y and random_state are defined in accordance with the sklearn standard.
 
@@ -38,20 +39,20 @@ def check_parameters(X: np.ndarray, *, y: np.ndarray=None, random_state: np.rand
     ----------
     X : np.ndarray
         the given data set
-    y : np.ndarray
+    y : np.ndarray | None
         the labels (can usually be ignored) (default: None)
-    random_state : np.random.RandomState | int
+    random_state : np.random.RandomState | int | None
         the random state (default: None)
     allow_nd : bool
         allow n-dimensional arrays instead of only allowing 2d arrays (default: False)
     allow_size_1 : bool
         allow a dataset with a single sample
-    estimator_obj : BaseEstimator
+    estimator_obj : BaseEstimator | None
         Initialization of the tested BaseEstimator (default: None)
 
     Returns
     -------
-    tuple : (np.ndarray, np.ndarray, np.random.RandomState)
+    tuple : tuple[np.ndarray, np.ndarray, np.random.RandomState]
         the checked data set,
         the checked labels
         the checked random_state
