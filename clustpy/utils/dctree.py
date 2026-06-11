@@ -400,11 +400,9 @@ class DCTree:
             return ""
         pointer_right = "   "
         pointer_left = "   " if self.root.right else "   "
-        repr_string = (
-            f"{self.root}"
-            f"{self.__repr__help(self.root.left, pointer_left, '', self.root.right is not None)}"
-            f"{self.__repr__help(self.root.right, pointer_right, '', False)}"
-        )
+        repr_string = f"{self.root}" 
+        repr_string += f"{self.__repr__help(self.root.left, pointer_left, '', self.root.right is not None)}" 
+        repr_string += f"{self.__repr__help(self.root.right, pointer_right, '', False)}"
         return repr_string
 
     def __repr__help(self, node: Optional[_DCNode], pointer: str, padding: str, has_right_sibling: bool) -> str:
@@ -432,13 +430,11 @@ class DCTree:
         padding_for_both = padding + ("   " if has_right_sibling else "   ")
         pointer_right = "   "
         pointer_left = "   " if node.right else "   "
-        repr_string = (
-            f"\n   {padding.replace('|', ' ')}// #region"
-            f"\n{padding}{pointer}{node}"
-            f"{self.__repr__help(node.left, pointer_left, padding_for_both, node.right is not None)}"
-            f"{self.__repr__help(node.right, pointer_right, padding_for_both, False)}"
-            f"\n   {padding.replace('|', ' ')}// #endregion"
-        )
+        repr_string = f"\n   {padding.replace('|', ' ')}// #region" 
+        repr_string += f"\n{padding}{pointer}{node}" 
+        repr_string += f"{self.__repr__help(node.left, pointer_left, padding_for_both, node.right is not None)}" 
+        repr_string += f"{self.__repr__help(node.right, pointer_right, padding_for_both, False)}" 
+        repr_string += f"\n   {padding.replace('|', ' ')}// #endregion"
         return repr_string
 
 
