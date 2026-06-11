@@ -167,7 +167,7 @@ def get_trained_network(trainloader: torch.utils.data.DataLoader = None, data: n
     neural_network = get_neural_network(input_dim, embedding_size, neural_network, neural_network_class,
                                          neural_network_params, neural_network_weights, device, random_state)
     # Start training
-    if not neural_network.fitted:
+    if not neural_network.fitted and n_epochs > 0:
         print("Neural network is not fitted yet, will be pretrained.")
         # Pretrain neural network
         optimizer_params = {"lr": 1e-3} if optimizer_params is None else optimizer_params
