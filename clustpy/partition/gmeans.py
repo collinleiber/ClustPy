@@ -54,10 +54,13 @@ def _gmeans(X: np.ndarray, significance: float, n_clusters_init: int, max_n_clus
             labels_split, centers_split, _ = _execute_two_means(X[ids_in_cluster], [np.arange(ids_in_cluster.shape[0])], 0,
                                                              np.array([centers[c]]), n_split_trials, random_state)
             # Project data form cluster onto resulting connection axis
-            projected_data = np.dot(X[ids_in_cluster], centers_split[0] - centers_split[1])
+            projection_vector = centers_split[0] - centers_split[1]
+            projection_vector /= np.linalg.norm(projection_vector)
+            projected_data = np.dot(X[ids_in_cluster], projection_vector)
+            projected_data = (projected_data - projected_data.mean()) / projected_data.std()
             # Use Anderson Darling to test if data is Gaussian
-            ad_result = anderson(projected_data, "norm")
-            p_value = _anderson_darling_statistic_to_prob(ad_result.statistic, len(ids_in_cluster))
+            ad_result = anderson(projected_data, "norm", method="interpolate")
+            p_value = ad_result.pvalue
             if p_value < significance:
                 # If data is not Gaussian, keep the newly created cluster centers
                 centers[c] = centers_split[0]
@@ -77,43 +80,6 @@ def _gmeans(X: np.ndarray, significance: float, n_clusters_init: int, max_n_clus
             centers = kmeans.cluster_centers_
             labels = kmeans.labels_
     return n_clusters, labels, centers
-
-
-def _anderson_darling_statistic_to_prob(statistic: float, n_points: int) -> float:
-    """
-    Transform the statistic returned by the Anderson Darling test into a p_value.
-    First the adjusted statistic will be calculated.
-    Afterwards, the actual p-value can be obtained.
-
-    Parameters
-    ----------
-    statistic : float
-        The original statistic from the Anderson Darling test.
-    n_points : int
-        The number of samples
-
-    Returns
-    -------
-    p_value : float
-        The p-value
-
-    References
-    ----------
-    D'Agostino, Ralph B., and Michael A. Stephens. "Goodness-of-fit techniques."
-    Statistics: Textbooks and Monographs (1986).
-    """
-    adjusted_stat = statistic * (1 + (.75 / n_points) + 2.25 / (n_points ** 2))
-    if adjusted_stat < 0.2:
-        # is log q => therefore add 1 - ...
-        p_value = 1 - np.exp(-13.436 + 101.14 * adjusted_stat - 223.73 * (adjusted_stat ** 2))
-    elif adjusted_stat < 0.34:
-        # is log q => therefore add 1 - ...
-        p_value = 1 - np.exp(-8.318 + 42.796 * adjusted_stat - 59.938 * (adjusted_stat ** 2))
-    elif adjusted_stat < 0.6:
-        p_value = np.exp(0.9177 - 4.279 * adjusted_stat - 1.38 * (adjusted_stat ** 2))
-    else:
-        p_value = np.exp(1.2937 - 5.709 * adjusted_stat - 0.0186 * (adjusted_stat ** 2))
-    return p_value
 
 
 class GMeans(ClusterMixin, BaseEstimator):

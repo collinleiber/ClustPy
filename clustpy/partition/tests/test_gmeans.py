@@ -1,6 +1,5 @@
 import numpy as np
 from clustpy.partition import GMeans
-from clustpy.partition.gmeans import _anderson_darling_statistic_to_prob
 from sklearn.datasets import make_blobs
 from scipy.stats import anderson
 from clustpy.utils.checks import check_clustpy_estimator
@@ -8,18 +7,6 @@ from clustpy.utils.checks import check_clustpy_estimator
 
 def test_gmeans_estimator():
     check_clustpy_estimator(GMeans(), ("check_complex_data"))
-
-
-def test_anderson_darling_statistic_to_prob():
-    n_points = 20
-    statistic = 0.435
-    assert np.isclose(_anderson_darling_statistic_to_prob(statistic, n_points), 0.270, atol=0.001)
-    # Example from https://www.spcforexcel.com/knowledge/basic-statistics/anderson-darling-test-for-normality
-    data = np.array([3334, 3554, 3625, 3837, 3838])
-    ad_result = anderson(data, "norm")
-    statistic = ad_result.statistic
-    assert np.isclose(statistic, 0.288, atol=0.001)
-    assert np.isclose(_anderson_darling_statistic_to_prob(statistic, data.shape[0]), 0.456, atol=0.001)
 
 
 """

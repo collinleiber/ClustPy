@@ -127,7 +127,7 @@ Actual XMeans methods
 
 
 def _xmeans(X: np.ndarray, n_clusters_init: int, max_n_clusters: int, check_global_score: bool, allow_merging: bool,
-            n_split_trials: int, random_state: np.random.RandomState) -> (int, np.ndarray, np.ndarray):
+            n_split_trials: int, split_criterion: str, random_state: np.random.RandomState) -> (int, np.ndarray, np.ndarray):
     """
     Start the actual XMeans clustering procedure on the input data set.
 
@@ -140,11 +140,14 @@ def _xmeans(X: np.ndarray, n_clusters_init: int, max_n_clusters: int, check_glob
     max_n_clusters : int
         Maximum number of clusters. Must be larger than n_clusters_init
     check_global_score : bool
-        Defines whether the global BIC score should be checked after the 'Improve-Params' step. Some implementations skip this step
+        Defines whether the global score should be checked after the 'Improve-Params' step. Some implementations skip this step
     allow_merging : bool
         Try to merge clusters after the regular XMeans algorithm terminated. See Ishioka et al. for more information
     n_split_trials : int
         Number tries to split a cluster. For each try 2-KMeans is executed with different cluster centers
+    split_criterion : str
+        The split criterion. Can be "bic-original" (BIC), "bic-corrected" (corrected BIC), 
+        "aic-original" (AIC), or "aic-corrected" (corrected AIC) 
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution
 
@@ -157,19 +160,17 @@ def _xmeans(X: np.ndarray, n_clusters_init: int, max_n_clusters: int, check_glob
     """
     assert max_n_clusters >= n_clusters_init, "max_n_clusters can not be smaller than n_clusters_init"
     n_dims = X.shape[1]
-    n_clusters, labels, centers, global_variance = _initial_kmeans_clusters(X, n_clusters_init, random_state)
+    n_clusters, labels, centers, inertia = _initial_kmeans_clusters(X, n_clusters_init, random_state)
     # Get parameters of all clusters
     ids_in_each_cluster = [np.where(labels == c)[0] for c in range(n_clusters)]
     cluster_sizes = np.array([ids_in_cluster.shape[0] for ids_in_cluster in ids_in_each_cluster])
-    cluster_variances = np.array([np.sum((X[ids_in_each_cluster[c]] - centers[c]) ** 2) / (
-            cluster_sizes[c] - 1) for c in range(n_clusters)])  # Only used if allow_merging is True
+    cluster_inertias = np.array([np.sum((X[ids_in_each_cluster[c]] - centers[c]) ** 2) if cluster_sizes[c] > 1 else 0 
+                                 for c in range(n_clusters)])
     if check_global_score:
-        # Get initial global variance
-        global_variance = global_variance / (X.shape[0] - n_clusters)
-        # Get initial global BIC score
-        best_global_bic_score = _bic_score(X.shape[0], cluster_sizes, n_dims, global_variance)
+        # Get initial global score
+        best_global_score = _clustering_score(X.shape[0], cluster_sizes, n_dims, inertia, split_criterion)
         # Save best result
-        best_result = (n_clusters, labels, centers, ids_in_each_cluster, cluster_sizes, cluster_variances)
+        best_result = (n_clusters, labels, centers, ids_in_each_cluster, cluster_sizes, cluster_inertias)
     while n_clusters < max_n_clusters:
         n_clusters_old = n_clusters
         # Split Clusters => Improve-Structure
@@ -179,21 +180,19 @@ def _xmeans(X: np.ndarray, n_clusters_init: int, max_n_clusters: int, check_glob
             if ids_in_cluster.shape[0] <= 2:
                 # Cluster can not be split because it is too small
                 continue
-            # Get variance of original cluster
-            cluster_variance = cluster_variances[c]
-            # Get BIC score of original cluster
-            cluster_bic_score = _bic_score(original_cluster_size, original_cluster_size, n_dims, cluster_variance)
+            # Get inertia of original cluster
+            cluster_inertia = cluster_inertias[c]
+            # Get score of original cluster
+            cluster_score = _clustering_score(original_cluster_size, original_cluster_size, n_dims, cluster_inertia, split_criterion)
             # Split cluster into two
-            labels_split, centers_split, split_variance = _execute_two_means(X[ids_in_cluster],
+            labels_split, centers_split, split_inertia = _execute_two_means(X[ids_in_cluster],
                                                                              [np.arange(original_cluster_size)], 0,
                                                                              np.array([centers[c]]), n_split_trials,
                                                                              random_state)
-            # Get variance of splitted clusters
-            split_variance = split_variance / (ids_in_cluster.shape[0] - 2)
             cluster_sizes_split = np.array([np.sum(labels_split == c) for c in range(2)])
-            # Get BIC score of splitted clusters
-            split_cluster_bic_score = _bic_score(original_cluster_size, cluster_sizes_split, n_dims, split_variance)
-            if cluster_bic_score < split_cluster_bic_score:
+            # Get score of splitted clusters
+            split_cluster_score = _clustering_score(original_cluster_size, cluster_sizes_split, n_dims, split_inertia, split_criterion)
+            if cluster_score < split_cluster_score:
                 # Keep new clusters
                 centers[c] = centers_split[0]
                 centers = np.r_[centers, [centers_split[1]]]
@@ -214,32 +213,29 @@ def _xmeans(X: np.ndarray, n_clusters_init: int, max_n_clusters: int, check_glob
             # Update parameters of all clusters
             ids_in_each_cluster = [np.where(labels == c)[0] for c in range(n_clusters)]
             cluster_sizes = np.array([ids_in_cluster.shape[0] for ids_in_cluster in ids_in_each_cluster])
-            cluster_variances = [np.sum((X[ids_in_each_cluster[c]] - centers[c]) ** 2) / (
-                    cluster_sizes[c] - 1) if cluster_sizes[c] > 1 else 0 for c in
-                                 range(n_clusters)]  # Only used if allow_merging is True
+            cluster_inertias = [np.sum((X[ids_in_each_cluster[c]] - centers[c]) ** 2) if cluster_sizes[c] > 1 else 0 for c in
+                                 range(n_clusters)]
             if check_global_score:
-                # Get new global variance
-                global_variance = kmeans.inertia_ / (X.shape[0] - n_clusters)
-                # Get new global BIC score
-                new_global_bic_score = _bic_score(X.shape[0], cluster_sizes, n_dims, global_variance)
-                if best_global_bic_score < new_global_bic_score:
+                # Get new global score
+                new_global_score = _clustering_score(X.shape[0], cluster_sizes, n_dims, kmeans.inertia_, split_criterion)
+                if best_global_score < new_global_score:
                     # If score improved, save new best model
-                    best_global_bic_score = new_global_bic_score
+                    best_global_score = new_global_score
                     best_result = (
                         n_clusters, labels.copy(), centers.copy(), ids_in_each_cluster.copy(), cluster_sizes.copy(),
-                        cluster_variances.copy())
+                        cluster_inertias.copy())
     if check_global_score:
         # Exchange latest result with best overall result
-        n_clusters, labels, centers, ids_in_each_cluster, cluster_sizes, cluster_variances = best_result
+        n_clusters, labels, centers, ids_in_each_cluster, cluster_sizes, cluster_inertias = best_result
     # OPTIONAL: try to merge clusters
     if allow_merging:
         n_clusters, labels, centers = _merge_clusters(X, n_clusters, labels, centers, ids_in_each_cluster,
-                                                      cluster_sizes, cluster_variances)
+                                                      cluster_sizes, cluster_inertias, split_criterion)
     return n_clusters, labels, centers
 
 
 def _merge_clusters(X: np.ndarray, n_clusters: int, labels: np.ndarray, centers: np.ndarray, ids_in_each_cluster: list,
-                    cluster_sizes: np.ndarray, cluster_variances: np.ndarray) -> (int, np.ndarray, np.ndarray):
+                    cluster_sizes: np.ndarray, cluster_inertias: np.ndarray, split_criterion: str) -> (int, np.ndarray, np.ndarray):
     """
     Addition to XMeans by Ishioka et al..
     Attempts to repair errors caused by an unfortunate splitting order by merging clusters.
@@ -260,8 +256,11 @@ def _merge_clusters(X: np.ndarray, n_clusters: int, labels: np.ndarray, centers:
         List containing the ids of the samples of a cluster
     cluster_sizes : np.ndarray
         The sizes of the clusters
-    cluster_variances : np.ndarray
-        The variances of the clusters
+    cluster_inertias : np.ndarray
+        The inertias of the clusters
+    split_criterion : str
+        The split criterion. Can be "bic-original" (BIC), "bic-corrected" (corrected BIC), 
+        "aic-original" (AIC), or "aic-corrected" (corrected AIC) 
 
     Returns
     -------
@@ -289,20 +288,18 @@ def _merge_clusters(X: np.ndarray, n_clusters: int, labels: np.ndarray, centers:
             if already_merged[c2]:
                 continue
             combined_cluster_size = cluster_sizes[c1] + cluster_sizes[c2]
-            # Get BIC score of non-merged clusters
-            cluster_1_and_2_variance = (cluster_variances[c1] * (cluster_sizes[c1] - 1) +
-                                        cluster_variances[c2] * (cluster_sizes[c2] - 1)) / (combined_cluster_size - 2)
-            cluster_1_and_2_bic_score = _bic_score(combined_cluster_size, cluster_sizes[[c1, c2]], n_dims,
-                                                   cluster_1_and_2_variance)
-            # Get BIC of merged cluster
+            # Get score of non-merged clusters
+            cluster_1_and_2_inertia = (cluster_inertias[c1] + cluster_inertias[c2])
+            cluster_1_and_2_score = _clustering_score(combined_cluster_size, cluster_sizes[[c1, c2]], n_dims,
+                                                   cluster_1_and_2_inertia, split_criterion)
+            # Get score of merged cluster
             new_center = (centers[c1] * cluster_sizes[c1] + centers[c2] * cluster_sizes[c2]) / combined_cluster_size
-            cluster_merged_variance = np.sum(
-                (X[np.r_[ids_in_each_cluster[c1], ids_in_each_cluster[c2]]] - new_center) ** 2) / (
-                                              combined_cluster_size - 1)
-            cluster_merged_bic_score = _bic_score(combined_cluster_size, combined_cluster_size,
-                                                  n_dims, cluster_merged_variance)
-            # Is merge improving the local BIC score?
-            if cluster_merged_bic_score > cluster_1_and_2_bic_score:
+            cluster_merged_inertia = np.sum(
+                (X[np.r_[ids_in_each_cluster[c1], ids_in_each_cluster[c2]]] - new_center) ** 2)
+            cluster_merged_score = _clustering_score(combined_cluster_size, combined_cluster_size,
+                                                  n_dims, cluster_merged_inertia, split_criterion)
+            # Is merge improving the local score?
+            if cluster_merged_score > cluster_1_and_2_score:
                 # Update labels and centers
                 min_cluster_id = min(c1, c2)
                 max_cluster_id = max(c1, c2)
@@ -322,10 +319,11 @@ def _merge_clusters(X: np.ndarray, n_clusters: int, labels: np.ndarray, centers:
     return n_clusters, labels, centers
 
 
-def _bic_score(n_points: int, cluster_sizes: np.ndarray, n_dims: int, variance: float) -> float:
+def _clustering_score(n_points: int, cluster_sizes: np.ndarray, n_dims: int, inertia: float, split_criterion: str) -> float:
     """
-    Calculate the BIC score of a clustering result.
-    For more information see: 'X-means: Extending k-means with efficient estimation of the number of clusters'
+    Calculate the score of a clustering result. In the original paper this corresponds to the BIC score of the result.
+    For more information see: 'X-means: Extending k-means with efficient estimation of the number of clusters' as well as 
+    https://github.com/bobhancock/goxmeans/blob/master/doc/BIC_notes.pdf.
 
     Parameters
     ----------
@@ -335,28 +333,45 @@ def _bic_score(n_points: int, cluster_sizes: np.ndarray, n_dims: int, variance: 
         Number of samples in each cluster. Can also by of type int in case of a single cluster
     n_dims : int
         Number of features in the data set
-    variance : float
-        The variance across all clusters
+    inertia : float
+        The inertia of the clustering result
+    split_criterion : str
+        The split criterion. Can be "original", "corrected", or "aic"
 
     Returns
     -------
-    bic_total : float
-        The BIC score of the cluster
+    score_total : float
+        The score of the clustering result
     """
     n_clusters = cluster_sizes.shape[0] if type(cluster_sizes) is np.ndarray else 1
-    # BIC of the free parameters
+    # Cost of the free parameters
     n_free_params = n_clusters * (n_dims + 1)  # Equal to: (n_clusters - 1) + n_clusters * n_dims + 1
-    bic_free_params = n_free_params * bic_costs(n_points, False)
-    # BIC of the data using the loglikelihood
-    bic_loglikelihood = np.sum(cluster_sizes * (np.log(cluster_sizes) - np.log(n_points) - np.log(
-        2.0 * np.pi) / 2 - n_dims * np.log(variance) / 2) - (cluster_sizes - n_clusters) / 2)
-    # Combine BIC score components
-    bic_total = bic_loglikelihood - bic_free_params
-    return bic_total
+    if split_criterion.startswith("bic"):
+        cost_free_params = n_free_params * bic_costs(n_points, False)
+    else:
+        cost_free_params = n_free_params
+    # Score of Loglikelihood
+    variance = inertia / (n_points - n_clusters)
+    if split_criterion.endswith("original"):
+        # BIC of the data using the loglikelihood as porposed in the original paper
+        score_loglikelihood = np.sum(cluster_sizes * np.log(cluster_sizes)) - n_points * (np.log(n_points) + np.log(
+            2.0 * np.pi) / 2 + n_dims * np.log(variance) / 2) - (n_points - n_clusters * n_clusters) / 2
+    else:
+        variance = variance / n_dims
+        score_loglikelihood = np.sum(cluster_sizes * np.log(cluster_sizes)) - n_points  * (np.log(n_points) + n_dims * np.log(
+            2 * np.pi * variance) / 2) - n_dims * (n_points - n_clusters) / 2
+    # Combine score components
+    score_total = score_loglikelihood - cost_free_params
+    return score_total
 
 
 class XMeans(ClusterMixin, BaseEstimator):
     """
+    Execute the XMeans clustering procedure.
+    Determines the number of clusters by executing the KMeans with an increasing number of clusters.
+    For each result, the clustering score based on the BIC or AIC is evaluated.
+    The process is repeated until no cluster are added anymore.
+    Optionally, a final merging mechanism can be used to check if the score can be further improved.
 
     Parameters
     ----------
@@ -365,12 +380,15 @@ class XMeans(ClusterMixin, BaseEstimator):
     max_n_clusters : int
         Maximum number of clusters. Must be larger than n_clusters_init (default: np.inf)
     check_global_score : bool
-        Defines whether the global BIC score should be checked after the 'Improve-Params' step. Some implementations skip this step (default: True)
+        Defines whether the global score should be checked after the 'Improve-Params' step. Some implementations skip this step (default: True)
     allow_merging : bool
         Try to merge clusters after the regular XMeans algorithm terminated. See Ishioka et al. for more information.
          Normally, if allow_merging is True, check_global_score should be False (default: False)
     n_split_trials : int
         Number tries to split a cluster. For each try 2-KMeans is executed with different cluster centers (default: 10)
+    split_criterion : str
+        The split criterion. Can be "bic-original" (BIC), "bic-corrected" (corrected BIC), 
+        "aic-original" (AIC), or "aic-corrected" (corrected AIC) (default: bic-corrected)
     random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
@@ -408,16 +426,21 @@ class XMeans(ClusterMixin, BaseEstimator):
 
     Ishioka, Tsunenori. "An expansion of X-means for automatically determining the optimal number of clusters."
     Proceedings of International Conference on Computational Intelligence. Vol. 2. 2005.
+
+    and
+
+    https://github.com/bobhancock/goxmeans/blob/master/doc/BIC_notes.pdf
     """
 
     def __init__(self, n_clusters_init: int = 2, max_n_clusters: int = np.inf, check_global_score: bool = True,
-                 allow_merging: bool = False, n_split_trials: int = 10,
+                 allow_merging: bool = False, n_split_trials: int = 10, split_criterion: str = "bic-corrected",
                  random_state: np.random.RandomState | int = None):
         self.n_clusters_init = n_clusters_init
         self.max_n_clusters = max_n_clusters
         self.check_global_score = check_global_score
         self.allow_merging = allow_merging
         self.n_split_trials = n_split_trials
+        self.split_criterion = split_criterion
         self.random_state = random_state
 
     def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'XMeans':
@@ -438,8 +461,10 @@ class XMeans(ClusterMixin, BaseEstimator):
             this instance of the XMeans algorithm
         """
         X, _, random_state = check_parameters(X=X, y=y, random_state=self.random_state)
+        split_criterion = self.split_criterion.lower()
+        assert split_criterion in ["bic-original", "bic-corrected", "aic-original", "aic-corrected"]
         n_clusters, labels, centers = _xmeans(X, self.n_clusters_init, self.max_n_clusters, self.check_global_score,
-                                              self.allow_merging, self.n_split_trials, random_state)
+                                              self.allow_merging, self.n_split_trials, split_criterion, random_state)
         self.n_clusters_ = n_clusters
         self.labels_ = labels
         self.cluster_centers_ = centers
