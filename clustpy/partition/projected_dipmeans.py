@@ -4,13 +4,14 @@ Collin Leiber
 """
 
 import numpy as np
-from sklearn.decomposition import PCA
-from clustpy.utils import dip_test, dip_pval
 from sklearn.base import BaseEstimator, ClusterMixin
-from clustpy.partition.xmeans import _initial_kmeans_clusters, _execute_two_means
-from clustpy.utils.checks import check_parameters
-from sklearn.utils.validation import check_is_fitted
+from sklearn.decomposition import PCA
 from sklearn.metrics.pairwise import pairwise_distances_argmin_min
+from sklearn.utils.validation import check_is_fitted
+
+from clustpy.partition.xmeans import _execute_two_means, _initial_kmeans_clusters
+from clustpy.utils import dip_pval, dip_test
+from clustpy.utils.checks import check_parameters
 
 
 def _proj_dipmeans(X: np.ndarray, significance: float, n_random_projections: int, pval_strategy: str, n_boots: int,
@@ -64,14 +65,18 @@ def _proj_dipmeans(X: np.ndarray, significance: float, n_random_projections: int
             cluster_dips = np.array([dip_test(projected_data[:, p], just_dip=True, is_data_sorted=False) for p in
                                      range(projected_data.shape[1])])
             # Calculate p-values of maximum dip
-            pval = dip_pval(np.max(cluster_dips), ids_in_cluster.shape[0], pval_strategy=pval_strategy, n_boots=n_boots,
+            max_dip = np.max(cluster_dips)
+            pval = dip_pval(max_dip, ids_in_cluster.shape[0], pval_strategy=pval_strategy, n_boots=n_boots,
                             random_state=random_state)
-            # Calculate cluster score
-            cluster_scores[c] = pval
-        # Get cluster with minimum pval
-        cluster_id_to_split = np.argmin(cluster_scores)
+            
+            if pval < significance:
+                # Save cluster multimodality score
+                cluster_scores[c] = max_dip
+
+        # Get cluster with maximum multimodality score
+        cluster_id_to_split = np.argmax(cluster_scores)
         # Check if any cluster has to be split
-        if cluster_scores[cluster_id_to_split] < significance:
+        if cluster_scores[cluster_id_to_split] > 0:
             # Split cluster using bisecting kmeans
             labels, centers, _ = _execute_two_means(X, ids_in_each_cluster, cluster_id_to_split, centers,
                                                     n_split_trials, random_state)
