@@ -18,7 +18,8 @@ dependencies = [
     "torch",
     "pandas",
     "tqdm",
-    "torchvision"
+    "torchvision",
+    "hdbscan",
 ]
 
 [project.optional-dependencies]

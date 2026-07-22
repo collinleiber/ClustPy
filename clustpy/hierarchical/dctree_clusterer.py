@@ -27,9 +27,6 @@ class DCTree_Clusterer(ClusterMixin, BaseEstimator):
     ----------
     min_points : int
         the minimum number of points (default: 5)
-    use_less_memory: bool
-      Use less memory when constructing the DCTree.
-      This will, however, increase the runtime (default: False)
 
     Attributes
     ----------
@@ -49,9 +46,8 @@ class DCTree_Clusterer(ClusterMixin, BaseEstimator):
     IEEE International Conference on Data Mining (ICDM), Abu Dhabi, United Arab Emirates, 2024, pp. 675-680, doi: 10.1109/ICDM59182.2024.
     """
 
-    def __init__(self, min_points: int = 5, use_less_memory: bool = False):
+    def __init__(self, min_points: int = 5):
         self.min_points = min_points
-        self.use_less_memory = use_less_memory
 
     def fit(self, X: np.ndarray, y: np.ndarray=None) -> 'DCTree_Clusterer':
         """
@@ -71,7 +67,7 @@ class DCTree_Clusterer(ClusterMixin, BaseEstimator):
             this instance of the DCTree_Clusterer algorithm
         """
         X, _, _ = check_parameters(X=X, y=y)
-        self.dc_tree_ = DCTree(X, min_points=self.min_points, use_less_memory=self.use_less_memory)
+        self.dc_tree_ = DCTree(X, min_points=self.min_points)
         condensed_root = self._condense(self.dc_tree_.root)
         stable_nodes = self._get_stable_nodes(condensed_root)
         labels = np.full(self.dc_tree_.n, -1 if stable_nodes else 0, dtype=np.int32)

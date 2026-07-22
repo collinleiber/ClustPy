@@ -3,15 +3,6 @@
 Pascal Weber
 """
 
-# Implementation of the dc-distance with a DCTree by
-# - Author: Pascal Weber
-# - Source: https://github.com/pasiweber/SHADE
-
-# Paper: Connecting the Dots -- Density-Connectivity Distance unifies DBSCAN, k-Center and Spectral Clustering
-# Authors: Anna Beer, Andrew Draganov, Ellen Hohma, Philipp Jahn, Christian M.M. Frey, and Ira Assent
-# Link: https://doi.org/10.1145/3580305.3599283
-
-
 from __future__ import annotations
 import numpy as np
 from typing import List, Optional, Sequence, Tuple, Union
@@ -35,9 +26,8 @@ class DCTree:
         points, of which the dc_distances should be computed of.
     min_points : int, optional
         min_points parameter used for the computation of the dc_distances (default: 5).
-    use_less_memory: bool
-      Use less memory when constructing the DCTree.
-      This will, however, increase the runtime (default: False).
+    precomputed : bool (default: false)
+        Use X as precomputed reachability distance matrix.
 
     Functions
     ---------
@@ -68,14 +58,14 @@ class DCTree:
         self,
         X: np.ndarray,
         min_points: int = 5,
-        use_less_memory: bool = False
+        precomputed=False,
     ):
         self.n = X.shape[0]
+        assert self.n > 1, "X needs at least two entries."
         self.min_points = min_points
-        if not use_less_memory:
-            # Calculate pair-wise reachability distance
+        if not precomputed:
             X = reachability_distances(X, min_points)
-        mst_edges = minimum_spanning_tree_prims(X, use_less_memory=use_less_memory, min_points=min_points)
+        mst_edges = minimum_spanning_tree_prims(X)
         self.root = self._build_tree(mst_edges)
         self._init_fast_index()
 
@@ -311,7 +301,6 @@ class DCTree:
             dc_dists = dc_dists + dc_dists.T
         return dc_dists
 
-
     def _traverse_until_k_clusters(self, n_clusters: int) -> List[_DCNode]:
         """
         Traverse the tree to identify n_clusters nodes that minimize the maximum within-cluster distance.
@@ -544,7 +533,7 @@ def reachability_distances(X: np.ndarray, min_points: int = 5) -> np.ndarray:
     return reach_distances
 
 
-def minimum_spanning_tree_prims(matrix: np.ndarray, use_less_memory: bool = False, min_points: int = None) -> np.ndarray:
+def minimum_spanning_tree_prims(matrix: np.ndarray) -> np.ndarray:
     """
     Create a Minimum-spanning-tree of a given matrix using Prim's algorithm.
     The tree will be build in O(n^2) time.
@@ -553,44 +542,24 @@ def minimum_spanning_tree_prims(matrix: np.ndarray, use_less_memory: bool = Fals
     ----------
     matrix : np.ndarray
         The input matrix
-    use_less_memory : bool
-        If true, the MST will not directly be build for the input matrix but the matrix will be used to construct a distance matrix first.
-        Saves quadratic RAM usage, but also needs double the time for computing (default: False)
-    min_points : int
-        Min_points for calculating the reachability distance. Only relevant if use_less_memory is True.
-        If min_points is None, the euclidean distance will be used (default: None)
 
     Returns
     -------
     mst_edges : np.ndarray
         The edges of the Minimum-spanning-tree, represented as a (n-1, 3) matrix with entries corresponding to (node_i, node_j, dist_ij)
     """
-    assert (matrix.shape[0] == matrix.shape[1]) or use_less_memory, "Input matrix must be quadratic or use_less_memory must be True."
+    assert (matrix.shape[0] == matrix.shape[1]), "Input matrix must be quadratic."
     n = matrix.shape[0]
     nodes_min_dist = np.full(n, np.inf)
     parent = np.zeros(n, dtype=int)
     not_in_mst = np.ones(n, dtype=bool)
     mst_edges = np.empty((n - 1), dtype=([("i", int), ("j", int), ("dist", float)]))
-    # If min_points is not None, use reachability distance => calculate core distances of all points
-    if use_less_memory and min_points is not None:
-        core_distances = np.zeros(n)
-        for i in range(n):
-            eucl_distances = cdist([matrix[i]], matrix, metric="euclidean").ravel()
-            core_distances[i] = np.partition(eucl_distances, min_points - 1)[min_points - 1]
     # Start building the MST
     u = 0
     nodes_min_dist[u] = 0
     not_in_mst[u] = False
     for i in range(n - 1):
-        if use_less_memory:
-            eucl_distances = cdist([matrix[u]], matrix, metric="euclidean").ravel()
-            if min_points is None:
-                dist_u = eucl_distances
-            else:
-                dist_u = np.maximum(eucl_distances, np.maximum(core_distances[u], core_distances))
-        else:
-            # If use_less_memory=False, 'matrix' is expected to be the precomputed distance matrix
-            dist_u = matrix[u]
+        dist_u = matrix[u]
         update_mask = not_in_mst & (dist_u < nodes_min_dist)
         # Update distances and parents
         nodes_min_dist[update_mask] = dist_u[update_mask]

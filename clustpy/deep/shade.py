@@ -37,9 +37,6 @@ class SHADE(_AbstractDeepClusteringAlgo):
         Defines whether the complete DC Tree should be used instead of a batch-wise version (default: True)
     use_matrix_dc_distance: bool
         Defines whether the matrix DC distance should be stored - can cause memory issues (default: True)
-    use_less_memory: bool
-      Use less memory when constructing the DCTree.
-      This will, however, increase the runtime (default: False)
     batch_size : int
         Size of the data batches. (default: 500)
     pretrain_optimizer_params : dict
@@ -102,7 +99,7 @@ class SHADE(_AbstractDeepClusteringAlgo):
     References
     ----------
     SHADE: Deep Density-based Clustering
-    Anna Beer; Pascal Weber; Lukas Miklautz; Collin Leiber; Walid Durani; Christian Böhm
+    Anna Beer, Pascal Weber, Lukas Miklautz, Collin Leiber, Walid Durani, Christian Böhm
     IEEE International Conference on Data Mining (ICDM), Abu Dhabi, United Arab Emirates, 2024, pp. 675-680, doi: 10.1109/ICDM59182.2024.
     """
 
@@ -113,7 +110,6 @@ class SHADE(_AbstractDeepClusteringAlgo):
         min_points : int = 5,
         use_complete_dc_tree: bool = True,
         use_matrix_dc_distance: bool = True,
-        use_less_memory: bool = False,
         batch_size: int = 500,
         pretrain_optimizer_params: dict = None,
         clustering_optimizer_params : dict = None,
@@ -136,7 +132,6 @@ class SHADE(_AbstractDeepClusteringAlgo):
         self.min_points = min_points
         self.use_complete_dc_tree = use_complete_dc_tree
         self.use_matrix_dc_distance = use_matrix_dc_distance
-        self.use_less_memory = use_less_memory
         self.pretrain_optimizer_params = pretrain_optimizer_params
         self.clustering_optimizer_params = clustering_optimizer_params
         self.pretrain_epochs = pretrain_epochs
@@ -166,13 +161,13 @@ class SHADE(_AbstractDeepClusteringAlgo):
         """
         X, _, random_state, pretrain_optimizer_params, _, _ = self._check_parameters(X, y=y)
         clustering_optimizer_params = {"lr": 1e-3} if self.clustering_optimizer_params is None else self.clustering_optimizer_params
-        clustering_params = {"min_points": self.min_points, "use_less_memory": self.use_less_memory} if self.clustering_params is None else self.clustering_params
+        clustering_params = {"min_points": self.min_points} if self.clustering_params is None else self.clustering_params
         device = detect_device(self.device)
         trainloader, testloader, batch_size = get_train_and_test_dataloader(X, self.batch_size, self.custom_dataloaders)
         assert batch_size >= self.min_points, f"Batch_size ({batch_size}) cannot be smaller than min_points ({self.min_points})"
         # Create dc_tree
         if self.use_complete_dc_tree:
-            self.dc_tree_ = DCTree(X, min_points=self.min_points, use_less_memory=self.use_less_memory)
+            self.dc_tree_ = DCTree(X, min_points=self.min_points)
         else:
             self.dc_tree_ = None
         # Create and pretrain Autoencoder
