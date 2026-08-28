@@ -15,7 +15,7 @@ from clustpy.alternative.nrkmeans import check_n_clusters_for_nr
 
 def _clustering_via_orthogonalization(X: np.ndarray, n_clusters: list[int], explained_variance_for_clustering: float,
                                       do_orthogonal_clustering: bool, random_state: np.random.RandomState) -> tuple[
-        np.ndarray, list[np.ndarray], list[np.ndarray], list[PCA], np.ndarray]:
+        np.ndarray, list[np.ndarray], list[np.ndarray], list[PCA] | None, np.ndarray]:
     """
     Start the actual Orthogonal Clustering (Orth1) or Clustering in Orthogonal Spaces (Orth2) procedure on the input data set.
 
@@ -34,7 +34,7 @@ def _clustering_via_orthogonalization(X: np.ndarray, n_clusters: list[int], expl
 
     Returns
     -------
-    tuple : tuple[np.ndarray, list[np.ndarray], list[np.ndarray], list[PCA], np.ndarray]
+    tuple : tuple[np.ndarray, list[np.ndarray], list[np.ndarray], list[PCA] | None, np.ndarray]
         The labels,
         The cluster centers,
         The projections,
@@ -45,7 +45,7 @@ def _clustering_via_orthogonalization(X: np.ndarray, n_clusters: list[int], expl
     labels = np.zeros((X.shape[0], len(n_clusters)), dtype=np.int32)
     cluster_centers = []
     projections = []
-    PCAs = [] if explained_variance_for_clustering != 1 else None
+    PCAs = []
     # Center data
     global_mean = np.mean(X, axis=0)
     X = X - global_mean
@@ -69,7 +69,7 @@ def _clustering_via_orthogonalization(X: np.ndarray, n_clusters: list[int], expl
             X, proj, centers_subspace = _clustering_in_orthogonal_spaces_transform(X, km)
         cluster_centers.append(centers_subspace)
         projections.append(proj)
-    return labels, cluster_centers, projections, PCAs, global_mean
+    return labels, cluster_centers, projections, PCAs if explained_variance_for_clustering != 1 else None, global_mean
 
 
 def _orthogonal_clustering_transform(X: np.ndarray, km: KMeans) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -157,7 +157,7 @@ class OrthogonalClustering(ClusterMixin, BaseEstimator):
         The final cluster centers
     projections_ : list[np.ndarray]
         The orthogonal projections
-    PCAs_ : list[PCA]
+    PCAs_ : list[PCA] | None
         The PCA transformations
     global_mean_ : np.ndarray
         The mean value of the fitted data set
@@ -299,7 +299,7 @@ class ClusteringInOrthogonalSpaces(OrthogonalClustering):
         The final cluster centers
     projections_ : list[np.ndarray]
         The orthogonal projections
-    PCAs_ : list[PCA]
+    PCAs_ : list[PCA] | None
         The PCA transformations
     global_mean_ : np.ndarray
         The mean value of the fitted data set

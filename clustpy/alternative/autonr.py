@@ -13,6 +13,53 @@ from clustpy.utils.checks import check_parameters
 from sklearn.utils.validation import check_is_fitted
 
 
+class _Nrkmeans_Mdl_Costs():
+    """
+    Objects to save some information regarding an intermediate NrKmeans result.
+    These information are the type of execution (real full space result or approximated), the MDL costs of the result
+    and the originating operation ('noise_space_split', 'cluster_space_split' or 'cluster_space_merge').
+    In general these objects are normally used for plotting the progress of the MDL costs when running AutoNR.
+
+    Parameters
+    ----------
+    full_space_execution : bool
+        indicates whether this NrKmeans result corresponds to a true full-space NrKmeans execution
+    costs : float
+        the total MDL costs of this NrKmeans result
+    originates_from_operation : str
+        specifies whether the results originates from a noise space split, cluster space split or cluster space merge.
+        Therefore, possibilities are: 'noise_space_split', 'cluster_space_split', 'cluster_space_merge'
+    """
+
+    def __init__(self, full_space_execution: bool, costs: float, originates_from_operation: str):
+        if originates_from_operation not in ["cluster_space_split", "noise_space_split", "cluster_space_merge"]:
+            raise ValueError("Type must be cluster_space_split, noise_space_split or cluster_space_merge")
+        self.full_space_execution = full_space_execution
+        self.costs = costs
+        self.originates_from_operation = originates_from_operation
+
+    def get_line_color(self) -> str:
+        """
+        Get the line color of a specific operation (for MDL progress plot).
+        Returns the specific color as string:
+        'noise_space_split' = brown, 'cluster_space_split' = orange, 'cluster_space_merge' = magenta
+
+        Returns
+        -------
+        color : str
+            The color string for this operation
+        """
+        if self.originates_from_operation == "noise_space_split":
+            color = "brown"
+        elif self.originates_from_operation == "cluster_space_split":
+            color = "orange"
+        elif self.originates_from_operation == "cluster_space_merge":
+            color = "magenta"
+        else:
+            raise ValueError(f"Operation has to be 'noise_space_split', 'cluster_space_split' or 'cluster_space_merge'. Your input: {self.originates_from_operation}")
+        return color
+
+
 def _autonr(X: np.ndarray, nrkmeans_repetitions: int, outliers: bool, max_subspaces: int | None, max_n_clusters: int | None,
             mdl_for_noisespace: bool, max_distance: float | None, precision: float | None, similarity_threshold: float,
             random_state: np.random.RandomState, debug: bool) -> tuple[NrKmeans, float, list[_Nrkmeans_Mdl_Costs]]:
@@ -184,8 +231,8 @@ def _autonr(X: np.ndarray, nrkmeans_repetitions: int, outliers: bool, max_subspa
     return best_nrkmeans, best_mdl_overall, all_mdl_costs
 
 
-def _check_input_parameters(X: np.ndarray, nrkmeans_repetitions: int, max_subspaces: int, max_n_clusters: int,
-                            max_distance: float, precision: float) -> tuple[int, int, float, float]:
+def _check_input_parameters(X: np.ndarray, nrkmeans_repetitions: int, max_subspaces: int | None, max_n_clusters: int | None,
+                            max_distance: float | None, precision: float | None) -> tuple[int, int, float, float]:
     """
     Check the input parameters for AutoNR. Further, all input values which are None will be defined.
 
@@ -195,13 +242,13 @@ def _check_input_parameters(X: np.ndarray, nrkmeans_repetitions: int, max_subspa
         the given data set
     nrkmeans_repetitions : int
         number of NrKmeans repetitions for each execution step to find the best local minimum
-    max_subspaces : int
+    max_subspaces : int | None
         maximum number of subspaces
-    max_n_clusters : int
+    max_n_clusters : int | None
         maximum number of clusters for each subspace
-    max_distance : float
+    max_distance : float | None
         distance used to encode cluster centers and outliers
-    precision : float
+    precision : float | None
         precision used to convert probability densities to actual probabilities
 
     Returns
@@ -300,7 +347,7 @@ def _execute_nrkmeans(X: np.ndarray, n_clusters: list[int], nrkmeans_repetitions
     randoms = random_state.randint(0, 2 ** 31 - 1, nrkmeans_repetitions)
     best_nrkmeans = None
     best_total_mdl_costs = np.inf
-    best_subspace_costs = np.inf
+    best_subspace_costs = [np.inf]
     add_random_executions = False
     if nrkmeans_repetitions > 1 and centers is not None and V is not None and P is not None:
         add_random_executions = True
@@ -333,6 +380,7 @@ def _execute_nrkmeans(X: np.ndarray, n_clusters: list[int], nrkmeans_repetitions
             best_total_mdl_costs = total_costs
             best_subspace_costs = all_subspace_costs
             best_nrkmeans = nrkmeans
+    assert best_nrkmeans is not None, "best_nrkmeans is still None"
     if debug:
         print("[AutoNR] Output n_clusters = {0} / m = {1}".format(best_nrkmeans.n_clusters_final_, best_nrkmeans.m_))
         print("[AutoNR] {0} ({1})".format(best_total_mdl_costs, best_subspace_costs))
@@ -393,8 +441,8 @@ def _split_noise_space(X_subspace: np.ndarray, subspace_nr: int, best_nrkmeans: 
     """
     # Default parameters for the split
     mdl_threshold_split = np.inf
-    mdl_total_split = None
-    subspace_costs_split = None
+    mdl_total_split = np.inf
+    subspace_costs_split = [np.inf]
     nrkmeans_split = None
     centers = None
     nrkmeans = None
@@ -410,8 +458,8 @@ def _split_noise_space(X_subspace: np.ndarray, subspace_nr: int, best_nrkmeans: 
                                                                nrkmeans_repetitions=1 if noise_stays_similar else nrkmeans_repetitions,
                                                                random_state=random_state,
                                                                centers=centers,
-                                                               V=None if centers is None else nrkmeans.V_,
-                                                               P=None if centers is None else nrkmeans.P_,
+                                                               V=None if centers is None or nrkmeans is None else nrkmeans.V_,
+                                                               P=None if centers is None or nrkmeans is None else nrkmeans.P_,
                                                                outliers=outliers, debug=debug,
                                                                mdl_for_noisespace=mdl_for_noisespace,
                                                                max_distance=max_distance, precision=precision)
@@ -462,6 +510,7 @@ def _split_noise_space(X_subspace: np.ndarray, subspace_nr: int, best_nrkmeans: 
                                            all_cluster_scatter_matrices,
                                            nrkmeans.labels_[:, 0])]
         n_clusters[0] += 1
+    assert nrkmeans_split is not None, "nrkmeans_split is still None"
     return nrkmeans_split, mdl_total_split, mdl_threshold_split, subspace_costs_split
 
 
@@ -518,7 +567,7 @@ def _split_cluster_space(X_subspace: np.ndarray, subspace_nr: int, best_nrkmeans
     # Default parameters for the split
     mdl_threshold_split = np.inf
     nrkmeans_split = None
-    mdl_total_split = None
+    mdl_total_split = np.inf
     n_clusters = [split_cluster_count, split_cluster_count]
     single_change_index = None
     V_split = None
@@ -526,6 +575,7 @@ def _split_cluster_space(X_subspace: np.ndarray, subspace_nr: int, best_nrkmeans
     centers = None
     while True:
         if n_clusters[0] * n_clusters[1] < split_cluster_count or 1 in n_clusters:
+            assert nrkmeans_split is not None, "nrkmeans_split is still None"
             if single_change_index is not None or nrkmeans_split.have_subspaces_been_lost():
                 break
             else:
@@ -652,7 +702,7 @@ def _split_cluster_space(X_subspace: np.ndarray, subspace_nr: int, best_nrkmeans
 def _merge_spaces(X: np.ndarray, best_nrkmeans: NrKmeans, best_mdl_overall: float, best_subspace_costs: list[float],
                   all_mdl_costs: list[_Nrkmeans_Mdl_Costs], max_n_clusters: int, outliers: bool, random_state: np.random.RandomState,
                   mdl_for_noisespace: bool, max_distance: float, precision: float, debug: bool) -> tuple[
-        NrKmeans, float, float, bool]:
+        NrKmeans, list[float], float, bool]:
     """
     Perform a cluster space merge. This operation tries combine two existing cluster spaces into a single cluster space.
     Starts with the highest possible number of clusters which is equal to n_clusters_1 * n_clusters_2.
@@ -690,7 +740,7 @@ def _merge_spaces(X: np.ndarray, best_nrkmeans: NrKmeans, best_mdl_overall: floa
 
     Returns
     -------
-    tuple : tuple[NrKmeans, float, float, bool]
+    tuple : tuple[NrKmeans, list[float], float, bool]
         The best NrKmeans result found during the cluster space merge,
         The MDL costs of the best newly identified subspace,
         The total MDL costs of the best NrKmeans result found,
@@ -706,7 +756,7 @@ def _merge_spaces(X: np.ndarray, best_nrkmeans: NrKmeans, best_mdl_overall: floa
                 print("Start merging")
                 print("==================================================")
             best_nrkmeans_iteration = None
-            best_subspace_costs_iteration = None
+            best_subspace_costs_iteration = [np.inf]
             # Go through each combination of subspaces
             for i in range(len(best_nrkmeans.n_clusters_final_) - 1):
                 for j in range(i + 1, len(best_nrkmeans.n_clusters_final_)):
@@ -732,15 +782,15 @@ def _merge_spaces(X: np.ndarray, best_nrkmeans: NrKmeans, best_mdl_overall: floa
                     # Rotation stays the same for single subspace_nr
                     V = np.identity(X_subspace.shape[1])
                     # Create every combination of centers for the two subspaces
-                    centers = []
+                    single_centers = []
                     turned_centers_1 = np.matmul(best_nrkmeans.cluster_centers_[i], best_nrkmeans.V_)[:,
                                        best_nrkmeans.P_[i]]
                     turned_centers_2 = np.matmul(best_nrkmeans.cluster_centers_[j], best_nrkmeans.V_)[:,
                                        best_nrkmeans.P_[j]]
                     for center_1 in turned_centers_1:
                         for center_2 in turned_centers_2:
-                            centers.append(np.append(center_1, center_2))
-                    centers = [centers]
+                            single_centers.append(np.append(center_1, center_2))
+                    centers = [np.array(single_centers)]
                     # Try decreasing number of clusters within merged subspaces
                     for n in reversed(range(max(best_nrkmeans.n_clusters_final_[i], best_nrkmeans.n_clusters_final_[j]),
                                             best_nrkmeans.n_clusters_final_[i] * best_nrkmeans.n_clusters_final_[j] + 1)):
@@ -777,6 +827,7 @@ def _merge_spaces(X: np.ndarray, best_nrkmeans: NrKmeans, best_mdl_overall: floa
                             break
                     # ============================= FULL SPACE =====================================
                     # Execute new found n_clusters for full space (except number of subspaces was 2)
+                    assert nrkmeans_merge is not None, "nrkmeans_merge is still None"
                     if len(best_nrkmeans.n_clusters_final_) > 2 and mdl_threshold_merge < best_subspace_costs[i] + \
                             best_subspace_costs[j]:
                         # Get parameters for full space execution
@@ -1066,53 +1117,6 @@ def _remove_multiple_noise_spaces(n_clusters: list[int], centers: list[np.ndarra
         del centers[-1]
         del n_clusters[-1]
     return n_clusters, centers, P
-
-
-class _Nrkmeans_Mdl_Costs():
-    """
-    Objects to save some information regarding an intermediate NrKmeans result.
-    These information are the type of execution (real full space result or approximated), the MDL costs of the result
-    and the originating operation ('noise_space_split', 'cluster_space_split' or 'cluster_space_merge').
-    In general these objects are normally used for plotting the progress of the MDL costs when running AutoNR.
-
-    Parameters
-    ----------
-    full_space_execution : bool
-        indicates whether this NrKmeans result corresponds to a true full-space NrKmeans execution
-    costs : float
-        the total MDL costs of this NrKmeans result
-    originates_from_operation : str
-        specifies whether the results originates from a noise space split, cluster space split or cluster space merge.
-        Therefore, possibilities are: 'noise_space_split', 'cluster_space_split', 'cluster_space_merge'
-    """
-
-    def __init__(self, full_space_execution: bool, costs: float, originates_from_operation: str):
-        if originates_from_operation not in ["cluster_space_split", "noise_space_split", "cluster_space_merge"]:
-            raise ValueError("Type must be cluster_space_split, noise_space_split or cluster_space_merge")
-        self.full_space_execution = full_space_execution
-        self.costs = costs
-        self.originates_from_operation = originates_from_operation
-
-    def get_line_color(self) -> str:
-        """
-        Get the line color of a specific operation (for MDL progress plot).
-        Returns the specific color as string:
-        'noise_space_split' = brown, 'cluster_space_split' = orange, 'cluster_space_merge' = magenta
-
-        Returns
-        -------
-        color : str
-            The color string for this operation
-        """
-        if self.originates_from_operation == "noise_space_split":
-            color = "brown"
-        elif self.originates_from_operation == "cluster_space_split":
-            color = "orange"
-        elif self.originates_from_operation == "cluster_space_merge":
-            color = "magenta"
-        else:
-            raise ValueError(f"Operation has to be 'noise_space_split', 'cluster_space_split' or 'cluster_space_merge'. Your input: {self.originates_from_operation}")
-        return color
 
 
 class AutoNR(ClusterMixin, BaseEstimator):

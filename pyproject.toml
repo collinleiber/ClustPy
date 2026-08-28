@@ -49,3 +49,6 @@ markers = [
 [tool.coverage.run]
 source = ["clustpy"]
 omit = ["*/tests/*"]
+
+[tool.mypy]
+disable_error_code = ["import-untyped"]

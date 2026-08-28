@@ -415,9 +415,9 @@ def plot_histogram(X: np.ndarray, labels: np.ndarray = None, density: bool = Tru
         plt.show()
 
 
-def plot_scatter_matrix(X: np.ndarray, labels: np.ndarray = None, centers: np.ndarray = None,
-                        true_labels: np.ndarray = None, density: bool = True, n_bins: int = 100,
-                        show_legend: bool = True, scattersize: float = 10, title: str = None, 
+def plot_scatter_matrix(X: np.ndarray, labels: np.ndarray | None = None, centers: np.ndarray | None = None,
+                        true_labels: np.ndarray | None = None, density: bool = True, n_bins: int = 100,
+                        show_legend: bool = True, scattersize: float = 10, title: str | None = None,
                         equal_axis: bool = False, max_dimensions: int = 10, show_plot: bool = True) -> plt.Axes:
     """
     Create a scatter matrix plot.
@@ -428,11 +428,11 @@ def plot_scatter_matrix(X: np.ndarray, labels: np.ndarray = None, centers: np.nd
     ----------
     X : np.ndarray
         the given data set
-    labels : np.ndarray
+    labels : np.ndarray | None
         The cluster labels. Specifies the color of the plotted objects. Can be None (default: None)
-    centers : np.ndarray
+    centers : np.ndarray | None
         The cluster centers. Will be plotted as red dots labeled by the corresponding cluster id. Can be None (default: None)
-    true_labels : np.ndarray
+    true_labels : np.ndarray | None
         The ground truth labels. Specifies the symbol of the plotted objects. Can be None (default: None)
     density : bool
         Defines whether a kernel density should be added to the histogram (default: True)
@@ -442,7 +442,7 @@ def plot_scatter_matrix(X: np.ndarray, labels: np.ndarray = None, centers: np.nd
         Defines whether a legend should be shown (default: True)
     scattersize : float
         The size of the scatters (default: 10)
-    title : str
+    title : str | None
         Title of the plot (default: None)
     equal_axis : bool
         Defines whether the axes are to be scaled to the same value range (default: False)
