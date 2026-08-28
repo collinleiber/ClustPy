@@ -6,7 +6,7 @@ import numpy as np
 from sklearn.datasets import make_blobs
 from sklearn.cluster import KMeans, DBSCAN
 from sklearn.mixture import GaussianMixture
-from clustpy.partition import XMeans
+from clustpy.centroid import XMeans
 from clustpy.deep.tests._helpers_for_tests import _get_dc_test_data
 from clustpy.deep.neural_networks import ConvolutionalAutoencoder
 

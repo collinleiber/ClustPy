@@ -20,10 +20,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python 3.12
+      - name: Set up Python 3.14
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.14'
           cache: 'pip' # Speeds up flake8 installation
 
       - name: Install dependencies
@@ -42,9 +42,9 @@ jobs:
     needs: lint  # This job only starts if 'lint' passes
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false # don't break 3.12 if 3.10 fails
+      fail-fast: false # don't break a version if another one fails
       matrix:
-        python-version: ["3.12", "3.10"]
+        python-version: ["3.14", "3.11"]
 
     steps:
       - uses: actions/checkout@v4
@@ -62,17 +62,17 @@ jobs:
           pip install -e .[full]
 
       - name: Test with pytest (with codecov)
-        if: ${{ matrix.python-version == '3.10' }}
+        if: ${{ matrix.python-version == '3.11' }}
         run: |
           pytest -m "not largedata" --cov --cov-report=xml
 
       - name: Test with pytest (without codecov)
-        if: ${{ matrix.python-version != '3.10' }}
+        if: ${{ matrix.python-version != '3.11' }}
         run: |
           pytest -m "not largedata"
 
       - name: Upload coverage reports to Codecov
-        if: ${{ matrix.python-version == '3.10' }}
+        if: ${{ matrix.python-version == '3.11' }}
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}

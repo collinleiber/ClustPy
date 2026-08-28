@@ -191,7 +191,23 @@ def test_evaluate_multiple_datasets():
                                     aggregation_functions=aggregations, add_runtime=True, add_n_clusters=True,
                                     save_path=None, save_intermediate_results=False, random_state=1,
                                     save_labels_path="test_evaluate_multiple_datasets_labels_dir/labels.csv")
+    # Should result in nan for both DBSCAN variations.
+    assert df.isna().any().sum() > 1
     assert df.shape == (len(datasets) * (n_repetitions + len(aggregations)), len(algorithms) * (len(metrics) * 2 + 2))
+    # Test that files exist
+    for d in datasets:
+        for a in algorithms:
+            for i in range(n_repetitions):
+                if (a.name.startswith("DBSCAN") and i > 0) or (a.name == "DBSCAN" and d.name == "X2"):
+                    # DBCSAN is deterministic, labels is only created once; also DBSCAN is ignored for X2
+                    assert not os.path.isfile(f"test_evaluate_multiple_datasets_labels_dir/labels_{d.name}_{a.name}_{i}.csv")
+                else:
+                    assert os.path.isfile(f"test_evaluate_multiple_datasets_labels_dir/labels_{d.name}_{a.name}_{i}.csv")
+                if d.name == "X" or a.name.startswith("DBSCAN"):
+                    # data X has no test set; DBSCAN has no predict
+                    assert not os.path.isfile(f"test_evaluate_multiple_datasets_labels_dir/labels_{d.name}_{a.name}_{i}_TEST.csv")
+                else:
+                    assert os.path.isfile(f"test_evaluate_multiple_datasets_labels_dir/labels_{d.name}_{a.name}_{i}_TEST.csv")
 
 
 @pytest.fixture
@@ -229,7 +245,12 @@ def test_evaluation_df_to_latex_table_multiple_datasets():
     df = evaluate_multiple_datasets(evaluation_datasets=datasets, evaluation_algorithms=algorithms,
                                     evaluation_metrics=metrics, n_repetitions=n_repetitions, add_runtime=False,
                                     add_n_clusters=True,
-                                    save_path="df.csv", save_intermediate_results=False, random_state=1)
+                                    save_path="df", save_intermediate_results=True, random_state=1)
+    # Check that files exist
+    assert os.path.isfile("df.csv")
+    for d in datasets:
+        assert os.path.isfile(f"df_{d.name}.csv")
+    # Test latex features
     output_str1 = evaluation_df_to_latex_table(df, "mean", "latex1.txt", None, None, False, False, False, None, None, None, 0)
     output_str1 = output_str1.split("\n")
     assert os.path.isfile("latex1.txt")

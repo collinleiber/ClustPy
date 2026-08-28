@@ -1303,9 +1303,6 @@ def acedec_init(data: np.ndarray, n_clusters: list, optimizer_params: dict, batc
     dataloader = get_dataloader(data, batch_size=batch_size, shuffle=True, drop_last=True)
     # only use one repeat as in ACeDeC paper
     acedec_rounds = 1
-    # acedec used 20.000 minibatch iterations for initialization. Thus we use a number of epochs corresponding to that
-    epochs_estimate = int(20000 / (data.shape[0] / batch_size))
-    max_epochs = np.max([epochs_estimate, epochs])
     if debug: print("Start ACeDeC init")
     for round_i in range(acedec_rounds):
         random_state = check_random_state(random_state)
@@ -1341,7 +1338,7 @@ def acedec_init(data: np.ndarray, n_clusters: list, optimizer_params: dict, batc
                         trainloader=None,
                         evalloader=None,
                         optimizer=optimizer,
-                        max_epochs=max_epochs,
+                        max_epochs=epochs,
                         model=_IdentityAutoencoder(),
                         ssl_loss_fn=mean_squared_error,
                         batch_size=batch_size,

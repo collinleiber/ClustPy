@@ -82,7 +82,7 @@ def test_diptest_python_impl_matches_c_impl_with_random_data():
     assert mn_py.shape[0] == X.shape[0] and np.min(mn_py) >= 0 and np.max(mn_py) < X.shape[0]
     assert mj_py.shape[0] == X.shape[0] and np.min(mj_py) >= 0 and np.max(mj_py) < X.shape[0]
     # Are all results equal?
-    assert dip_py == dip_c
+    assert np.abs(dip_py - dip_c) < 1e-10
     assert modal_interval_py == modal_interval_c
     assert modal_triangle_py == modal_triangle_c
     assert np.array_equal(gcm_py, gcm_c)

@@ -1,7 +1,7 @@
 def test_example_1():
-    from clustpy.partition import SubKmeans
+    from clustpy.centroid import SubKmeans
     from clustpy.data import create_subspace_data
-    from clustpy.metrics import unsupervised_clustering_accuracy as acc
+    from clustpy.metrics.external import unsupervised_clustering_accuracy as acc
 
     data, labels = create_subspace_data(1000, n_clusters=4, subspace_features=[2, 5])
     sk = SubKmeans(4)
@@ -13,7 +13,7 @@ def test_example_1():
 def test_example_2():
     from clustpy.alternative import NrKmeans
     from clustpy.data import load_fruit
-    from clustpy.metrics import MultipleLabelingsConfusionMatrix
+    from clustpy.metrics.external import MultipleLabelingsConfusionMatrix
     from sklearn.metrics import normalized_mutual_info_score as nmi
     import numpy as np
 
@@ -40,11 +40,11 @@ def test_example_3():
 
 def test_example_4():
     from clustpy.utils import EvaluationDataset, EvaluationAlgorithm, EvaluationMetric, evaluate_multiple_datasets
-    from clustpy.partition import ProjectedDipMeans, SubKmeans
+    from clustpy.centroid import ProjectedDipMeans, SubKmeans
     from sklearn.metrics import normalized_mutual_info_score as nmi, silhouette_score
     from sklearn.cluster import KMeans, DBSCAN
     from clustpy.data import load_breast_cancer, load_iris, load_wine
-    from clustpy.metrics import unsupervised_clustering_accuracy as acc
+    from clustpy.metrics.external import unsupervised_clustering_accuracy as acc
     from sklearn.decomposition import PCA
     import numpy as np
 

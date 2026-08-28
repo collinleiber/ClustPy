@@ -9,10 +9,10 @@ description = "A Python library for advanced clustering algorithms"
 readme = "README.md"
 authors = [{name = "Collin Leiber", email = "leiber@dbs.ifi.lmu.de"}]
 license = {text = "BSD-3-Clause License"}
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "numpy",
-    "scipy",
+    "scipy>=1.17.0",
     "scikit-learn>=1.6",
     "matplotlib",
     "torch",

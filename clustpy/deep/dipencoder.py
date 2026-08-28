@@ -8,7 +8,7 @@ from sklearn.cluster import KMeans
 from clustpy.utils import dip_test
 import torch
 import numpy as np
-from clustpy.partition.skinnydip import _dip_mirrored_data
+from clustpy.density.skinnydip import _dip_mirrored_data
 from clustpy.deep._utils import detect_device, encode_batchwise, mean_squared_error
 from clustpy.deep._train_utils import get_default_deep_clustering_initialization
 from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo

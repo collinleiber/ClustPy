@@ -146,7 +146,9 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
     save_path : str | Path
         The path where the final DataFrame should be saved. If None, the DataFrame will not be saved (default: None)
     save_labels_path : str | Path
-        The path where the clustering labels should be saved. If None, the labels will not be saved (default: None)
+        The path where the clustering labels should be saved.
+        The files will be saved as [save_labels_path] _ [ALGORITHM_NAME] _ [REPETITION].
+        If None, the labels will not be saved (default: None)
     ignore_algorithms : tuple
         List of algorithm names (as specified in the EvaluationAlgorithm object) that should be ignored for this specific data set (default: [])
     dataset_name : str
@@ -220,7 +222,7 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
     assert len(metric_names) == 0 or max(np.unique(metric_names, return_counts=True)[
                                              1]) == 1, "Some names of your metrics do not seem to be unique! Note that metrics must not be named 'runtime' or 'n_clusters'"
     header = pd.MultiIndex.from_product([algo_names, metric_names], names=["algorithm", "metric"])
-    value_placeholder = np.zeros((n_repetitions, len(algo_names) * len(metric_names)))
+    value_placeholder = np.full((n_repetitions, len(algo_names) * len(metric_names)), np.nan)
     df = pd.DataFrame(value_placeholder, columns=header, index=[str(rep) for rep in range(n_repetitions)])
     for eval_algo in evaluation_algorithms:
         automatically_set_n_clusters = False
@@ -302,14 +304,14 @@ def evaluate_dataset(X: np.ndarray, evaluation_algorithms: list, evaluation_metr
                 runtime = time.time() - start_time
                 # Optional: Save labels
                 if save_labels_path is not None:
-                    save_labels_path_algo = save_labels_path.with_name("{0}_{1}_{2}".format(save_labels_path.name,
-                                                                                               eval_algo.name, rep))
+                    save_labels_path_algo = save_labels_path.with_name("{0}_{1}_{2}{3}".format(save_labels_path.stem,
+                                                                                               eval_algo.name, rep, save_labels_path.suffix))
                     # Check if directory exists
                     save_labels_path_algo.parent.mkdir(parents=True, exist_ok=True)
                     np.savetxt(save_labels_path_algo, algo_obj.labels_)
                     # Also save predict labels
                     if X_test is not None and labels_predicted_test is not None:
-                        save_labels_path_algo_test = save_labels_path_algo.with_name("{0}_TEST".format(save_labels_path_algo.name))
+                        save_labels_path_algo_test = save_labels_path_algo.with_name("{0}_TEST{1}".format(save_labels_path_algo.stem, save_labels_path_algo.suffix))
                         np.savetxt(save_labels_path_algo_test, labels_predicted_test)
                 # Get result of all metrics
                 if evaluation_metrics is not None:
@@ -421,10 +423,12 @@ def evaluate_multiple_datasets(evaluation_datasets: list, evaluation_algorithms:
     save_intermediate_results : bool
         Defines whether the result of each data set should be separately saved. 
         Useful if the evaluation takes a lot of time.
-        The files will be saved as [save_path]_[DATASET_NAME]. 
+        The files will be saved as [save_path] _ [DATASET_NAME].
         This implies that save_path has to be defined if save_intermediate_results is set to True (default: False)
     save_labels_path : str | Path
-        The path where the clustering labels should be saved. If None, the labels will not be saved (default: None)
+        The path where the clustering labels should be saved.
+        The files will be saved as [save_labels_path] _ [DATASET_NAME] _ [ALGORITHM_NAME] _ [REPETITION].
+        If None, the labels will not be saved (default: None)
     random_state : np.random.RandomState | int | list
         use a fixed random state to get a repeatable solution. Can also be of type int.
         Furthermore, if can be a list containing an int for each repetition (default: None)
@@ -505,10 +509,10 @@ def evaluate_multiple_datasets(evaluation_datasets: list, evaluation_algorithms:
                 X = _preprocess_dataset(X, eval_data.preprocess_methods, eval_data.preprocess_params)
                 if X_test is not None:
                     X_test = _preprocess_dataset(X_test, eval_data.preprocess_methods, eval_data.preprocess_params)
-            inner_save_path = None if not save_intermediate_results else save_path.with_name("{0}_{1}".format(save_path.name,
-                                                                                              eval_data.name))
-            inner_save_labels_path = None if save_labels_path is None else save_labels_path.with_name("{0}_{1}".format(
-                save_labels_path.name, eval_data.name))
+            inner_save_path = None if not save_intermediate_results else save_path.with_name("{0}_{1}{2}".format(save_path.stem,
+                                                                                              eval_data.name, save_path.suffix))
+            inner_save_labels_path = None if save_labels_path is None else save_labels_path.with_name("{0}_{1}{2}".format(
+                save_labels_path.stem, eval_data.name, save_labels_path.suffix))
             df = evaluate_dataset(X, evaluation_algorithms, evaluation_metrics=evaluation_metrics,
                                   labels_true=labels_true,
                                   n_repetitions=n_repetitions, X_test=X_test, labels_true_test=labels_true_test,
