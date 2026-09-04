@@ -3,15 +3,6 @@
 Pascal Weber
 """
 
-# Implementation of the dc-distance with a DCTree by
-# - Author: Pascal Weber
-# - Source: https://github.com/pasiweber/SHADE
-
-# Paper: Connecting the Dots -- Density-Connectivity Distance unifies DBSCAN, k-Center and Spectral Clustering
-# Authors: Anna Beer, Andrew Draganov, Ellen Hohma, Philipp Jahn, Christian M.M. Frey, and Ira Assent
-# Link: https://doi.org/10.1145/3580305.3599283
-
-
 from __future__ import annotations
 import numpy as np
 from typing import List, Optional, Sequence, Tuple, Union
@@ -35,9 +26,8 @@ class DCTree:
         points, of which the dc_distances should be computed of.
     min_points : int, optional
         min_points parameter used for the computation of the dc_distances (default: 5).
-    use_less_memory: bool
-      Use less memory when constructing the DCTree.
-      This will, however, increase the runtime (default: False).
+    precomputed : bool (default: false)
+        Use X as precomputed reachability distance matrix.
 
     Functions
     ---------
@@ -68,14 +58,14 @@ class DCTree:
         self,
         X: np.ndarray,
         min_points: int = 5,
-        use_less_memory: bool = False
+        precomputed=False,
     ):
         self.n = X.shape[0]
+        assert self.n > 1, "X needs at least two entries."
         self.min_points = min_points
-        if not use_less_memory:
-            # Calculate pair-wise reachability distance
+        if not precomputed:
             X = reachability_distances(X, min_points)
-        mst_edges = minimum_spanning_tree_prims(X, use_less_memory=use_less_memory, min_points=min_points)
+        mst_edges = minimum_spanning_tree_prims(X)
         self.root = self._build_tree(mst_edges)
         self._init_fast_index()
 
@@ -115,7 +105,7 @@ class DCTree:
             idx += 1
         return new_root_node
 
-    def _get_root(self, node: _DCNode) -> '_DCNode':
+    def _get_root(self, node: _DCNode) -> "_DCNode":
         """
         Get the root of a node and update all root_ entries that have been visited.
 
@@ -153,12 +143,12 @@ class DCTree:
         DOWN, UP = 0, 1
         stack = [(self.root, 0, DOWN)]  # (node, level, DOWN / UP)
         while len(stack) > 0:
-            (node, level, status) = stack.pop()
+            node, level, status = stack.pop()
             if status == DOWN:
                 if self.f_occur[node.id] is None:
                     self.f_occur[node.id] = len(self.euler)
                 self.euler.append(node)
-                self.level.append(level) 
+                self.level.append(level)
                 if node.right is not None:
                     stack.append((node, level, UP))
                     stack.append((node.right, level + 1, DOWN))
@@ -184,10 +174,7 @@ class DCTree:
             choose_left = levels[left_indices] <= levels[right_indices]
             self.sparse_table[j, :limit] = np.where(choose_left, left_indices, right_indices)
 
-    def __getitem__(
-        self,
-        point_idx: Union[int, Sequence[int], np.ndarray]
-    ) -> Union[_DCNode, List[_DCNode]]:
+    def __getitem__(self, point_idx: Union[int, Sequence[int], np.ndarray]) -> Union[_DCNode, List[_DCNode]]:
         """
         Returns the _DCNode of given index if `point_idx` is an integer or a list of _DCNodes if `point_idx' is a Sequence.
 
@@ -211,14 +198,14 @@ class DCTree:
     def dc_dist(self, i: int, j: int) -> float:
         """
         Returns the dc_distance between points[i] and points[j] in O(1) time.
-        
+
         Parameters
         ----------
         i : int
             index of the first point
         j : int
             index of the second point
-        
+
         Returns
         -------
         dc_distance : float
@@ -258,7 +245,7 @@ class DCTree:
             "tree":     traverses the tree in O(n) time (n = len(points)), no matter the size of X / Y.
             "dc_dist":  uses the dc_dist function and needs O(k*l) time (k = len(X), l = len(Y))).
             (default: "tree")
-        
+
         Returns
         -------
         dc_dists : np.array
@@ -294,14 +281,14 @@ class DCTree:
                 if node.left is not None and node.right is not None:
                     i_leaves = node.left.leaves
                     j_leaves = node.right.leaves
-                    (i_, j_) = (idx_rev_X[i_leaves], idx_rev_Y[j_leaves])
-                    (i_, j_) = (i_[i_ != -1], j_[j_ != -1])
+                    i_, j_ = (idx_rev_X[i_leaves], idx_rev_Y[j_leaves])
+                    i_, j_ = (i_[i_ != -1], j_[j_ != -1])
                     if len(i_) > 0 and len(j_) > 0:
                         dc_dists[(i_[:, np.newaxis], j_[np.newaxis, :])] = node.dist
                     # In case of asymmetric call
                     if idx_X is not idx_Y:
-                        (i_, j_) = (idx_rev_Y[i_leaves], idx_rev_X[j_leaves])
-                        (i_, j_) = (i_[i_ != -1], j_[j_ != -1])
+                        i_, j_ = (idx_rev_Y[i_leaves], idx_rev_X[j_leaves])
+                        i_, j_ = (i_[i_ != -1], j_[j_ != -1])
                         if len(i_) > 0 and len(j_) > 0:
                             dc_dists[(j_[:, np.newaxis], i_[np.newaxis, :])] = node.dist
         else:
@@ -310,7 +297,6 @@ class DCTree:
             # Mirror values
             dc_dists = dc_dists + dc_dists.T
         return dc_dists
-
 
     def _traverse_until_k_clusters(self, n_clusters: int) -> List[_DCNode]:
         """
@@ -373,7 +359,7 @@ class DCTree:
             the number of desired clusters
         eps : float
             a small constaint used to differentiate from the next potential cluster (default: 1e-10)
-            
+
         Returns
         -------
         min_eps : float
@@ -400,8 +386,8 @@ class DCTree:
             return ""
         pointer_right = "   "
         pointer_left = "   " if self.root.right else "   "
-        repr_string = f"{self.root}" 
-        repr_string += f"{self.__repr__help(self.root.left, pointer_left, '', self.root.right is not None)}" 
+        repr_string = f"{self.root}"
+        repr_string += f"{self.__repr__help(self.root.left, pointer_left, '', self.root.right is not None)}"
         repr_string += f"{self.__repr__help(self.root.right, pointer_right, '', False)}"
         return repr_string
 
@@ -430,10 +416,10 @@ class DCTree:
         padding_for_both = padding + ("   " if has_right_sibling else "   ")
         pointer_right = "   "
         pointer_left = "   " if node.right else "   "
-        repr_string = f"\n   {padding.replace('|', ' ')}// #region" 
-        repr_string += f"\n{padding}{pointer}{node}" 
-        repr_string += f"{self.__repr__help(node.left, pointer_left, padding_for_both, node.right is not None)}" 
-        repr_string += f"{self.__repr__help(node.right, pointer_right, padding_for_both, False)}" 
+        repr_string = f"\n   {padding.replace('|', ' ')}// #region"
+        repr_string += f"\n{padding}{pointer}{node}"
+        repr_string += f"{self.__repr__help(node.left, pointer_left, padding_for_both, node.right is not None)}"
+        repr_string += f"{self.__repr__help(node.right, pointer_right, padding_for_both, False)}"
         repr_string += f"\n   {padding.replace('|', ' ')}// #endregion"
         return repr_string
 
@@ -469,7 +455,7 @@ class _DCNode:
         left: Optional[_DCNode] = None,
         right: Optional[_DCNode] = None,
         parent: Optional[_DCNode] = None,
-        root: Optional[_DCNode] = None
+        root: Optional[_DCNode] = None,
     ):
         self.id = id
         self.dist = dist
@@ -544,7 +530,7 @@ def reachability_distances(X: np.ndarray, min_points: int = 5) -> np.ndarray:
     return reach_distances
 
 
-def minimum_spanning_tree_prims(matrix: np.ndarray, use_less_memory: bool = False, min_points: int = None) -> np.ndarray:
+def minimum_spanning_tree_prims(matrix: np.ndarray) -> np.ndarray:
     """
     Create a Minimum-spanning-tree of a given matrix using Prim's algorithm.
     The tree will be build in O(n^2) time.
@@ -553,44 +539,24 @@ def minimum_spanning_tree_prims(matrix: np.ndarray, use_less_memory: bool = Fals
     ----------
     matrix : np.ndarray
         The input matrix
-    use_less_memory : bool
-        If true, the MST will not directly be build for the input matrix but the matrix will be used to construct a distance matrix first.
-        Saves quadratic RAM usage, but also needs double the time for computing (default: False)
-    min_points : int
-        Min_points for calculating the reachability distance. Only relevant if use_less_memory is True.
-        If min_points is None, the euclidean distance will be used (default: None)
 
     Returns
     -------
     mst_edges : np.ndarray
         The edges of the Minimum-spanning-tree, represented as a (n-1, 3) matrix with entries corresponding to (node_i, node_j, dist_ij)
     """
-    assert (matrix.shape[0] == matrix.shape[1]) or use_less_memory, "Input matrix must be quadratic or use_less_memory must be True."
+    assert matrix.shape[0] == matrix.shape[1], "Input matrix must be quadratic."
     n = matrix.shape[0]
     nodes_min_dist = np.full(n, np.inf)
     parent = np.zeros(n, dtype=int)
     not_in_mst = np.ones(n, dtype=bool)
     mst_edges = np.empty((n - 1), dtype=([("i", int), ("j", int), ("dist", float)]))
-    # If min_points is not None, use reachability distance => calculate core distances of all points
-    if use_less_memory and min_points is not None:
-        core_distances = np.zeros(n)
-        for i in range(n):
-            eucl_distances = cdist([matrix[i]], matrix, metric="euclidean").ravel()
-            core_distances[i] = np.partition(eucl_distances, min_points - 1)[min_points - 1]
     # Start building the MST
     u = 0
     nodes_min_dist[u] = 0
     not_in_mst[u] = False
     for i in range(n - 1):
-        if use_less_memory:
-            eucl_distances = cdist([matrix[u]], matrix, metric="euclidean").ravel()
-            if min_points is None:
-                dist_u = eucl_distances
-            else:
-                dist_u = np.maximum(eucl_distances, np.maximum(core_distances[u], core_distances))
-        else:
-            # If use_less_memory=False, 'matrix' is expected to be the precomputed distance matrix
-            dist_u = matrix[u]
+        dist_u = matrix[u]
         update_mask = not_in_mst & (dist_u < nodes_min_dist)
         # Update distances and parents
         nodes_min_dist[update_mask] = dist_u[update_mask]
