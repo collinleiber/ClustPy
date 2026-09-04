@@ -206,7 +206,7 @@ def p_cluster(
     """Compute p_cluster of all samples.
 
     p_cluster is the Silhouette Coefficient over the dc-distance metric.
-    Contrary to the Silhouette Coefficient, it is definded for
+    Contrary to the Silhouette Coefficient, it is defined for
     ``1 <= n_labels <= n_samples``.
 
     For ``n_labels == 1`` or `` ``n_labels == n_samples`` it will return
@@ -277,7 +277,7 @@ def p_noise(
     """Compute (p_sparse, p_far) of all samples.
 
     ``p_sparse`` calculates how well the noise sample lays within a sparse region.
-    ``p_far`` calulcates how well the noise is remote remote to a non noise sample.
+    ``p_far`` calculates how well the noise is remote remote to a non noise sample.
     To clarify, ``p_sparse`` and ``p_far`` are calculated depending on the existing
     clustering. Changing the clustering without changing the noise samples can change
     the values of ``p_sparse`` and ``p_far``.
@@ -308,7 +308,7 @@ def p_noise(
     Returns
     -------
     (p_sparse, p_far) : tuple of two array-like, both of shape (n_noise,)
-        (p_sparse, p_far) for each sample, returned in two seperate arrays.
+        (p_sparse, p_far) for each sample, returned in two separate arrays.
 
     Example
     -------
