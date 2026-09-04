@@ -2,6 +2,7 @@ import numpy as np
 from sklearn.metrics.cluster._supervised import check_clusterings
 from sklearn.utils import check_X_y
 from scipy.spatial import cKDTree
+from typing import Optional
 
 
 def _check_labels_arrays(labels_true: np.ndarray, labels_pred: np.ndarray, allow_2d_labels: bool = False) -> (np.ndarray, np.ndarray):
@@ -210,11 +211,8 @@ def _assign_noise_points_to_nearest_cluster(labels: np.ndarray, X: np.ndarray) -
 
 # Unified Interface
 def handle_noise(
-    labels: np.ndarray,
-    strategy: str,
-    X: np.ndarray | None = None,
-    labels_compare: np.ndarray | None = None
-) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
+    labels: np.ndarray, strategy: str, X: Optional[np.ndarray] = None, labels_compare: Optional[np.ndarray] = None
+) -> tuple[np.ndarray, np.ndarray | None, np.ndarray | None]:
     """
     Handle noise points (label = -1) in clustering results using a specified strategy.
     If X is provided, also return the adapted X (e.g., rows corresponding to
@@ -233,11 +231,11 @@ def handle_noise(
         - "filter"             : Remove all noise points.
         - "nearest_cluster" : Assign each noise point to nearest cluster (requires X).
 
-    X : np.ndarray | None
+    X : Optional[np.ndarray]
         Data matrix of shape (n_samples, n_features).
         Required for "nearest_cluster".
 
-    labels_compare : np.ndarray | None
+    labels_compare : Optional[np.ndarray]
         Second set of labels that will be reduced if strategy is "filter" (default: None)
 
     Returns
@@ -246,10 +244,10 @@ def handle_noise(
         Labels after applying the chosen strategy.
         If X is provided, also returns new_X aligned with new_labels.
 
-    new_X : np.ndarray, optional
+    new_X : np.ndarray | None
         Adapted X after removing noise points (is None if X was not provided).
 
-    new_labels_compare : np.ndarray, optional
+    new_labels_compare : np.ndarray | None
         Adapted labels_compare after removing noise points (is None if labels_compare was not provided).
 
     Raises
@@ -257,6 +255,7 @@ def handle_noise(
     ValueError
         If an invalid strategy is provided or required inputs are missing.
     """
+
     if X is not None:
         X, labels = _check_length_data_and_labels(X, labels, True)
     if labels_compare is not None:
