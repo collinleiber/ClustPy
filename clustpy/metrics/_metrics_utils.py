@@ -209,10 +209,7 @@ def _assign_noise_points_to_nearest_cluster(labels: np.ndarray, X: np.ndarray) -
 
 # Unified Interface
 def handle_noise(
-    labels: np.ndarray,
-    strategy: str,
-    X: np.ndarray | None = None,
-    labels_compare: np.ndarray | None = None
+    labels: np.ndarray, strategy: str, X: np.ndarray | None = None, labels_compare: np.ndarray | None = None
 ) -> tuple[np.ndarray, np.ndarray | None, np.ndarray | None]:
     """
     Handle noise points (label = -1) in clustering results using a specified strategy.
@@ -248,7 +245,7 @@ def handle_noise(
     new_X : np.ndarray | None
         Adapted X after removing noise points (is None if X was not provided).
 
-    new_labels_compare : np.ndarray | Nnoe
+    new_labels_compare : np.ndarray | None
         Adapted labels_compare after removing noise points (is None if labels_compare was not provided).
 
     Raises
@@ -256,6 +253,7 @@ def handle_noise(
     ValueError
         If an invalid strategy is provided or required inputs are missing.
     """
+
     if X is not None:
         X, labels = _check_length_data_and_labels(X, labels, True)
     if labels_compare is not None:
