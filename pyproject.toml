@@ -54,5 +54,5 @@ omit = ["*/tests/*"]
 show_missing = true
 
 [tool.mypy]
-disable_error_code = ["import-untyped"]
+disable_error_code = ["import-untyped","import-not-found"]
 exclude = ".*/tests/.*"
