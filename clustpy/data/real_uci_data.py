@@ -348,17 +348,19 @@ def load_ecoli(ignore_small_clusters: bool = False, return_X_y: bool = False, do
     if ignore_small_clusters:
         # Optional: Remove the three small clusters consisting of only 2, 2 and 5 samples
         keep_labels = [l not in ["imL", "imS", "omL"] for l in labels_raw]
-        data = data[keep_labels]
+        data_final = data[keep_labels]
         labels_raw = [l for i, l in enumerate(labels_raw) if keep_labels[i]]
+    else:
+        data_final = data
     LE = LabelEncoder()
     labels = LE.fit_transform(labels_raw)
     # Convert labels to int32 format
     labels = labels.astype(np.int32)
     # Return values
     if return_X_y:
-        return data, labels
+        return data_final, labels
     else:
-        return Bunch(dataset_name="Ecoli", data=data, target=labels)
+        return Bunch(dataset_name="Ecoli", data=data_final, target=labels)
 
 
 def load_htru2(return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:

@@ -438,7 +438,7 @@ def plot_histogram(X: np.ndarray, labels: np.ndarray | None = None, density: boo
 def plot_scatter_matrix(X: np.ndarray, labels: np.ndarray | None = None, centers: np.ndarray | None = None,
                         true_labels: np.ndarray | None = None, density: bool = True, n_bins: int = 100,
                         show_legend: bool = True, scattersize: float = 10, title: str | None = None,
-                        equal_axis: bool = False, max_dimensions: int = 10, show_plot: bool = True) -> plt.Axes | None:
+                        equal_axis: bool = False, max_dimensions: int = 10, show_plot: bool = True) -> plt.Axes | np.ndarray | None:
     """
     Create a scatter matrix plot.
     Visualizes a 2d scatter plot for each combination of features.
@@ -474,7 +474,7 @@ def plot_scatter_matrix(X: np.ndarray, labels: np.ndarray | None = None, centers
 
     Returns
     -------
-    axes : plt.Axes | None
+    axes : plt.Axes | np.ndarray | None
         None if show_plot is True, otherwise the used matplotlib axes
     """
     if X.shape[1] > max_dimensions:

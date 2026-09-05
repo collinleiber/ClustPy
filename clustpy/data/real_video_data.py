@@ -33,7 +33,7 @@ def _load_video(path: str | Path, image_size: tuple | None) -> np.ndarray:
         The array containing the frames
     """
     # Load video
-    vid = cv2.VideoCapture(path)
+    vid = cv2.VideoCapture(path if isinstance(path, str) else str(path))
     if not vid.isOpened():
         vid.release()
         raise IOError(f"OpenCV could not open {path}. This usually indicates missing codecs (ffmpeg/libav).")

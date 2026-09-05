@@ -209,7 +209,7 @@ def _load_image_data(image: str | Path | np.ndarray, image_size: tuple | None, c
         pil_image = pil_imagefile.copy()
         pil_imagefile.close()
     else:
-        pil_image = Image.fromarray(np.uint8(image))
+        pil_image = Image.fromarray(np.asarray(image, dtype=np.uint32))
     if color_image:
         pil_image = pil_image.convert("RGB")
     # Convert to coherent size

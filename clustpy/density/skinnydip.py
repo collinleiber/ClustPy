@@ -115,7 +115,7 @@ def _unidip_original(X_1d: np.ndarray, significance: float, already_sorted: bool
     """
     assert significance >= 0 and significance <= 1, "[UniDip] significance must be a value in the range [0, 1]"
     assert X_1d.ndim == 1, "[UniDip] Data must be 1-dimensional. Your input has shape: {0}".format(X_1d.shape)
-    cluster_boundaries : list[tuple[float, float]] = []
+    cluster_boundaries : list[tuple[int, int]] = []
     # Check if data is already sorted
     if already_sorted:
         argsorted = np.arange(X_1d.shape[0])

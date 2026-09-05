@@ -2422,7 +2422,7 @@ class ACeDeC(ENRC):
         self.acedec_labels_ = self.enrc_labels_[:, 0]
         return self
 
-    def predict(self, X: np.ndarray, use_P: bool = True, dataloader: torch.utils.data.DataLoader = None) -> np.ndarray:  # type: ignore[override]
+    def predict(self, X: np.ndarray, use_P: bool = True, dataloader: torch.utils.data.DataLoader | None = None) -> np.ndarray:  # type: ignore[override]
         """
         Predicts the labels of the input data.
 
@@ -2432,7 +2432,7 @@ class ACeDeC(ENRC):
             input data
         use_P: bool
             if True then P will be used to hard select the dimensions for each clustering, else the soft beta weights are used (default: True)
-        dataloader : torch.utils.data.DataLoader
+        dataloader : torch.utils.data.DataLoader | None
             dataloader to be used. Can be None if X is given (default: None)
 
         Returns

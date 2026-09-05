@@ -342,7 +342,7 @@ class DCTree:
         
         Returns
         -------
-        dc_dists : np.array
+        dc_dists : np.ndarray
             ndarray of shape (n_samples_X, n_samples_Y) containing the distances
         """
         if idx_X is None:
@@ -389,8 +389,10 @@ class DCTree:
             raise ValueError(f"'{access_method}' is no valid `access_method`")
         if idx_X is idx_Y:
             # Mirror values
-            dc_dists = dc_dists + dc_dists.T
-        return dc_dists
+            dc_dists_final = dc_dists + dc_dists.T
+        else:
+            dc_dists_final = dc_dists
+        return dc_dists_final
 
 
     def _traverse_until_k_clusters(self, n_clusters: int) -> list[_DCNode]:
