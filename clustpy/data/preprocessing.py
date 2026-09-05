@@ -28,7 +28,7 @@ class ZNormalizer(TransformerMixin, BaseEstimator):
     def __init__(self, feature_or_channel_wise: bool = False):
         self.feature_or_channel_wise = feature_or_channel_wise
 
-    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'ZNormalizer':
+    def fit(self, X: np.ndarray, y: np.ndarray | None = None) -> 'ZNormalizer':
         """
         Compute the mean and std values regarding the input data set.
 
@@ -36,7 +36,7 @@ class ZNormalizer(TransformerMixin, BaseEstimator):
         ----------
         X : np.ndarray
             the given data set
-        y : np.ndarray
+        y : np.ndarray | None
             the labels (can be ignored)
 
         Returns

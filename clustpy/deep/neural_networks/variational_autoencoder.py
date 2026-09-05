@@ -46,22 +46,22 @@ class VariationalAutoencoder(FeedforwardAutoencoder):
         If decoder_layers are not specified then the decoder is symmetric and goes in the same order from embedding to input.
     batch_norm : bool
         set True if you want to use torch.nn.BatchNorm1d (default: False)
-    dropout : float
+    dropout : float | None
         set the amount of dropout you want to use (default: None)
-    activation: torch.nn.Module
+    activation: type[torch.nn.Module]
         activation function from torch.nn, set the activation function for the hidden layers, if None then it will be linear (default: torch.nn.LeakyReLU)
     bias : bool
         set False if you do not want to use a bias term in the linear layers (default: True)
-    decoder_layers : list
+    decoder_layers : list | None
         list of different layer sizes from embedding to output of the decoder. If set to None, will be symmetric to layers (default: None)
-    decoder_output_fn : torch.nn.Module
+    decoder_output_fn : type[torch.nn.Module] | None
         activation function from torch.nn, set the activation function for the decoder output layer, if None then it will be linear.
         E.g. set to torch.nn.Sigmoid if you want to scale the decoder output between 0 and 1 (default: torch.nn.Sigmoid)
     work_on_copy : bool
         If set to true, deep clustering algorithms will optimize a copy of the autoencoder and not the autoencoder itself.
         Ensures that the same autoencoder can be used by multiple deep clustering algorithms.
         As copies of this object are created, the memory requirement increases (default: True)
-    random_state : np.random.RandomState | int
+    random_state : np.random.RandomState | int | None
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Attributes
@@ -84,10 +84,10 @@ class VariationalAutoencoder(FeedforwardAutoencoder):
     Kingma, Diederik P., and Max Welling. "Auto-encoding variational Bayes." Int. Conf. on Learning Representations.
     """
 
-    def __init__(self, layers: list, batch_norm: bool = False, dropout: float = None,
-                 activation_fn: torch.nn.Module = torch.nn.LeakyReLU, bias: bool = True, decoder_layers: list = None,
-                 decoder_output_fn: torch.nn.Module = torch.nn.Sigmoid, work_on_copy: bool = True,
-                 random_state: np.random.RandomState | int = None):
+    def __init__(self, layers: list, batch_norm: bool = False, dropout: float | None = None,
+                 activation_fn: type[torch.nn.Module] = torch.nn.LeakyReLU, bias: bool = True, decoder_layers: list | None = None,
+                 decoder_output_fn: type[torch.nn.Module] | None = torch.nn.Sigmoid, work_on_copy: bool = True,
+                 random_state: np.random.RandomState | int | None = None):
         super().__init__(layers, batch_norm, dropout, activation_fn, bias, decoder_layers, decoder_output_fn,
                          work_on_copy, random_state)
         # Get size of embedding from last dimension of layers
@@ -98,7 +98,7 @@ class VariationalAutoencoder(FeedforwardAutoencoder):
         self.mean = torch.nn.Linear(layers[-2], embedding_size)
         self.log_variance = torch.nn.Linear(layers[-2], embedding_size)
 
-    def encode(self, x: torch.Tensor) -> (torch.Tensor, torch.Tensor):
+    def encode(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:  # type: ignore[override]
         """
         Apply the encoder function to x.
         Overwrites function from FeedforwardAutoencoder.
@@ -110,7 +110,7 @@ class VariationalAutoencoder(FeedforwardAutoencoder):
 
         Returns
         -------
-        tuple : (torch.Tensor, torch.Tensor)
+        tuple : tuple[torch.Tensor, torch.Tensor]
             mean value of the central VAE layer,
             logarithmic variance value of the central VAE layer (use logarithm of variance - numerical purposes)
         """
@@ -120,7 +120,7 @@ class VariationalAutoencoder(FeedforwardAutoencoder):
         q_logvar = self.log_variance(embedded)
         return q_mean, q_logvar
 
-    def forward(self, x: torch.Tensor) -> (torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor):
+    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:  # type: ignore[override]
         """
         Applies both the encode and decode function.
         The forward function is automatically called if we call self(x).
@@ -133,7 +133,7 @@ class VariationalAutoencoder(FeedforwardAutoencoder):
 
         Returns
         -------
-        tuple : (torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor)
+        tuple : tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
             sampling using q_mean and q_logvar,
             mean value of the central VAE layer,
             logarithmic variance value of the central VAE layer (use logarithm of variance - numerical purposes),
@@ -144,8 +144,8 @@ class VariationalAutoencoder(FeedforwardAutoencoder):
         reconstruction = self.decode(z)
         return z, q_mean, q_logvar, reconstruction
 
-    def loss(self, batch: list, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss, device: torch.device,
-             corruption_fn: Callable = None, beta: float = 1) -> (torch.Tensor, torch.Tensor, torch.Tensor):
+    def loss(self, batch: list, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss, device: torch.device,  # type: ignore[override]
+             corruption_fn: Callable | None = None, beta: float = 1.) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Calculate the loss of a single batch of data.
 
@@ -157,19 +157,18 @@ class VariationalAutoencoder(FeedforwardAutoencoder):
             self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss
         device : torch.device
             device to be trained on
-        corruption_fn : Callable
+        corruption_fn : Callable | None
             Can be used to corrupt the input data, e.g., when using a denoising autoencoder.
             Note that the function must match the data and the data loaders.
             For example, if the data is normalized, this may have to be taken into account in the corruption function - e.g. in case of salt and pepper noise (default: None)
         beta : float
-            weighting of the KL loss (default: 1)
+            weighting of the KL loss (default: 1.)
 
         Returns
         -------
-        total_loss: (torch.Tensor, torch.Tensor, torch.Tensor)
+        total_loss: tuple[torch.Tensor, torch.Tensor]
             the ssl loss of the input sample,
-            the sampling,
-            the reconstruction of the data point
+            the sampling
         """
         assert type(batch) is list, "batch must come from a dataloader and therefore be of type list"
         batch_data = batch[1].to(device)
@@ -182,7 +181,7 @@ class VariationalAutoencoder(FeedforwardAutoencoder):
         kl_loss /= batch_data.shape[0]
 
         total_loss = ssl_loss + beta * kl_loss
-        return total_loss, z, reconstruction
+        return total_loss, z
 
     def transform(self, X: np.ndarray) -> np.ndarray:
         """

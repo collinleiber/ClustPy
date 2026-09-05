@@ -18,7 +18,7 @@ from sklearn.neighbors import NearestNeighbors
 def _specialk(X: np.ndarray, significance: float, n_dimensions: int,
               similarity_matrix: str | np.ndarray | scipy.sparse.csr_matrix, n_neighbors: int,
               percentage: float, n_cluster_pairs_to_consider: int, max_n_clusters: int,
-              random_state: np.random.RandomState, debug: bool) -> (int, np.ndarray):
+              random_state: np.random.RandomState, debug: bool) -> tuple[int, np.ndarray]:
     """
     Start the actual SpecialK clustering procedure on the input data set.
 
@@ -52,7 +52,7 @@ def _specialk(X: np.ndarray, significance: float, n_dimensions: int,
 
     Returns
     -------
-    tuple : (int, np.ndarray)
+    tuple : tuple[int, np.ndarray]
         The final number of clusters,
         The labels as identified by DipMeans,
     """
@@ -251,8 +251,8 @@ class SpecialK(ClusterMixin, BaseEstimator):
         The cluster pairs responsible for the highest cut. If None, all pairs will be considered.
         Smaller values for n_cluster_pairs_to_consider will decrease the computing time (default: 10)
     max_n_clusters : int
-        Maximum number of clusters. Must be larger than n_clusters_init (default: np.inf)
-    random_state : np.random.RandomState | int
+        Maximum number of clusters. Must be larger than n_clusters_init (default: 1000)
+    random_state : np.random.RandomState | int | None
         use a fixed random state to get a repeatable solution (default: None)
     debug : bool
         If true, additional information will be printed to the console (default: False)
@@ -275,7 +275,7 @@ class SpecialK(ClusterMixin, BaseEstimator):
     def __init__(self, significance: float = 0.01, n_dimensions: int = 200,
                  similarity_matrix: str | np.ndarray | scipy.sparse.csr_matrix = 'NAM',
                  n_neighbors: int = 5, percentage: float = 0.99, n_cluster_pairs_to_consider: int = 10,
-                 max_n_clusters: int = np.inf, random_state: np.random.RandomState | int = None, debug: bool = False):
+                 max_n_clusters: int = 1000, random_state: np.random.RandomState | int | None = None, debug: bool = False):
         self.significance = significance
         self.n_dimensions = n_dimensions
         self.similarity_matrix = similarity_matrix
@@ -286,7 +286,7 @@ class SpecialK(ClusterMixin, BaseEstimator):
         self.random_state = random_state
         self.debug = debug
 
-    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'SpecialK':
+    def fit(self, X: np.ndarray, y: np.ndarray | None = None) -> 'SpecialK':
         """
         Initiate the actual clustering process on the input data set.
         The resulting cluster labels will be stored in the labels_ attribute.
@@ -295,7 +295,7 @@ class SpecialK(ClusterMixin, BaseEstimator):
         ----------
         X : np.ndarray
             the given data set
-        y : np.ndarray
+        y : np.ndarray | None
             the labels (can be ignored)
 
         Returns

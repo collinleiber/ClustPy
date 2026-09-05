@@ -3,7 +3,6 @@
 import torch
 from torch import nn
 from torch.nn import functional as F
-from typing import Type, Union, List, Optional
 from torchvision.models._api import WeightsEnum
 
 
@@ -341,9 +340,9 @@ class ResNetDecoder(nn.Module):
 
 def _resnet_encoder(
         arch: str,
-        block: Type[Union[EncoderBlock, EncoderBottleneck]],
-        layers: List[int],
-        pretrained_weights: Optional[WeightsEnum],
+        block: EncoderBlock | EncoderBottleneck,
+        layers: list[int],
+        pretrained_weights: WeightsEnum | None,
         first_conv: bool,
         maxpool1: bool
 ) -> ResNetEncoder:
@@ -360,9 +359,9 @@ def _resnet_encoder(
 
 def _resnet_decoder(
         arch: str,
-        block: Type[Union[DecoderBlock, DecoderBottleneck]],
-        layers: List[int],
-        pretrained_weights: Optional[WeightsEnum],
+        block: DecoderBlock | DecoderBottleneck,
+        layers: list[int],
+        pretrained_weights: WeightsEnum | None,
         latent_dim: int,
         input_height: int,
         first_conv: bool,

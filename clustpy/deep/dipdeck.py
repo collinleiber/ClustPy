@@ -7,7 +7,8 @@ from scipy.spatial.distance import cdist
 import numpy as np
 from clustpy.utils import dip_test, dip_pval
 import torch
-from clustpy.deep._utils import encode_batchwise, squared_euclidean_distance, int_to_one_hot, mean_squared_error
+from clustpy.deep._utils import squared_euclidean_distance, int_to_one_hot, mean_squared_error
+from clustpy.deep._encoding_utils import encode_batchwise
 from clustpy.deep._train_utils import get_default_deep_clustering_initialization
 from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
 from sklearn.cluster import KMeans
@@ -16,13 +17,14 @@ import tqdm
 from collections.abc import Callable
 from sklearn.utils.validation import check_is_fitted
 from pathlib import Path
+from clustpy.deep.neural_networks._abstract_neural_network import _AbstractNeuralNetwork
 
 
 def _merge_by_dip_value(X: np.ndarray, embedded_data: np.ndarray, cluster_labels_cpu: np.ndarray,
-                        dip_argmax: np.ndarray, n_clusters_current: int, centers_cpu: np.ndarray,
+                        dip_argmax: tuple, n_clusters_current: int, centers_cpu: np.ndarray,
                         embedded_centers_cpu: np.ndarray, max_cluster_size_diff_factor: float, pval_strategy: str,
-                        n_boots: int, random_state: np.random.RandomState) -> (
-        np.ndarray, np.ndarray, np.ndarray, np.ndarray):
+                        n_boots: int, random_state: np.random.RandomState) -> tuple[
+        np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Merge the clusters within dip_argmax because their Dip-value is larger than the threshold.
     Sets the labels of the two cluster to n_clusters - 1. The other labels are adjusted accordingly.
@@ -36,7 +38,7 @@ def _merge_by_dip_value(X: np.ndarray, embedded_data: np.ndarray, cluster_labels
         the embedded data set
     cluster_labels_cpu : np.ndarray
         The current cluster labels, saved as numpy array (not torch.Tensor)
-    dip_argmax : np.ndarray
+    dip_argmax : tuple
         The indices of the two clusters having the largest Dip-value within the dip matrix
     n_clusters_current : int
         current number of clusters. Is equal to n_clusters_init in the beginning
@@ -56,7 +58,7 @@ def _merge_by_dip_value(X: np.ndarray, embedded_data: np.ndarray, cluster_labels
 
     Returns
     -------
-    tuple : (np.ndarray, np.ndarray, np.ndarray, np.ndarray)
+    tuple : tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
         The updated labels
         The updated centers,
         The updated embedded centers,
@@ -79,7 +81,7 @@ def _merge_by_dip_value(X: np.ndarray, embedded_data: np.ndarray, cluster_labels
     optimal_new_center = (embedded_centers_cpu[dip_argmax[0]] * points_in_center_1 +
                           embedded_centers_cpu[dip_argmax[1]] * points_in_center_2) / (
                                  points_in_center_1 + points_in_center_2)
-    new_center_cpu, new_embedded_center_cpu = _get_nearest_points_to_optimal_centers(X, [optimal_new_center],
+    new_center_cpu, new_embedded_center_cpu = _get_nearest_points_to_optimal_centers(X, np.array([optimal_new_center]),
                                                                                      embedded_data)
     # Remove the two old centers and add the new one
     centers_cpu_tmp = np.delete(centers_cpu, dip_argmax, axis=0)
@@ -94,10 +96,10 @@ def _merge_by_dip_value(X: np.ndarray, embedded_data: np.ndarray, cluster_labels
 
 
 def _force_merge(X: np.ndarray, embedded_data: np.ndarray, cluster_labels_cpu: np.ndarray,
-                 dip_argmax: np.ndarray, n_clusters_current: int, centers_cpu: np.ndarray,
+                 dip_argmax: tuple, n_clusters_current: int, centers_cpu: np.ndarray,
                  embedded_centers_cpu: np.ndarray, max_cluster_size_diff_factor: float, pval_strategy: str,
-                 n_boots: int, merges_log: list, random_state: np.random.RandomState)-> (
-        np.ndarray, np.ndarray, np.ndarray):
+                 n_boots: int, merges_log: list, random_state: np.random.RandomState)-> tuple[
+        np.ndarray, np.ndarray, np.ndarray]:
     """
     Force a merge of two clusters.
     First strategy is to delete the smallest cluster if it is smaller than 0.2 * the average cluster size.
@@ -112,7 +114,7 @@ def _force_merge(X: np.ndarray, embedded_data: np.ndarray, cluster_labels_cpu: n
         the embedded data set
     cluster_labels_cpu : np.ndarray
         The current cluster labels, saved as numpy array (not torch.Tensor)
-    dip_argmax : np.ndarray
+    dip_argmax : tuple
         The indices of the two clusters having the largest Dip-value within the dip matrix
     n_clusters_current : int
         current number of clusters. Is equal to n_clusters_init in the beginning
@@ -134,7 +136,7 @@ def _force_merge(X: np.ndarray, embedded_data: np.ndarray, cluster_labels_cpu: n
 
     Returns
     -------
-    tuple : (np.ndarray, np.ndarray, np.ndarray)
+    tuple : tuple[np.ndarray, np.ndarray, np.ndarray]
         The updated labels
         The updated centers,
         The updated dip matrix
@@ -164,17 +166,18 @@ def _force_merge(X: np.ndarray, embedded_data: np.ndarray, cluster_labels_cpu: n
                                         n_boots, random_state)
     else:
         # Else: merge clusters with highest dip
-        merges_log.append(
-            "Force merge of clusters {0} with dip value {1}".format(dip_argmax, dip_matrix_cpu[dip_argmax]))
         cluster_labels_cpu, centers_cpu, _, dip_matrix_cpu = \
             _merge_by_dip_value(X, embedded_data, cluster_labels_cpu, dip_argmax, n_clusters_current,
                                 centers_cpu, embedded_centers_cpu, max_cluster_size_diff_factor, pval_strategy,
                                 n_boots, random_state)
+        merges_log.append(
+            "Force merge of clusters {0} with dip value {1}".format(dip_argmax, dip_matrix_cpu[dip_argmax]))
+
     return cluster_labels_cpu, centers_cpu, dip_matrix_cpu
 
 
-def _get_nearest_points_to_optimal_centers(X: np.ndarray, optimal_centers: np.ndarray, embedded_data: np.ndarray) -> (
-        np.ndarray, np.ndarray):
+def _get_nearest_points_to_optimal_centers(X: np.ndarray, optimal_centers: np.ndarray, embedded_data: np.ndarray) -> tuple[
+        np.ndarray, np.ndarray]:
     """
     Get the nearest embedded points within the dataset to a set of optimal centers.
     Additionally, this method will return the corresponding point in the full dimensional space.
@@ -228,7 +231,7 @@ def _get_nearest_points(points_in_larger_cluster: np.ndarray, center: np.ndarray
     distances = cdist(points_in_larger_cluster, [center])
     nearest_points = np.argsort(distances, axis=0)
     # Check if more points should be taken because the other cluster is too small
-    sample_size = size_smaller_cluster * max_cluster_size_diff_factor
+    sample_size = int(size_smaller_cluster * max_cluster_size_diff_factor)
     if size_smaller_cluster + sample_size < min_sample_size:
         sample_size = min(int(min_sample_size - size_smaller_cluster), len(points_in_larger_cluster))
     subset_all_points = points_in_larger_cluster[nearest_points[:sample_size, 0]]
@@ -371,7 +374,7 @@ class _DipDECK_Module(torch.nn.Module):
         return self
 
     def _update_centers_labels_dipmatrix_cpu(self, X: np.ndarray, embedded_data: np.ndarray, 
-                                             embedded_centers_cpu: np.ndarray) -> (np.ndarray, np.ndarray, np.ndarray, np.ndarray):
+                                             embedded_centers_cpu: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
         Update the main parameters of the DipDECK algorithm. These are the labels, centers and the dip matrix.
 
@@ -386,7 +389,7 @@ class _DipDECK_Module(torch.nn.Module):
 
         Returns
         -------
-        tuple : (np.ndarray, np.ndarray, np.ndarray)
+        tuple : tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
             the update numpy cluster labels,
             the update numpy cluster centers,
             the update numpy cluster centers in the embedding,
@@ -401,7 +404,7 @@ class _DipDECK_Module(torch.nn.Module):
                                         self.max_cluster_size_diff_factor, self.pval_strategy, self.n_boots, self.random_state)
         return cluster_labels_cpu, centers_cpu, embedded_centers_cpu, dip_matrix_cpu
 
-    def _loss(self, batch: list, neural_network: torch.nn.Module, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss, ssl_loss_weight: float, 
+    def _loss(self, batch: list, neural_network: _AbstractNeuralNetwork, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss, ssl_loss_weight: float,
               clustering_loss_weight: float, dip_matrix_weight: torch.Tensor, is_first_iteration: bool, device: torch.device) -> torch.Tensor:
         """
         Calculate the complete DipDECK + neural network loss.
@@ -410,7 +413,7 @@ class _DipDECK_Module(torch.nn.Module):
         ----------
         batch : list
             the minibatch
-        neural_network : torch.nn.Module
+        neural_network : _AbstractNeuralNetwork
             the neural network
         ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
             self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
@@ -433,9 +436,9 @@ class _DipDECK_Module(torch.nn.Module):
         ids = batch[0]
         # Self-supervised Loss
         if self.augmentation_invariance:
-            ssl_loss, embedded, _, embedded_aug, _ = neural_network.loss_augmentation(batch, ssl_loss_fn, device)
+            ssl_loss, embedded, embedded_aug = neural_network.loss_augmentation(batch, ssl_loss_fn, device)
         else:
-            ssl_loss, embedded, _ = neural_network.loss(batch, ssl_loss_fn, device)
+            ssl_loss, embedded = neural_network.loss(batch, ssl_loss_fn, device)
         # Encode centers
         embedded_centers_torch = neural_network.encode(self.cluster_centers)
         # Get distances between points and centers. Get nearest center
@@ -469,7 +472,7 @@ class _DipDECK_Module(torch.nn.Module):
         loss = ssl_loss_weight * ssl_loss + clustering_loss_weight * cluster_loss
         return loss
 
-    def fit(self, X, neural_network: torch.nn.Module, trainloader: torch.utils.data.DataLoader, 
+    def fit(self, X, neural_network: _AbstractNeuralNetwork, trainloader: torch.utils.data.DataLoader,
             testloader: torch.utils.data.DataLoader, n_epochs: int,
             device: torch.device, optimizer: torch.optim.Optimizer, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss,
             clustering_loss_weight: float, ssl_loss_weight: float, debug: bool) -> '_DipDECK_Module':
@@ -480,7 +483,7 @@ class _DipDECK_Module(torch.nn.Module):
         ----------
         X : np.ndarray
             the given data set
-        neural_network : torch.nn.Module
+        neural_network : _AbstractNeuralNetwork
             the neural network
         trainloader : torch.utils.data.DataLoader
             dataloader to be used for training
@@ -514,7 +517,7 @@ class _DipDECK_Module(torch.nn.Module):
             dip_matrix_eye = self.dip_matrix + torch.eye(self.n_clusters_current, device=device)
             dip_matrix_weight = dip_matrix_eye / dip_matrix_eye.sum(1).reshape((-1, 1))
             # Iterate over batches
-            total_loss = 0
+            total_loss = 0.
             for batch in trainloader:
                 loss = self._loss(batch, neural_network, ssl_loss_fn, ssl_loss_weight, clustering_loss_weight, dip_matrix_weight, i == 0, device)
                 total_loss += loss.item()
@@ -587,7 +590,7 @@ class DipDECK(_AbstractDeepClusteringAlgo):
 
     Parameters
     ----------
-    n_clusters_init : int
+    n_clusters_init : int | None
         initial number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN (default: 35)
     dip_merge_threshold : float
         threshold regarding the Dip-p-value that defines if two clusters should be merged. Must be bvetween 0 and 1 (default: 0.9)
@@ -596,39 +599,39 @@ class DipDECK(_AbstractDeepClusteringAlgo):
     ssl_loss_weight : float
         weight of the self-supervised learning (ssl) loss (default: 1.0)
     max_n_clusters : int
-        maximum number of clusters. Must be larger than min_n_clusters. If the result has more clusters, a merge will be forced (default: np.inf)
+        maximum number of clusters. Must be larger than min_n_clusters. If the result has more clusters, a merge will be forced (default: 1000)
     min_n_clusters : int
         minimum number of clusters. Must be larger than 0, smaller than max_n_clusters and smaller than n_clusters_init.
         When this number of clusters is reached, all further merge processes will be hindered (default: 1)
     batch_size : int
         size of the data batches (default: 256)
-    pretrain_optimizer_params : dict
+    pretrain_optimizer_params : dict | None
         parameters of the optimizer for the pretraining of the neural network, includes the learning rate. If None, it will be set to {"lr": 1e-3} (default: None)
-    clustering_optimizer_params : dict
+    clustering_optimizer_params : dict | None
         parameters of the optimizer for the actual clustering procedure, includes the learning rate. If None, it will be set to {"lr": 1e-4} (default: None)
     pretrain_epochs : int
         number of epochs for the pretraining of the neural network (default: 100)
     clustering_epochs : int
         number of epochs for the actual clustering procedure. Will reset after each merge (default: 50)
-    optimizer_class : torch.optim.Optimizer
+    optimizer_class : type[torch.optim.Optimizer]
         the optimizer class (default: torch.optim.Adam)
     ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
          self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: mean_squared_error)
-    neural_network : torch.nn.Module | tuple
+    neural_network : _AbstractNeuralNetwork | tuple[type[_AbstractNeuralNetwork], dict] | None
         the input neural network. If None, a new FeedforwardAutoencoder will be created.
         Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict) (default: None)
-    neural_network_weights : str | Path
+    neural_network_weights : str | Path | None
         Path to a file containing the state_dict of the neural_network (default: None)
     embedding_size : int
         size of the embedding within the neural network (default: 5)
     max_cluster_size_diff_factor : float
         The maximum different in size when comparing two clusters regarding the number of samples.
-        If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) closest samples will be used for the Dip calculation (default: 2)
+        If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) closest samples will be used for the Dip calculation (default: 2.)
     pval_strategy : str
         Defines which strategy to use to receive dip-p-vales. Possibilities are 'table', 'function' and 'bootstrap' (default: 'table')
     n_boots : int
         Number of bootstraps used to calculate dip-p-values. Only necessary if pval_strategy is 'bootstrap' (default: 1000)
-    custom_dataloaders : tuple
+    custom_dataloaders : tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader] | tuple[str | Path, str | Path] | None
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         Can also be a tuple of strings, where the first entry is the path to a saved trainloader and the second entry the path to a saved testloader.
         In this case the dataloaders will be loaded by torch.load(PATH).
@@ -636,14 +639,14 @@ class DipDECK(_AbstractDeepClusteringAlgo):
     augmentation_invariance : bool
         If True, augmented samples provided in custom_dataloaders[0] will be used to learn
         cluster assignments that are invariant to the augmentation transformations (default: False)
-    initial_clustering_class : ClusterMixin
+    initial_clustering_class : ClusterMixin | None
         clustering class to obtain the initial cluster labels after the pretraining (default: KMeans)
-    initial_clustering_params : dict
+    initial_clustering_params : dict | None
         parameters for the initial clustering class. If None, it will be set to {} (default: None)
-    device : torch.device
+    device : torch.device | int | str | None
         The device on which to perform the computations.
         If device is None then it will be automatically chosen: if a gpu is available the gpu with the highest amount of free memory will be chosen (default: None)
-    random_state : np.random.RandomState | int
+    random_state : np.random.RandomState | int | None
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
     debug : bool
         If true, additional information will be printed to the console (default: False)
@@ -656,7 +659,7 @@ class DipDECK(_AbstractDeepClusteringAlgo):
         The final number of clusters
     cluster_centers_ : np.ndarray
         The final cluster centers
-    neural_network_trained_ : torch.nn.Module
+    neural_network_trained_ : _AbstractNeuralNetwork
         The final neural network
     n_features_in_ : int
         the number of features used for the fitting
@@ -675,17 +678,20 @@ class DipDECK(_AbstractDeepClusteringAlgo):
     Proceedings of the 27th ACM SIGKDD Conference on Knowledge Discovery & Data Mining. 2021.
     """
 
-    def __init__(self, n_clusters_init: int = 35, dip_merge_threshold: float = 0.9, clustering_loss_weight: float = 1.,
-                 ssl_loss_weight: float = 1., max_n_clusters: int = np.inf, min_n_clusters: int = 1,
-                 batch_size: int = 256, pretrain_optimizer_params: dict = None,
-                 clustering_optimizer_params: dict = None, pretrain_epochs: int = 100, clustering_epochs: int = 50,
-                 optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
+    def __init__(self, n_clusters_init: int | None = 35, dip_merge_threshold: float = 0.9, clustering_loss_weight: float = 1.,
+                 ssl_loss_weight: float = 1., max_n_clusters: int = 1000, min_n_clusters: int = 1,
+                 batch_size: int = 256, pretrain_optimizer_params: dict | None = None,
+                 clustering_optimizer_params: dict | None = None, pretrain_epochs: int = 100, clustering_epochs: int = 50,
+                 optimizer_class: type[torch.optim.Optimizer] = torch.optim.Adam,
                  ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error,
-                 neural_network: torch.nn.Module | tuple = None, neural_network_weights: str | Path = None,
-                 embedding_size: int = 5, max_cluster_size_diff_factor: float = 2, pval_strategy: str = "table",
-                 n_boots: int = 1000, custom_dataloaders: tuple = None, augmentation_invariance: bool = False,
-                 initial_clustering_class: ClusterMixin = KMeans, initial_clustering_params: dict = None,
-                 device: torch.device = None, random_state: np.random.RandomState | int = None, debug: bool = False):
+                 neural_network: _AbstractNeuralNetwork | tuple[type[_AbstractNeuralNetwork], dict] | None = None,
+                 neural_network_weights: str | Path | None = None,
+                 embedding_size: int = 5, max_cluster_size_diff_factor: float = 2., pval_strategy: str = "table",
+                 n_boots: int = 1000,
+                 custom_dataloaders: tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader] | tuple[str | Path, str | Path] | None = None,
+                 augmentation_invariance: bool = False, initial_clustering_class: ClusterMixin | None = KMeans,
+                 initial_clustering_params: dict | None = None, device: torch.device | int | str | None = None,
+                 random_state: np.random.RandomState | int | None = None, debug: bool = False):
         super().__init__(batch_size, neural_network, neural_network_weights, embedding_size, device, random_state)
         self.n_clusters_init = n_clusters_init
         self.dip_merge_threshold = dip_merge_threshold
@@ -708,7 +714,7 @@ class DipDECK(_AbstractDeepClusteringAlgo):
         self.initial_clustering_params = initial_clustering_params
         self.debug = debug
 
-    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DipDECK':
+    def fit(self, X: np.ndarray, y: np.ndarray | None = None) -> 'DipDECK':
         """
         Initiate the actual clustering process on the input data set.
         The resulting cluster labels will be stored in the labels_ attribute.
@@ -717,7 +723,7 @@ class DipDECK(_AbstractDeepClusteringAlgo):
         ----------
         X : np.ndarray
             the given data set
-        y : np.ndarray
+        y : np.ndarray | None
             the labels (can be ignored)
 
         Returns
@@ -738,7 +744,7 @@ class DipDECK(_AbstractDeepClusteringAlgo):
             self.neural_network, self.embedding_size, self.custom_dataloaders, self.initial_clustering_class, initial_clustering_params,
             self.device, random_state, neural_network_weights=self.neural_network_weights)
         if n_clusters_init < self.min_n_clusters:
-            raise Exception("n_clusters_init ({0}) can not be smaller than min_n_clusters ({0})".format(n_clusters_init,
+            raise Exception("n_clusters_init ({0}) can not be smaller than min_n_clusters ({1})".format(n_clusters_init,
                                                                                                         self.min_n_clusters))
         if self.custom_dataloaders is not None:
             # Get new X from testloader (important if transformations are used within the dataloader)
@@ -755,17 +761,17 @@ class DipDECK(_AbstractDeepClusteringAlgo):
         optimizer = self.optimizer_class(neural_network.parameters(), **clustering_optimizer_params)
         # Create DipDECK_Module
         dipdeck_module = _DipDECK_Module(n_clusters_init, cluster_labels_cpu, centers_cpu, dip_matrix_cpu, self.dip_merge_threshold, self.max_n_clusters, self.min_n_clusters, 
-                                         self.max_cluster_size_diff_factor, self.pval_strategy, self.n_boots, self.random_state, self.augmentation_invariance).to_device(device)
+                                         self.max_cluster_size_diff_factor, self.pval_strategy, self.n_boots, random_state, self.augmentation_invariance).to_device(device)
         dipdeck_module.fit(X, neural_network, trainloader, testloader, self.clustering_epochs, device, optimizer, self.ssl_loss_fn, self.clustering_loss_weight, self.ssl_loss_weight, self.debug)
         # Save values
         self.labels_ = dipdeck_module.labels.detach().cpu().numpy()
         self.n_clusters_ = dipdeck_module.n_clusters_current
         self.cluster_centers_ = dipdeck_module.cluster_centers.detach().cpu().numpy()
         self.neural_network_trained_ = neural_network
-        self.set_n_featrues_in(X)
+        self.set_n_features_in(X)
         return self
 
-    def predict(self, X: np.ndarray) -> np.ndarray:
+    def predict(self, X: np.ndarray, cluster_centers: np.ndarray | None = None) -> np.ndarray:
         """
         Predicts the labels of the input data.
 
@@ -773,6 +779,8 @@ class DipDECK(_AbstractDeepClusteringAlgo):
         ----------
         X : np.ndarray
             input data
+        cluster_centers : np.ndarray | None
+            Not used (default: None)
 
         Returns
         -------

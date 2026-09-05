@@ -8,12 +8,12 @@ from scipy.stats import ks_2samp
 from sklearn.base import BaseEstimator, ClusterMixin
 from sklearn.mixture import GaussianMixture as GMM
 from sklearn.utils.validation import check_is_fitted
-
 from clustpy.utils.checks import check_parameters
 
 
-def _pgmeans(X, significance, n_projections, n_samples, n_new_centers, amount_random_centers, n_clusters_init,
-             max_n_clusters, random_state) -> (int, np.ndarray, np.ndarray, GMM):
+def _pgmeans(X : np.ndarray, significance :float, n_projections : int, n_samples : int, n_new_centers : int,
+             amount_random_centers : float, n_clusters_init : int | np.ndarray,
+             max_n_clusters : int, random_state : np.random.RandomState) -> tuple[int, np.ndarray, np.ndarray, GMM]:
     """
     Start the actual PGMeans clustering procedure on the input data set.
 
@@ -37,7 +37,7 @@ def _pgmeans(X, significance, n_projections, n_samples, n_new_centers, amount_ra
         Amount of random centers tested. Must be a value in the range [0, 1].
         In total (n_new_centers * amount_random_centers) random centers will be tested.
         The other possible centers will be chosen based on the probability densities of the current GMM model
-    n_clusters_init : int
+    n_clusters_init : int | np.ndarray
         The initial number of clusters. Can also be of type np.ndarray if initial cluster centers are specified
     max_n_clusters : int
         Maximum number of clusters. Must be larger than n_clusters_init
@@ -46,13 +46,13 @@ def _pgmeans(X, significance, n_projections, n_samples, n_new_centers, amount_ra
 
     Returns
     -------
-    tuple : (int, np.ndarray, np.ndarray, GMM)
+    tuple : tuple[int, np.ndarray, np.ndarray, GMM]
         The final number of clusters,
         The labels as identified by PGMeans,
         The cluster centers as identified by PGMeans,
         The final Gaussian Mixture Model
     """
-    assert max_n_clusters >= n_clusters_init, "max_n_clusters can not be smaller than n_clusters_init"
+    assert (isinstance(n_clusters_init, int) and max_n_clusters >= n_clusters_init) or (isinstance(n_clusters_init, np.ndarray) and max_n_clusters >= n_clusters_init.shape[0]), "max_n_clusters can not be smaller than n_clusters_init"
     assert significance >= 0 and significance <= 1, "significance must be a value in the range [0, 1]"
     assert amount_random_centers >= 0 and amount_random_centers <= 1, "amount_random_centers must be a value in the range [0, 1]"
     # Start parameters
@@ -175,8 +175,8 @@ def _update_gmm_with_new_center(X: np.ndarray, n_clusters: int, current_gmm: GMM
     return best_gmm
 
 
-def _initial_gmm_clusters(X: np.ndarray, n_clusters_init: int, gmm_repetitions: int,
-                          random_state: np.random.RandomState) -> (int, GMM):
+def _initial_gmm_clusters(X: np.ndarray, n_clusters_init: int | np.ndarray, gmm_repetitions: int,
+                          random_state: np.random.RandomState) -> tuple[int, GMM]:
     """
     Get the initial Gaussian Mixture Model based on the n_clusters_init parameter.
     If n_clusters_init is an integer, the cluster parameters are identified by a GMM with init_n_clusters als single input.
@@ -186,7 +186,7 @@ def _initial_gmm_clusters(X: np.ndarray, n_clusters_init: int, gmm_repetitions: 
     ----------
     X : np.ndarray
         the given data set
-    n_clusters_init : int
+    n_clusters_init : int | np.ndarray
         The initial number of clusters. Can also by of type np.ndarray if initial cluster centers are specified
     gmm_repetitions : int
         Number of repetitions for the initial GMM
@@ -195,15 +195,15 @@ def _initial_gmm_clusters(X: np.ndarray, n_clusters_init: int, gmm_repetitions: 
 
     Returns
     -------
-    tuple : (int, GMM)
+    tuple : tuple[int, GMM]
         The initial number of clusters,
         The initial GMM
     """
-    if type(n_clusters_init) is int and n_clusters_init == 1:
+    if isinstance(n_clusters_init, int) and n_clusters_init == 1:
         # Convert n_cluster_init to initial cluster center. GMM will be created below
         n_clusters_init = np.mean(X, axis=0).reshape(1, -1)
     # Create initial GMM
-    if type(n_clusters_init) is int:
+    if isinstance(n_clusters_init, int):
         # Normally, init_n_clusters is int
         n_clusters = n_clusters_init
         initial_gmm = GMM(n_components=n_clusters, n_init=gmm_repetitions, random_state=random_state)
@@ -228,10 +228,10 @@ class PGMeans(ClusterMixin, BaseEstimator):
     ----------
     significance : float
         Threshold to decide if the result of the Kolmogorov Smirnov Test indicates a Gaussian Mixture Model (default: 0.001)
-    n_projections : int
+    n_projections : int | None
         Number of projection axes to test different projected GMMs on.
         Can be None, in that case it will be set to: -2.6198 * log(significance) (default: None)
-    n_samples : int
+    n_samples : int | None
         Number of samples generated from the fitted GMM and used to execute the Kolmogorov Smirnov Test.
         If it is chosen larger than the number of data samples, it will be equal to this value.
         Can be None, in that case it will be set to: 3 / significance (default: None)
@@ -242,11 +242,11 @@ class PGMeans(ClusterMixin, BaseEstimator):
         Amount of random centers tested. Must be a value in the range [0, 1].
         In total (n_new_centers * amount_random_centers) random centers will be tested.
         The other possible centers will be chosen based on the probability densities of the current GMM modal (default: 0.5)
-    n_clusters_init : int
+    n_clusters_init : int | np.ndarray
         The initial number of clusters. Can also by of type np.ndarray if initial cluster centers are specified (default: 1)
     max_n_clusters : int
-        Maximum number of clusters. Must be larger than n_clusters_init (default: np.inf)
-    random_state : np.random.RandomState | int
+        Maximum number of clusters. Must be larger than n_clusters_init (default: 1000)
+    random_state : np.random.RandomState | int | None
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Attributes
@@ -268,9 +268,9 @@ class PGMeans(ClusterMixin, BaseEstimator):
     Advances in neural information processing systems. 2007.
     """
 
-    def __init__(self, significance: float = 0.001, n_projections: int = None, n_samples: int = None,
+    def __init__(self, significance: float = 0.001, n_projections: int | None = None, n_samples: int | None = None,
                  n_new_centers: int = 10, amount_random_centers: float = 0.5, n_clusters_init: int = 1,
-                 max_n_clusters: int = np.inf, random_state: np.random.RandomState | int = None):
+                 max_n_clusters: int = 1000, random_state: np.random.RandomState | int | None = None):
         self.significance = significance
         self.n_projections = n_projections
         self.n_samples = n_samples
@@ -280,7 +280,7 @@ class PGMeans(ClusterMixin, BaseEstimator):
         self.amount_random_centers = amount_random_centers
         self.random_state = random_state
 
-    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'PGMeans':
+    def fit(self, X: np.ndarray, y: np.ndarray | None = None) -> 'PGMeans':
         """
         Initiate the actual clustering process on the input data set.
         The resulting cluster labels will be stored in the labels_ attribute.
@@ -289,7 +289,7 @@ class PGMeans(ClusterMixin, BaseEstimator):
         ----------
         X : np.ndarray
             the given data set
-        y : np.ndarray
+        y : np.ndarray | None
             the labels (can be ignored)
 
         Returns

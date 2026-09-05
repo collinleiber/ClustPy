@@ -229,7 +229,7 @@ def multiple_labelings_pc_f1_score(labels_true: np.ndarray, labels_pred: np.ndar
 
 
 def _get_multiple_labelings_pair_counting_categories(labels_true: np.ndarray, labels_pred: np.ndarray,
-                                                     remove_noise_spaces: bool) -> (int, int, int, int):
+                                                     remove_noise_spaces: bool) -> tuple[int, int, int, int]:
     """
     Get the number of 'true positives', 'false positives', 'false negatives' and 'true negatives' to calculate pair-counting scores using multiple labelings.
     In contrast to common pair-counting calculations, a match between two samples counts if it occurs in at least one label set.
@@ -245,7 +245,7 @@ def _get_multiple_labelings_pair_counting_categories(labels_true: np.ndarray, la
 
     Returns
     -------
-    tuple : (int, int, int, int)
+    tuple : tuple[int, int, int, int]
         The number of true positives,
         The number of false positives,
         The number of false negatives,
@@ -416,9 +416,9 @@ class MultipleLabelingsConfusionMatrix(ConfusionMatrix):
         self.true_clusters = np.arange(labels_true.shape[1])
         self.pred_clusters = np.arange(labels_pred.shape[1])
 
-    def plot(self, show_text: bool = True, ground_truth_names: list | None = None, 
+    def plot(self, show_text: bool = True, ground_truth_names: list | np.ndarray | None = None,
             figsize: tuple = (10, 10), cmap: str = "YlGn", textcolor: str = "black",
-             vmin: float = 0.0, vmax: float = 1.0) -> None:
+             vmin: float = 0.0, vmax: float | None = 1.0) -> None:
         """
         Plot the Multiple Labelings Confusion Matrix.
         Same plot as for a regular Confusion Matrix but vmax is by default set to 1 as it is usually the maximum value for clustering metrics.
@@ -427,7 +427,7 @@ class MultipleLabelingsConfusionMatrix(ConfusionMatrix):
         ----------
         show_text : bool
             Show the value in each cell as text (default: True)
-        ground_truth_names : list | None
+        ground_truth_names : list | np.ndarray | None
             List of containing the names of the ground truth cluster sets
         figsize : tuple
             Tuple indicating the height and width of the plot (default: (10, 10))
@@ -439,7 +439,7 @@ class MultipleLabelingsConfusionMatrix(ConfusionMatrix):
             Minimum possible value within a cell of the confusion matrix.
             If None, it will be set as the minimum value within the confusion matrix.
             Used to choose the color from the colormap (default: 0.0)
-        vmax : float
+        vmax : float | None
             Maximum possible value within a cell of the confusion matrix.
             If None, it will be set as the maximum value within the confusion matrix.
             Used to choose the color from the colormap (default: 1.0)
@@ -570,18 +570,20 @@ def is_multi_labelings_n_clusters_correct(labels_true: np.ndarray, labels_pred: 
         return False
     # Start main method by calculating n_clusters
     unique_labels_true = [np.unique(labels_true[:, i]) for i in range(labels_true.shape[1])]
-    unique_labels_true = np.sort([len(u[u >= 0]) for u in unique_labels_true])  # Ignore outliers with label=-1
+    unique_labels_true_np = np.array([len(u[u >= 0]) for u in unique_labels_true])  # Ignore outliers with label=-1
+    unique_labels_true_np = np.sort(unique_labels_true_np)
     unique_labels_pred = [np.unique(labels_pred[:, i]) for i in range(labels_pred.shape[1])]
-    unique_labels_pred = np.sort([len(u[u >= 0]) for u in unique_labels_pred])  # Ignore outliers with label=-1
+    unique_labels_pred_np = np.array([len(u[u >= 0]) for u in unique_labels_pred])  # Ignore outliers with label=-1
+    unique_labels_pred_np = np.sort(unique_labels_pred_np)
     if check_subset:
-        for gt in unique_labels_true:
+        for gt in unique_labels_true_np:
             # Check if all n_clusters of the true labelings are contained in the predicted labelings
-            if gt in unique_labels_pred:
-                index = np.where(gt == unique_labels_pred)[0][0]
-                unique_labels_pred = np.delete(unique_labels_pred, index)
+            if gt in unique_labels_pred_np:
+                index = np.where(gt == unique_labels_pred_np)[0][0]
+                unique_labels_pred_np = np.delete(unique_labels_pred_np, index)
             else:
                 return False
         is_equal = True
     else:
-        is_equal = np.array_equal(unique_labels_true, unique_labels_pred)
+        is_equal = np.array_equal(unique_labels_true_np, unique_labels_pred_np)
     return is_equal

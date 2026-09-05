@@ -5,7 +5,7 @@ Collin Leiber
 
 import numpy as np
 from scipy.stats import ortho_group
-from sklearn.utils import check_random_state
+from clustpy.utils.checks import check_random_state
 from scipy.spatial.distance import pdist
 from sklearn.utils.extmath import row_norms
 from sklearn.metrics.pairwise import pairwise_distances_argmin_min
@@ -263,7 +263,7 @@ def _initialize_nrkmeans_parameters(X: np.ndarray, n_clusters: list[int], V: np.
                 used_dimensionalities))
     # Define initial cluster centers with kmeans++ for each subspace
     if centers is None:
-        centers = [kpp(X, k, row_norms(X, squared=True), random_state=random_state, n_local_trials=None)[0] for k in n_clusters]
+        centers = [kpp(X, k, x_squared_norms=row_norms(X, squared=True), random_state=random_state, n_local_trials=None)[0] for k in n_clusters]
     else:
         centers = centers.copy()
     if not type(centers) is list or not len(centers) is subspaces:

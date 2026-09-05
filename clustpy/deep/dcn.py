@@ -4,7 +4,8 @@ Lukas Miklautz,
 Dominik Mautz
 """
 
-from clustpy.deep._utils import encode_batchwise, squared_euclidean_distance, predict_batchwise, mean_squared_error
+from clustpy.deep._utils import squared_euclidean_distance, mean_squared_error
+from clustpy.deep._encoding_utils import encode_batchwise, predict_batchwise
 from clustpy.deep._train_utils import get_default_deep_clustering_initialization
 from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
 import torch
@@ -14,24 +15,26 @@ from sklearn.base import ClusterMixin
 import tqdm
 from collections.abc import Callable
 from pathlib import Path
+from clustpy.deep.neural_networks._abstract_neural_network import _AbstractNeuralNetwork
 
 
-def _dcn(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_params: dict,
+def _dcn(X: np.ndarray | torch.Tensor, n_clusters: int | None, batch_size: int, pretrain_optimizer_params: dict,
          clustering_optimizer_params: dict, pretrain_epochs: int, clustering_epochs: int,
-         optimizer_class: torch.optim.Optimizer, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss,
-         neural_network: torch.nn.Module | tuple, neural_network_weights: str | Path,
+         optimizer_class: type[torch.optim.Optimizer], ssl_loss_fn: Callable | torch.nn.modules.loss._Loss,
+         neural_network: _AbstractNeuralNetwork | tuple[type[_AbstractNeuralNetwork], dict] | None, neural_network_weights: str | Path | None,
          embedding_size: int, clustering_loss_weight: float, ssl_loss_weight: float,
-         custom_dataloaders: tuple, augmentation_invariance: bool, initial_clustering_class: ClusterMixin,
-         initial_clustering_params: dict, device: torch.device,
-         random_state: np.random.RandomState) -> (np.ndarray, np.ndarray, np.ndarray, np.ndarray, torch.nn.Module):
+         custom_dataloaders: tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader] | tuple[str | Path, str | Path] | None,
+         augmentation_invariance: bool, initial_clustering_class: ClusterMixin | None,
+         initial_clustering_params: dict, device: torch.device | int | str | None,
+         random_state: np.random.RandomState) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, _AbstractNeuralNetwork]:
     """
     Start the actual DCN clustering procedure on the input data set.
 
     Parameters
     ----------
-    X : np.ndarray / torch.Tensor
+    X : np.ndarray | torch.Tensor
         the given data set. Can be a np.ndarray or a torch.Tensor
-    n_clusters : int
+    n_clusters : int | None
         number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN
     batch_size : int
         size of the data batches
@@ -43,14 +46,14 @@ def _dcn(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_par
         number of epochs for the pretraining of the neural network
     clustering_epochs : int
         number of epochs for the actual clustering procedure
-    optimizer_class : torch.optim.Optimizer
+    optimizer_class : type[torch.optim.Optimizer]
         the optimizer class
     ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
          self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
-    neural_network : torch.nn.Module | tuple
+    neural_network : _AbstractNeuralNetwork | tuple[type[_AbstractNeuralNetwork], dict] | None
         the input neural network.
         Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict)
-    neural_network_weights : str | Path
+    neural_network_weights : str | Path | None
         Path to a file containing the state_dict of the neural_network.
     embedding_size : int
         size of the embedding within the neural network
@@ -58,7 +61,7 @@ def _dcn(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_par
         weight of the clustering loss
     ssl_loss_weight : float
         weight of the self-supervised learning (ssl) loss
-    custom_dataloaders : tuple
+    custom_dataloaders : tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader] | tuple[str | Path, str | Path] | None
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         Can also be a tuple of strings, where the first entry is the path to a saved trainloader and the second entry the path to a saved testloader.
         In this case the dataloaders will be loaded by torch.load(PATH).
@@ -66,18 +69,18 @@ def _dcn(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_par
     augmentation_invariance : bool
         If True, augmented samples provided in custom_dataloaders[0] will be used to learn 
         cluster assignments that are invariant to the augmentation transformations
-    initial_clustering_class : ClusterMixin
+    initial_clustering_class : ClusterMixin | None
         clustering class to obtain the initial cluster labels after the pretraining
     initial_clustering_params : dict
         parameters for the initial clustering class
-    device : torch.device
+    device : torch.device | int | str | None
         The device on which to perform the computations
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution
 
     Returns
     -------
-    tuple : (np.ndarray, np.ndarray, np.ndarray, np.ndarray, torch.nn.Module)
+    tuple : tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, _AbstractNeuralNetwork]
         The labels as identified by a final KMeans execution,
         The cluster centers as identified by a final KMeans execution,
         The labels as identified by DCN after the training terminated,
@@ -106,8 +109,8 @@ def _dcn(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_par
     return kmeans.labels_, kmeans.cluster_centers_, dcn_labels, dcn_centers, neural_network
 
 
-def _compute_centroids(centers: torch.Tensor, embedded: torch.Tensor, counts: torch.Tensor, labels: torch.Tensor) -> (
-        torch.Tensor, torch.Tensor):
+def _compute_centroids(centers: torch.Tensor, embedded: torch.Tensor, counts: torch.Tensor, labels: torch.Tensor) -> tuple[
+        torch.Tensor, torch.Tensor]:
     """
     Update the centers and amount of object ever assigned to a center.
 
@@ -129,11 +132,11 @@ def _compute_centroids(centers: torch.Tensor, embedded: torch.Tensor, counts: to
 
     Returns
     -------
-    centers, counts : (torch.Tensor, torch.Tensor)
+    centers, counts : tuple[torch.Tensor, torch.Tensor]
         The updated centers and the updated counts
     """
     for i in range(embedded.shape[0]):
-        c = labels[i].item()
+        c = int(labels[i].item())
         counts[c] += 1
         eta = 1.0 / counts[c].item()
         centers[c] = (1 - eta) * centers[c] + eta * embedded[i]
@@ -211,7 +214,7 @@ class _DCN_Module(torch.nn.Module):
         labels = (dist.min(dim=1)[1]).int()
         return labels
 
-    def update_centroids(self, embedded: torch.Tensor, labels: torch.Tensor) -> (torch.Tensor, torch.Tensor):
+    def update_centroids(self, embedded: torch.Tensor, labels: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Update the cluster centers of the _DCN_Module.
 
@@ -224,7 +227,7 @@ class _DCN_Module(torch.nn.Module):
 
         Returns
         -------
-        tuple : (torch.Tensor, torch.Tensor)
+        tuple : tuple[torch.Tensor, torch.Tensor]
             The updated centers,
             The new amount of objects that ever got assigned to a cluster
         """
@@ -250,7 +253,7 @@ class _DCN_Module(torch.nn.Module):
         self.to(device)
         return self
 
-    def _loss(self, batch: list, neural_network: torch.nn.Module, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss,
+    def _loss(self, batch: list, neural_network: _AbstractNeuralNetwork, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss,
               ssl_loss_weight: float, clustering_loss_weight: float, device: torch.device) -> torch.Tensor:
         """
         Calculate the complete DCN + neural network loss.
@@ -259,7 +262,7 @@ class _DCN_Module(torch.nn.Module):
         ----------
         batch : list
             the minibatch
-        neural_network : torch.nn.Module
+        neural_network : _AbstractNeuralNetwork
             the neural network
         ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
             self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
@@ -277,9 +280,9 @@ class _DCN_Module(torch.nn.Module):
         """
         # compute self-supervised loss
         if self.augmentation_invariance:
-            ssl_loss, embedded, _, embedded_aug, _ = neural_network.loss_augmentation(batch, ssl_loss_fn, device)
+            ssl_loss, embedded, embedded_aug = neural_network.loss_augmentation(batch, ssl_loss_fn, device)
         else:
-            ssl_loss, embedded, _ = neural_network.loss(batch, ssl_loss_fn, device)
+            ssl_loss, embedded = neural_network.loss(batch, ssl_loss_fn, device)
 
         # compute cluster loss
         labels = self.labels[batch[0]]
@@ -294,7 +297,7 @@ class _DCN_Module(torch.nn.Module):
 
         return loss
 
-    def fit(self, neural_network: torch.nn.Module, trainloader: torch.utils.data.DataLoader,
+    def fit(self, neural_network: _AbstractNeuralNetwork, trainloader: torch.utils.data.DataLoader,
             testloader: torch.utils.data.DataLoader, n_epochs: int, device: torch.device,
             optimizer: torch.optim.Optimizer, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss, clustering_loss_weight: float,
             ssl_loss_weight: float) -> '_DCN_Module':
@@ -303,7 +306,7 @@ class _DCN_Module(torch.nn.Module):
 
         Parameters
         ----------
-        neural_network : torch.nn.Module
+        neural_network : _AbstractNeuralNetwork
             the neural network
         trainloader : torch.utils.data.DataLoader
             dataloader to be used for training
@@ -331,7 +334,7 @@ class _DCN_Module(torch.nn.Module):
         tbar = tqdm.trange(n_epochs, desc="DCN training")
         for _ in tbar:
             # Update Network
-            total_loss = 0
+            total_loss = 0.
             for batch in trainloader:
                 loss = self._loss(batch, neural_network, ssl_loss_fn, ssl_loss_weight, clustering_loss_weight,
                                   device)
@@ -375,19 +378,19 @@ class DCN(_AbstractDeepClusteringAlgo):
 
     Parameters
     ----------
-    n_clusters : int
+    n_clusters : int | None
         number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN (default: 8)
     batch_size : int
         size of the data batches (default: 256)
-    pretrain_optimizer_params : dict
+    pretrain_optimizer_params : dict | None
         parameters of the optimizer for the pretraining of the neural network, includes the learning rate. If None, it will be set to {"lr": 1e-3} (default: None)
-    clustering_optimizer_params : dict
+    clustering_optimizer_params : dict | None
         parameters of the optimizer for the actual clustering procedure, includes the learning rate. If None, it will be set to {"lr": 1e-4} (default: None)
     pretrain_epochs : int
         number of epochs for the pretraining of the neural network (default: 100)
     clustering_epochs : int
         number of epochs for the actual clustering procedure (default: 150)
-    optimizer_class : torch.optim.Optimizer
+    optimizer_class : type[torch.optim.Optimizer]
         the optimizer class (default: torch.optim.Adam)
     ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
          self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: mean_squared_error)
@@ -395,14 +398,14 @@ class DCN(_AbstractDeepClusteringAlgo):
         weight of the clustering loss (default: 0.1)
     ssl_loss_weight : float
         weight of the self-supervised learning (ssl) loss (default: 1.0)
-    neural_network : torch.nn.Module | tuple
+    neural_network : _AbstractNeuralNetwork | tuple[type[_AbstractNeuralNetwork], dict] | None
         the input neural network. If None, a new FeedforwardAutoencoder will be created.
         Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict) (default: None)
-    neural_network_weights : str | Path
+    neural_network_weights : str | Path | None
         Path to a file containing the state_dict of the neural_network (default: None)
     embedding_size : int
         size of the embedding within the neural network (default: 10)
-    custom_dataloaders : tuple
+    custom_dataloaders : tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader] | tuple[str | Path, str | Path] | None
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         Can also be a tuple of strings, where the first entry is the path to a saved trainloader and the second entry the path to a saved testloader.
         In this case the dataloaders will be loaded by torch.load(PATH).
@@ -410,14 +413,14 @@ class DCN(_AbstractDeepClusteringAlgo):
     augmentation_invariance : bool
         If True, augmented samples provided in custom_dataloaders[0] will be used to learn 
         cluster assignments that are invariant to the augmentation transformations (default: False)
-    initial_clustering_class : ClusterMixin
+    initial_clustering_class : ClusterMixin | None
         clustering class to obtain the initial cluster labels after the pretraining (default: KMeans)
-    initial_clustering_params : dict
+    initial_clustering_params : dict | None
         parameters for the initial clustering class. If None, it will be set to {} (default: None)
-    device : torch.device
+    device : torch.device | int | str | None
         The device on which to perform the computations.
         If device is None then it will be automatically chosen: if a gpu is available the gpu with the highest amount of free memory will be chosen (default: None)
-    random_state : np.random.RandomState | int
+    random_state : np.random.RandomState | int | None
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Attributes
@@ -430,7 +433,7 @@ class DCN(_AbstractDeepClusteringAlgo):
         The final DCN labels
     dcn_cluster_centers_ : np.ndarray
         The final DCN cluster centers
-    neural_network_trained_ : torch.nn.Module
+    neural_network_trained_ : _AbstractNeuralNetwork
         The final neural network
     n_features_in_ : int
         the number of features used for the fitting
@@ -450,15 +453,16 @@ class DCN(_AbstractDeepClusteringAlgo):
     international conference on machine learning. PMLR, 2017.
     """
 
-    def __init__(self, n_clusters: int = 8, batch_size: int = 256, pretrain_optimizer_params: dict = None,
-                 clustering_optimizer_params: dict = None, pretrain_epochs: int = 100,
-                 clustering_epochs: int = 150, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
+    def __init__(self, n_clusters: int | None = 8, batch_size: int = 256, pretrain_optimizer_params: dict | None = None,
+                 clustering_optimizer_params: dict | None = None, pretrain_epochs: int = 100,
+                 clustering_epochs: int = 150, optimizer_class: type[torch.optim.Optimizer] = torch.optim.Adam,
                  ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error, clustering_loss_weight: float = 0.1,
-                 ssl_loss_weight: float = 1.0, neural_network: torch.nn.Module | tuple = None,
-                 neural_network_weights: str | Path = None, embedding_size: int = 10, custom_dataloaders: tuple = None,
-                 augmentation_invariance: bool = False, initial_clustering_class: ClusterMixin = KMeans,
-                 initial_clustering_params: dict = None, device: torch.device = None,
-                 random_state: np.random.RandomState | int = None):
+                 ssl_loss_weight: float = 1.0, neural_network: _AbstractNeuralNetwork | tuple[type[_AbstractNeuralNetwork], dict] | None = None,
+                 neural_network_weights: str | Path | None = None, embedding_size: int = 10,
+                 custom_dataloaders: tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader] | tuple[str | Path, str | Path] | None = None,
+                 augmentation_invariance: bool = False, initial_clustering_class: ClusterMixin | None = KMeans,
+                 initial_clustering_params: dict | None = None, device: torch.device | int | str | None = None,
+                 random_state: np.random.RandomState | int | None = None):
         super().__init__(batch_size, neural_network, neural_network_weights, embedding_size, device, random_state)
         self.n_clusters = n_clusters
         self.pretrain_optimizer_params = pretrain_optimizer_params
@@ -474,7 +478,7 @@ class DCN(_AbstractDeepClusteringAlgo):
         self.initial_clustering_class = initial_clustering_class
         self.initial_clustering_params = initial_clustering_params
 
-    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DCN':
+    def fit(self, X: np.ndarray, y: np.ndarray | None = None) -> 'DCN':
         """
         Initiate the actual clustering process on the input data set.
         The resulting cluster labels will be stored in the labels_ attribute.
@@ -483,7 +487,7 @@ class DCN(_AbstractDeepClusteringAlgo):
         ----------
         X : np.ndarray
             the given data set
-        y : np.ndarray
+        y : np.ndarray | None
             the labels (can be ignored)
 
         Returns
@@ -516,5 +520,5 @@ class DCN(_AbstractDeepClusteringAlgo):
         self.dcn_labels_ = dcn_labels
         self.dcn_cluster_centers_ = dcn_centers
         self.neural_network_trained_ = neural_network
-        self.set_n_featrues_in(X)
+        self.set_n_features_in(X)
         return self

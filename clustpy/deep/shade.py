@@ -11,12 +11,15 @@ from clustpy.hierarchical import DCTree_Clusterer
 from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
 from clustpy.deep._data_utils import get_train_and_test_dataloader
 from clustpy.deep._train_utils import get_trained_network
-from clustpy.deep._utils import detect_device, squared_euclidean_distance, encode_batchwise, run_initial_clustering, mean_squared_error
+from clustpy.deep._utils import detect_device, squared_euclidean_distance, run_initial_clustering, mean_squared_error
+from clustpy.deep._encoding_utils import encode_batchwise
 from clustpy.utils.checks import check_parameters
 import tqdm
-from typing import Callable, Optional, Tuple
 from sklearn.utils.validation import check_is_fitted
 from sklearn.base import ClusterMixin
+from collections.abc import Callable
+from pathlib import Path
+from clustpy.deep.neural_networks._abstract_neural_network import _AbstractNeuralNetwork
 
 
 class SHADE(_AbstractDeepClusteringAlgo):
@@ -29,7 +32,7 @@ class SHADE(_AbstractDeepClusteringAlgo):
     ----------
     clustering_class : ClusterMixin
         clustering class to obtain the cluster labels after getting the embedding (default: DCTree_Clusterer)
-    clustering_params : dict
+    clustering_params : dict | None
         parameters for the clustering class. If None, it will be set to {"min_points": min_points} (default: None)
     min_points : int
         the minimum number of points (default: 5)
@@ -42,23 +45,23 @@ class SHADE(_AbstractDeepClusteringAlgo):
       This will, however, increase the runtime (default: False)
     batch_size : int
         Size of the data batches. (default: 500)
-    pretrain_optimizer_params : dict
+    pretrain_optimizer_params : dict | None
         parameters of the optimizer for the pretraining of the neural network, includes the learning rate.
         If None, it will be set to {"lr": 1e-3}. (default: None)
-    clustering_optimizer_params : dict
+    clustering_optimizer_params : dict | None
         parameters of the optimizer for the actual clustering procedure, includes the learning rate. If None, it will be set to {"lr": 1e-4} (default: None)
     pretrain_epochs : int
         number of epochs for the pretraining of the neural network. (default: 0)
     clustering_epochs : int
         number of epochs for the actual clustering procedure (default: 100)
-    optimizer_class : torch.optim.Optimizer
+    optimizer_class : type[torch.optim.Optimizer]
         the optimizer class (default: torch.optim.Adam)
     ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
          self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: mean_squared_error)
-    neural_network : torch.nn.Module | tuple
+    neural_network : _AbstractNeuralNetwork | tuple[type[_AbstractNeuralNetwork], dict] | None
         the input neural network. If None, a new FeedforwardAutoencoder will be created.
         Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict) (default: None)
-    neural_network_weights : str
+    neural_network_weights : str | Path | None
         Path to a file containing the state_dict of the neural_network (default: None)
     embedding_size : int
         size of the embedding within the neural network (default: 10)
@@ -66,15 +69,15 @@ class SHADE(_AbstractDeepClusteringAlgo):
         weight of the density loss compared to the reconstruction loss (default: 1.0)
     ssl_loss_weight : float
         weight of the self-supervised learning (ssl) loss (default: 1.0)
-    custom_dataloaders : tuple
+    custom_dataloaders : tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader] | tuple[str | Path, str | Path] | None
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         Can also be a tuple of strings, where the first entry is the path to a saved trainloader and the second entry the path to a saved testloader.
         In this case the dataloaders will be loaded by torch.load(PATH).
         If None, the default dataloaders will be used (default: None)
-    device : torch.device
+    device : torch.device | int | str | None
         The device on which to perform the computations.
         If device is None then it will be automatically chosen: if a gpu is available the gpu with the highest amount of free memory will be chosen (default: None)
-    random_state : np.random.RandomState | int
+    random_state : np.random.RandomState | int | None
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Attributes
@@ -85,9 +88,9 @@ class SHADE(_AbstractDeepClusteringAlgo):
         The final labels
     cluster_centers_ : np.ndarray
         The final cluster centers defined as the mean of assigned samples within the AE embedding
-    dc_tree_ : DCTree
+    dc_tree_ : DCTree | None
         The dc tree
-    neural_network_trained_ : torch.nn.Module
+    neural_network_trained_ : _AbstractNeuralNetwork
         The final neural network
     n_features_in_ : int
         the number of features used for the fitting
@@ -108,27 +111,27 @@ class SHADE(_AbstractDeepClusteringAlgo):
 
     def __init__(
         self,
-        clustering_class : Optional[ClusterMixin] = DCTree_Clusterer,
-        clustering_params : dict = None,
+        clustering_class : ClusterMixin = DCTree_Clusterer,
+        clustering_params : dict | None = None,
         min_points : int = 5,
         use_complete_dc_tree: bool = True,
         use_matrix_dc_distance: bool = True,
         use_less_memory: bool = False,
         batch_size: int = 500,
-        pretrain_optimizer_params: dict = None,
-        clustering_optimizer_params : dict = None,
+        pretrain_optimizer_params: dict | None = None,
+        clustering_optimizer_params : dict | None = None,
         pretrain_epochs : int = 0,
         clustering_epochs : int = 100,
-        optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
+        optimizer_class: type[torch.optim.Optimizer] = torch.optim.Adam,
         ssl_loss_fn : Callable | torch.nn.modules.loss._Loss = mean_squared_error,
-        neural_network : torch.nn.Module | tuple = None,
-        neural_network_weights : str = None,
+        neural_network : _AbstractNeuralNetwork | tuple[type[_AbstractNeuralNetwork], dict] | None = None,
+        neural_network_weights : str | Path | None = None,
         embedding_size : int = 10,
         density_loss_weight : float = 1.0,
         ssl_loss_weight : float = 1.0,
-        custom_dataloaders : tuple = None,
-        device : torch.device = None,
-        random_state : np.random.RandomState | int = None,
+        custom_dataloaders : tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader] | tuple[str | Path, str | Path] | None = None,
+        device : torch.device | int | str | None = None,
+        random_state : np.random.RandomState | int | None = None,
     ):
         super().__init__(batch_size, neural_network, neural_network_weights, embedding_size, device, random_state)
         self.clustering_class = clustering_class
@@ -147,7 +150,7 @@ class SHADE(_AbstractDeepClusteringAlgo):
         self.ssl_loss_weight = ssl_loss_weight
         self.custom_dataloaders = custom_dataloaders
 
-    def fit(self, X: np.ndarray, y: np.ndarray=None) -> SHADE:
+    def fit(self, X: np.ndarray, y: np.ndarray | None = None) -> SHADE:
         """
         Cluster the input dataset with the SHADE algorithm.
         The resulting cluster labels will be stored in the `labels_` attribute.
@@ -156,7 +159,7 @@ class SHADE(_AbstractDeepClusteringAlgo):
         ----------
         X : np.ndarray
             The given data set.
-        y : np.ndarray
+        y : np.ndarray | None
             The labels. (can be ignored)
 
         Returns
@@ -171,10 +174,7 @@ class SHADE(_AbstractDeepClusteringAlgo):
         trainloader, testloader, batch_size = get_train_and_test_dataloader(X, self.batch_size, self.custom_dataloaders)
         assert batch_size >= self.min_points, f"Batch_size ({batch_size}) cannot be smaller than min_points ({self.min_points})"
         # Create dc_tree
-        if self.use_complete_dc_tree:
-            self.dc_tree_ = DCTree(X, min_points=self.min_points, use_less_memory=self.use_less_memory)
-        else:
-            self.dc_tree_ = None
+        self.dc_tree_ = DCTree(X, min_points=self.min_points, use_less_memory=self.use_less_memory) if self.use_complete_dc_tree else None
         # Create and pretrain Autoencoder
         neural_network_params = {"layers": [X.shape[1], 512, 256, 128, self.embedding_size]}
         neural_network = get_trained_network(trainloader, n_epochs=self.pretrain_epochs,
@@ -210,10 +210,10 @@ class SHADE(_AbstractDeepClusteringAlgo):
         self.labels_ = labels
         self.cluster_centers_ = cluster_centers
         self.neural_network_trained_ = neural_network
-        self.set_n_featrues_in(X)
+        self.set_n_features_in(X)
         return self
 
-    def predict(self, X: np.ndarray) -> np.ndarray:
+    def predict(self, X: np.ndarray, cluster_centers: np.ndarray | None = None) -> np.ndarray:
         """
         Predicts the labels of the input data.
         Note that this is just a very imprecise estimation as we are not using the DC Tree to predict the labels.
@@ -223,6 +223,8 @@ class SHADE(_AbstractDeepClusteringAlgo):
         ----------
         X : np.ndarray
             input data
+        cluster_centers : np.ndarray | None
+            Not used (default: None)
 
         Returns
         -------
@@ -230,7 +232,9 @@ class SHADE(_AbstractDeepClusteringAlgo):
             The predicted labels
         """
         check_is_fitted(self, ["labels_", "neural_network_trained_", "n_features_in_"])
-        X, _, _ = check_parameters(X, allow_size_1=True, allow_nd=self.neural_network_trained_.allow_nd_input, estimator_obj=self)
+        assert isinstance(self.neural_network_trained_, _AbstractNeuralNetwork), "neural_network_trained_ must be of type _AbstractNeuralNetwork. Your input has type {0}".format(type(self.neural_network_trained_))
+        neural_network = self.neural_network_trained_
+        X, _, _ = check_parameters(X, allow_size_1=True, allow_nd=neural_network.allow_nd_input, estimator_obj=self)
         print("WARNING: predict does not use the embedding of the manifold and is, therefore, just a very rough estimate")
         predicted_labels = super().predict(X)
         return predicted_labels
@@ -244,11 +248,11 @@ class _SHADE_Module(torch.nn.Module):
     ----------
     n_epochs : int
         number of epochs for the clustering procedure
-    neural_network : torch.nn.Module
+    neural_network : _AbstractNeuralNetwork
         the neural network
     min_points : int
         the minimum number of points
-    dc_tree : Optional[DCTree]
+    dc_tree : DCTree | None
         the DCTree
     use_matrix_dc_distance: bool
         Defines whether the matrix DC distance should be stored - can cause memory issues
@@ -265,9 +269,9 @@ class _SHADE_Module(torch.nn.Module):
     def __init__(
         self,
         n_epochs : int,
-        neural_network: torch.nn.Module,
+        neural_network: _AbstractNeuralNetwork,
         min_points: int,
-        dc_tree: Optional[DCTree],
+        dc_tree: DCTree | None,
         use_matrix_dc_distance: bool,
         device: torch.device,
         ssl_loss_fn: Callable | torch.nn.modules.loss._Loss,
@@ -335,8 +339,8 @@ class _SHADE_Module(torch.nn.Module):
         self,
         X: np.ndarray,
         batch: list,
-        matrix_dc_distance_torch: torch.Tensor
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        matrix_dc_distance_torch: torch.Tensor | None
+    ) -> torch.Tensor:
         """
         Calculate the autoencoder reconstruction + d_dc loss.
 
@@ -346,7 +350,7 @@ class _SHADE_Module(torch.nn.Module):
             The data
         batch : list
             The minibatch.
-        matrix_dc_distance_torch : torch.Tensor
+        matrix_dc_distance_torch : torch.Tensor | None
             A matrix containing pairwise dc distances
 
         Returns
@@ -355,7 +359,7 @@ class _SHADE_Module(torch.nn.Module):
             The final SHADE loss.
         """
         # Reconstrucion
-        ssl_loss, embedded, _ = self.neural_network.loss(batch, self.ssl_loss_fn, self.device)
+        ssl_loss, embedded = self.neural_network.loss(batch, self.ssl_loss_fn, self.device)
         # Density loss
         if self.dc_tree is None:
             # Batch-wise DCTree
@@ -363,7 +367,7 @@ class _SHADE_Module(torch.nn.Module):
             batch_dc_dists = torch.tensor(dc_distances, device=self.device)
         else:
             # DCTree of all data points X
-            if self.use_matrix_dc_distance:
+            if self.use_matrix_dc_distance and matrix_dc_distance_torch is not None:
                 idxs = batch[0].to(self.device)
                 batch_dc_dists = matrix_dc_distance_torch[idxs[:, None], idxs[None, :]]
             else:

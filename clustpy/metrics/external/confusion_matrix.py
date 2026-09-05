@@ -4,7 +4,7 @@ from scipy.optimize import linear_sum_assignment
 from clustpy.metrics._metrics_utils import _check_labels_arrays
 
 
-def _rearrange(confusion_matrix: np.ndarray) -> (np.ndarray, np.ndarray):
+def _rearrange(confusion_matrix: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """
     Rearrange the confusion matrix in such a way that the sum of the diagonal is maximized.
     Thereby, the best matching combination of labels will be shown.
@@ -19,7 +19,7 @@ def _rearrange(confusion_matrix: np.ndarray) -> (np.ndarray, np.ndarray):
 
     Returns
     -------
-    rearranged_confusion_matrix : np.ndarray
+    rearranged_confusion_matrix : tuple[np.ndarray, np.ndarray]
         The rearranged confusion matrix
         (If number of ground truth labels is larger than the number of predicted labels, the resulting confusion matrix will be quadradic with multiple 0 columns),
         The indices regarding the rearrangement
@@ -43,8 +43,8 @@ def _rearrange(confusion_matrix: np.ndarray) -> (np.ndarray, np.ndarray):
     return rearranged_confusion_matrix, rearranged_order
 
 
-def _plot_confusion_matrix(confusion_matrix: np.ndarray, show_text: bool, row_names : list, column_names : list, figsize: tuple, cmap: str, textcolor: str,
-                           vmin: float, vmax: float) -> None:
+def _plot_confusion_matrix(confusion_matrix: np.ndarray, show_text: bool, row_names : list | np.ndarray, column_names : list | np.ndarray, figsize: tuple, cmap: str, textcolor: str,
+                           vmin: float | None, vmax: float | None) -> None:
     """
     Plot the confusion matrix.
 
@@ -54,9 +54,9 @@ def _plot_confusion_matrix(confusion_matrix: np.ndarray, show_text: bool, row_na
         The confusion matrix to plot
     show_text : bool
         Show the value in each cell as text
-    row_names : list
+    row_names : list | np.ndarray
         List of containing the names of the rows
-    column_names : list
+    column_names : list | np.ndarray
         List of containing the names of the columns
     figsize : tuple
         Tuple indicating the height and width of the plot
@@ -64,11 +64,11 @@ def _plot_confusion_matrix(confusion_matrix: np.ndarray, show_text: bool, row_na
         Colormap used for the plot
     textcolor : str
         Color of the text. Only relevant if show_text is True
-    vmin : float
+    vmin : float | None
         Minimum possible value within a cell of the confusion matrix.
         If None, it will be set as the minimum value within the confusion matrix.
         Used to choose the color from the colormap
-    vmax : float
+    vmax : float | None
         Maximum possible value within a cell of the confusion matrix.
         If None, it will be set as the maximum value within the confusion matrix.
         Used to choose the color from the colormap
@@ -115,7 +115,7 @@ class ConfusionMatrix():
         The confusion matrix
     """
 
-    def __init__(self, labels_true: np.ndarray, labels_pred: np.ndarray, shape: tuple | str | None=None):
+    def __init__(self, labels_true: np.ndarray, labels_pred: np.ndarray, shape: tuple | str | None = None):
         labels_true, labels_pred = _check_labels_arrays(labels_true, labels_pred)
         true_clusters, true_clusters_idx = np.unique(labels_true, return_inverse=True)
         pred_clusters, pred_clusters_idx = np.unique(labels_pred, return_inverse=True)
@@ -128,7 +128,7 @@ class ConfusionMatrix():
                 max_labels = max(len(true_clusters), len(pred_clusters))
                 shape = (max_labels, max_labels)
             else:
-                assert len(shape) == 2 and shape[0] >= len(true_clusters) and shape[1] >= len(pred_clusters), f"Shape must be 'square' or a tuple containing two values such that shape[0] >= len(np.unique(labels_true)) and shape[1] >= len(np.unique(labels_pred)). Your values: shape = {shape}, len(np.unique(labels_true)) = {len(np.unique(labels_true))}, len(np.unique(labels_pred)) = {len(np.unique(labels_pred))}"
+                assert isinstance(shape, tuple) and len(shape) == 2 and shape[0] >= len(true_clusters) and shape[1] >= len(pred_clusters), f"Shape must be 'square' or a tuple containing two values such that shape[0] >= len(np.unique(labels_true)) and shape[1] >= len(np.unique(labels_pred)). Your values: shape = {shape}, len(np.unique(labels_true)) = {len(np.unique(labels_true))}, len(np.unique(labels_pred)) = {len(np.unique(labels_pred))}"
             # Fill unique label information (self.true_clusters and self.pred_clusters) with -2 placeholders
             if shape[0] > len(true_clusters):
                 self.true_clusters = np.append(self.true_clusters, [-2] * (shape[0] - len(true_clusters)))
@@ -175,9 +175,9 @@ class ConfusionMatrix():
             self.pred_clusters = self.pred_clusters[rearranged_order[:len(self.pred_clusters)]]
         return rearranged_confusion_matrix
 
-    def plot(self, show_text: bool = True, ground_truth_names: list | None = None, 
-             figsize: tuple = (10, 10), cmap: str = "YlGn", textcolor: str = "black", 
-             vmin: int = 0, vmax: int = None) -> None:
+    def plot(self, show_text: bool = True, ground_truth_names: list | np.ndarray | None = None,
+             figsize: tuple = (10, 10), cmap: str = "YlGn", textcolor: str = "black",
+             vmin: int = 0, vmax: int | None = None) -> None:
         """
         Plot the confusion matrix.
 
@@ -185,7 +185,7 @@ class ConfusionMatrix():
         ----------
         show_text : bool
             Show the value in each cell as text (default: True)
-        ground_truth_names : list | None
+        ground_truth_names : list | np.ndarray | None
             List of containing the names of the ground truth clusters
         figsize : tuple
             Tuple indicating the height and width of the plot (default: (10, 10))

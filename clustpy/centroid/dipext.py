@@ -4,7 +4,7 @@ Benjamin Schelling and Sam Maurus (original R implementation),
 Collin Leiber
 """
 
-from clustpy.utils import dip_test, dip_gradient
+from clustpy.utils import dip_test, dip_test_extended, dip_gradient
 import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.base import BaseEstimator, ClusterMixin, TransformerMixin
@@ -13,9 +13,9 @@ from sklearn.utils.validation import check_is_fitted
 from sklearn.metrics.pairwise import pairwise_distances_argmin_min
 
 
-def _dip_ext(X: np.ndarray, n_components: int, do_dip_scaling: bool, step_size: float, momentum: float,
+def _dip_ext(X: np.ndarray, n_components: int | None, do_dip_scaling: bool, step_size: float, momentum: float,
              dip_threshold: float, n_starting_vectors: int, ambiguous_triangle_strategy: str,
-             random_state: np.random.RandomState) -> (np.ndarray, np.ndarray, list, np.ndarray):
+             random_state: np.random.RandomState) -> tuple[np.ndarray, np.ndarray, list[np.ndarray], np.ndarray, tuple[np.ndarray, np.ndarray] | None]:
     """
     Start the actual DipExt dimensionality-reduction procedure on the input data set.
 
@@ -23,7 +23,7 @@ def _dip_ext(X: np.ndarray, n_components: int, do_dip_scaling: bool, step_size: 
     ----------
     X : np.ndarray
         the given data set
-    n_components : int
+    n_components : int | None
         The number of components to extract. Can be None, in that case dip_threshold wil be used to define the number of components
     do_dip_scaling : bool
         If true, the resulting features space will be scaled by performing a min-max normalization for each feature and multiplying this feautre by its dip-value
@@ -44,7 +44,7 @@ def _dip_ext(X: np.ndarray, n_components: int, do_dip_scaling: bool, step_size: 
 
     Returns
     -------
-    tuple : (np.ndarray, np.ndarray, list, np.ndarray)
+    tuple : tuple[np.ndarray, np.ndarray, list[np.ndarray], np.ndarray, tuple[np.ndarray, np.ndarray] | None]
         The resulting feature space (Number of samples x number of components),
         The dip-value of each resulting feature,
         List containing the used projection axes,
@@ -61,7 +61,7 @@ def _dip_ext(X: np.ndarray, n_components: int, do_dip_scaling: bool, step_size: 
     subspace = np.zeros((X.shape[0], 0))
     projection_axes = []
     dip_values = []
-    max_dip = 0
+    max_dip = 0.
     remaining_X = X
     # Find multimodal axes
     while True:
@@ -83,18 +83,18 @@ def _dip_ext(X: np.ndarray, n_components: int, do_dip_scaling: bool, step_size: 
         remaining_X = np.matmul(remaining_X, orthogonal_space[:, 1:])
     # Sort features by dip-value
     argsorted_dip = np.argsort(dip_values)[::-1]
-    dip_values = np.array(dip_values)[argsorted_dip]
+    sorted_dip_values = np.array(dip_values)[argsorted_dip]
     subspace = subspace[:, argsorted_dip]
     if do_dip_scaling:
-        subspace, max_min_values = _dip_scaling(subspace, dip_values)
+        subspace, max_min_values = _dip_scaling(subspace, sorted_dip_values)
     else:
         max_min_values = None
-    return subspace, dip_values, projection_axes, argsorted_dip, max_min_values
+    return subspace, sorted_dip_values, projection_axes, argsorted_dip, max_min_values
 
 
 def _find_max_dip_by_sgd(X: np.ndarray, step_size: float, momentum: float, n_starting_vectors: int,
-                         ambiguous_triangle_strategy: str, random_state: np.random.RandomState) -> (
-        float, np.ndarray, np.ndarray):
+                         ambiguous_triangle_strategy: str, random_state: np.random.RandomState) -> tuple[
+        float, np.ndarray, np.ndarray]:
     """
     Find the axes with n_starting_vectors highest dip-values and start gradient descent from there.
 
@@ -117,13 +117,13 @@ def _find_max_dip_by_sgd(X: np.ndarray, step_size: float, momentum: float, n_sta
 
     Returns
     -------
-    tuple : (float, np.ndarray, np.ndarray)
+    tuple : tuple[float, np.ndarray, np.ndarray]
         The highest dip-value found,
         The corresponding projection axis,
         The data set projected onto this projection axis
     """
     # Get dip-value of each axis
-    axis_dips = [dip_test(X[:, i], just_dip=True, is_data_sorted=False) for i in range(X.shape[1])]
+    axis_dips = [dip_test(X[:, i], is_data_sorted=False) for i in range(X.shape[1])]
     if X.shape[1] == 1:
         return axis_dips[0], np.array([1]), X
     # Sort axes by dip-values
@@ -149,8 +149,8 @@ def _find_max_dip_by_sgd(X: np.ndarray, step_size: float, momentum: float, n_sta
 
 
 def _find_max_dip_by_sgd_with_start(X: np.ndarray, projection: np.ndarray, step_size: float, momentum: float,
-                                    ambiguous_triangle_strategy: str, random_state: np.random.RandomState) -> (
-        float, np.ndarray, np.ndarray):
+                                    ambiguous_triangle_strategy: str, random_state: np.random.RandomState) -> tuple[
+        float, np.ndarray, np.ndarray]:
     """
     Perform gradient descent to find the projection vector with the maximum dip-value.
 
@@ -173,17 +173,17 @@ def _find_max_dip_by_sgd_with_start(X: np.ndarray, projection: np.ndarray, step_
 
     Returns
     -------
-    tuple : (float, np.ndarray, np.ndarray)
+    tuple : tuple[float, np.ndarray, np.ndarray]
         The highest dip-value found,
         The corresponding projection axis,
         The data set projected onto this projection axis
     """
     # Initial values
-    total_angle = 0
-    best_projection = None
-    best_projected_data = None
+    total_angle = 0.
+    best_projection = np.zeros(X.shape[1])
+    best_projected_data = np.zeros(X.shape[0])
     direction = np.zeros(X.shape[1])
-    max_dip = 0
+    max_dip = 0.
     # Perform SGD
     while True:
         # Ensure unit vector
@@ -196,13 +196,13 @@ def _find_max_dip_by_sgd_with_start(X: np.ndarray, projection: np.ndarray, step_
             best_projected_data = projected_data
         # Normally there is only one gradient. But there can be multiple if ambiguous_triangle_strategy is 'all'
         if ambiguous_triangle_strategy == "all":
-            tmp_max_dip = 0
-            tmp_best_result = None
+            tmp_max_dip = 0.
+            tmp_best_result = (np.zeros(X.shape[1]), np.zeros(X.shape[1]))
             for tmp_gradient in gradient:
                 tmp_direction = momentum * direction + step_size * tmp_gradient
                 tmp_projection = projection + tmp_direction
                 tmp_projected_data = np.matmul(X, tmp_projection)
-                tmp_dip_value = dip_test(tmp_projected_data, just_dip=True, is_data_sorted=False)
+                tmp_dip_value = dip_test(tmp_projected_data, is_data_sorted=False)
                 if tmp_dip_value > tmp_max_dip:
                     tmp_max_dip = tmp_dip_value
                     tmp_best_result = (tmp_direction, tmp_projection)
@@ -222,8 +222,8 @@ def _find_max_dip_by_sgd_with_start(X: np.ndarray, projection: np.ndarray, step_
 
 
 def _get_max_dip_using_gradient(X: np.ndarray, projection_vector: np.ndarray, ambiguous_triangle_strategy: str,
-                                random_state: np.random.RandomState) -> (
-        np.ndarray, float, np.ndarray):
+                                random_state: np.random.RandomState) -> tuple[
+        np.ndarray, float, np.ndarray]:
     """
     Use current projection_vector to calculate the dip value and a corresponding modal_triangle.
     The modal_triangle is then used to calculate the gradient of the used projection axis.
@@ -243,7 +243,7 @@ def _get_max_dip_using_gradient(X: np.ndarray, projection_vector: np.ndarray, am
 
     Returns
     -------
-    tuple : (np.ndarray, float, np.ndarray)
+    tuple : tuple[np.ndarray, float, np.ndarray]:
         The gradient of the dip regarding the projection axis (can contain multiple gradients if ambiguous_triangle_strategy is 'all'),
         The dip-value,
         The data set projected onto the current projection axis
@@ -254,7 +254,9 @@ def _get_max_dip_using_gradient(X: np.ndarray, projection_vector: np.ndarray, am
     sorted_indices = np.argsort(projected_data)
     sorted_projected_data = projected_data[sorted_indices]
     # Calculate dip, capturing the output which we need for touching-triangle calculations
-    dip_value, _, modal_triangle = dip_test(sorted_projected_data, just_dip=False, is_data_sorted=True)
+    dip_output = dip_test_extended(sorted_projected_data)
+    dip_value = dip_output[0]
+    modal_triangle = dip_output[2]
     if modal_triangle[0] == -1:
         return np.zeros(X.shape[1]), dip_value, projected_data
     if ambiguous_triangle_strategy == "all":
@@ -367,7 +369,7 @@ def _ambiguous_modal_triangle_all(X: np.ndarray, projected_data: np.ndarray, sor
     return np.array(gradients)
 
 
-def _get_ambiguous_modal_triangle_possibilities(sorted_projected_data: np.ndarray, modal_triangle: np.ndarray) -> list:
+def _get_ambiguous_modal_triangle_possibilities(sorted_projected_data: np.ndarray, modal_triangle: tuple) -> list:
     """
     Get all the possibilities for the modal triangle by checking if the surrounding values are equal to the triangle values.
 
@@ -407,7 +409,7 @@ Utils
 
 
 def _transform_using_projections(X: np.ndarray, projection_axes: list, do_dip_scaling: bool,
-                                 dip_values: np.ndarray, argsorted_dips: np.ndarray, max_min_values: tuple) -> np.ndarray:
+                                 dip_values: np.ndarray, argsorted_dips: np.ndarray, max_min_values: tuple | None) -> np.ndarray:
     """
     Transform a give data set using the projection axes obtained by a previous DipExt execution.
 
@@ -423,7 +425,7 @@ def _transform_using_projections(X: np.ndarray, projection_axes: list, do_dip_sc
         The dip-value of each resulting feature
     argsorted_dips : np.ndarray
         The indices of the sorted original dip-values (decreasing), needed to adjust order of the features
-    max_min_values : tuple
+    max_min_values : tuple | None
         Tuple containing the max and min values for each feature. Should be None if do_dip_scaling is False
 
     Returns
@@ -499,7 +501,7 @@ def _n_starting_vectors_default(n_dims: int) -> int:
     return n_starting_vectors
 
 
-def _dip_scaling(X: np.ndarray, dip_values: np.ndarray,  max_min_values: tuple = None) -> (np.ndarray, tuple):
+def _dip_scaling(X: np.ndarray, dip_values: np.ndarray,  max_min_values: tuple | None = None) -> tuple[np.ndarray, tuple]:
     """
     Perform dip scaling.
     Normalize each features using min-max normalization and multiply all feature values by their corresponding dip-values.
@@ -510,12 +512,12 @@ def _dip_scaling(X: np.ndarray, dip_values: np.ndarray,  max_min_values: tuple =
         the given data set
     dip_values : np.ndarray
         The dip-values for each feature
-    max_min_values : tuple
+    max_min_values : tuple | None
         Tuple containing the max and min values for each feature. Can be None during the fitting stage
 
     Returns
     -------
-    tuple : (np.ndarray, tuple)
+    tuple : tuple[np.ndarray, tuple]
         The scaled data set,
         The Max and Min values used for scaling
     
@@ -532,7 +534,7 @@ def _dip_scaling(X: np.ndarray, dip_values: np.ndarray,  max_min_values: tuple =
     return X_scaled, max_min_values
 
 
-def _dip_init(subspace: np.ndarray, n_clusters: int) -> (np.ndarray, np.ndarray):
+def _dip_init(subspace: np.ndarray, n_clusters: int) -> tuple[np.ndarray, np.ndarray]:
     """
     Execute the DipInit clustering procedure. Executes KMeans using initial cluster centers.
 
@@ -545,7 +547,7 @@ def _dip_init(subspace: np.ndarray, n_clusters: int) -> (np.ndarray, np.ndarray)
 
     Returns
     -------
-    tuple: (np.ndarray, np.ndarray)
+    tuple: tuple[np.ndarray, np.ndarray]
         The labels as identified by DipInit,
         The cluster centers as identified by DipInit
     """
@@ -579,7 +581,7 @@ class DipExt(TransformerMixin, BaseEstimator):
 
     Parameters
     ----------
-    n_components : int
+    n_components : int | None
         The number of components to extract. Can be None, in that case dip_threshold wil be used to define the number of components (default: None)
     do_dip_scaling : bool
         If true, the resulting features space will be scaled by performing a min-max normalization for each feature and multiplying this feautre by its dip-value (default: True)
@@ -589,13 +591,13 @@ class DipExt(TransformerMixin, BaseEstimator):
         Momentum used for gradient descent (default: 0.95)
     dip_threshold : float
         Defines the number of components if n_components is None. If an identified feature has a dip-value below the maximum dip-value times dip_threshold, DipExt will terminate (default: 0.5)
-    n_starting_vectors : int
+    n_starting_vectors : int | None
         The number of starting vectors for gradient descent. Can be None, in that case it will be equal to log(data dimensionality) + 1 (default: None)
     ambiguous_triangle_strategy : str
         The strategy with which to handle an ambiguous modal triangle. Can be 'ignore', 'random' or 'all'.
         In the case of 'random', a valid triangle is created at random.
         In the case of 'all', for each possible triangle the gradient is calculated and it is checked for which gradient the following result looks most promising - this strategy can increase the runtime noticeably (default: 'ignore')
-    random_state : np.random.RandomState | int
+    random_state : np.random.RandomState | int | None
         use a fixed random state to get a repeatable solution. Can also be of type int. Only used if ambiguous_triangle_strategy is 'random' (default: None)
 
     Attributes
@@ -615,9 +617,9 @@ class DipExt(TransformerMixin, BaseEstimator):
     The European Conference on Machine Learning and Principles and Practice of Knowledge Discovery in Databases 2020
     """
 
-    def __init__(self, n_components: int = None, do_dip_scaling: bool = True, step_size: float = 0.1,
-                 momentum: float = 0.95, dip_threshold: float = 0.5, n_starting_vectors: int = None,
-                 ambiguous_triangle_strategy: str = "ignore", random_state: np.random.RandomState | int = None):
+    def __init__(self, n_components: int | None = None, do_dip_scaling: bool = True, step_size: float = 0.1,
+                 momentum: float = 0.95, dip_threshold: float = 0.5, n_starting_vectors: int | None = None,
+                 ambiguous_triangle_strategy: str = "ignore", random_state: np.random.RandomState | int | None = None):
         self.n_components = n_components
         self.do_dip_scaling = do_dip_scaling
         self.step_size = step_size
@@ -627,7 +629,7 @@ class DipExt(TransformerMixin, BaseEstimator):
         self.ambiguous_triangle_strategy = ambiguous_triangle_strategy
         self.random_state = random_state
 
-    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DipExt':
+    def fit(self, X: np.ndarray, y: np.ndarray | None = None) -> 'DipExt':
         """
         Retrieve the necessary projection axes to apply DipExt to any given data set.
 
@@ -635,7 +637,7 @@ class DipExt(TransformerMixin, BaseEstimator):
         ----------
         X : np.ndarray
             the given data set
-        y : np.ndarray
+        y : np.ndarray | None
             the labels (can be ignored)
 
         Returns
@@ -666,7 +668,7 @@ class DipExt(TransformerMixin, BaseEstimator):
                                                 self.argsorted_dips_, self.max_min_values_)
         return subspace
 
-    def fit_transform(self, X: np.ndarray, y: np.ndarray = None) -> np.ndarray:
+    def fit_transform(self, X: np.ndarray, y: np.ndarray | None = None) -> np.ndarray:
         """
         Initiate the actual dimensionality-reduction process on the input data set.
 
@@ -674,7 +676,7 @@ class DipExt(TransformerMixin, BaseEstimator):
         ----------
         X : np.ndarray
             the given data set
-        y : np.ndarray
+        y : np.ndarray | None
             the labels (can be ignored)
 
         Returns
@@ -714,7 +716,7 @@ class DipInit(DipExt, ClusterMixin, BaseEstimator):
     ----------
     n_clusters : int
         The number of clusters (default: 8)
-    n_components : int
+    n_components : int | None
         The number of components to extract. Can be None, in that case dip_threshold wil be used to define the number of components (default: None)
     do_dip_scaling : bool
         If true, the resulting features space will be scaled by performing a min-max normalization for each feature and multiplying this feautre by its dip-value (default: True)
@@ -724,13 +726,13 @@ class DipInit(DipExt, ClusterMixin, BaseEstimator):
         Momentum used for gradient descent (default: 0.95)
     dip_threshold : float
         Defines the number of components if n_components is None. If an identified feature has a dip-value below the maximum dip-value times dip_threshold, DipExt will terminate (default: 0.5)
-    n_starting_vectors : int
+    n_starting_vectors : int | None
         The number of starting vectors for gradient descent. Can be None, in that case it will be equal to log(data dimensionality) + 1 (default: None)
     ambiguous_triangle_strategy : str
         The strategy with which to handle an ambiguous modal triangle. Can be 'ignore', 'random' or 'all'.
         In the case of 'random', a valid triangle is created at random.
         In the case of 'all', for each possible triangle the gradient is calculated and it is checked for which gradient the following result looks most promising - this strategy can increase the runtime noticeably (default: 'ignore')
-    random_state : np.random.RandomState | int
+    random_state : np.random.RandomState | int | None
         use a fixed random state to get a repeatable solution. Can also be of type int. Only used if ambiguous_triangle_strategy is 'random' (default: None)
 
     Attributes
@@ -754,14 +756,14 @@ class DipInit(DipExt, ClusterMixin, BaseEstimator):
     The European Conference on Machine Learning and Principles and Practice of Knowledge Discovery in Databases 2020
     """
 
-    def __init__(self, n_clusters: int = 8, n_components: int = None, do_dip_scaling: bool = True, step_size: float = 0.1,
-                 momentum: float = 0.95, dip_threshold: float = 0.5, n_starting_vectors: int = None,
-                 ambiguous_triangle_strategy: str = "ignore", random_state: np.random.RandomState | int = None):
+    def __init__(self, n_clusters: int = 8, n_components: int | None = None, do_dip_scaling: bool = True, step_size: float = 0.1,
+                 momentum: float = 0.95, dip_threshold: float = 0.5, n_starting_vectors: int | None = None,
+                 ambiguous_triangle_strategy: str = "ignore", random_state: np.random.RandomState | int | None = None):
         super().__init__(n_components, do_dip_scaling, step_size, momentum, dip_threshold, n_starting_vectors,
                          ambiguous_triangle_strategy, random_state)
         self.n_clusters = n_clusters
 
-    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DipInit':
+    def fit(self, X: np.ndarray, y: np.ndarray | None = None) -> 'DipInit':
         """
         Initiate the actual clustering process on the input data set.
         The resulting cluster labels will be stored in the labels_ attribute.
@@ -770,7 +772,7 @@ class DipInit(DipExt, ClusterMixin, BaseEstimator):
         ----------
         X : np.ndarray
             the given data set
-        y : np.ndarray
+        y : np.ndarray | None
             the labels (can be ignored)
 
         Returns

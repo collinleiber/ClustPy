@@ -50,5 +50,9 @@ markers = [
 source = ["clustpy"]
 omit = ["*/tests/*"]
 
+[tool.coverage.report]
+show_missing = true
+
 [tool.mypy]
 disable_error_code = ["import-untyped"]
+exclude = ".*/tests/.*"

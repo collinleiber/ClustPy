@@ -1,10 +1,10 @@
 from sklearn.utils.estimator_checks import estimator_checks_generator
 from sklearn.base import BaseEstimator
 import numpy as np
-from sklearn.utils import check_X_y, check_array, check_random_state
+from sklearn.utils import check_X_y, check_array, check_random_state as check_random_state_sklearn
 
 
-def check_clustpy_estimator(estimator_obj: BaseEstimator, checks_to_ignore: tuple[str, ...] | list[str] = ("check_complex_data")) -> None:
+def check_clustpy_estimator(estimator_obj: BaseEstimator, checks_to_ignore: tuple[str, ...] | list[str] = ("check_complex_data",)) -> None:
     """
     Run the check_estimator function from sklearn ignoring the check for complex data.
     For more information, check: https://github.com/scikit-learn/scikit-learn/blob/main/sklearn/utils/estimator_checks.py
@@ -31,7 +31,7 @@ def check_clustpy_estimator(estimator_obj: BaseEstimator, checks_to_ignore: tupl
 
 def check_parameters(X: np.ndarray, *, y: np.ndarray | None = None, random_state: np.random.RandomState | int | None = None,
                      allow_nd: bool=False, allow_size_1: bool=False, estimator_obj: BaseEstimator | None = None) -> tuple[
-                         np.ndarray, np.ndarray, np.random.RandomState]:
+                         np.ndarray, np.ndarray | None, np.random.RandomState]:
     """
     Check if parameters for X, y and random_state are defined in accordance with the sklearn standard.
 
@@ -52,7 +52,7 @@ def check_parameters(X: np.ndarray, *, y: np.ndarray | None = None, random_state
 
     Returns
     -------
-    tuple : tuple[np.ndarray, np.ndarray, np.random.RandomState]
+    tuple : tuple[np.ndarray, np.ndarray | None, np.random.RandomState]
         the checked data set,
         the checked labels
         the checked random_state
@@ -62,6 +62,7 @@ def check_parameters(X: np.ndarray, *, y: np.ndarray | None = None, random_state
         X = check_array(X, accept_sparse=False, allow_nd=allow_nd, ensure_2d=ensure_2d)
     else:
         X, y = check_X_y(X, y, accept_sparse=False, allow_nd=allow_nd, ensure_2d=ensure_2d)
+        assert y is not None, "y is None, but should not be None"
         class_labels = np.unique(y)
         if np.min(class_labels) == 1 and np.max(class_labels) == len(class_labels):
             y -= 1
@@ -76,3 +77,22 @@ def check_parameters(X: np.ndarray, *, y: np.ndarray | None = None, random_state
         raise ValueError("X has {0} features, but {1} is expecting {2} features as input.".format(X.shape[1], estimator_obj.__class__.__name__, estimator_obj.n_features_in_))
     random_state = check_random_state(random_state)
     return X, y, random_state
+
+
+def check_random_state(random_state: np.random.RandomState | int | None) -> np.random.RandomState:
+    """
+    Check if random_state is defined in accordance with the sklearn standard.
+
+    Parameters
+    ----------
+    random_state : np.random.RandomState | int | None
+        the random state (default: None)
+
+    Returns
+    -------
+    random_state_checked : np.random.RandomState
+        the checked random_state
+    """
+    random_state_checked = check_random_state_sklearn(random_state)
+    assert isinstance(random_state_checked, np.random.RandomState), "random_state is not a valid random state"
+    return random_state_checked

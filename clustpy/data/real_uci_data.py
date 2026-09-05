@@ -8,7 +8,7 @@ from sklearn.datasets._base import Bunch
 from pathlib import Path
 
 
-def load_banknotes(return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+def load_banknotes(return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the banknote authentication data set. It consists of 1372 genuine and forged banknote samples.
     N=1372, d=4, k=2.
@@ -17,12 +17,12 @@ def load_banknotes(return_X_y: bool = False, downloads_path: str | Path = None) 
     ----------
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (1372 x 4), the labels numpy array (1372)
@@ -41,7 +41,7 @@ def load_banknotes(return_X_y: bool = False, downloads_path: str | Path = None) 
         return Bunch(dataset_name="Banknotes", data=data, target=labels)
 
 
-def load_spambase(return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+def load_spambase(return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the spambase data set. It consists of 4601 spam and non-spam mails.
     N=4601, d=57, k=2.
@@ -50,12 +50,12 @@ def load_spambase(return_X_y: bool = False, downloads_path: str | Path = None) -
     ----------
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (4601 x 57), the labels numpy array (4601)
@@ -74,7 +74,7 @@ def load_spambase(return_X_y: bool = False, downloads_path: str | Path = None) -
         return Bunch(dataset_name="Spambase", data=data, target=labels)
 
 
-def load_seeds(return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+def load_seeds(return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the seeds data set. It consists of 210 samples belonging to one of three varieties of wheat.
     N=210, d=7, k=3.
@@ -83,12 +83,12 @@ def load_seeds(return_X_y: bool = False, downloads_path: str | Path = None) -> B
     ----------
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (210 x 7), the labels numpy array (210)
@@ -110,7 +110,7 @@ def load_seeds(return_X_y: bool = False, downloads_path: str | Path = None) -> B
         return Bunch(dataset_name="Seeds", data=data, target=labels)
 
 
-def load_skin(return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+def load_skin(return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the Skin Segmentation data set. It consists of 245057 skin- and non-skin samples with their B, G, R color
     information.
@@ -120,12 +120,12 @@ def load_skin(return_X_y: bool = False, downloads_path: str | Path = None) -> Bu
     ----------
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (245057 x 3), the labels numpy array (245057)
@@ -147,7 +147,7 @@ def load_skin(return_X_y: bool = False, downloads_path: str | Path = None) -> Bu
         return Bunch(dataset_name="SkinSegmentation", data=data, target=labels)
 
 
-def load_soybean_small(return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+def load_soybean_small(return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the small version of the soybean data set. It is a small subset of the original soybean data set.
     It consists of 47 samples belonging to one of 4 classes.
@@ -157,12 +157,12 @@ def load_soybean_small(return_X_y: bool = False, downloads_path: str | Path = No
     ----------
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (47 x 35), the labels numpy array (47)
@@ -189,7 +189,7 @@ def load_soybean_small(return_X_y: bool = False, downloads_path: str | Path = No
         return Bunch(dataset_name="SoybeanSmall", data=data, target=labels)
 
 
-def load_soybean_large(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+def load_soybean_large(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the large version of the soybean data set. It consists of 562 samples belonging to one of 15 classes.
     Originally, the data set would have samples and 19 classes but some samples have attributes showing '?' values. Those
@@ -203,12 +203,12 @@ def load_soybean_large(subset: str = "all", return_X_y: bool = False, downloads_
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (562 x 35), the labels numpy array (562)
@@ -257,7 +257,7 @@ def load_soybean_large(subset: str = "all", return_X_y: bool = False, downloads_
         return Bunch(dataset_name="SoybeanLarge", data=data, target=labels)
 
 
-def load_pendigits(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+def load_pendigits(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the pendigits data set. It consists of 10992 vectors of length 16, representing 8 coordinates. The coordinates
     were taken from the task of writing digits (0 to 9) on a tablet.
@@ -270,12 +270,12 @@ def load_pendigits(subset: str = "all", return_X_y: bool = False, downloads_path
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (10992 x 16), the labels numpy array (10992)
@@ -308,7 +308,7 @@ def load_pendigits(subset: str = "all", return_X_y: bool = False, downloads_path
         return Bunch(dataset_name="Pendigits", data=data, target=labels)
 
 
-def load_ecoli(ignore_small_clusters: bool = False, return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+def load_ecoli(ignore_small_clusters: bool = False, return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the ecoli data set. It consists of 336 samples belonging to one of 8 classes.
     N=336, d=7, k=8.
@@ -319,12 +319,12 @@ def load_ecoli(ignore_small_clusters: bool = False, return_X_y: bool = False, do
         specify if the three small clusters with size 2, 2 and 5 should be ignored (default: False)
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (336 x 7), the labels numpy array (336)
@@ -361,7 +361,7 @@ def load_ecoli(ignore_small_clusters: bool = False, return_X_y: bool = False, do
         return Bunch(dataset_name="Ecoli", data=data, target=labels)
 
 
-def load_htru2(return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+def load_htru2(return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the HTRU2 data set. It consists of 17898 samples belonging to the pulsar or non-pulsar class.
     A special property is that more than 90% of the data belongs to class 0.
@@ -371,12 +371,12 @@ def load_htru2(return_X_y: bool = False, downloads_path: str | Path = None) -> B
     ----------
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (17898 x 8), the labels numpy array (17898)
@@ -407,7 +407,7 @@ def load_htru2(return_X_y: bool = False, downloads_path: str | Path = None) -> B
         return Bunch(dataset_name="HTRU2", data=data, target=labels)
 
 
-def load_letterrecognition(return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+def load_letterrecognition(return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the Letter Recognition data set. It consists of 20000 samples where each sample represents one of the 26 capital
     letters in the English alphabet. All samples are composed of 16 numerical stimuli describing the respective letter.
@@ -417,12 +417,12 @@ def load_letterrecognition(return_X_y: bool = False, downloads_path: str | Path 
     ----------
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (20000 x 16), the labels numpy array (20000)
@@ -459,7 +459,7 @@ def load_letterrecognition(return_X_y: bool = False, downloads_path: str | Path 
         return Bunch(dataset_name="Letterrecognition", data=data, target=labels)
 
 
-def load_har(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+def load_har(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the Human Activity Recognition data set. It consists of 10299 samples each representing sensor data of a person
     performing an activity. The six activities are walking, walking_upstairs, walking_downstairs, sitting, standing and
@@ -473,12 +473,12 @@ def load_har(subset: str = "all", return_X_y: bool = False, downloads_path: str 
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (10992 x 561), the labels numpy array (10992)
@@ -523,7 +523,7 @@ def load_har(subset: str = "all", return_X_y: bool = False, downloads_path: str 
         return Bunch(dataset_name="HAR", data=data, target=labels)
 
 
-def load_statlog_shuttle(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+def load_statlog_shuttle(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the statlog shuttle data set. It consists of 58000 samples belonging to one of 7 classes. A special property is
     that about 80% of the data belongs to class 0.
@@ -536,12 +536,12 @@ def load_statlog_shuttle(subset: str = "all", return_X_y: bool = False, download
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (58000 x 9), the labels numpy array (58000)
@@ -596,7 +596,7 @@ def load_statlog_shuttle(subset: str = "all", return_X_y: bool = False, download
 
 
 def load_mice_protein(return_additional_labels: bool = False, return_X_y: bool = False,
-                      downloads_path: str | Path = None) -> Bunch:
+                      downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the Mice Protein Expression data set. It consists of 1077 samples belonging to one of 8 classes.
     Each feature represents the expression level of one of 77 proteins.
@@ -612,12 +612,12 @@ def load_mice_protein(return_additional_labels: bool = False, return_X_y: bool =
         return additional labels (default: False)
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (1077 x 68), the labels numpy array (1077)
@@ -671,7 +671,7 @@ def load_mice_protein(return_additional_labels: bool = False, return_X_y: bool =
         return Bunch(dataset_name="MiceProtein", data=data, target=labels)
 
 
-def load_user_knowledge(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+def load_user_knowledge(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the user knowledge data set. It consists of 403 samples belonging to one of 4 classes.
     The 4 classes are the knowledge levels 'very low', 'low', 'middle' and 'high'.
@@ -684,12 +684,12 @@ def load_user_knowledge(subset: str = "all", return_X_y: bool = False, downloads
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (403 x 5), the labels numpy array (403)
@@ -740,7 +740,7 @@ def load_user_knowledge(subset: str = "all", return_X_y: bool = False, downloads
         return Bunch(dataset_name="UserKnowledge", data=data, target=labels)
 
 
-def load_breast_tissue(return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+def load_breast_tissue(return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the breast tissue data set. It consists of 106 samples belonging to one of 6 classes.
     N=106, d=9, k=6.
@@ -749,12 +749,12 @@ def load_breast_tissue(return_X_y: bool = False, downloads_path: str | Path = No
     ----------
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (106 x 9), the labels numpy array (106)
@@ -783,7 +783,7 @@ def load_breast_tissue(return_X_y: bool = False, downloads_path: str | Path = No
         return Bunch(dataset_name="BreastTissue", data=data, target=labels)
 
 
-def load_forest_types(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+def load_forest_types(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the forest type mapping data set. It consists of 523 samples belonging to one of 4 classes.
     The data set is composed of 198 training and 325 test samples.
@@ -795,12 +795,12 @@ def load_forest_types(subset: str = "all", return_X_y: bool = False, downloads_p
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (523 x 27), the labels numpy array (523)
@@ -845,7 +845,7 @@ def load_forest_types(subset: str = "all", return_X_y: bool = False, downloads_p
         return Bunch(dataset_name="ForestTypes", data=data, target=labels)
 
 
-def load_dermatology(return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+def load_dermatology(return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the dermatology data set. It consists of 366 samples belonging to one of 6 classes.
     8 samples contain '?' values and are therefore removed.
@@ -855,12 +855,12 @@ def load_dermatology(return_X_y: bool = False, downloads_path: str | Path = None
     ----------
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (358 x 34), the labels numpy array (358)
@@ -886,7 +886,7 @@ def load_dermatology(return_X_y: bool = False, downloads_path: str | Path = None
         return Bunch(dataset_name="Dermatology", data=data, target=labels)
 
 
-def load_multiple_features(return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+def load_multiple_features(return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the multiple features data set. It consists of 2000 samples belonging to one of 10 classes.
     Each class corresponds to handwritten numerals (0-9) extracted from a collection of Dutch utility maps.
@@ -896,12 +896,12 @@ def load_multiple_features(return_X_y: bool = False, downloads_path: str | Path 
     ----------
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (2000 x 649), the labels numpy array (2000)
@@ -930,7 +930,7 @@ def load_multiple_features(return_X_y: bool = False, downloads_path: str | Path 
         return Bunch(dataset_name="MultipleFeatures", data=data, target=labels)
 
 
-def load_statlog_australian_credit_approval(return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+def load_statlog_australian_credit_approval(return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the statlog Australian Credit Approval data set. It consists of 690 samples belonging to one of 2 classes.
     N=690, d=14, k=2.
@@ -939,12 +939,12 @@ def load_statlog_australian_credit_approval(return_X_y: bool = False, downloads_
     ----------
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (690 x 14), the labels numpy array (690)
@@ -964,7 +964,7 @@ def load_statlog_australian_credit_approval(return_X_y: bool = False, downloads_
         return Bunch(dataset_name="StatlogAustralianCreditApproval", data=data, target=labels)
 
 
-def load_breast_cancer_wisconsin_original(return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+def load_breast_cancer_wisconsin_original(return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the original breast cancer Wisconsin data set. It consists of 699 samples belonging to one of 2 classes.
     16 samples contain '?' values and will be removed.
@@ -974,12 +974,12 @@ def load_breast_cancer_wisconsin_original(return_X_y: bool = False, downloads_pa
     ----------
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (683 x 9), the labels numpy array (683)
@@ -1009,7 +1009,7 @@ def load_breast_cancer_wisconsin_original(return_X_y: bool = False, downloads_pa
         return Bunch(dataset_name="BreastCancerWisconsin", data=data, target=labels)
 
 
-def load_optdigits(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+def load_optdigits(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the optdigits data set. It consists of 5620 8x8 grayscale images, each representing a digit (0 to 9).
     Each pixel depicts the number of marked pixel within a 4x4 block of the original 32x32 bitmaps.
@@ -1022,12 +1022,12 @@ def load_optdigits(subset: str = "all", return_X_y: bool = False, downloads_path
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Furthermore, the original images are contained in the 'images' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
@@ -1062,7 +1062,7 @@ def load_optdigits(subset: str = "all", return_X_y: bool = False, downloads_path
         return Bunch(dataset_name="Optdigits", data=data, target=labels, images=data_image, image_format="HW")
 
 
-def load_semeion(return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+def load_semeion(return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the semeion data set. It consists of 1593 samples belonging to one of 10 classes.
     Each sample corresponds to a grayscale 16x16 scan of handwritten digits originating from about 80 different persons.
@@ -1073,12 +1073,12 @@ def load_semeion(return_X_y: bool = False, downloads_path: str | Path = None) ->
     ----------
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Furthermore, the original images are contained in the 'images' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
@@ -1106,7 +1106,7 @@ def load_semeion(return_X_y: bool = False, downloads_path: str | Path = None) ->
         return Bunch(dataset_name="Semeion", data=data, target=labels, images=data_image, image_format="HW")
 
 
-def load_cmu_faces(return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+def load_cmu_faces(return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the CMU Face Images data set. It consists of 640 30x32 grayscale images showing 20 persons in different poses
     (up, straight, left, right) and with different expressions (neutral, happy, sad, angry). Additionally, the persons
@@ -1118,12 +1118,12 @@ def load_cmu_faces(return_X_y: bool = False, downloads_path: str | Path = None) 
     -------
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Furthermore, the original images are contained in the 'images' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
@@ -1180,7 +1180,7 @@ def load_cmu_faces(return_X_y: bool = False, downloads_path: str | Path = None) 
                      classes=(names, positions, expressions, eyes))
 
 
-def load_gene_expression_cancer_rna_seq(return_X_y: bool = False, downloads_path: str | Path = None):
+def load_gene_expression_cancer_rna_seq(return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the Gene Expression Cancer RNA-SEQ data set. It consists of 801 samples belonging to one of 5 classes.
     N=801, d=20531, k=5.
@@ -1189,12 +1189,12 @@ def load_gene_expression_cancer_rna_seq(return_X_y: bool = False, downloads_path
     ----------
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (801 x 20531), the labels numpy array (801)
@@ -1226,7 +1226,7 @@ def load_gene_expression_cancer_rna_seq(return_X_y: bool = False, downloads_path
         return Bunch(dataset_name="GeneExpressionCancerRNA-SEQ", data=data, target=labels)
 
 
-def load_sport_articles(return_X_y: bool = False, downloads_path: str | Path = None):
+def load_sport_articles(return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the Sport Articles data set. It consists of 1000 samples belonging to one of 2 classes (objective or subjective).
     We only consider features that correspond to specific frequencies and, therefore, ignore the attributes 
@@ -1242,7 +1242,7 @@ def load_sport_articles(return_X_y: bool = False, downloads_path: str | Path = N
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (1000 x 55), the labels numpy array (1000)
@@ -1288,7 +1288,7 @@ def load_sport_articles(return_X_y: bool = False, downloads_path: str | Path = N
         return Bunch(dataset_name="SportArticles", data=data, target=labels)
 
 
-def load_wholesale_customers(return_X_y: bool = False, downloads_path: str | Path = None):
+def load_wholesale_customers(return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the Wholesale Customers data set. It consists of 440 samples and can be grouped in two different ways:
     Either two classes based on the channel (Horeca or Retail) or three classes based on the region (Lisbon, Oporto or Other region).
@@ -1298,12 +1298,12 @@ def load_wholesale_customers(return_X_y: bool = False, downloads_path: str | Pat
     ----------
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (440 x 6), the labels numpy array (440 x 2)
@@ -1333,10 +1333,10 @@ def load_wholesale_customers(return_X_y: bool = False, downloads_path: str | Pat
         return Bunch(dataset_name="WholesaleCustomers", data=data, target=labels)
 
 
-def load_reuters21578(subset: str = "all", categories: tuple = ("grain", "money-fx", "earn", "acq", "crude"),
+def load_reuters21578(subset: str = "all", categories: tuple[str, ...] | list[str] | None = ("grain", "money-fx", "earn", "acq", "crude"),
                use_tfidf: bool = True, use_stemming: bool = True, use_stop_words: bool = True, max_df: float | int = 1., 
                min_df: float | int = 1, max_features: int = 2000, min_variance : float = 0., 
-               sublinear_tf: bool = False, return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+               sublinear_tf: bool = False, return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the Reuters21578 data set. It consists of 21578 Reuters newswire artices divided into different categories.
     When loading the artices, the title will be included in the text.
@@ -1351,7 +1351,7 @@ def load_reuters21578(subset: str = "all", categories: tuple = ("grain", "money-
     ----------
     subset : str
         can be 'all', 'test', 'train', 'test-cgi' or 'train-cgi'. 'all' combines test and train data (default: 'all')
-    categories : tuple
+    categories :tuple[str, ...] | list[str] | None
         specify the categories. Can be None if all categories should be used (default: ("grain", "money-fx", "earn", "acq", "crude"))
     use_tfidf : bool
         If true, tf-idf will be applied as the last step of the pipeline (default: True)
@@ -1375,12 +1375,12 @@ def load_reuters21578(subset: str = "all", categories: tuple = ("grain", "money-
         Apply sublinear term frequency scaling, i.e. replace tf with 1 + log(tf) (see sklearn TfidfTransformer) (default: False)
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (8367 x 2000 - using the default settings), the labels numpy array (8367 - using the default settings)
@@ -1413,9 +1413,9 @@ def load_reuters21578(subset: str = "all", categories: tuple = ("grain", "money-
         if file.suffix == ".sgm":
             in_body = False
             with open(file, "rb") as f:
-                for line in f.readlines():
+                for line_raw in f.readlines():
                     # Needed so that reut2-017.sgm is not crashing due to encoding
-                    line = line.decode('utf-8','ignore')
+                    line = line_raw.decode('utf-8','ignore')
                     # New entry starts
                     if line.startswith("<REUTERS"):
                         in_body = False
@@ -1459,9 +1459,10 @@ def load_reuters21578(subset: str = "all", categories: tuple = ("grain", "money-
                         all_topics.append(topics)
     assert len(all_bodies) == 21578, "number of articles is not correct. Should be 21578 but is {0}".format(len(all_bodies))
     # Filter documents to receive only articles with a single relevant category
+    final_topics = [""] * len(all_topics)
     for i in range(len(all_topics)-1, -1, -1):
         hits = 0
-        new_topic = None
+        new_topic = "NONE"
         for t in all_topics[i]:
             if categories is None or t in categories:
                 hits += 1
@@ -1471,14 +1472,15 @@ def load_reuters21578(subset: str = "all", categories: tuple = ("grain", "money-
             del all_lewis_splits[i]
             del all_cgi_splits[i]
             del all_topics[i]
+            del final_topics[i]
         else:
-            all_topics[i] = new_topic
+            final_topics[i] = new_topic
     # Transform raw data
-    data, vocabulary = _transform_text_data(all_bodies, use_tfidf, use_stemming, use_stop_words, max_df, min_df, max_features, min_variance, 
+    data, vocabulary = _transform_text_data(all_bodies, use_tfidf, use_stemming, use_stop_words, max_df, min_df, max_features, min_variance,
                                 sublinear_tf)
     # Get labels
     LE = LabelEncoder()
-    labels = LE.fit_transform(all_topics)
+    labels = LE.fit_transform(final_topics)
     # Select subset
     if subset != "all":
         if subset == "train":

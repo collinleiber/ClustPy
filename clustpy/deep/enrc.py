@@ -3,22 +3,27 @@
 Lukas Miklautz
 """
 
+from __future__ import annotations
 import torch
 from sklearn.cluster import KMeans
 import numpy as np
 from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
-from clustpy.deep._utils import int_to_one_hot, squared_euclidean_distance, encode_batchwise, \
-    detect_device, mean_squared_error
+from clustpy.deep._utils import int_to_one_hot, squared_euclidean_distance, \
+    detect_device, mean_squared_error, get_device_from_module
+from clustpy.deep._encoding_utils import encode_batchwise
 from clustpy.deep._data_utils import get_dataloader, get_train_and_test_dataloader
 from clustpy.deep._train_utils import get_trained_network
 from clustpy.alternative import NrKmeans
-from sklearn.utils import check_random_state
+from clustpy.utils.checks import check_random_state
 from sklearn.metrics import normalized_mutual_info_score
 from clustpy.utils.plots import plot_scatter_matrix
 from clustpy.alternative.nrkmeans import _get_total_cost_function
 import tqdm
 from collections.abc import Callable
 from pathlib import Path
+from clustpy.deep.neural_networks._abstract_autoencoder import _AbstractAutoencoder
+from clustpy.deep.neural_networks._abstract_neural_network import _AbstractNeuralNetwork
+from sklearn.utils.validation import check_is_fitted
 
 
 class _ENRC_Module(torch.nn.Module):
@@ -68,17 +73,17 @@ class _ENRC_Module(torch.nn.Module):
 
     def __init__(self, centers: list, P: list, V: np.ndarray, beta_init_value: float = 0.9,
                  clustering_loss_weight: float = 1.0, ssl_loss_weight: float = 1.0,
-                 center_lr: float = 0.5, rotate_centers: bool = False, beta_weights: np.ndarray = None,
+                 center_lr: float = 0.5, rotate_centers: bool = False, beta_weights: np.ndarray | None = None,
                  augmentation_invariance: bool = False):
         super().__init__()
 
         self.P = P
         self.m = [len(P_i) for P_i in self.P]
         if beta_weights is None:
-            beta_weights = beta_weights_init(self.P, n_dims=centers[0].shape[1], high_value=beta_init_value)
+            beta_weights_torch = beta_weights_init(self.P, n_dims=centers[0].shape[1], high_value=beta_init_value)
         else:
-            beta_weights = torch.tensor(beta_weights).float()
-        self.beta_weights = torch.nn.Parameter(beta_weights, requires_grad=True)
+            beta_weights_torch = torch.tensor(beta_weights).float()
+        self.beta_weights = torch.nn.Parameter(beta_weights_torch, requires_grad=True)
         self.V = torch.nn.Parameter(torch.tensor(V, dtype=torch.float), requires_grad=True)
         self.clustering_loss_weight = clustering_loss_weight
         self.ssl_loss_weight = ssl_loss_weight
@@ -250,8 +255,8 @@ class _ENRC_Module(torch.nn.Module):
                                assignment_matrix_dict[subspace_i],
                                subspace_id=subspace_i)
 
-    def forward(self, z: torch.Tensor, assignment_matrix_dict: dict = None) -> (
-            torch.Tensor, torch.Tensor, torch.Tensor, dict):
+    def forward(self, z: torch.Tensor, assignment_matrix_dict: dict | None = None) -> tuple[
+            torch.Tensor, torch.Tensor, torch.Tensor, dict]:
         """
         Calculates the k-means loss and cluster assignments for each clustering.
 
@@ -259,12 +264,12 @@ class _ENRC_Module(torch.nn.Module):
         ----------
         z : torch.Tensor
             embedded input data point, can also be a mini-batch of embedded points
-        assignment_matrix_dict : dict
+        assignment_matrix_dict : dict | None
             dict of torch.tensors, contains for each i^th clustering a one hot encoded matrix of cluster assignments (default: None)
 
         Returns
         -------
-        tuple : (torch.Tensor, torch.Tensor, torch.Tensor, dict)
+        tuple : tuple[torch.Tensor, torch.Tensor, torch.Tensor, dict]
             averaged sum of all k-means losses for each clustering,
             the rotated embedded point,
             the back rotated embedded point,
@@ -274,7 +279,7 @@ class _ENRC_Module(torch.nn.Module):
         z_rot_back = self.rotate_back(z_rot)
 
         subspace_betas = self.subspace_betas()
-        subspace_losses = 0
+        subspace_losses = torch.tensor(0.)
 
         if assignment_matrix_dict is None:
             assignment_matrix_dict = {}
@@ -318,14 +323,14 @@ class _ENRC_Module(torch.nn.Module):
                                         use_P=use_P)
         return predicted_labels
 
-    def predict_batchwise(self, model: torch.nn.Module, dataloader: torch.utils.data.DataLoader,
+    def predict_batchwise(self, neural_network: _AbstractAutoencoder | _IdentityAutoencoder, dataloader: torch.utils.data.DataLoader,
                           device: torch.device = torch.device("cpu"), use_P: bool = False) -> np.ndarray:
         """
         Predicts the labels for each clustering of a dataloader in a mini-batch manner.
 
         Parameters
         ----------
-        model : torch.nn.Module
+        neural_network : _AbstractAutoencoder | _IdentityAutoencoder
             the input model for encoding the data
         dataloader : torch.utils.data.DataLoader
             dataloader to be used for prediction
@@ -339,14 +344,14 @@ class _ENRC_Module(torch.nn.Module):
         predicted_labels : np.ndarray
             n x c matrix, where n is the number of data points in z and c is the number of clusterings.
         """
-        predicted_labels = enrc_predict_batchwise(V=self.V, centers=self.centers, model=model, dataloader=dataloader,
-                                                  subspace_betas=self.subspace_betas(), device=device, use_P=use_P)
+        predicted_labels = enrc_predict_batchwise(V=self.V, centers=self.centers, neural_network=neural_network, dataloader=dataloader,
+                                                  subspace_betas=self.subspace_betas(), use_P=use_P)
         return predicted_labels
 
-    def recluster(self, dataloader: torch.utils.data.DataLoader, model: torch.nn.Module, optimizer_params: dict,
-                  optimizer_class: torch.optim.Optimizer = None,
+    def recluster(self, dataloader: torch.utils.data.DataLoader, neural_network: _AbstractAutoencoder, optimizer_params: dict,
+                  optimizer_class: type[torch.optim.Optimizer] | None = None,
                   device: torch.device = torch.device('cpu'), rounds: int = 1, reclustering_strategy="auto",
-                  init_kwargs: dict = None) -> None:
+                  init_kwargs: dict | None = None) -> None:
         """
         Recluster ENRC inplace using NrKMeans or SGD (depending on the data set size, see init='auto' for details).
         Can lead to improved and more stable performance.
@@ -356,11 +361,11 @@ class _ENRC_Module(torch.nn.Module):
         ----------
         dataloader : torch.utils.data.DataLoader
             dataloader to be used for prediction
-        model : torch.nn.Module
+        neural_network : _AbstractAutoencoder
             the input model for encoding the data
         optimizer_params: dict
             parameters of the optimizer for the actual clustering procedure, includes the learning rate
-        optimizer_class : torch.optim.Optimizer
+        optimizer_class : type[torch.optim.Optimizer] | None
             optimizer for training. If None then torch.optim.Adam will be used (default: None)
         device : torch.device
             device to be predicted on (default: torch.device('cpu'))
@@ -368,7 +373,7 @@ class _ENRC_Module(torch.nn.Module):
             number of repetitions of the reclustering procedure (default: 1)
         reclustering_strategy : string
             choose which initialization strategy should be used. Has to be one of 'nrkmeans', 'random' or 'sgd' (default: 'nrkmeans')
-        init_kwargs : dict
+        init_kwargs : dict | None
             additional parameters that are used if reclustering_strategy is a callable (optional) (default: None)
         """
 
@@ -377,16 +382,18 @@ class _ENRC_Module(torch.nn.Module):
         n_clusters = [c.shape[0] for c in self.centers]
 
         # Encode data
-        embedded_data = encode_batchwise(dataloader, model)
+        embedded_data = encode_batchwise(dataloader, neural_network)
         embedded_rot = np.matmul(embedded_data, V)
 
+        assert hasattr(dataloader, "batch_size") and dataloader.batch_size is not None, "dataloader must have attribute batch_size"
+        batch_size = dataloader.batch_size
         # Apply reclustering in the rotated space, because V does not have to be orthogonal, so it could learn a mapping that is not recoverable by nrkmeans.
         centers_reclustered, P, new_V, beta_weights = enrc_init(data=embedded_rot, n_clusters=n_clusters, rounds=rounds,
                                                                 max_iter=300, optimizer_params=optimizer_params,
                                                                 optimizer_class=optimizer_class,
                                                                 init=reclustering_strategy, debug=False,
                                                                 init_kwargs=init_kwargs,
-                                                                batch_size=dataloader.batch_size,
+                                                                batch_size=batch_size,
                                                                 )
 
         # Update V, because we applied the reclustering in the rotated space
@@ -400,27 +407,27 @@ class _ENRC_Module(torch.nn.Module):
         self.centers = [torch.tensor(centers_sub, dtype=torch.float32) for centers_sub in centers_reclustered]
         self.to_device(device)
 
-    def fit(self, trainloader: torch.utils.data.DataLoader, evalloader: torch.utils.data.DataLoader,
-            optimizer: torch.optim.Optimizer, max_epochs: int, model: torch.nn.Module,
+    def fit(self, trainloader: torch.utils.data.DataLoader | None, evalloader: torch.utils.data.DataLoader | None,
+            optimizer: torch.optim.Optimizer, max_epochs: int, neural_network: _AbstractAutoencoder | _IdentityAutoencoder,
             batch_size: int, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error,
             device: torch.device = torch.device("cpu"), debug: bool = True,
-            scheduler: torch.optim.lr_scheduler = None, fix_rec_error: bool = False,
-            tolerance_threshold: float = None, data: torch.Tensor | np.ndarray = None) -> (
-            torch.nn.Module, '_ENRC_Module'):
+            scheduler: torch.optim.lr_scheduler.LRScheduler | None = None, fix_rec_error: bool = False,
+            tolerance_threshold: float | None = None, data: torch.Tensor | np.ndarray | None = None) -> tuple[
+            _AbstractAutoencoder | _IdentityAutoencoder, '_ENRC_Module']:
         """
         Trains ENRC and the neural network in place.
 
         Parameters
         ----------
-        trainloader : torch.utils.data.DataLoader
+        trainloader : torch.utils.data.DataLoader | None
             dataloader to be used for training
-        evalloader : torch.utils.data.DataLoader
+        evalloader : torch.utils.data.DataLoader | None
             Evalloader is used for checking label change
         optimizer : torch.optim.Optimizer
             parameterized optimizer to be used
         max_epochs : int
             maximum number of epochs for training
-        model : torch.nn.Module
+        neural_network : _AbstractAutoencoder | _IdentityAutoencoder
             The underlying neural network
         batch_size: int
             batch size for dataloader
@@ -430,25 +437,25 @@ class _ENRC_Module(torch.nn.Module):
             device to be trained on (default: torch.device('cpu'))
         debug : bool
             if True than training errors will be printed (default: True)
-        scheduler : torch.optim.lr_scheduler
+        scheduler : torch.optim.lr_scheduler | None
             parameterized learning rate scheduler that should be used (default: None)
         fix_rec_error : bool
             if set to True than reconstruction loss is weighted proportionally to the cluster loss. Only used for init='sgd' (default: False)
-        tolerance_threshold : float
+        tolerance_threshold : float | None
             tolerance threshold to determine when the training should stop. If the NMI(old_labels, new_labels) >= (1-tolerance_threshold)
             for all clusterings then the training will stop before max_epochs is reached. If set high than training will stop earlier then max_epochs, and if set to 0 or None the training
             will train as long as max_epochs (default: None)
-        data : torch.Tensor | np.ndarray
+        data : torch.Tensor | np.ndarray | None
             dataset to be used for training (default: None)
         Returns
         -------
-        tuple : (torch.nn.Module, _ENRC_Module)
+        tuple : tuple[_AbstractAutoencoder | _IdentityAutoencoder, '_ENRC_Module']
             trained neural network,
             trained enrc module
         """
         # Deactivate Batchnorm and dropout
-        model.eval()
-        model.to(device)
+        neural_network.eval()
+        neural_network.to(device)
         self.to_device(device)
 
         if trainloader is None and data is not None:
@@ -458,12 +465,15 @@ class _ENRC_Module(torch.nn.Module):
         if evalloader is None and data is not None:
             # Evalloader is used for checking label change. Only difference to the trainloader here is that shuffle=False.
             evalloader = get_dataloader(data, batch_size=batch_size, shuffle=False, drop_last=False)
+        assert evalloader is not None, "evalloader should not be None at this point"
+        assert trainloader is not None, "trainloader should not be None at this point"
 
         if fix_rec_error:
             if debug: print("Calculate initial reconstruction error")
-            _, _, init_ssl_loss = enrc_encode_decode_batchwise_with_loss(V=self.V, centers=self.centers, model=model,
+            _, _, init_ssl_loss = enrc_encode_decode_batchwise_with_loss(V=self.V, centers=self.centers, neural_network=neural_network,
                                                                          dataloader=evalloader, device=device,
                                                                          ssl_loss_fn=ssl_loss_fn)
+            assert init_ssl_loss is not None, "init_ssl_loss should not be None"
             # For numerical stability we add a small number
             init_ssl_loss += 1e-8
             if debug: print("Initial reconstruction error is ", init_ssl_loss)
@@ -471,7 +481,7 @@ class _ENRC_Module(torch.nn.Module):
         labels_old = None
         tbar = tqdm.trange(max_epochs, desc="ENRC training")
         for _ in tbar:
-            total_loss = 0
+            total_loss = 0.
             for batch in trainloader:
                 if self.augmentation_invariance:
                     batch_data_aug = batch[1].to(device)
@@ -479,17 +489,17 @@ class _ENRC_Module(torch.nn.Module):
                 else:
                     batch_data = batch[1].to(device)
 
-                z = model.encode(batch_data)
+                z = neural_network.encode(batch_data)
                 subspace_loss, z_rot, z_rot_back, assignment_matrix_dict = self(z)
 
-                reconstruction = model.decode(z_rot_back)
+                reconstruction = neural_network.decode(z_rot_back)
                 ssl_loss = ssl_loss_fn(reconstruction, batch_data)
 
                 if self.augmentation_invariance:
-                    z_aug = model.encode(batch_data_aug)
+                    z_aug = neural_network.encode(batch_data_aug)
                     # reuse assignments
                     subspace_loss_aug, _, z_rot_back_aug, _ = self(z_aug, assignment_matrix_dict=assignment_matrix_dict)
-                    reconstruction_aug = model.decode(z_rot_back_aug)
+                    reconstruction_aug = neural_network.decode(z_rot_back_aug)
                     ssl_loss_aug = ssl_loss_fn(reconstruction_aug, batch_data_aug)
                     ssl_loss = (ssl_loss + ssl_loss_aug) / 2
                     subspace_loss = (subspace_loss + subspace_loss_aug) / 2
@@ -511,7 +521,7 @@ class _ENRC_Module(torch.nn.Module):
                     self.update_centers(z_rot, assignment_matrix_dict)
                 # Check if clusters have to be reinitialized
                 for subspace_i in range(len(self.centers)):
-                    reinit_centers(enrc=self, subspace_id=subspace_i, dataloader=trainloader, model=model,
+                    reinit_centers(enrc=self, subspace_id=subspace_i, dataloader=trainloader, neural_network=neural_network,
                                    n_samples=512, kmeans_steps=10, debug=debug)
 
                 # Increase reinit_threshold over time
@@ -530,7 +540,7 @@ class _ENRC_Module(torch.nn.Module):
 
             if tolerance_threshold is not None and tolerance_threshold > 0:
                 # Check if labels have changed
-                labels_new = self.predict_batchwise(model=model, dataloader=evalloader, device=device, use_P=True)
+                labels_new = self.predict_batchwise(neural_network=neural_network, dataloader=evalloader, device=device, use_P=True)
                 if _are_labels_equal(labels_new=labels_new, labels_old=labels_old, threshold=tolerance_threshold):
                     # training has converged
                     if debug:
@@ -542,7 +552,7 @@ class _ENRC_Module(torch.nn.Module):
         # Extract P and m
         self.P = self.get_P()
         self.m = [len(P_i) for P_i in self.P]
-        return model, self
+        return neural_network, self
 
 
 """
@@ -621,7 +631,7 @@ class _IdentityAutoencoder(torch.nn.Module):
         return reconstruction
 
 
-def _get_P(betas: torch.Tensor, centers: list, shared_space_variation: float = 0.05) -> float:
+def _get_P(betas: torch.Tensor, centers: list, shared_space_variation: float = 0.05) -> list:
     """
     Converts the softmax betas back to hard assignments P and returns them as a list.
 
@@ -643,15 +653,15 @@ def _get_P(betas: torch.Tensor, centers: list, shared_space_variation: float = 0
     shared_space_idx = [i for i, centers_i in enumerate(centers) if centers_i.shape[0] == 1]
     if shared_space_idx:
         # Specifies how much beta in the shared space is allowed to diverge from the uniform distribution
-        shared_space_idx = shared_space_idx[0]
+        shared_space_idx_0 = shared_space_idx[0]
         equal_threshold = 1.0 / betas.shape[0]
         # Increase Weight of shared space dimensions that are close to the uniform distribution
         equal_threshold -= shared_space_variation
-        betas[shared_space_idx][betas[shared_space_idx] > equal_threshold] += 1
+        betas[shared_space_idx_0][betas[shared_space_idx_0] > equal_threshold] += 1
 
     # Select highest assigned dimensions to P
     max_assigned_dims = betas.argmax(0)
-    P = [[] for _ in range(betas.shape[0])]
+    P: list[list[int]] = [[] for _ in range(betas.shape[0])]
     for dim_i, cluster_subspace_id in enumerate(max_assigned_dims):
         P[cluster_subspace_id].append(dim_i)
     return P
@@ -728,14 +738,13 @@ def enrc_predict(z: torch.Tensor, V: torch.Tensor, centers: list, subspace_betas
         else:
             weighted_squared_diff = squared_euclidean_distance(z_rot, centers_i, weights=subspace_betas[i, :])
         labels_sub = weighted_squared_diff.argmin(1)
-        labels_sub = labels_sub.detach().cpu().numpy().astype(np.int32)
-        labels.append(labels_sub)
+        labels_sub_np = labels_sub.detach().cpu().numpy().astype(np.int32)
+        labels.append(labels_sub_np)
     return np.stack(labels).transpose()
 
 
-def enrc_predict_batchwise(V: torch.Tensor, centers: list, subspace_betas: torch.Tensor, model: torch.nn.Module,
-                           dataloader: torch.utils.data.DataLoader, device: torch.device = torch.device("cpu"),
-                           use_P: bool = False) -> np.ndarray:
+def enrc_predict_batchwise(V: torch.Tensor, centers: list, subspace_betas: torch.Tensor, neural_network: _AbstractAutoencoder | _IdentityAutoencoder,
+                           dataloader: torch.utils.data.DataLoader, use_P: bool = False) -> np.ndarray:
     """
     Predicts the labels for each clustering of a dataloader in a mini-batch manner.
 
@@ -747,12 +756,10 @@ def enrc_predict_batchwise(V: torch.Tensor, centers: list, subspace_betas: torch
         list of torch.Tensor, cluster centers for each clustering
     subspace_betas : torch.Tensor
         weights for each dimension per clustering. Calculated via softmax(beta_weights).
-    model : torch.nn.Module
+    neural_network: _AbstractAutoencoder | _IdentityAutoencoder
         the input model for encoding the data
     dataloader : torch.utils.data.DataLoader
         dataloader to be used for prediction
-    device : torch.device
-        device to be predicted on (default: torch.device('cpu'))
     use_P: bool
         if True then P will be used to hard select the dimensions for each clustering, else the soft beta weights are used (default: False)
     
@@ -761,21 +768,23 @@ def enrc_predict_batchwise(V: torch.Tensor, centers: list, subspace_betas: torch
     predicted_labels : np.ndarray
         n x c matrix, where n is the number of data points in z and c is the number of clusterings.
     """
-    model.eval()
+    neural_network.eval()
+    device = get_device_from_module(neural_network)
     predictions = []
     with torch.no_grad():
         for batch in dataloader:
             batch_data = batch[1].to(device)
-            z = model.encode(batch_data)
+            z = neural_network.encode(batch_data)
             pred_i = enrc_predict(z=z, V=V, centers=centers, subspace_betas=subspace_betas, use_P=use_P)
             predictions.append(pred_i)
     return np.concatenate(predictions)
 
 
-def enrc_encode_decode_batchwise_with_loss(V: torch.Tensor, centers: list, model: torch.nn.Module,
+def enrc_encode_decode_batchwise_with_loss(V: torch.Tensor, centers: list, neural_network: _AbstractAutoencoder | _IdentityAutoencoder,
                                            dataloader: torch.utils.data.DataLoader,
                                            device: torch.device = torch.device("cpu"),
-                                           ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = None) -> np.ndarray:
+                                           ssl_loss_fn: Callable | torch.nn.modules.loss._Loss | None = None) -> tuple[
+                                               np.ndarray, np.ndarray, float | None]:
     """
     Encode and Decode input data of a dataloader in a mini-batch manner with ENRC.
 
@@ -785,13 +794,13 @@ def enrc_encode_decode_batchwise_with_loss(V: torch.Tensor, centers: list, model
         orthogonal rotation matrix
     centers : list
         list of torch.Tensor, cluster centers for each clustering
-    model : torch.nn.Module
+    neural_network: _AbstractAutoencoder | _IdentityAutoencoder
         the input model for encoding the data
     dataloader : torch.utils.data.DataLoader
         dataloader to be used for prediction
     device : torch.device
         device to be predicted on (default: torch.device('cpu'))
-    ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
+    ssl_loss_fn : Callable | torch.nn.modules.loss._Loss | None
          self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: None)
 
     Returns
@@ -800,10 +809,10 @@ def enrc_encode_decode_batchwise_with_loss(V: torch.Tensor, centers: list, model
         n x d matrix, where n is the number of data points and d is the number of dimensions of z.
     enrc_decoding : np.ndarray
         n x D matrix, where n is the number of data points and D is the data dimensionality.
-    reconstruction_error : flaot
+    reconstruction_error : float | None
         reconstruction error (will be None if ssl_loss_fn is not specified)
     """
-    model.eval()
+    neural_network.eval()
     reconstructions = []
     embeddings = []
     if ssl_loss_fn is None:
@@ -813,19 +822,19 @@ def enrc_encode_decode_batchwise_with_loss(V: torch.Tensor, centers: list, model
     with torch.no_grad():
         for batch in dataloader:
             batch_data = batch[1].to(device)
-            z = model.encode(batch_data)
+            z = neural_network.encode(batch_data)
             z_rot = _rotate(z=z, V=V)
             embeddings.append(z_rot.detach().cpu())
             z_rot_back = _rotate_back(z_rot=z_rot, V=V)
-            reconstruction = model.decode(z_rot_back)
+            reconstruction = neural_network.decode(z_rot_back)
             if ssl_loss_fn is not None:
                 loss += ssl_loss_fn(reconstruction, batch_data).item()
             reconstructions.append(reconstruction.detach().cpu())
-    if ssl_loss_fn is not None:
+    if loss is not None:
         loss /= len(dataloader)
-    embeddings = torch.cat(embeddings).numpy()
-    reconstructions = torch.cat(reconstructions).numpy()
-    return embeddings, reconstructions, loss
+    embeddings_np = torch.cat(embeddings).numpy()
+    reconstructions_np = torch.cat(reconstructions).numpy()
+    return embeddings_np, reconstructions_np, loss
 
 
 """
@@ -888,7 +897,7 @@ def calculate_optimal_beta_weights_special_case(data: torch.Tensor, centers: lis
     device = V.device
     with torch.no_grad():
         # calculate kmeans losses for each clustering
-        km_losses = [[] for _ in centers]
+        km_losses: list[list[torch.Tensor]] = [[] for _ in centers]
         for batch in dataloader:
             batch = batch[1].to(device)
             z_rot = torch.matmul(batch, V)
@@ -904,15 +913,16 @@ def calculate_optimal_beta_weights_special_case(data: torch.Tensor, centers: lis
 
                 km_losses[i].append(weighted_squared_diff_masked.detach().cpu())
                 centers_i = centers_i.cpu()
+        km_losses_sums = [torch.tensor(0.)] * len(km_losses)
         for i, km_loss in enumerate(km_losses):
             # Sum over samples and centers
-            km_losses[i] = torch.cat(km_loss, 0).sum(0).sum(0)
+            km_losses_sums[i] = torch.cat(km_loss, 0).sum(0).sum(0)
         # calculate beta_weights for each dimension and clustering based on kmeans losses
         best_weights = []
-        best_weights.append(optimal_beta(km_losses[0], km_losses[1]))
-        best_weights.append(optimal_beta(km_losses[1], km_losses[0]))
-        best_weights = torch.stack(best_weights)
-    return best_weights
+        best_weights.append(optimal_beta(km_losses_sums[0], km_losses_sums[1]))
+        best_weights.append(optimal_beta(km_losses_sums[1], km_losses_sums[0]))
+        best_weights_torch = torch.stack(best_weights)
+    return best_weights_torch
 
 
 def beta_weights_init(P: list, n_dims: int, high_value: float = 0.9) -> torch.Tensor:
@@ -990,9 +1000,9 @@ def calculate_beta_weight(data: torch.Tensor, centers: list, V: torch.Tensor, P:
     return beta_weights
 
 
-def nrkmeans_init(data: np.ndarray, n_clusters: list, rounds: int = 10, max_iter: int = 100, input_centers: list = None,
-                  P: list = None, V: np.ndarray = None, random_state: np.random.RandomState = None, debug=True) -> (
-        list, list, np.ndarray, np.ndarray):
+def nrkmeans_init(data: np.ndarray, n_clusters: list, rounds: int = 10, max_iter: int = 100, input_centers: list | None = None,
+                  P: list | None = None, V: np.ndarray | None = None, random_state: np.random.RandomState | None = None, debug: bool=True) -> tuple[
+        list, list, np.ndarray, np.ndarray]:
     """
     Initialization strategy based on the NrKmeans Algorithm. This strategy is preferred for small data sets, but the orthogonality
     constraint on V and subsequently for the clustered subspaces can be sometimes to limiting in practice, e.g., if clusterings are
@@ -1008,20 +1018,20 @@ def nrkmeans_init(data: np.ndarray, n_clusters: list, rounds: int = 10, max_iter
         number of repetitions of the NrKmeans algorithm (default: 10)
     max_iter : int
         maximum number of iterations of NrKmeans (default: 100)
-    input_centers : list
+    input_centers : list | None
         list of np.ndarray, optional parameter if initial cluster centers want to be set (optional) (default: None)
-    P : list
+    P : list | None
         list containing projections for each subspace (optional) (default: None)
-    V : np.ndarray
+    V : np.ndarray | None
         orthogonal rotation matrix (optional) (default: None)
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | None
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
     debug : bool
         if True then the cost of each round will be printed (default: True)
 
     Returns
     -------
-    tuple : (list, list, np.ndarray, np.ndarray)
+    tuple : tuple[list, list, np.ndarray, np.ndarray]
         list of cluster centers for each subspace
         list containing projections for each subspace
         orthogonal rotation matrix
@@ -1047,7 +1057,7 @@ def nrkmeans_init(data: np.ndarray, n_clusters: list, rounds: int = 10, max_iter
         else:
             cost = _get_total_cost_function(V=V_i, P=P_i, scatter_matrices=scatter_matrices_i)
             if lowest > cost:
-                best = [centers_i, P_i, V_i, ]
+                best = (centers_i, P_i, V_i)
                 lowest = cost
             if debug:
                 print(f"Round {i}: Found solution with: {cost} (current best: {lowest})")
@@ -1066,14 +1076,14 @@ def nrkmeans_init(data: np.ndarray, n_clusters: list, rounds: int = 10, max_iter
                                          centers=[torch.from_numpy(centers_sub).float() for centers_sub in centers],
                                          V=torch.from_numpy(V).float(),
                                          P=P)
-    beta_weights = beta_weights.detach().cpu().numpy()
+    beta_weights_np = beta_weights.detach().cpu().numpy()
 
-    return centers, P, V, beta_weights
+    return centers, P, V, beta_weights_np
 
 
-def random_nrkmeans_init(data: np.ndarray, n_clusters: list, rounds: int = 10, input_centers: list = None,
-                         P: list = None, V: np.ndarray = None, random_state: np.random.RandomState = None,
-                         debug: bool = True) -> (list, list, np.ndarray, np.ndarray):
+def random_nrkmeans_init(data: np.ndarray, n_clusters: list, rounds: int = 10, input_centers: list | None = None,
+                         P: list | None = None, V: np.ndarray | None = None, random_state: np.random.RandomState | None = None,
+                         debug: bool = True) -> tuple[list, list, np.ndarray, np.ndarray]:
     """
     Initialization strategy based on the NrKmeans Algorithm. For documentation see nrkmeans_init function.
     Same as nrkmeans_init, but max_iter is set to 1, so the results will be faster and more random.
@@ -1086,20 +1096,20 @@ def random_nrkmeans_init(data: np.ndarray, n_clusters: list, rounds: int = 10, i
         list of ints, number of clusters for each clustering
     rounds : int
         number of repetitions of the NrKmeans algorithm (default: 10)
-    input_centers : list
+    input_centers : list | None
         list of np.ndarray, optional parameter if initial cluster centers want to be set (optional) (default: None)
-    P : list
+    P : list | None
         list containing projections for each subspace (optional) (default: None)
-    V : np.ndarray
+    V : np.ndarray | None
         orthogonal rotation matrix (optional) (default: None)
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | None
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
     debug : bool
         if True then the cost of each round will be printed (default: True)
 
     Returns
     -------
-    tuple : (list, list, np.ndarray, np.ndarray)
+    tuple : tuple[list, list, np.ndarray, np.ndarray]
         list of cluster centers for each subspace
         list containing projections for each subspace
         orthogonal rotation matrix
@@ -1111,7 +1121,7 @@ def random_nrkmeans_init(data: np.ndarray, n_clusters: list, rounds: int = 10, i
 
 def _determine_sgd_init_costs(enrc: _ENRC_Module, dataloader: torch.utils.data.DataLoader,
                               ssl_loss_fn: Callable | torch.nn.modules.loss._Loss, device: torch.device,
-                              return_rot: bool = False) -> float:
+                              return_rot: bool = False) -> float | tuple[float, np.ndarray]:
     """
     Determine the initial sgd costs.
 
@@ -1130,10 +1140,11 @@ def _determine_sgd_init_costs(enrc: _ENRC_Module, dataloader: torch.utils.data.D
 
     Returns
     -------
-    cost : float
-        the costs
+    tuple : float | tuple[float, np.ndarray]
+        the costs,
+        the rotated data (if return_rot is true)
     """
-    cost = 0
+    cost = torch.tensor(0.)
     rotated_data = []
     with torch.no_grad():
         for batch in dataloader:
@@ -1144,17 +1155,17 @@ def _determine_sgd_init_costs(enrc: _ENRC_Module, dataloader: torch.utils.data.D
             cost += (subspace_loss + ssl_loss)
         cost /= len(dataloader)
     if return_rot:
-        rotated_data = torch.cat(rotated_data).numpy()
-        return cost.item(), rotated_data
+        rotated_data_np = torch.cat(rotated_data).numpy()
+        return cost.item(), rotated_data_np
     else:
         return cost.item()
 
 
 def sgd_init(data: np.ndarray, n_clusters: list, optimizer_params: dict, batch_size: int = 128,
-             optimizer_class: torch.optim.Optimizer = None, rounds: int = 2, epochs: int = 10,
-             random_state: np.random.RandomState = None, input_centers: list = None, P: list = None,
-             V: np.ndarray = None, device: torch.device = torch.device("cpu"), debug: bool = True) -> (
-        list, list, np.ndarray, np.ndarray):
+             optimizer_class: type[torch.optim.Optimizer] | None = None, rounds: int = 2, epochs: int = 10,
+             random_state: np.random.RandomState | None = None, input_centers: list | None = None, P: list | None = None,
+             V: np.ndarray | None = None, device: torch.device = torch.device("cpu"), debug: bool = True) -> tuple[
+                 list, list, np.ndarray, np.ndarray]:
     """
     Initialization strategy based on optimizing ENRC's parameters V and beta in isolation from the neural network using a mini-batch gradient descent optimizer.
     This initialization strategy scales better to large data sets than the nrkmeans_init and only constraints V using the reconstruction error (mean_squared_error),
@@ -1170,19 +1181,19 @@ def sgd_init(data: np.ndarray, n_clusters: list, optimizer_params: dict, batch_s
         parameters of the optimizer used to optimize V and beta, includes the learning rate
     batch_size : int
         size of the data batches (default: 128)
-    optimizer_class : torch.optim.Optimizer
+    optimizer_class : type[torch.optim.Optimizer] | None
         optimizer for training. If None then torch.optim.Adam will be used (default: None)
     rounds : int
         number of repetitions of the initialization procedure (default: 2)
     epochs : int
         number of epochs for the actual clustering procedure (default: 10)
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | None
         random state for reproducible results (default: None)
-    input_centers : list
+    input_centers : list | None
         list of np.ndarray, default=None, optional parameter if initial cluster centers want to be set (optional)
-    P : list
+    P : list | None
         list containing projections for each subspace (optional) (default: None)
-    V : np.ndarray
+    V : np.ndarray | None
         orthogonal rotation matrix (optional) (default: None)
     device : torch.device
         device on which should be trained on (default: torch.device('cpu'))
@@ -1191,7 +1202,7 @@ def sgd_init(data: np.ndarray, n_clusters: list, optimizer_params: dict, batch_s
 
     Returns
     -------
-    tuple : (list, list, np.ndarray, np.ndarray)
+    tuple : tuple[list, list, np.ndarray, np.ndarray]
         list of cluster centers for each subspace,
         list containing projections for each subspace,
         orthogonal rotation matrix,
@@ -1218,7 +1229,7 @@ def sgd_init(data: np.ndarray, n_clusters: list, optimizer_params: dict, batch_s
                       ]
         if optimizer_class is None:
             optimizer_class = torch.optim.Adam
-        optimizer = optimizer_class(param_dict)
+        optimizer = optimizer_class(param_dict)  # type: ignore[call-arg]
         # Training loop
         # For the initialization we increase the weight for the rec error to enforce close to orthogonal V by setting fix_rec_error=True
         enrc_module.fit(data=data,
@@ -1226,7 +1237,7 @@ def sgd_init(data: np.ndarray, n_clusters: list, optimizer_params: dict, batch_s
                         evalloader=None,
                         optimizer=optimizer,
                         max_epochs=epochs,
-                        model=_IdentityAutoencoder(),
+                        neural_network=_IdentityAutoencoder(),
                         ssl_loss_fn=mean_squared_error,
                         batch_size=batch_size,
                         device=device,
@@ -1235,25 +1246,27 @@ def sgd_init(data: np.ndarray, n_clusters: list, optimizer_params: dict, batch_s
 
         cost = _determine_sgd_init_costs(enrc=enrc_module, dataloader=dataloader, ssl_loss_fn=mean_squared_error,
                                          device=device)
+        assert isinstance(cost, float), "cost should be float"
         if lowest > cost:
-            best = [enrc_module.centers, enrc_module.P, enrc_module.V, enrc_module.beta_weights]
+            best = (enrc_module.centers, enrc_module.P, enrc_module.V.data, enrc_module.beta_weights.data)
             lowest = cost
         if debug:
             print(f"Round {round_i}: Found solution with: {cost} (current best: {lowest})")
-
-    centers, P, V, beta_weights = best
-    beta_weights = calculate_beta_weight(data=torch.from_numpy(data).float(), centers=centers, V=V, P=P)
-    centers = [centers_i.detach().cpu().numpy() for centers_i in centers]
-    beta_weights = beta_weights.detach().cpu().numpy()
-    V = V.detach().cpu().numpy()
-    return centers, P, V, beta_weights
+    assert best is not None, "best should not be None at this point"
+    centers, P_best, V_best, beta_weights = best
+    assert isinstance(centers, list) and isinstance(P_best, list) and isinstance(V_best, torch.Tensor) and isinstance(beta_weights, torch.Tensor)
+    beta_weights = calculate_beta_weight(data=torch.from_numpy(data).float(), centers=centers, V=V_best, P=P_best)
+    centers_np = [centers_i.detach().cpu().numpy() for centers_i in centers]
+    beta_weights_np = beta_weights.detach().cpu().numpy()
+    V_np = V_best.detach().cpu().numpy()
+    return centers_np, P_best, V_np, beta_weights_np
 
 
 def acedec_init(data: np.ndarray, n_clusters: list, optimizer_params: dict, batch_size: int = 128,
-                optimizer_class: torch.optim.Optimizer = None, rounds: int = None, epochs: int = 10,
-                random_state: np.random.RandomState = None, input_centers: list = None, P: list = None,
-                V: np.ndarray = None, device: torch.device = torch.device("cpu"), debug: bool = True) -> (
-        list, list, np.ndarray, np.ndarray):
+                optimizer_class: type[torch.optim.Optimizer] | None = None, rounds: int | None = None, epochs: int = 10,
+                random_state: np.random.RandomState | None = None, input_centers: list | None = None, P: list | None = None,
+                V: np.ndarray | None = None, device: torch.device = torch.device("cpu"), debug: bool = True) -> tuple[
+        list, list, np.ndarray, np.ndarray]:
     """
     Initialization strategy based on optimizing ACeDeC's parameters V and beta in isolation from the neural network using a mini-batch gradient descent optimizer.
     This initialization strategy scales better to large data sets than the nrkmeans_init and only constraints V using the reconstruction error (mean_squared_error),
@@ -1269,21 +1282,19 @@ def acedec_init(data: np.ndarray, n_clusters: list, optimizer_params: dict, batc
         parameters of the optimizer used to optimize V and beta, includes the learning rate
     batch_size : int
         size of the data batches (default: 128)
-    optimizer_params: dict
-            parameters of the optimizer for the actual clustering procedure, includes the learning rate
-    optimizer_class : torch.optim.Optimizer
+    optimizer_class : type[torch.optim.Optimizer] | None
         optimizer for training. If None then torch.optim.Adam will be used (default: None)
-    rounds : int
+    rounds : int | None
         not used here (default: None)
     epochs : int
         epochs is automatically set to be close to 20.000 minibatch iterations as in the ACeDeC paper. If this determined value is smaller than the passed epochs, then epochs is used (default: 10)
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | None
         random state for reproducible results (default: None)
-    input_centers : list
-        list of np.ndarray, default=None, optional parameter if initial cluster centers want to be set (optional)
-    P : list
+    input_centers : list | None
+        list of np.ndarray, default=None, optional parameter if initial cluster centers want to be set (default: None)
+    P : list | None
         list containing projections for each subspace (optional) (default: None)
-    V : np.ndarray
+    V : np.ndarray | None
         orthogonal rotation matrix (optional) (default: None)
     device : torch.device
         device on which should be trained on (default: torch.device('cpu'))
@@ -1292,7 +1303,7 @@ def acedec_init(data: np.ndarray, n_clusters: list, optimizer_params: dict, batc
 
     Returns
     -------
-    tuple : (list, list, np.ndarray, np.ndarray)
+    tuple : tuple[list, list, np.ndarray, np.ndarray]
         list of cluster centers for each subspace,
         list containing projections for each subspace,
         orthogonal rotation matrix,
@@ -1330,7 +1341,7 @@ def acedec_init(data: np.ndarray, n_clusters: list, optimizer_params: dict, batc
                       ]
         if optimizer_class is None:
             optimizer_class = torch.optim.Adam
-        optimizer = optimizer_class(param_dict)
+        optimizer = optimizer_class(param_dict)  # type: ignore[call-arg]
         # Training loop
         # For the initialization we increase the weight for the rec error to enforce close to orthogonal V by setting fix_rec_error=True
         if debug: print("Start pretraining parameters with SGD")
@@ -1339,16 +1350,17 @@ def acedec_init(data: np.ndarray, n_clusters: list, optimizer_params: dict, batc
                         evalloader=None,
                         optimizer=optimizer,
                         max_epochs=epochs,
-                        model=_IdentityAutoencoder(),
+                        neural_network=_IdentityAutoencoder(),
                         ssl_loss_fn=mean_squared_error,
                         batch_size=batch_size,
                         device=device,
                         debug=debug,
                         fix_rec_error=True)
 
-        cost, z_rot = _determine_sgd_init_costs(enrc=enrc_module, dataloader=dataloader, ssl_loss_fn=mean_squared_error,
+        init_costs_output = _determine_sgd_init_costs(enrc=enrc_module, dataloader=dataloader, ssl_loss_fn=mean_squared_error,
                                                 device=device, return_rot=True)
-
+        assert isinstance(init_costs_output, tuple), "cost should be a tuple"
+        cost, z_rot = init_costs_output
         # Recluster with KMeans to get better centroid estimate
         kmeans = KMeans(n_clusters[0], n_init=10)
         kmeans.fit(z_rot)
@@ -1357,25 +1369,26 @@ def acedec_init(data: np.ndarray, n_clusters: list, optimizer_params: dict, batc
         enrc_module.centers = [torch.tensor(centers_sub, dtype=torch.float32) for centers_sub in enrc_rotated_centers]
 
         if lowest > cost:
-            best = [enrc_module.centers, enrc_module.P, enrc_module.V, enrc_module.beta_weights]
+            best = (enrc_module.centers, enrc_module.P, enrc_module.V.data, enrc_module.beta_weights.data)
             lowest = cost
         if debug:
             print(f"Round {round_i}: Found solution with: {cost} (current best: {lowest})")
+    assert best is not None, "best should not be None at this point"
+    centers, P_best, V_best, beta_weights = best
+    assert isinstance(centers, list) and isinstance(P_best, list) and isinstance(V_best, torch.Tensor) and isinstance(beta_weights, torch.Tensor)
 
-    centers, P, V, beta_weights = best
-
-    beta_weights = calculate_beta_weight(data=torch.from_numpy(data).float(), centers=centers, V=V, P=P)
-    centers = [centers_i.detach().cpu().numpy() for centers_i in centers]
-    beta_weights = beta_weights.detach().cpu().numpy()
-    V = V.detach().cpu().numpy()
-    return centers, P, V, beta_weights
+    beta_weights = calculate_beta_weight(data=torch.from_numpy(data).float(), centers=centers, V=V_best, P=P_best)
+    centers_np = [centers_i.detach().cpu().numpy() for centers_i in centers]
+    beta_weights_np = beta_weights.detach().cpu().numpy()
+    V_np = V_best.detach().cpu().numpy()
+    return centers_np, P_best, V_np, beta_weights_np
 
 
-def enrc_init(data: np.ndarray, n_clusters: list, init: str = "auto", rounds: int = 10, input_centers: list = None,
-              P: list = None, V: np.ndarray = None, random_state: np.random.RandomState = None, max_iter: int = 100,
-              optimizer_params: dict = None, optimizer_class: torch.optim.Optimizer = None, batch_size: int = 128,
+def enrc_init(data: np.ndarray, n_clusters: list, init: str = "auto", rounds: int = 10, input_centers: list | None = None,
+              P: list | None = None, V: np.ndarray | None = None, random_state: np.random.RandomState | None = None, max_iter: int = 100,
+              optimizer_params: dict | None = None, optimizer_class: type[torch.optim.Optimizer] | None = None, batch_size: int = 128,
               epochs: int = 10, device: torch.device = torch.device("cpu"), debug: bool = True,
-              init_kwargs: dict = None) -> (list, list, np.ndarray, np.ndarray):
+              init_kwargs: dict | None = None) -> tuple[list, list, np.ndarray, np.ndarray]:
     """
     Initialization strategy for the ENRC algorithm.
 
@@ -1404,19 +1417,19 @@ def enrc_init(data: np.ndarray, n_clusters: list, init: str = "auto", rounds: in
     
     rounds : int
         number of repetitions of the initialization procedure (default: 10)
-    input_centers : list
+    input_centers : list | None
         list of np.ndarray, optional parameter if initial cluster centers want to be set (optional) (default: None)
-    P : list
+    P : list | None
         list containing projections for each subspace (optional) (default: None)
-    V : np.ndarray
+    V : np.ndarray | None
         orthogonal rotation matrix (optional) (default: None)
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | None
         random state for reproducible results (default: None)
     max_iter : int
         maximum number of iterations of NrKmeans.  Only used for init='nrkmeans' (default: 100)
-    optimizer_params : dict
-        parameters of the optimizer used to optimize V and beta, includes the learning rate. Only used for init='sgd'
-    optimizer_class : torch.optim.Optimizer
+    optimizer_params : dict | None
+        parameters of the optimizer used to optimize V and beta, includes the learning rate. Only used for init='sgd' (default: None)
+    optimizer_class : type[torch.optim.Optimizer] | None
         optimizer for training. If None then torch.optim.Adam will be used. Only used for init='sgd' (default: None)
     batch_size : int
         size of the data batches. Only used for init='sgd' (default: 128)
@@ -1426,11 +1439,11 @@ def enrc_init(data: np.ndarray, n_clusters: list, init: str = "auto", rounds: in
         device on which should be trained on. Only used for init='sgd' (default: torch.device('cpu'))
     debug : bool
         if True then the cost of each round will be printed (default: True)
-    init_kwargs : dict
+    init_kwargs : dict | None
         additional parameters that are used if init is a callable (optional) (default: None)
     Returns
     -------
-    tuple : (list, list, np.ndarray, np.ndarray)
+    tuple : tuple[list, list, np.ndarray, np.ndarray]
         list of cluster centers for each subspace
         list containing projections for each subspace
         orthogonal rotation matrix
@@ -1449,11 +1462,13 @@ def enrc_init(data: np.ndarray, n_clusters: list, init: str = "auto", rounds: in
                                                            input_centers=input_centers, P=P, V=V,
                                                            random_state=random_state, debug=debug)
     elif init == "sgd":
+        assert optimizer_params is not None, "optimizer_params can not be None for init strategy 'sgd'"
         centers, P, V, beta_weights = sgd_init(data=data, n_clusters=n_clusters, optimizer_params=optimizer_params,
                                                rounds=rounds, epochs=epochs, input_centers=input_centers, P=P, V=V,
                                                optimizer_class=optimizer_class, batch_size=batch_size,
                                                random_state=random_state, device=device, debug=debug)
     elif init == "acedec":
+        assert optimizer_params is not None, "optimizer_params can not be None for init strategy 'acedec'"
         centers, P, V, beta_weights = acedec_init(data=data, n_clusters=n_clusters, optimizer_params=optimizer_params,
                                                   rounds=rounds, epochs=epochs, input_centers=input_centers, P=P, V=V,
                                                   optimizer_class=optimizer_class, batch_size=batch_size,
@@ -1475,6 +1490,7 @@ def enrc_init(data: np.ndarray, n_clusters: list, init: str = "auto", rounds: in
             centers, P, V, beta_weights = init(data, n_clusters)
     else:
         raise ValueError(f"init={init} is not implemented.")
+    assert isinstance(centers, list) and isinstance(P, list) and isinstance(V, np.ndarray) and isinstance(beta_weights, np.ndarray)
     return centers, P, V, beta_weights
 
 
@@ -1483,11 +1499,10 @@ def enrc_init(data: np.ndarray, n_clusters: list, init: str = "auto", rounds: in
 """
 
 
-def _calculate_rotated_embeddings_and_distances_for_n_samples(enrc: _ENRC_Module, model: torch.nn.Module,
+def _calculate_rotated_embeddings_and_distances_for_n_samples(enrc: _ENRC_Module, neural_network: _AbstractAutoencoder | _IdentityAutoencoder,
                                                               dataloader: torch.utils.data.DataLoader, n_samples: int,
                                                               center_id: int, subspace_id: int, device: torch.device,
-                                                              calc_distances: bool = True) -> (
-        torch.Tensor, torch.Tensor):
+                                                              calc_distances: bool = True) -> tuple[torch.Tensor, torch.Tensor | None]:
     """
     Helper function for calculating the distances and embeddings for n_samples in a mini-batch fashion.
 
@@ -1495,7 +1510,7 @@ def _calculate_rotated_embeddings_and_distances_for_n_samples(enrc: _ENRC_Module
     ----------
     enrc : _ENRC_Module
         The ENRC Module
-    model : torch.nn.Module
+    neural_network : _AbstractAutoencoder | _IdentityAutoencoder
         The neural network
     dataloader : torch.utils.data.DataLoader
         dataloader from which data is randomly sampled
@@ -1508,11 +1523,11 @@ def _calculate_rotated_embeddings_and_distances_for_n_samples(enrc: _ENRC_Module
     device : torch.device
         device to be trained on
     calc_distances : bool
-        specifies if the distances between all not lonely centers to embedded data points should be calculated
+        specifies if the distances between all not lonely centers to embedded data points should be calculated (default: True)
 
     Returns
     -------
-    tuple : (torch.Tensor, torch.Tensor)
+    tuple : tuple[torch.Tensor, torch.Tensor | None]
         the rotated embedded data points
         the distances (if calc_distancesis True)
     """
@@ -1530,7 +1545,7 @@ def _calculate_rotated_embeddings_and_distances_for_n_samples(enrc: _ENRC_Module
             # so removing the last objects does not matter
             diff = (batch.shape[0] + sample_count) - n_samples
             batch = batch[:-diff]
-        z_rot = enrc.rotate(model.encode(batch))
+        z_rot = enrc.rotate(neural_network.encode(batch))
         embedding_rot.append(z_rot.detach().cpu())
 
         if calc_distances:
@@ -1544,12 +1559,12 @@ def _calculate_rotated_embeddings_and_distances_for_n_samples(enrc: _ENRC_Module
         sample_count += batch.shape[0]
         if sample_count >= n_samples:
             break
-    embedding_rot = torch.cat(embedding_rot, 0)
+    embedding_rot_torch = torch.cat(embedding_rot, 0)
     if calc_distances:
-        dists = torch.cat(dists, 0)
+        dists_torch = torch.cat(dists, 0)
     else:
-        dists = None
-    return embedding_rot, dists
+        dists_torch = None
+    return embedding_rot_torch, dists_torch
 
 
 def _split_most_expensive_cluster(distances: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
@@ -1597,7 +1612,7 @@ def _random_reinit_cluster(embedded: torch.Tensor) -> torch.Tensor:
 
 
 def reinit_centers(enrc: _ENRC_Module, subspace_id: int, dataloader: torch.utils.data.DataLoader,
-                   model: torch.nn.Module,
+                   neural_network: _AbstractAutoencoder | _IdentityAutoencoder,
                    n_samples: int = 512, kmeans_steps: int = 10, split: str = "random", debug: bool = False) -> None:
     """
     Reinitializes centers that have been lost, i.e. if they did not get any data point assigned. Before a center is reinitialized,
@@ -1612,7 +1627,7 @@ def reinit_centers(enrc: _ENRC_Module, subspace_id: int, dataloader: torch.utils
         integer which indicates which subspace the cluster to be checked are in.
     dataloader : torch.utils.data.DataLoader
         dataloader from which data is randomly sampled. Important shuffle=True needs to be set, because n_samples random samples are drawn.
-    model : torch.nn.Module
+    neural_network : _AbstractAutoencoder | _IdentityAutoencoder
         neural network used for the embedding
     n_samples : int
         number of samples that should be used for the reclustering (default: 512)
@@ -1623,8 +1638,9 @@ def reinit_centers(enrc: _ENRC_Module, subspace_id: int, dataloader: torch.utils
         'random' : split a random point from the random sample of size=n_samples.
         'cost' : split the cluster with max kmeans cost.
     debug : bool
-        if True than training errors will be printed (default: True)
+        if True than training errors will be printed (default: False)
     """
+    assert hasattr(dataloader.dataset, '__len__'), "The dataloader must have a dataset attribute to determine the size of the data set."
     N = len(dataloader.dataset)
     if n_samples > N:
         if debug: print(
@@ -1639,15 +1655,16 @@ def reinit_centers(enrc: _ENRC_Module, subspace_id: int, dataloader: torch.utils
             if count_i > enrc.reinit_threshold:
                 if debug: print(f"Reinitialize cluster {center_id} in subspace {subspace_id}")
                 if split == "cost":
-                    embedding_rot, dists = _calculate_rotated_embeddings_and_distances_for_n_samples(enrc, model,
+                    embedding_rot, dists = _calculate_rotated_embeddings_and_distances_for_n_samples(enrc, neural_network,
                                                                                                      dataloader,
                                                                                                      n_samples,
                                                                                                      center_id,
                                                                                                      subspace_id,
                                                                                                      device)
+                    assert dists is not None, "dists should not be None at this point"
                     new_center = _split_most_expensive_cluster(distances=dists, z=embedding_rot)
                 elif split == "random":
-                    embedding_rot, _ = _calculate_rotated_embeddings_and_distances_for_n_samples(enrc, model,
+                    embedding_rot, _ = _calculate_rotated_embeddings_and_distances_for_n_samples(enrc, neural_network,
                                                                                                  dataloader, n_samples,
                                                                                                  center_id, subspace_id,
                                                                                                  device,
@@ -1657,19 +1674,20 @@ def reinit_centers(enrc: _ENRC_Module, subspace_id: int, dataloader: torch.utils
                     raise NotImplementedError(f"split={split} is not implemented. Has to be 'cost' or 'random'.")
                 enrc.centers[subspace_id][center_id, :] = new_center.to(device)
 
-                embeddingloader = torch.utils.data.DataLoader(embedding_rot, batch_size=dataloader.batch_size,
+                assert dataloader.batch_size is not None, "batch size of dataloader is None."
+                embeddingloader = get_dataloader(embedding_rot, batch_size=dataloader.batch_size,
                                                               shuffle=False, drop_last=False)
                 # perform mini-batch kmeans steps
-                batch_cluster_sums = 0
-                mask_sum = 0
+                batch_cluster_sums = torch.zeros((k, embedding_rot.shape[1]))
+                mask_sum = torch.zeros(k)
                 for step_i in range(kmeans_steps):
                     for z_rot in embeddingloader:
-                        z_rot = z_rot.to(device)
-                        weighted_squared_diff = squared_euclidean_distance(z_rot, enrc.centers[subspace_id],
+                        z_rot_data = z_rot[1].to(device)
+                        weighted_squared_diff = squared_euclidean_distance(z_rot_data, enrc.centers[subspace_id],
                                                                            weights=subspace_betas[subspace_id, :])
                         assignments = weighted_squared_diff.detach().argmin(1)
                         one_hot_mask = int_to_one_hot(assignments, k)
-                        batch_cluster_sums += (z_rot.unsqueeze(1) * one_hot_mask.unsqueeze(2)).sum(0)
+                        batch_cluster_sums += (z_rot_data.unsqueeze(1) * one_hot_mask.unsqueeze(2)).sum(0)
                         mask_sum += one_hot_mask.sum(0)
                     nonzero_mask = (mask_sum != 0)
                     enrc.centers[subspace_id][nonzero_mask] = batch_cluster_sums[nonzero_mask] / mask_sum[
@@ -1685,18 +1703,18 @@ def reinit_centers(enrc: _ENRC_Module, subspace_id: int, dataloader: torch.utils
 """
 
 
-def _are_labels_equal(labels_new: np.ndarray, labels_old: np.ndarray, threshold: float = None) -> bool:
+def _are_labels_equal(labels_new: np.ndarray | None, labels_old: np.ndarray | None, threshold: float | None = None) -> bool:
     """
     Check if the old labels and new labels are equal. Therefore check the nmi for each subspace_nr. If all are 1, labels
     have not changed.
     
     Parameters
     ----------
-    labels_new: np.ndarray
+    labels_new: np.ndarray | None
         new labels list
-    labels_old: np.ndarray
+    labels_old: np.ndarray | None
         old labels list
-    threshold: float
+    threshold: float | None
         specifies how close the two labelings should match (default: None)
 
     Returns
@@ -1708,37 +1726,38 @@ def _are_labels_equal(labels_new: np.ndarray, labels_old: np.ndarray, threshold:
         return False
 
     if threshold is None:
-        v = 1
+        v = 1.
     else:
-        v = 1 - threshold
+        v = 1. - threshold
     return all(
         [normalized_mutual_info_score(labels_new[:, i], labels_old[:, i], average_method="arithmetic") >= v for i in
          range(labels_new.shape[1])])
 
 
-def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers: list, batch_size: int,
+def _enrc(X: np.ndarray | torch.Tensor, n_clusters: list, V: np.ndarray | None, P: list | None, input_centers: list | None, batch_size: int,
           pretrain_optimizer_params: dict, clustering_optimizer_params: dict, pretrain_epochs: int,
-          clustering_epochs: int, optimizer_class: torch.optim.Optimizer, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss,
-          clustering_loss_weight: float, ssl_loss_weight: float, neural_network: torch.nn.Module | tuple,
-          neural_network_weights: str | Path, embedding_size: int, init: str, random_state: np.random.RandomState,
-          device: torch.device, scheduler: torch.optim.lr_scheduler, scheduler_params: dict, tolerance_threshold: float,
-          init_kwargs: dict, init_subsample_size: int, custom_dataloaders: tuple, augmentation_invariance: bool,
-          final_reclustering: bool, debug: bool) -> (
-        np.ndarray, list, np.ndarray, list, np.ndarray, list, list, torch.nn.Module):
+          clustering_epochs: int, optimizer_class: type[torch.optim.Optimizer], ssl_loss_fn: Callable | torch.nn.modules.loss._Loss,
+          clustering_loss_weight: float, ssl_loss_weight: float, neural_network: _AbstractNeuralNetwork | tuple[type[_AbstractNeuralNetwork], dict] | None,
+          neural_network_weights: str | Path | None, embedding_size: int, init: str, random_state: np.random.RandomState,
+          device: torch.device | int | str | None, scheduler: type[torch.optim.lr_scheduler.LRScheduler] | None, scheduler_params: dict | None, tolerance_threshold: float | None,
+          init_kwargs: dict | None, init_subsample_size: int,
+          custom_dataloaders: tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader] | tuple[str | Path, str | Path] | None,
+          augmentation_invariance: bool, final_reclustering: bool, debug: bool) -> tuple[np.ndarray, list, np.ndarray, list, np.ndarray,
+                                                          list, list, _AbstractAutoencoder, np.ndarray]:
     """
     Start the actual ENRC clustering procedure on the input data set.
 
     Parameters
     ----------
-    X : np.ndarray
+    X : np.ndarray | torch.Tensor
         input data
     n_clusters : list
         list containing number of clusters for each clustering
-    V : np.ndarray
+    V : np.ndarray | None
         orthogonal rotation matrix
-    P : list
+    P : list | None
         list containing projections for each clustering
-    input_centers : list
+    input_centers : list | None
         list containing the cluster centers for each clustering
     batch_size : int
         size of the data batches
@@ -1750,7 +1769,7 @@ def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers
         number of epochs for the pretraining of the neural network
     clustering_epochs : int
         maximum number of epochs for the actual clustering procedure
-    optimizer_class : torch.optim.Optimizer
+    optimizer_class : type[torch.optim.Optimizer]
         optimizer for pretraining and training
     ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
          self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
@@ -1758,10 +1777,10 @@ def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers
         weight of the cluster loss term. The higher it is set the more the embedded space will be shaped to the assumed cluster structure
     ssl_loss_weight : float
         weight of the self-supervised learning (ssl) loss
-    neural_network : torch.nn.Module | tuple
+    neural_network : _AbstractNeuralNetwork | tuple[type[_AbstractNeuralNetwork], dict] | None
         the input neural network.
         Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict)
-    neural_network_weights : str | Path
+    neural_network_weights : str | Path | None
         Path to a file containing the state_dict of the neural_network.
     embedding_size : int
         size of the embedding within the neural network. Only used if neural_network is None
@@ -1769,21 +1788,21 @@ def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers
         strchoose which initialization strategy should be used. Has to be one of 'nrkmeans', 'random' or 'sgd'.
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution
-    device : torch.device
+    device : torch.device | int | str | None
         if device is None then it will be checked whether a gpu is available or not
-    scheduler : torch.optim.lr_scheduler
+    scheduler : type[torch.optim.lr_scheduler.LRScheduler] | None
         learning rate scheduler that should be used
-    scheduler_params : dict
+    scheduler_params : dict | None
         dictionary of the parameters of the scheduler object
-    tolerance_threshold : float
+    tolerance_threshold : float | None
         tolerance threshold to determine when the training should stop. If the NMI(old_labels, new_labels) >= (1-tolerance_threshold)
         for all clusterings then the training will stop before max_epochs is reached. If set high than training will stop earlier then max_epochs, and if set to 0 or None the training
         will train as long as the labels are not changing anymore.
-    init_kwargs : dict
+    init_kwargs : dict | None
         additional parameters that are used if init is a callable
     init_subsample_size : int
         specify if only a subsample of size 'init_subsample_size' of the data should be used for the initialization
-    custom_dataloaders : tuple
+    custom_dataloaders : tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader] | tuple[str | Path, str | Path] | None
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         Can also be a tuple of strings, where the first entry is the path to a saved trainloader and the second entry the path to a saved testloader.
         In this case the dataloaders will be loaded by torch.load(PATH).
@@ -1798,7 +1817,7 @@ def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers
 
     Returns
     -------
-    tuple : (np.ndarray, list, np.ndarray, list, np.ndarray, list, list, torch.nn.Module)
+    tuple : tuple[np.ndarray, list, np.ndarray, list, np.ndarray, list, list, _AbstractAutoencoder, np.ndarray]
         the cluster labels,
         the cluster centers,
         the orthogonal rotation matrix,
@@ -1810,8 +1829,7 @@ def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers
         the cluster labels before final_reclustering
     """
     # Set device to train on
-    if device is None:
-        device = detect_device()
+    device = detect_device(device)
     # Setup dataloaders
     trainloader, testloader, batch_size = get_train_and_test_dataloader(X, batch_size, custom_dataloaders)
     if custom_dataloaders is not None:
@@ -1826,11 +1844,13 @@ def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers
     else:
         subsampleloader = testloader
     # Setup neural network
-    neural_network = get_trained_network(trainloader, n_epochs=pretrain_epochs,
+    neural_network_trained = get_trained_network(trainloader, n_epochs=pretrain_epochs,
                                          optimizer_params=pretrain_optimizer_params, optimizer_class=optimizer_class,
                                          device=device, ssl_loss_fn=ssl_loss_fn, embedding_size=embedding_size,
                                          neural_network=neural_network, neural_network_weights=neural_network_weights,
                                          random_state=random_state)
+    assert isinstance(neural_network_trained, _AbstractAutoencoder)
+    neural_network = neural_network_trained
     # Run ENRC init
     if debug:
         print("Run init: ", init)
@@ -1859,10 +1879,13 @@ def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers
                   dict({'params': [enrc_module.V]}, **clustering_optimizer_params),
                   dict({'params': [enrc_module.beta_weights]}, **clustering_optimizer_beta_params)
                   ]
-    optimizer = optimizer_class(param_dict)
+    optimizer = optimizer_class(param_dict)  # type: ignore[call-arg]
 
     if scheduler is not None:
-        scheduler = scheduler(optimizer, **scheduler_params)
+        scheduler_params = {} if scheduler_params is None else scheduler_params
+        scheduler_obj = scheduler(optimizer, **scheduler_params)
+    else:
+        scheduler_obj = None
 
     # Training loop
     if debug: print("Start training")
@@ -1872,9 +1895,9 @@ def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers
                     optimizer=optimizer,
                     ssl_loss_fn=ssl_loss_fn,
                     batch_size=batch_size,
-                    model=neural_network,
+                    neural_network=neural_network,
                     device=device,
-                    scheduler=scheduler,
+                    scheduler=scheduler_obj,
                     tolerance_threshold=tolerance_threshold,
                     debug=debug)
 
@@ -1882,17 +1905,17 @@ def _enrc(X: np.ndarray, n_clusters: list, V: np.ndarray, P: list, input_centers
         print("Betas after training")
         print(enrc_module.subspace_betas().detach().cpu().numpy())
 
-    cluster_labels_before_reclustering = enrc_module.predict_batchwise(model=neural_network, dataloader=testloader,
+    cluster_labels_before_reclustering = enrc_module.predict_batchwise(neural_network=neural_network, dataloader=testloader,
                                                                        device=device, use_P=True)
     # Recluster
     if final_reclustering:
         if debug:
             print("Recluster")
-        enrc_module.recluster(dataloader=subsampleloader, model=neural_network, device=device,
+        enrc_module.recluster(dataloader=subsampleloader, neural_network=neural_network, device=device,
                               optimizer_params=clustering_optimizer_params,
                               optimizer_class=optimizer_class, reclustering_strategy=init, init_kwargs=init_kwargs)
         # Predict labels and transfer other parameters to numpy
-        cluster_labels = enrc_module.predict_batchwise(model=neural_network, dataloader=testloader, device=device,
+        cluster_labels = enrc_module.predict_batchwise(neural_network=neural_network, dataloader=testloader, device=device,
                                                        use_P=True)
         if debug:
             print("Betas after reclustering")
@@ -1913,29 +1936,29 @@ class ENRC(_AbstractDeepClusteringAlgo):
         
     Parameters
     ----------
-    n_clusters : list
+    n_clusters : list | int
         list containing number of clusters for each clustering
-    V : np.ndarray
+    V : np.ndarray | None
         orthogonal rotation matrix (optional) (default: None)
-    P : list
+    P : list | None
         list containing projections for each clustering (optional) (default: None)
-    input_centers : list
+    input_centers : list | None
         list containing the cluster centers for each clustering (optional) (default: None)
     batch_size : int
         size of the data batches (default: 128)
-    pretrain_optimizer_params : dict
+    pretrain_optimizer_params : dict | None
         parameters of the optimizer for the pretraining of the neural network, includes the learning rate. If None, it will be set to {"lr": 1e-3} (default: None)
-    clustering_optimizer_params : dict
+    clustering_optimizer_params : dict | None
         parameters of the optimizer for the actual clustering procedure, includes the learning rate. If None, it will be set to {"lr": 1e-4} (default: None)
     pretrain_epochs : int
         number of epochs for the pretraining of the neural network (default: 100)
     clustering_epochs : int
         maximum number of epochs for the actual clustering procedure (default: 150)
-    tolerance_threshold : float
+    tolerance_threshold : float | None
         tolerance threshold to determine when the training should stop. If the NMI(old_labels, new_labels) >= (1-tolerance_threshold)
         for all clusterings then the training will stop before max_epochs is reached. If set high than training will stop earlier then max_epochs, and if set to 0 or None the training
         will train as long as the labels are not changing anymore (default: None)
-    optimizer_class : torch.optim.Optimizer
+    optimizer_class : type[torch.optim.Optimizer]
         optimizer for pretraining and training (default: torch.optim.Adam)
     ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
          self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: mean_squared_error)
@@ -1943,10 +1966,10 @@ class ENRC(_AbstractDeepClusteringAlgo):
         weight of the cluster loss term. The higher it is set the more the embedded space will be shaped to the assumed cluster structure (default: 1.0)
     ssl_loss_weight : float
         weight of the self-supervised learning (ssl) loss (default: 1.0)
-    neural_network : torch.nn.Module | tuple
+    neural_network : _AbstractAutoencoder | tuple[type[_AbstractAutoencoder], dict] | None
         the input neural network. If None, a new FeedforwardAutoencoder will be created.
         Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict) (default: None)
-    neural_network_weights : str | Path
+    neural_network_weights : str | Path | None
         Path to a file containing the state_dict of the neural_network (default: None)
     embedding_size : int
         size of the embedding within the neural network. Only used if neural_network is None (default: 20)
@@ -1954,18 +1977,20 @@ class ENRC(_AbstractDeepClusteringAlgo):
         choose which initialization strategy should be used. Has to be one of 'nrkmeans', 'random' or 'sgd' (default: 'nrkmeans')
     random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
-    device : torch.device
+    device : torch.device | int | str | None
         The device on which to perform the computations.
         If device is None then it will be automatically chosen: if a gpu is available the gpu with the highest amount of free memory will be chosen (default: None)
-    scheduler : torch.optim.lr_scheduler
+    scheduler : type[torch.optim.lr_scheduler.LRScheduler] | None
         learning rate scheduler that should be used (default: None)
-    scheduler_params : dict
+    scheduler_params : dict | None
         dictionary of the parameters of the scheduler object (default: None)
-    init_kwargs : dict
+    init_kwargs : dict | None
         additional parameters that are used if init is a callable (optional) (default: None)
     init_subsample_size: int
         specify if only a subsample of size 'init_subsample_size' of the data should be used for the initialization. If None, all data will be used. (default: 10,000)
-    custom_dataloaders : tuple
+    random_state : np.random.RandomState | int | None
+        use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
+    custom_dataloaders : tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader] | tuple[str | Path, str | Path] | None
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         Can also be a tuple of strings, where the first entry is the path to a saved trainloader and the second entry the path to a saved testloader.
         In this case the dataloaders will be loaded by torch.load(PATH).
@@ -1984,7 +2009,7 @@ class ENRC(_AbstractDeepClusteringAlgo):
         The final labels
     cluster_centers_ : np.ndarray
         The final cluster centers
-    neural_network_trained_ : torch.nn.Module
+    neural_network_trained_ : _AbstractAutoencoder
         The final neural network
     n_features_in_ : int
         the number of features used for the fitting
@@ -1999,17 +2024,19 @@ class ENRC(_AbstractDeepClusteringAlgo):
     Proceedings of the AAAI Conference on Artificial Intelligence. Vol. 34. No. 04. 2020.
     """
 
-    def __init__(self, n_clusters: list, V: np.ndarray = None, P: list = None, input_centers: list = None,
-                 batch_size: int = 128, pretrain_optimizer_params: dict = None,
-                 clustering_optimizer_params: dict = None, pretrain_epochs: int = 100, clustering_epochs: int = 150,
-                 tolerance_threshold: float = None, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
+    def __init__(self, n_clusters: list | int, V: np.ndarray | None = None, P: list | None = None, input_centers: list | None = None,
+                 batch_size: int = 128, pretrain_optimizer_params: dict | None = None,
+                 clustering_optimizer_params: dict | None = None, pretrain_epochs: int = 100, clustering_epochs: int = 150,
+                 tolerance_threshold: float | None = None, optimizer_class: type[torch.optim.Optimizer] = torch.optim.Adam,
                  ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error,
                  clustering_loss_weight: float = 1.0, ssl_loss_weight: float = 1.0,
-                 neural_network: torch.nn.Module | tuple = None, neural_network_weights: str | Path = None,
+                 neural_network: _AbstractAutoencoder | tuple[type[_AbstractAutoencoder], dict] | None = None,
+                 neural_network_weights: str | Path | None = None,
                  embedding_size: int = 20, init: str = "nrkmeans",
-                 device: torch.device = None, scheduler: torch.optim.lr_scheduler = None,
-                 scheduler_params: dict = None, init_kwargs: dict = None, init_subsample_size: int = 10000,
-                 random_state: np.random.RandomState | int = None, custom_dataloaders: tuple = None,
+                 device: torch.device | int | str | None = None, scheduler: type[torch.optim.lr_scheduler.LRScheduler] | None = None,
+                 scheduler_params: dict | None = None, init_kwargs: dict | None = None, init_subsample_size: int = 10000,
+                 random_state: np.random.RandomState | int | None = None,
+                 custom_dataloaders: tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader] | tuple[str | Path, str | Path] | None = None,
                  augmentation_invariance: bool = False, final_reclustering: bool = True, debug: bool = False):
         super().__init__(batch_size, neural_network, neural_network_weights, embedding_size, device, random_state)
         self.n_clusters = n_clusters
@@ -2037,10 +2064,10 @@ class ENRC(_AbstractDeepClusteringAlgo):
             raise ValueError(f"init={init} does not exist, has to be one of {available_init_strategies()}.")
         self.input_centers = input_centers
         self.V = V
-        self.m = None
+        self.m = [0]
         self.P = P
 
-    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'ENRC':
+    def fit(self, X: np.ndarray, y: np.ndarray | None = None) -> 'ENRC':
         """
         Cluster the input dataset with the ENRC algorithm. Saves the labels, centers, V, m, Betas, and P
         in the ENRC object.
@@ -2050,7 +2077,7 @@ class ENRC(_AbstractDeepClusteringAlgo):
         ----------
         X : np.ndarray
             input data
-        y : np.ndarray
+        y : np.ndarray | None
             the labels (can be ignored)
             
         Returns
@@ -2058,7 +2085,7 @@ class ENRC(_AbstractDeepClusteringAlgo):
         self : ENRC
             returns the ENRC object
         """
-        if type(self.n_clusters) is int:
+        if isinstance(self.n_clusters, int):
             n_clusters = [self.n_clusters, 1]
         else:
             n_clusters = self.n_clusters.copy()
@@ -2105,21 +2132,21 @@ class ENRC(_AbstractDeepClusteringAlgo):
         self.betas = betas
         self.n_clusters_out_ = n_clusters
         self.neural_network_trained_ = neural_network
-        self.set_n_featrues_in(X)
+        self.set_n_features_in(X)
         return self
 
-    def predict(self, X: np.ndarray = None, use_P: bool = True,
-                dataloader: torch.utils.data.DataLoader = None) -> np.ndarray:
+    def predict(self, X: np.ndarray | None = None, use_P: bool = True,  # type: ignore[override]
+                dataloader: torch.utils.data.DataLoader | None = None) -> np.ndarray:
         """
         Predicts the labels for each clustering of X in a mini-batch manner.
         
         Parameters
         ----------
-        X : np.ndarray
+        X : np.ndarray | None
             input data
         use_P: bool
             if True then P will be used to hard select the dimensions for each clustering, else the soft beta weights are used (default: True)
-        dataloader : torch.utils.data.DataLoader
+        dataloader : torch.utils.data.DataLoader | None
             dataloader to be used. Can be None if X is given (default: None)
 
         Returns
@@ -2127,7 +2154,11 @@ class ENRC(_AbstractDeepClusteringAlgo):
         predicted_labels : np.ndarray
             n x c matrix, where n is the number of data points in X and c is the number of clusterings.
         """
+        check_is_fitted(self, ["labels_", "neural_network_trained_", "n_features_in_"])
+        assert isinstance(self.neural_network_trained_, _AbstractAutoencoder), "neural_network_trained_ must be of type _AbstractAutoencoder. Your input has type {0}".format(type(self.neural_network_trained_))
+
         if dataloader is None:
+            assert X is not None, "X can not None if dataloader is None"
             dataloader = get_dataloader(X, batch_size=self.batch_size, shuffle=False, drop_last=False)
 
         self.neural_network_trained_.to(self.device)
@@ -2135,9 +2166,8 @@ class ENRC(_AbstractDeepClusteringAlgo):
                                                   centers=[torch.from_numpy(c).float().to(self.device) for c in
                                                            self.cluster_centers_],
                                                   subspace_betas=torch.from_numpy(self.betas).float().to(self.device),
-                                                  model=self.neural_network_trained_,
+                                                  neural_network=self.neural_network_trained_,
                                                   dataloader=dataloader,
-                                                  device=self.device,
                                                   use_P=use_P)
         return predicted_labels
 
@@ -2157,6 +2187,8 @@ class ENRC(_AbstractDeepClusteringAlgo):
         rotated : np.ndarray
             The transformed data
         """
+        assert isinstance(self.neural_network_trained_, _AbstractAutoencoder), "neural_network_trained_ must be of type _AbstractAutoencoder. Your input has type {0}".format(type(self.neural_network_trained_))
+        assert self.V is not None, "V should not be None"
         if not embedded:
             dataloader = get_dataloader(X, batch_size=self.batch_size, shuffle=False, drop_last=False)
             emb = encode_batchwise(dataloader=dataloader, neural_network=self.neural_network_trained_)
@@ -2183,6 +2215,8 @@ class ENRC(_AbstractDeepClusteringAlgo):
         subspace : np.ndarray
             The transformed subspace
         """
+        assert isinstance(self.neural_network_trained_, _AbstractAutoencoder), "neural_network_trained_ must be of type _AbstractAutoencoder. Your input has type {0}".format(type(self.neural_network_trained_))
+        assert self.V is not None and self.P is not None, "V and P should not be None"
         if not embedded:
             dataloader = get_dataloader(X, batch_size=self.batch_size, shuffle=False, drop_last=False)
             emb = encode_batchwise(dataloader=dataloader, neural_network=self.neural_network_trained_)
@@ -2192,9 +2226,9 @@ class ENRC(_AbstractDeepClusteringAlgo):
         subspace = np.matmul(emb, cluster_space_V)
         return subspace
 
-    def plot_subspace(self, X: np.ndarray, subspace_index: int = 0, labels: np.ndarray = None,
+    def plot_subspace(self, X: np.ndarray, subspace_index: int = 0, labels: np.ndarray | None = None,
                       plot_centers: bool = False,
-                      gt: np.ndarray = None, equal_axis: bool = False) -> None:
+                      gt: np.ndarray | None = None, equal_axis: bool = False) -> None:
         """
         Plot the specified subspace_nr as scatter matrix plot.
        
@@ -2204,12 +2238,12 @@ class ENRC(_AbstractDeepClusteringAlgo):
             input data
         subspace_index: int
             index of the subspace_nr (default: 0)
-        labels: np.ndarray
+        labels: np.ndarray | None
             the labels to use for the plot (default: labels found by Nr-Kmeans) (default: None)
         plot_centers: bool
             plot centers if True (default: False)
-        gt: np.ndarray
-            of ground truth labels (default=None)
+        gt: np.ndarray | None
+            of ground truth labels (default: None)
         equal_axis: bool
             equalize axis if True (default: False)
         Returns
@@ -2240,6 +2274,8 @@ class ENRC(_AbstractDeepClusteringAlgo):
         centers_rec : centers_rec
             reconstructed centers as np.ndarray
         """
+        assert isinstance(self.neural_network_trained_, _AbstractAutoencoder), "neural_network_trained_ must be of type _AbstractAutoencoder. Your input has type {0}".format(type(self.neural_network_trained_))
+        assert self.V is not None, "V should not be None"
         cluster_space_centers = self.cluster_centers_[subspace_index]
         # rotate back as centers are in the V-rotated space
         centers_rot_back = np.matmul(cluster_space_centers, self.V.transpose())
@@ -2256,27 +2292,27 @@ class ACeDeC(ENRC):
     ----------
     n_clusters : int
         number of clusters
-    V : np.ndarray
+    V : np.ndarray | None
         orthogonal rotation matrix (optional) (default: None)
-    P : list
+    P : list | None
         list containing projections for clusters in clustered space and cluster in shared space (optional) (default: None)
-    input_centers : list
+    input_centers : list | None
         list containing the cluster centers for clusters in clustered space and cluster in shared space (optional) (default: None)
     batch_size : int
         size of the data batches (default: 128)
-    pretrain_optimizer_params : dict
+    pretrain_optimizer_params : dict | None
         parameters of the optimizer for the pretraining of the neural network, includes the learning rate. If None, it will be set to {"lr": 1e-3} (default: None)
-    clustering_optimizer_params : dict
+    clustering_optimizer_params : dict | None
         parameters of the optimizer for the actual clustering procedure, includes the learning rate. If None, it will be set to {"lr": 1e-4} (default: None)
     pretrain_epochs : int
         number of epochs for the pretraining of the neural network (default: 100)
     clustering_epochs : int
         maximum number of epochs for the actual clustering procedure (default: 150)
-    tolerance_threshold : float
+    tolerance_threshold : float | None
         tolerance threshold to determine when the training should stop. If the NMI(old_labels, new_labels) >= (1-tolerance_threshold)
         for all clusterings then the training will stop before max_epochs is reached. If set high than training will stop earlier then max_epochs, and if set to 0 or None the training
         will train as long as the labels are not changing anymore (default: None)
-    optimizer_class : torch.optim.Optimizer
+    optimizer_class : type[torch.optim.Optimizer]
         optimizer for pretraining and training (default: torch.optim.Adam)
     ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
          self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: mean_squared_error)
@@ -2284,10 +2320,10 @@ class ACeDeC(ENRC):
         weight of the cluster loss term. The higher it is set the more the embedded space will be shaped to the assumed cluster structure (default: 1.0)
     ssl_loss_weight : float
         weight of the self-supervised learning (ssl) loss (default: 1.0)
-    neural_network : torch.nn.Module | tuple
+    neural_network : _AbstractAutoencoder | tuple[type[_AbstractAutoencoder], dict] | None
         the input neural network. If None, a new FeedforwardAutoencoder will be created.
         Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict) (default: None)
-    neural_network_weights : str | Path
+    neural_network_weights : str | Path | None
         Path to a file containing the state_dict of the neural_network (default: None)
     embedding_size : int
         size of the embedding within the neural network. Only used if neural_network is None (default: 20)
@@ -2295,18 +2331,20 @@ class ACeDeC(ENRC):
         choose which initialization strategy should be used. Has to be one of 'acedec', 'subkmeans', 'random' or 'sgd' (default: 'acedec')
     random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
-    device : torch.device
+    device : torch.device | int | str | None
         The device on which to perform the computations.
         If device is None then it will be automatically chosen: if a gpu is available the gpu with the highest amount of free memory will be chosen (default: None)
-    scheduler : torch.optim.lr_scheduler
+    scheduler : type[torch.optim.lr_scheduler.LRScheduler] | None
         learning rate scheduler that should be used (default: None)
-    scheduler_params : dict
+    scheduler_params : dict | None
         dictionary of the parameters of the scheduler object (default: None)
-    init_kwargs : dict
+    init_kwargs : dict | None
         additional parameters that are used if init is a callable (optional) (default: None)
     init_subsample_size: int
         specify if only a subsample of size 'init_subsample_size' of the data should be used for the initialization. If None, all data will be used. (default: 10,000)
-    custom_dataloaders : tuple
+    random_state : np.random.RandomState | int | None
+        use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
+    custom_dataloaders : tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader] | tuple[str | Path, str | Path] | None
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         Can also be a tuple of strings, where the first entry is the path to a saved trainloader and the second entry the path to a saved testloader.
         In this case the dataloaders will be loaded by torch.load(PATH).
@@ -2340,17 +2378,19 @@ class ACeDeC(ENRC):
     Details (Don't) Matter: Isolating Cluster Information in Deep Embedded Spaces. IJCAI 2021: 2826-2832
     """
 
-    def __init__(self, n_clusters: int, V: np.ndarray = None, P: list = None, input_centers: list = None,
-                 batch_size: int = 128, pretrain_optimizer_params: dict = None,
-                 clustering_optimizer_params: dict = None, pretrain_epochs: int = 100, clustering_epochs: int = 150,
-                 tolerance_threshold: float = None, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
+    def __init__(self, n_clusters: int, V: np.ndarray | None = None, P: list | None = None, input_centers: list | None = None,
+                 batch_size: int = 128, pretrain_optimizer_params: dict | None = None,
+                 clustering_optimizer_params: dict | None = None, pretrain_epochs: int = 100, clustering_epochs: int = 150,
+                 tolerance_threshold: float | None = None, optimizer_class: type[torch.optim.Optimizer] = torch.optim.Adam,
                  ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error,
                  clustering_loss_weight: float = 1.0, ssl_loss_weight: float = 1.0,
-                 neural_network: torch.nn.Module | tuple = None, neural_network_weights: str | Path = None,
+                 neural_network: _AbstractAutoencoder | tuple[type[_AbstractAutoencoder], dict] | None = None,
+                 neural_network_weights: str | Path | None = None,
                  embedding_size: int = 20, init: str = "acedec",
-                 device: torch.device = None, scheduler: torch.optim.lr_scheduler = None,
-                 scheduler_params: dict = None, init_kwargs: dict = None, init_subsample_size: int = 10000,
-                 random_state: np.random.RandomState | int = None, custom_dataloaders: tuple = None,
+                 device: torch.device | int | str | None = None, scheduler: type[torch.optim.lr_scheduler.LRScheduler] | None = None,
+                 scheduler_params: dict | None = None, init_kwargs: dict | None = None, init_subsample_size: int = 10000,
+                 random_state: np.random.RandomState | int | None = None,
+                 custom_dataloaders: tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader] | tuple[str | Path, str | Path] | None = None,
                  augmentation_invariance: bool = False,
                  final_reclustering: bool = True, debug: bool = False):
         super().__init__(n_clusters, V, P, input_centers,
@@ -2361,7 +2401,7 @@ class ACeDeC(ENRC):
                          init_subsample_size, random_state, custom_dataloaders, augmentation_invariance,
                          final_reclustering, debug)
 
-    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'ACeDeC':
+    def fit(self, X: np.ndarray, y: np.ndarray | None = None) -> 'ACeDeC':
         """
         Cluster the input dataset with the ACeDeC algorithm. Saves the labels, centers, V, m, Betas, and P
         in the ACeDeC object.
@@ -2370,7 +2410,7 @@ class ACeDeC(ENRC):
         ----------
         X : np.ndarray
             input data
-        y : np.ndarray
+        y : np.ndarray | None
             the labels (can be ignored)
         Returns
         ----------
@@ -2382,7 +2422,7 @@ class ACeDeC(ENRC):
         self.acedec_labels_ = self.enrc_labels_[:, 0]
         return self
 
-    def predict(self, X: np.ndarray, use_P: bool = True, dataloader: torch.utils.data.DataLoader = None) -> np.ndarray:
+    def predict(self, X: np.ndarray, use_P: bool = True, dataloader: torch.utils.data.DataLoader = None) -> np.ndarray:  # type: ignore[override]
         """
         Predicts the labels of the input data.
 

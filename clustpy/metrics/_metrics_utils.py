@@ -4,7 +4,7 @@ from sklearn.utils import check_X_y
 from scipy.spatial import cKDTree
 
 
-def _check_labels_arrays(labels_true: np.ndarray, labels_pred: np.ndarray, allow_2d_labels: bool = False) -> (np.ndarray, np.ndarray):
+def _check_labels_arrays(labels_true: np.ndarray, labels_pred: np.ndarray, allow_2d_labels: bool = False) -> tuple[np.ndarray, np.ndarray]:
     """
     Check that the ground truth labels and the prediction labels are compatible.
     If they do not match throw an exception.
@@ -20,7 +20,7 @@ def _check_labels_arrays(labels_true: np.ndarray, labels_pred: np.ndarray, allow
 
     Returns
     -------
-    tuple : (np.ndarray, np.ndarray)
+    tuple : tuple[np.ndarray, np.ndarray]
         The ground truth labels,
         The predicted labels
     """
@@ -51,7 +51,7 @@ def _check_labels_arrays(labels_true: np.ndarray, labels_pred: np.ndarray, allow
     return labels_true, labels_pred
 
 
-def _check_length_data_and_labels(X: np.ndarray, labels: np.ndarray, allow_single_cluster: bool = False) -> (np.ndarray, np.ndarray):
+def _check_length_data_and_labels(X: np.ndarray, labels: np.ndarray, allow_single_cluster: bool = False) -> tuple[np.ndarray, np.ndarray]:
     """
     Check that the data and the prediction labels are compatible.
     If they do not match throw an exception.
@@ -67,7 +67,7 @@ def _check_length_data_and_labels(X: np.ndarray, labels: np.ndarray, allow_singl
 
     Returns
     -------
-    tuple : (np.ndarray, np.ndarray)
+    tuple : tuple[np.ndarray, np.ndarray]
         The data set,
         The predicted labels
     """
@@ -134,7 +134,7 @@ def _assign_noise_points_to_singletons(labels: np.ndarray) -> np.ndarray:
     return new_labels
 
 
-def _remove_noise_points(labels: np.ndarray) -> np.ndarray:
+def _remove_noise_points(labels: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """
     Remove all noise points (label = -1) from the label array.
     This function filters out all entries labeled as -1. The resulting array
@@ -150,7 +150,6 @@ def _remove_noise_points(labels: np.ndarray) -> np.ndarray:
     new_labels : np.ndarray
         Array containing only non-noise labels (labels >= 0).
         Note: This changes the length of the array.
-
     non_noise_indices : np.ndarray
         The indices of the non-noise points.
     """
@@ -214,7 +213,7 @@ def handle_noise(
     strategy: str,
     X: np.ndarray | None = None,
     labels_compare: np.ndarray | None = None
-) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray | None, np.ndarray | None]:
     """
     Handle noise points (label = -1) in clustering results using a specified strategy.
     If X is provided, also return the adapted X (e.g., rows corresponding to
@@ -246,10 +245,10 @@ def handle_noise(
         Labels after applying the chosen strategy.
         If X is provided, also returns new_X aligned with new_labels.
 
-    new_X : np.ndarray, optional
+    new_X : np.ndarray | None
         Adapted X after removing noise points (is None if X was not provided).
 
-    new_labels_compare : np.ndarray, optional
+    new_labels_compare : np.ndarray | Nnoe
         Adapted labels_compare after removing noise points (is None if labels_compare was not provided).
 
     Raises
@@ -275,6 +274,8 @@ def handle_noise(
         if labels_compare is not None:
             labels_compare = labels_compare[non_noise_indices]
     elif strategy == "nearest_cluster":
+        if X is None:
+            raise ValueError("X must be provided for the 'nearest_cluster' strategy.")
         new_labels = _assign_noise_points_to_nearest_cluster(labels, X)
     else:
         raise ValueError(

@@ -15,7 +15,7 @@ from sklearn.metrics.pairwise import pairwise_distances_argmin_min
 
 def _dipmeans(X: np.ndarray, significance: float, split_viewers_threshold: float, pval_strategy: str, n_boots: int,
               n_split_trials: int, n_clusters_init: int, max_n_clusters: int, random_state: np.random.RandomState,
-              debug: bool) -> (int, np.ndarray, np.ndarray):
+              debug: bool) -> tuple[int, np.ndarray, np.ndarray]:
     """
     Start the actual DipMeans clustering procedure on the input data set.
 
@@ -44,7 +44,7 @@ def _dipmeans(X: np.ndarray, significance: float, split_viewers_threshold: float
 
     Returns
     -------
-    tuple : (int, np.ndarray, np.ndarray)
+    tuple : tuple[int, np.ndarray, np.ndarray]
         The final number of clusters,
         The labels as identified by DipMeans,
         The cluster centers as identified by DipMeans
@@ -62,7 +62,7 @@ def _dipmeans(X: np.ndarray, significance: float, split_viewers_threshold: float
         for c in range(n_clusters):
             ids_in_cluster = ids_in_each_cluster[c]
             # Calculate dip values for the distances of each point in cluster
-            cluster_dips = np.array([dip_test(data_dist_matrix[p, ids_in_cluster], just_dip=True, is_data_sorted=False) for p in
+            cluster_dips = np.array([dip_test(data_dist_matrix[p, ids_in_cluster], is_data_sorted=False) for p in
                                      ids_in_cluster])
             # Calculate p-values
             if pval_strategy == "bootstrap":
@@ -82,7 +82,7 @@ def _dipmeans(X: np.ndarray, significance: float, split_viewers_threshold: float
                 # Maximum score found. No need to search for another potential cluster
                 break
         # Get cluster with maximum score
-        cluster_id_to_split = np.argmax(cluster_scores)
+        cluster_id_to_split = int(np.argmax(cluster_scores))
         if debug:
             print("Cluster scores: {0}. Maximum score for cluster {1}".format(cluster_scores, cluster_id_to_split))
         # Check if any cluster has to be split
@@ -122,7 +122,7 @@ class DipMeans(ClusterMixin, BaseEstimator):
     n_clusters_init : int
         The initial number of clusters. Can also by of type np.ndarray if initial cluster centers are specified (default: 1)
     max_n_clusters : int
-        Maximum number of clusters. Must be larger than n_clusters_init (default: np.inf)
+        Maximum number of clusters. Must be larger than n_clusters_init (default: 1000)
     random_state : np.random.RandomState | int
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
     debug : bool
@@ -148,7 +148,7 @@ class DipMeans(ClusterMixin, BaseEstimator):
 
     def __init__(self, significance: float = 0.001, split_viewers_threshold: float = 0.01,
                  pval_strategy: str = "table", n_boots: int = 1000, n_split_trials: int = 10, n_clusters_init: int = 1,
-                 max_n_clusters: int = np.inf, random_state: np.random.RandomState | int = None, debug: bool = False):
+                 max_n_clusters: int = 1000, random_state: np.random.RandomState | int | None= None, debug: bool = False):
         self.significance = significance
         self.split_viewers_threshold = split_viewers_threshold
         self.pval_strategy = pval_strategy
@@ -159,7 +159,7 @@ class DipMeans(ClusterMixin, BaseEstimator):
         self.random_state = random_state
         self.debug = debug
 
-    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DipMeans':
+    def fit(self, X: np.ndarray, y: np.ndarray | None = None) -> 'DipMeans':
         """
         Initiate the actual clustering process on the input data set.
         The resulting cluster labels will be stored in the labels_ attribute.
@@ -168,7 +168,7 @@ class DipMeans(ClusterMixin, BaseEstimator):
         ----------
         X : np.ndarray
             the given data set
-        y : np.ndarray
+        y : np.ndarray | None
             the labels (can be ignored)
 
         Returns

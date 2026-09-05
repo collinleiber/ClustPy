@@ -19,22 +19,22 @@ class FeedforwardAutoencoder(_AbstractAutoencoder):
         If decoder_layers are not specified then the decoder is symmetric and goes in the same order from embedding to input.
     batch_norm : bool
         Set True if you want to use torch.nn.BatchNorm1d (default: False)
-    dropout : float
+    dropout : float | None
         Set the amount of dropout you want to use (default: None)
-    activation_fn : torch.nn.Module
+    activation_fn : type[torch.nn.Module]
         activation function from torch.nn, set the activation function for the hidden layers, if None then it will be linear (default: torch.nn.LeakyReLU)
     bias : bool
         set False if you do not want to use a bias term in the linear layers (default: True)
-    decoder_layers : list
+    decoder_layers : list | None
         list of different layer sizes from embedding to output of the decoder. If set to None, will be symmetric to layers (default: None)
-    decoder_output_fn : torch.nn.Module
+    decoder_output_fn : type[torch.nn.Module] | None
         activation function from torch.nn, set the activation function for the decoder output layer, if None then it will be linear.
         E.g. set to torch.nn.Sigmoid if you want to scale the decoder output between 0 and 1 (default: None)
     work_on_copy : bool
         If set to true, deep clustering algorithms will optimize a copy of the autoencoder and not the autoencoder itself.
         Ensures that the same autoencoder can be used by multiple deep clustering algorithms.
         As copies of this object are created, the memory requirement increases (default: True)
-    random_state : np.random.RandomState | int
+    random_state : np.random.RandomState | int | None
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Attributes
@@ -59,10 +59,10 @@ class FeedforwardAutoencoder(_AbstractAutoencoder):
     AIChE journal 37.2 (1991): 233-243.
     """
 
-    def __init__(self, layers: list, batch_norm: bool = False, dropout: float = None,
-                 activation_fn: torch.nn.Module = torch.nn.LeakyReLU, bias: bool = True, decoder_layers: list = None,
-                 decoder_output_fn: torch.nn.Module = None, work_on_copy: bool = True,
-                 random_state: np.random.RandomState | int = None):
+    def __init__(self, layers: list, batch_norm: bool = False, dropout: float | None = None,
+                 activation_fn: type[torch.nn.Module] = torch.nn.LeakyReLU, bias: bool = True, decoder_layers: list | None = None,
+                 decoder_output_fn: type[torch.nn.Module] | None = None, work_on_copy: bool = True,
+                 random_state: np.random.RandomState | int | None = None):
         super().__init__(work_on_copy, random_state)
         if decoder_layers is None:
             decoder_layers = layers[::-1]

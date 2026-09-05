@@ -86,22 +86,22 @@ class NeighborEncoder(FeedforwardAutoencoder):
         specifies whether a point itself should also be decoded (default: False)
     batch_norm : bool
         Set True if you want to use torch.nn.BatchNorm1d (default: False)
-    dropout : float
+    dropout : float | None
         Set the amount of dropout you want to use (default: None)
-    activation_fn : torch.nn.Module
+    activation_fn : type[torch.nn.Module]
         activation function from torch.nn, set the activation function for the hidden layers, if None then it will be linear (default: torch.nn.LeakyReLU)
     bias : bool
         set False if you do not want to use a bias term in the linear layers (default: True)
-    decoder_layers : list
+    decoder_layers : list | None
         list of different layer sizes from embedding to output of the decoder. If set to None, will be symmetric to layers (default: None)
-    decoder_output_fn : torch.nn.Module
+    decoder_output_fn : type[torch.nn.Module] | None
         activation function from torch.nn, set the activation function for the decoder output layer, if None then it will be linear.
         E.g. set to torch.nn.Sigmoid if you want to scale the decoder output between 0 and 1 (default: None)
     work_on_copy : bool
         If set to true, deep clustering algorithms will optimize a copy of the autoencoder and not the autoencoder itself.
         Ensures that the same autoencoder can be used by multiple deep clustering algorithms.
         As copies of this object are created, the memory requirement increases (default: True)
-    random_state : np.random.RandomState | int
+    random_state : np.random.RandomState | int | None
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Attributes
@@ -142,9 +142,9 @@ class NeighborEncoder(FeedforwardAutoencoder):
     """
 
     def __init__(self, layers: list, n_neighbors: int, decode_self: bool = False, batch_norm: bool = False,
-                 dropout: float = None, activation_fn: torch.nn.Module = torch.nn.LeakyReLU, bias: bool = True,
-                 decoder_layers: list = None, decoder_output_fn: torch.nn.Module = None, work_on_copy: bool = True,
-                 random_state: np.random.RandomState | int = None):
+                 dropout: float | None = None, activation_fn: type[torch.nn.Module] = torch.nn.LeakyReLU, bias: bool = True,
+                 decoder_layers: list | None = None, decoder_output_fn: type[torch.nn.Module] | None = None, work_on_copy: bool = True,
+                 random_state: np.random.RandomState | int | None = None):
         assert n_neighbors > 0 or decode_self, "n_neighbors must be an integer larger than 0 or decode_self must be true"
         super().__init__(layers, batch_norm, dropout, activation_fn, bias, decoder_layers, decoder_output_fn,
                          work_on_copy, random_state)
@@ -182,7 +182,7 @@ class NeighborEncoder(FeedforwardAutoencoder):
         return decoded_neighbors
 
     def loss(self, batch: list, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss, device: torch.device,
-             corruption_fn: Callable = None) -> (torch.Tensor, torch.Tensor, torch.Tensor):
+             corruption_fn: Callable | None = None) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Calculate the loss of a single batch of data.
         Corresponds to the sum of losses concerning each neighbor.
@@ -196,17 +196,16 @@ class NeighborEncoder(FeedforwardAutoencoder):
             self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss
         device : torch.device
             device to be trained on
-        corruption_fn : Callable
+        corruption_fn : Callable | None
             Can be used to corrupt the input data, e.g., when using a denoising autoencoder.
             Note that the function must match the data and the data loaders.
             For example, if the data is normalized, this may have to be taken into account in the corruption function - e.g. in case of salt and pepper noise (default: None)
 
         Returns
         -------
-        loss : (torch.Tensor, torch.Tensor, torch.Tensor)
+        loss : tuple[torch.Tensor, torch.Tensor]
             the sum of the reconstruction losses of the input sample,
-            the embedded input sample,
-            the reconstructions of the embedded sample concerning its neighbor decoders
+            the embedded input sample
         """
         assert type(batch) is list, "batch must come from a dataloader and therefore be of type list"
         batch_data = batch[1].to(device)
@@ -220,14 +219,15 @@ class NeighborEncoder(FeedforwardAutoencoder):
         if self.decode_self:
             reconstruction = decoded_neighbors[-1]
             loss = loss + ssl_loss_fn(reconstruction, batch_data)
-        return loss, embedded, decoded_neighbors
+        return loss, embedded
 
-    def fit(self, n_epochs: int, optimizer_params: dict, batch_size: int = 128,
-            dataloader: torch.utils.data.DataLoader = None, evalloader: torch.utils.data.DataLoader = None,
-            optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
+    def fit(self, n_epochs: int = 100, optimizer_params: dict | None = None, batch_size: int = 128,
+            data: np.ndarray | torch.Tensor | None = None, data_eval: np.ndarray | torch.Tensor | None = None,
+            dataloader: torch.utils.data.DataLoader | None = None, evalloader: torch.utils.data.DataLoader | None = None,
+            optimizer_class: type[torch.optim.Optimizer] = torch.optim.Adam,
             ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error, patience: int = 5,
-            scheduler: torch.optim.lr_scheduler = None, scheduler_params: dict = None,
-            corruption_fn: Callable = None, model_path: str = None) -> 'NeighborEncoder':
+            scheduler: type[torch.optim.lr_scheduler.LRScheduler] | None = None, scheduler_params: dict | None = None,
+            corruption_fn: Callable | None = None, model_path: str | None = None) -> 'NeighborEncoder':
         """
         Trains the NeighborEncoder in place.
         Equal to fit function of the FeedforwardAutoencoder but does only work with a dataloader (not with a regular data array).
@@ -236,31 +236,35 @@ class NeighborEncoder(FeedforwardAutoencoder):
         Parameters
         ----------
         n_epochs : int
-            number of epochs for training
-        optimizer_params : dict
-            parameters of the optimizer, includes the learning rate
+            number of epochs for training (default: 100)
+        optimizer_params : dict | None
+            parameters of the optimizer, includes the learning rate (default: None)
         batch_size : int
             size of the data batches (default: 128)
-        dataloader : torch.utils.data.DataLoader
+        data : np.ndarray | torch.Tensor | None
+            Not used by the NeighborEncoder (default: None)
+        data_eval : np.ndarray | torch.Tensor | None
+            Not used by the NeighborEncoder (default: None)
+        dataloader : torch.utils.data.DataLoader | None
             dataloader to be used for training (default: default=None)
-        evalloader : torch.utils.data.DataLoader
+        evalloader : torch.utils.data.DataLoader | None
             dataloader to be used for evaluation, early stopping and learning rate scheduling if scheduler=torch.optim.lr_scheduler.ReduceLROnPlateau (default: None)
-        optimizer_class : torch.optim.Optimizer
+        optimizer_class : type[torch.optim.Optimizer]
             optimizer to be used (default: torch.optim.Adam)
         ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
             self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss (default: mean_squared_error)
         patience : int
             patience parameter for EarlyStopping (default: 5)
-        scheduler : torch.optim.lr_scheduler
+        scheduler : type[torch.optim.lr_scheduler.LRScheduler] | None
             learning rate scheduler that should be used.
             If torch.optim.lr_scheduler.ReduceLROnPlateau is used then the behaviour is matched by providing the validation_loss calculated based on samples from evalloader (default: None)
-        scheduler_params : dict
+        scheduler_params : dict | None
             dictionary of the parameters of the scheduler object (default: None)
-        corruption_fn : Callable
+        corruption_fn : Callable | None
             Can be used to corrupt the input data, e.g., when using a denoising autoencoder.
             Note that the function must match the data and the data loaders.
             For example, if the data is normalized, this may have to be taken into account in the corruption function - e.g. in case of salt and pepper noise (default: None)
-        model_path : str
+        model_path : str | None
             if specified will save the trained model to the location. If evalloader is used, then only the best model w.r.t. evaluation loss is saved (default: None)
 
         Returns
@@ -268,6 +272,8 @@ class NeighborEncoder(FeedforwardAutoencoder):
         self : NeighborEncoder
             this instance of the NeighborEncoder
         """
+        if data is not None or data_eval is not None:
+            raise ValueError("NeighborEncoder.fit does not work with data arrays, only with dataloaders. Please provide a dataloader and evalloader instead.")
         super().fit(n_epochs, optimizer_params, batch_size, None, None, dataloader, evalloader, optimizer_class,
                     ssl_loss_fn, patience, scheduler, scheduler_params, corruption_fn, model_path)
         return self
