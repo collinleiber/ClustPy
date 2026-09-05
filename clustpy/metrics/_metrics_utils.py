@@ -253,7 +253,6 @@ def handle_noise(
     ValueError
         If an invalid strategy is provided or required inputs are missing.
     """
-
     if X is not None:
         X, labels = _check_length_data_and_labels(X, labels, True)
     if labels_compare is not None:

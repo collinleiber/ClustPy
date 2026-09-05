@@ -169,6 +169,7 @@ Remove clustpy via pip to avoid ambiguities during development, e.g., when chang
         - Multiple Labelings Pair Counting Scores [[Publication](https://ieeexplore.ieee.org/abstract/document/6228189)] [[Docs](https://clustpy.readthedocs.io/en/latest/clustpy.metrics.external.html#clustpy.metrics.external.multipe_labelings_scoring.MultipleLabelingsPairCountingScores)]
     - Internal Metrics
         - Clustering Validation Index based on Nearest Neighbors (CVNN) [[Publication](https://ieeexplore.ieee.org/document/6341117)] [[Docs](https://clustpy.readthedocs.io/en/latest/clustpy.metrics.internal.html#clustpy.metrics.internal.cvnn.cvnn_score)]
+        - DISCO [[Publication](https://proceedings.iclr.cc/paper_files/paper/2026/hash/8ab1d14d822936a9bf95a012640c70bd-Abstract-Conference.html)] [[Docs](https://clustpy.readthedocs.io/en/latest/clustpy.metrics.internal.html#clustpy.metrics.internal.disco.disco_score)]
 - Utils
     - Automatic evaluation methods [[Docs](https://clustpy.readthedocs.io/en/latest/clustpy.utils.html#module-clustpy.utils.evaluation)]
     - Hartigans Dip-test [[Publication](https://www.jstor.org/stable/2241144)] [[Docs](https://clustpy.readthedocs.io/en/latest/clustpy.utils.html#module-clustpy.utils.diptest)]
