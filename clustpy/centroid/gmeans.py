@@ -14,7 +14,7 @@ from sklearn.metrics.pairwise import pairwise_distances_argmin_min
 
 
 def _gmeans(X: np.ndarray, significance: float, n_clusters_init: int, max_n_clusters: int, n_split_trials: int,
-            pval_strategy: str, n_boots: int, random_state: np.random.RandomState) -> (int, np.ndarray, np.ndarray):
+            pval_strategy: str, n_boots: int, random_state: np.random.RandomState) -> tuple[int, np.ndarray, np.ndarray]:
     """
     Start the actual GMeans clustering procedure on the input data set.
 
@@ -41,7 +41,7 @@ def _gmeans(X: np.ndarray, significance: float, n_clusters_init: int, max_n_clus
 
     Returns
     -------
-    tuple : (int, np.ndarray, np.ndarray)
+    tuple : tuple[int, np.ndarray, np.ndarray]
         The final number of clusters,
         The labels as identified by GMeans,
         The cluster centers as identified by GMeans
@@ -157,7 +157,7 @@ def _gmeans_ad_statistic(statistic: float, n_samples: int) -> float:
     return adjusted_stat
 
 
-def _anderson_bootstraps(n_samples: int, n_boots: int, random_state: np.random.RandomState) -> list[float]:
+def _anderson_bootstraps(n_samples: int, n_boots: int, random_state: np.random.RandomState) -> np.ndarray:
     """
     Adjust the ad statistic as described in the GMeans paper.
 
@@ -172,13 +172,14 @@ def _anderson_bootstraps(n_samples: int, n_boots: int, random_state: np.random.R
 
     Returns
     -------
-    gmeans_ads : list[float]
+    gmeans_ads : np.ndarray
         the bootstraped ad statistic
     """
     samples = random_state.normal(size=(n_boots, n_samples))
     simulation_ads = [anderson(samples[i], "norm", method="interpolate").statistic for i in range(n_boots)]
     gmeans_ads = [_gmeans_ad_statistic(ad, n_samples) for ad in simulation_ads]
-    return gmeans_ads
+    gmeans_ads_array = np.array(gmeans_ads)
+    return gmeans_ads_array
 
 
 class GMeans(ClusterMixin, BaseEstimator):
@@ -196,7 +197,7 @@ class GMeans(ClusterMixin, BaseEstimator):
     n_clusters_init : int
         The initial number of clusters. Can also by of type np.ndarray if initial cluster centers are specified (default: 1)
     max_n_clusters : int
-        Maximum number of clusters. Must be larger than n_clusters_init (default: np.inf)
+        Maximum number of clusters. Must be larger than n_clusters_init (default: 1000)
     n_split_trials : int
         Number tries to split a cluster. For each try 2-KMeans is executed with different cluster centers (default: 10)
     pval_strategy: str
@@ -205,7 +206,7 @@ class GMeans(ClusterMixin, BaseEstimator):
         including monte-carlo simulation) or 'interpolate' (interpolation strategy from scipy) (default: 'equation')
     n_boots : int
         Number of bootstraps used to calculate the p-values. Only necessary if pval_strategy is 'original' (default: 1000)
-    random_state : np.random.RandomState | int
+    random_state : np.random.RandomState | int | None
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Attributes
@@ -230,9 +231,9 @@ class GMeans(ClusterMixin, BaseEstimator):
     Statistics: Textbooks and Monographs (1986).
     """
 
-    def __init__(self, significance: float = 0.0001, n_clusters_init: int = 1, max_n_clusters: int = np.inf,
+    def __init__(self, significance: float = 0.0001, n_clusters_init: int = 1, max_n_clusters: int = 1000,
                  n_split_trials: int = 10, pval_strategy: str = "equation", n_boots: int = 1000,
-                 random_state: np.random.RandomState | int = None):
+                 random_state: np.random.RandomState | int | None = None):
         self.significance = significance
         self.n_clusters_init = n_clusters_init
         self.max_n_clusters = max_n_clusters
@@ -241,7 +242,7 @@ class GMeans(ClusterMixin, BaseEstimator):
         self.n_boots = n_boots
         self.random_state = random_state
 
-    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'GMeans':
+    def fit(self, X: np.ndarray, y: np.ndarray | None = None) -> 'GMeans':
         """
         Initiate the actual clustering process on the input data set.
         The resulting cluster labels will be stored in the labels_ attribute.
@@ -250,7 +251,7 @@ class GMeans(ClusterMixin, BaseEstimator):
         ----------
         X : np.ndarray
             the given data set
-        y : np.ndarray
+        y : np.ndarray | None
             the labels (can be ignored)
 
         Returns

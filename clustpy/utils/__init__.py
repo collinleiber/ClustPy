@@ -1,6 +1,6 @@
 from .evaluation import evaluate_dataset, evaluate_multiple_datasets, EvaluationDataset, \
     EvaluationAlgorithm, EvaluationMetric, evaluation_df_to_latex_table
-from .diptest import dip_test, dip_pval, dip_boot_samples, dip_gradient, dip_pval_gradient, plot_dip
+from .diptest import dip_test, dip_test_extended, dip_pval, dip_boot_samples, dip_gradient, dip_pval_gradient, plot_dip
 from .plots import plot_with_transformation, plot_image, plot_scatter_matrix, plot_histogram, plot_1d_data, \
     plot_2d_data, plot_3d_data
 from .dctree import DCTree, reachability_distances, minimum_spanning_tree_prims
@@ -11,6 +11,7 @@ __all__ = ['evaluate_dataset',
            'EvaluationAlgorithm',
            'EvaluationDataset',
            'dip_test',
+           'dip_test_extended',
            'dip_pval',
            'dip_boot_samples',
            'plot_with_transformation',

@@ -19,7 +19,7 @@ class EarlyStopping():
     ----------
     counter : integer
         counting the consecutive epochs without improvement
-    best_loss : torch.Tensor
+    best_loss : torch.Tensor | None
         best loss achieved before stopping
     early_stop : boolean
         indicating whether to stop training or not
@@ -31,7 +31,7 @@ class EarlyStopping():
         self.verbose = verbose
 
         self.counter = 0
-        self.best_loss = None
+        self.best_loss: torch.Tensor | None = None
         self.early_stop = False
 
     def __call__(self, val_loss: torch.Tensor) -> None:
@@ -44,7 +44,7 @@ class EarlyStopping():
         val_loss : torch.Tensor
             the input validation loss. Will be compared to self.best_loss
         """
-        if self.best_loss == None:
+        if self.best_loss is None:
             self.best_loss = val_loss
         elif self.best_loss - val_loss >= self.min_delta:
             self.best_loss = val_loss

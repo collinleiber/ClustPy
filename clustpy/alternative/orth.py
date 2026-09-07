@@ -13,9 +13,9 @@ from sklearn.utils.validation import check_is_fitted
 from clustpy.alternative.nrkmeans import check_n_clusters_for_nr
 
 
-def _clustering_via_orthogonalization(X: np.ndarray, n_clusters: list, explained_variance_for_clustering: float,
-                                      do_orthogonal_clustering: bool, random_state: np.random.RandomState) -> (
-        np.ndarray, list, list, list, np.ndarray):
+def _clustering_via_orthogonalization(X: np.ndarray, n_clusters: list[int], explained_variance_for_clustering: float,
+                                      do_orthogonal_clustering: bool, random_state: np.random.RandomState) -> tuple[
+        np.ndarray, list[np.ndarray], list[np.ndarray], list[PCA] | None, np.ndarray]:
     """
     Start the actual Orthogonal Clustering (Orth1) or Clustering in Orthogonal Spaces (Orth2) procedure on the input data set.
 
@@ -23,7 +23,7 @@ def _clustering_via_orthogonalization(X: np.ndarray, n_clusters: list, explained
     ----------
     X : np.ndarray
         the given data set
-    n_clusters : list
+    n_clusters : list[int]
         list containing number of clusters for each subspace
     explained_variance_for_clustering : float
         Defines the variances that is contained in the subspace used for clustering. If this value is 1, PCA will not be executed before performing KMeans
@@ -34,7 +34,7 @@ def _clustering_via_orthogonalization(X: np.ndarray, n_clusters: list, explained
 
     Returns
     -------
-    tuple : (np.ndarray, list, list, list, np.ndarray)
+    tuple : tuple[np.ndarray, list[np.ndarray], list[np.ndarray], list[PCA] | None, np.ndarray]
         The labels,
         The cluster centers,
         The projections,
@@ -45,7 +45,7 @@ def _clustering_via_orthogonalization(X: np.ndarray, n_clusters: list, explained
     labels = np.zeros((X.shape[0], len(n_clusters)), dtype=np.int32)
     cluster_centers = []
     projections = []
-    PCAs = [] if explained_variance_for_clustering != 1 else None
+    PCAs = []
     # Center data
     global_mean = np.mean(X, axis=0)
     X = X - global_mean
@@ -69,10 +69,10 @@ def _clustering_via_orthogonalization(X: np.ndarray, n_clusters: list, explained
             X, proj, centers_subspace = _clustering_in_orthogonal_spaces_transform(X, km)
         cluster_centers.append(centers_subspace)
         projections.append(proj)
-    return labels, cluster_centers, projections, PCAs, global_mean
+    return labels, cluster_centers, projections, PCAs if explained_variance_for_clustering != 1 else None, global_mean
 
 
-def _orthogonal_clustering_transform(X: np.ndarray, km: KMeans) -> (np.ndarray, np.ndarray, np.ndarray):
+def _orthogonal_clustering_transform(X: np.ndarray, km: KMeans) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Execute the Orthogonal clustering (Orth1) feature transformation.
 
@@ -85,7 +85,7 @@ def _orthogonal_clustering_transform(X: np.ndarray, km: KMeans) -> (np.ndarray, 
 
     Returns
     -------
-    tuple : (np.ndarray, np.ndarray, np.ndarray)
+    tuple : tuple[np.ndarray, np.ndarray, np.ndarray]
         The transformed data set,
         The executed projection,
         The full-dimensional cluster centers
@@ -104,7 +104,7 @@ def _orthogonal_clustering_transform(X: np.ndarray, km: KMeans) -> (np.ndarray, 
     return X, projections_subspace, centers_subspace
 
 
-def _clustering_in_orthogonal_spaces_transform(X: np.ndarray, km: KMeans) -> (np.ndarray, np.ndarray, np.ndarray):
+def _clustering_in_orthogonal_spaces_transform(X: np.ndarray, km: KMeans) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Execute the Clustering in Orthogonal Spaces (Orth2) feature transformation.
 
@@ -117,7 +117,7 @@ def _clustering_in_orthogonal_spaces_transform(X: np.ndarray, km: KMeans) -> (np
 
     Returns
     -------
-    tuple : (np.ndarray, np.ndarray, np.ndarray)
+    tuple : tuple[np.ndarray, np.ndarray, np.ndarray]
         The transformed data set,
         The executed projection,
         The full-dimensional cluster centers
@@ -141,23 +141,23 @@ class OrthogonalClustering(ClusterMixin, BaseEstimator):
 
     Parameters
     ----------
-    n_clusters : list | tuple
+    n_clusters : list[int] | tuple[int, ...]
         list containing number of clusters for each subspace (default: (3, 3))
     explained_variance_for_clustering : float
         Defines the variance that is contained in the subspace used for clustering. This subspace is received by performing PCA.
         If explained_variance_for_clustering is 1, PCA will not be executed before performing KMeans (default: 0.9)
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | int | None
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Attributes
     ----------
     labels_ : np.ndarray
         The final labels
-    cluster_centers_ : list
+    cluster_centers_ : list[np.ndarray]
         The final cluster centers
-    projections_ : list
+    projections_ : list[np.ndarray]
         The orthogonal projections
-    PCAs_ : list
+    PCAs_ : list[PCA] | None
         The PCA transformations
     global_mean_ : np.ndarray
         The mean value of the fitted data set
@@ -171,13 +171,13 @@ class OrthogonalClustering(ClusterMixin, BaseEstimator):
     Seventh IEEE international conference on data mining (ICDM 2007). IEEE, 2007.
     """
 
-    def __init__(self, n_clusters: list | tuple = (3, 3), explained_variance_for_clustering: float = 0.9,
-                 random_state: np.random.RandomState = None):
+    def __init__(self, n_clusters: list[int] | tuple[int, ...] = (3, 3), explained_variance_for_clustering: float = 0.9,
+                 random_state: np.random.RandomState | int | None = None):
         self.n_clusters = n_clusters
         self.explained_variance_for_clustering = explained_variance_for_clustering
         self.random_state = random_state
 
-    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'OrthogonalClustering':
+    def fit(self, X: np.ndarray, y: np.ndarray | None = None) -> 'OrthogonalClustering':
         """
         Initiate the actual clustering process on the input data set.
         The resulting cluster labels will be stored in the labels_ attribute.
@@ -186,7 +186,7 @@ class OrthogonalClustering(ClusterMixin, BaseEstimator):
         ----------
         X : np.ndarray
             the given data set
-        y : np.ndarray
+        y : np.ndarray | None
             the labels (can be ignored)
 
         Returns
@@ -283,23 +283,23 @@ class ClusteringInOrthogonalSpaces(OrthogonalClustering):
 
     Parameters
     ----------
-    n_clusters : list | tuple
+    n_clusters : list[int] | tuple[int, ...]
         list containing number of clusters for each subspace (default: (3, 3))
     explained_variance_for_clustering : float
         Defines the variance that is contained in the subspace used for clustering. This subspace is received by performing PCA.
         If explained_variance_for_clustering is 1, PCA will not be executed before performing KMeans (default: 0.9)
-    random_state : np.random.RandomState | int
+    random_state : np.random.RandomState | int | None
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Attributes
     ----------
     labels_ : np.ndarray
         The final labels
-    cluster_centers_ : list
+    cluster_centers_ : list[np.ndarray]
         The final cluster centers
-    projections_ : list
+    projections_ : list[np.ndarray]
         The orthogonal projections
-    PCAs_ : list
+    PCAs_ : list[PCA] | None
         The PCA transformations
     global_mean_ : np.ndarray
         The mean value of the fitted data set
@@ -312,11 +312,11 @@ class ClusteringInOrthogonalSpaces(OrthogonalClustering):
     Seventh IEEE international conference on data mining (ICDM 2007). IEEE, 2007.
     """
 
-    def __init__(self, n_clusters: list | tuple = (3, 3), explained_variance_for_clustering: float = 0.9,
-                 random_state: np.random.RandomState | int = None):
+    def __init__(self, n_clusters: list[int] | tuple[int, ...] = (3, 3), explained_variance_for_clustering: float = 0.9,
+                 random_state: np.random.RandomState | int | None = None):
         super().__init__(n_clusters, explained_variance_for_clustering, random_state)
 
-    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'ClusteringInOrthogonalSpaces':
+    def fit(self, X: np.ndarray, y: np.ndarray | None = None) -> 'ClusteringInOrthogonalSpaces':
         """
         Initiate the actual clustering process on the input data set.
         The resulting cluster labels will be stored in the labels_ attribute.
@@ -325,7 +325,7 @@ class ClusteringInOrthogonalSpaces(OrthogonalClustering):
         ----------
         X : np.ndarray
             the given data set
-        y : np.ndarray
+        y : np.ndarray | None
             the labels (can be ignored)
 
         Returns

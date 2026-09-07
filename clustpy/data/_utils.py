@@ -24,14 +24,14 @@ import subprocess
 DEFAULT_DOWNLOAD_PATH = Path.home() / "Downloads" / "clustpy_datafiles"
 
 
-def _get_download_dir(downloads_path: str | Path) -> Path:
+def _get_download_dir(downloads_path: str | Path | None) -> Path:
     """
     Helper function to define the path where the data files should be stored. If downloads_path is None then default path
     '[USER]/Downloads/clustpy_datafiles' will be used. If the directory does not exists it will be created.
 
     Parameters
     ----------
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data will be stored. Can be None
 
     Returns
@@ -112,7 +112,7 @@ def _download_file_from_google_drive(file_id: str, filename_local: str | Path, c
     session.close()
 
 
-def _load_data_file(filename_local: Path, file_url: str, delimiter: str = ",", last_column_are_labels: bool = True) -> tuple[
+def _load_data_file(filename_local: Path, file_url: str, delimiter: str | None = ",", last_column_are_labels: bool = True) -> tuple[
         np.ndarray, np.ndarray]:
     """
     Helper function to load a data file. Either the first or last column, depending on last_column_are_labels, of the
@@ -125,7 +125,7 @@ def _load_data_file(filename_local: Path, file_url: str, delimiter: str = ",", l
         local name of the file after it has been downloaded
     file_url : str
         URL of the file
-    delimiter : str
+    delimiter : str | None
         delimiter in the data file (default: ";")
     last_column_are_labels : bool
         specifies if the last column contains the labels. If false labels should be contained in the first column (default: True)
@@ -183,7 +183,7 @@ def _decompress_z_file(filename: str | Path, directory: str | Path) -> bool:
     return True
 
 
-def _load_image_data(image: str | Path | np.ndarray, image_size: tuple, color_image: bool) -> np.ndarray:
+def _load_image_data(image: str | Path | np.ndarray, image_size: tuple | None, color_image: bool) -> np.ndarray:
     """
     Load image and convert it into a coherent size. Returns a numpy array containing the image data.
 
@@ -191,7 +191,7 @@ def _load_image_data(image: str | Path | np.ndarray, image_size: tuple, color_im
     ----------
     image : str | Path | np.ndarray
         Path to the image. Can also be a numpy array containing the specific pixels
-    image_size : tuple
+    image_size : tuple | None
         images of various sizes can be converted into a coherent size.
         The tuple equals (width, height) of the images.
         Can also be None if the image size should not be changed
@@ -204,16 +204,18 @@ def _load_image_data(image: str | Path | np.ndarray, image_size: tuple, color_im
         The numpy array containing the image data
     """
     if isinstance(image, (str, PurePath)):
-        pil_image = Image.open(image)
+        pil_imagefile = Image.open(image)
+        # create an Image copy so we can close the file handle
+        pil_image = pil_imagefile.copy()
+        pil_imagefile.close()
     else:
-        pil_image = Image.fromarray(np.uint8(image))
+        pil_image = Image.fromarray(np.asarray(image, dtype=np.uint32))
     if color_image:
         pil_image = pil_image.convert("RGB")
     # Convert to coherent size
     if image_size is not None:
         pil_image = pil_image.resize(image_size)
     image_data = np.array(pil_image).copy()
-    pil_image.close()
     assert image_size is None or image_data.shape == (
         image_size[0], image_size[1], 3), "Size of image is not correct. Should be {0} but is {1}".format(image_size,
                                                                                                           image_data.shape)
@@ -242,9 +244,9 @@ class _StemmedCountVectorizer(CountVectorizer):
         return stemmed_words
 
 
-def _transform_text_data(data: np.ndarray, use_tfidf: bool, use_stemming: bool, use_stop_words: bool, max_df: float | int, 
+def _transform_text_data(data: list[str], use_tfidf: bool, use_stemming: bool, use_stop_words: bool, max_df: float | int,
                          min_df: float | int, max_features: int, min_variance : float, sublinear_tf: bool, 
-                         data_all: np.ndarray | None = None) -> tuple[np.ndarray, list[str]]:
+                         data_all: list[str] | None = None) -> tuple[np.ndarray, list[str]]:
     """
     Transform a set of texts into a data matrix.
     Result can be either a raw count matrix or the result of tf-idf.
@@ -252,7 +254,7 @@ def _transform_text_data(data: np.ndarray, use_tfidf: bool, use_stemming: bool, 
 
     Parameters
     ----------
-    data : np.ndarray
+    data : list[str]
         The given data set containing the raw texts
     use_tfidf : bool
         If true, tf-idf will be applied as the last step of the pipeline
@@ -274,7 +276,7 @@ def _transform_text_data(data: np.ndarray, use_tfidf: bool, use_stemming: bool, 
         The default is to keep all features with non-zero variance, i.e. remove only the features that have the same value in all samples 
     sublinear_tf : bool
         Apply sublinear term frequency scaling, i.e. replace tf with 1 + log(tf) (see sklearn TfidfTransformer)
-    data_all : np.ndarray | None
+    data_all : list[str] | None
         The complete data set, i.e., if no subset is used. If it is None, it will be equal to data (default: None)
 
     Returns
@@ -305,8 +307,8 @@ def _transform_text_data(data: np.ndarray, use_tfidf: bool, use_stemming: bool, 
         tfidf = TfidfTransformer(sublinear_tf=sublinear_tf)
         tfidf.fit(data_sparse_all)
         data_sparse = tfidf.transform(data_sparse)
-    data = np.asarray(data_sparse.todense())
-    return data, vocabulary
+    data_final = np.asarray(data_sparse.todense())
+    return data_final, vocabulary
 
 
 def flatten_images(data: np.ndarray, format: str) -> np.ndarray:

@@ -5,16 +5,17 @@ except:
 import numpy as np
 import matplotlib.pyplot as plt
 from clustpy.utils.plots import plot_histogram
-from sklearn.utils import check_random_state
+from clustpy.utils.checks import check_random_state
 
 
-def dip_test(X: np.ndarray, just_dip: bool = True, is_data_sorted: bool = False, return_gcm_lcm_mn_mj: bool = False,
-             use_c: bool = True, debug: bool = False) -> (
-        float, tuple, tuple, np.ndarray, np.ndarray, np.ndarray, np.ndarray):
+def dip_test_extended(X: np.ndarray, return_gcm_lcm_mn_mj: bool = False,
+             use_c: bool = True, debug: bool = False) -> tuple[
+        float, tuple, tuple] | tuple[float, tuple, tuple, np.ndarray | None, np.ndarray | None, np.ndarray | None, np.ndarray | None]:
     """
     Calculate the Dip-value. This can either be done using the C implementation or the python version.
-    In addition to the Dip-value additional values can be returned.
-    These are e.g. the modal interval (indices of the beginning and end of the steepest slop of the ECDF) and the modal interval (used to calculate the gradient of the Dip-value) if just_dip is False.
+    The function expects the data to be sorted!
+    In addition to the Dip-value additional values will be returned.
+    These are the modal interval (indices of the beginning and end of the steepest slop of the ECDF) and the modal interval (used to calculate the gradient of the Dip-value).
     Further, the indices of the Greatest Convex Minorant (gcm), Least Concave Majorant (lcm), minorant and majorant values can be returned by setting return_gcm_lcm_mn_mj to True.
     Note that modal_triangle can be (-1,-1,-1) if the triangle could not be determined correctly.
 
@@ -22,12 +23,8 @@ def dip_test(X: np.ndarray, just_dip: bool = True, is_data_sorted: bool = False,
     ----------
     X : np.ndarray
         the given univariate data set
-    just_dip : bool
-        Defines whether only the Dip-value should be returned or also the modal interval and modal triangle (default: True)
-    is_data_sorted : bool
-        Should be True if the data set is already sorted (default: False)
     return_gcm_lcm_mn_mj : bool
-        Defines whether the gcm, lcm, mn and mj arrays should be returned. In this case just_dip must be False (default: False)
+        Defines whether the gcm, lcm, mn and mj arrays should be returned (default: False)
     use_c : bool
         Defines whether the C implementation should be used (defualt: True)
     debug : bool
@@ -35,14 +32,15 @@ def dip_test(X: np.ndarray, just_dip: bool = True, is_data_sorted: bool = False,
 
     Returns
     -------
-    tuple: (float, tuple, tuple, np.ndarray, np.ndarray, np.ndarray, np.ndarray)
+    tuple: tuple[
+        float, tuple, tuple] | tuple[float, tuple, tuple, np.ndarray | None, np.ndarray | None, np.ndarray | None, np.ndarray | None]
         The resulting Dip-value,
-        The indices of the modal_interval - corresponds to the steepest slope in the ECDF (if just_dip is False),
-        The indices of the modal triangle (if just_dip is False),
-        The indices of points that are part of the Greatest Convex Minorant (gcm) (if just_dip is False and return_gcm_lcm_mn_mj is True),
-        The indices of points that are part of the Least Concave Majorant (lcm) (if just_dip is False and return_gcm_lcm_mn_mj is True),
-        The minorant values (if just_dip is False and return_gcm_lcm_mn_mj is True),
-        The majorant values (if just_dip is False and return_gcm_lcm_mn_mj is True)
+        The indices of the modal_interval - corresponds to the steepest slope in the ECDF,
+        The indices of the modal triangle,
+        The indices of points that are part of the Greatest Convex Minorant (gcm) (if return_gcm_lcm_mn_mj is True),
+        The indices of points that are part of the Least Concave Majorant (lcm) (if return_gcm_lcm_mn_mj is True),
+        The minorant values (if return_gcm_lcm_mn_mj is True),
+        The majorant values (if return_gcm_lcm_mn_mj is True)
 
     References
     ----------
@@ -55,10 +53,7 @@ def dip_test(X: np.ndarray, just_dip: bool = True, is_data_sorted: bool = False,
     Applied Statistics 34.3 (1985): 320-5.
     """
     assert X.ndim == 1, "Data must be 1-dimensional for the dip-test. Your shape:{0}".format(X.shape)
-    assert just_dip or is_data_sorted == True, "Data must be sorted if modal interval and/or modal triangle should be returned (else indices will not match)"
-    assert not return_gcm_lcm_mn_mj or not just_dip, "If GCM, LCM, mn and mj should be returned, 'just_dip' must be False"
-    if not is_data_sorted:
-        X = np.sort(X)
+    assert np.all(X[:-1] <= X[1:]), "Data must be sorted for the dip-test."
     # Obtain results
     if X.shape[0] < 4 or X[0] == X[-1]:
         dip_value = 0.0
@@ -73,9 +68,7 @@ def dip_test(X: np.ndarray, just_dip: bool = True, is_data_sorted: bool = False,
     else:
         dip_value, modal_interval, modal_triangle, _, _, mn, mj = _dip_python_impl(X, debug)
     # Return results
-    if just_dip:
-        return dip_value
-    elif return_gcm_lcm_mn_mj:
+    if return_gcm_lcm_mn_mj:
         if mn is not None and mj is not None:
             gcm, lcm = _get_complete_gcm_lcm(mn, mj, modal_interval)
         else:
@@ -85,7 +78,46 @@ def dip_test(X: np.ndarray, just_dip: bool = True, is_data_sorted: bool = False,
         return dip_value, modal_interval, modal_triangle
 
 
-def _dip_c_impl(X: np.ndarray, debug: bool) -> (float, tuple, tuple, np.ndarray, np.ndarray, np.ndarray, np.ndarray):
+def dip_test(X: np.ndarray, is_data_sorted: bool = False, use_c: bool = True, debug: bool = False) -> float:
+    """
+    Calculate the Dip-value. This can either be done using the C implementation or the python version.
+
+    Parameters
+    ----------
+    X : np.ndarray
+        the given univariate data set
+    is_data_sorted : bool
+        Should be True if the data set is already sorted (default: False)
+    use_c : bool
+        Defines whether the C implementation should be used (defualt: True)
+    debug : bool
+        If true, additional information will be printed to the console (default: False)
+
+    Returns
+    -------
+    dip_value: float
+        The resulting Dip-value
+
+    References
+    ----------
+    Hartigan, John A., and Pamela M. Hartigan.
+    "The dip test of unimodality." The annals of Statistics (1985): 70-84.
+
+    and
+
+    Hartigan, P. M. "Computation of the dip statistic to test for unimodality: Algorithm as 217."
+    Applied Statistics 34.3 (1985): 320-5.
+    """
+    assert X.ndim == 1, "Data must be 1-dimensional for the dip-test. Your shape:{0}".format(X.shape)
+    if not is_data_sorted:
+        X = np.sort(X)
+    dip_output = dip_test_extended(X, return_gcm_lcm_mn_mj=False, use_c=use_c, debug=debug)
+    dip_value = dip_output[0]
+    # Return results
+    return dip_value
+
+
+def _dip_c_impl(X: np.ndarray, debug: bool) -> tuple[float, tuple, tuple, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Calls the Dip C implementation by Martin Maechler.
 
@@ -98,7 +130,7 @@ def _dip_c_impl(X: np.ndarray, debug: bool) -> (float, tuple, tuple, np.ndarray,
 
     Returns
     -------
-    tuple : (float, tuple, tuple, np.ndarray, np.ndarray, np.ndarray, np.ndarray)
+    tuple : tuple[float, tuple, tuple, np.ndarray, np.ndarray, np.ndarray, np.ndarray]
         The resulting Dip-value,
         The indices of the modal_interval - corresponds to the steepest slope in the ECDF,
         The indices of the modal triangle
@@ -124,8 +156,8 @@ def _dip_c_impl(X: np.ndarray, debug: bool) -> (float, tuple, tuple, np.ndarray,
         modal_triangle[0], modal_triangle[1], modal_triangle[2]), gcm, lcm, mn, mj
 
 
-def _dip_python_impl(X: np.ndarray, debug: bool) -> (
-        float, tuple, tuple, np.ndarray, np.ndarray, np.ndarray, np.ndarray):
+def _dip_python_impl(X: np.ndarray, debug: bool) -> tuple[
+        float, tuple, tuple, np.ndarray | None, np.ndarray | None, np.ndarray | None, np.ndarray | None]:
     """
     A python version of the Dip C implementation by Martin Maechler.
 
@@ -138,7 +170,7 @@ def _dip_python_impl(X: np.ndarray, debug: bool) -> (
 
     Returns
     -------
-    tuple : (float, tuple, tuple, np.ndarray, np.ndarray, np.ndarray, np.ndarray)
+    tuple : tuple[float, tuple, tuple, np.ndarray | None, np.ndarray | None, np.ndarray | None, np.ndarray | None]
         The resulting Dip-value,
         The indices of the modal_interval - corresponds to the steepest slope in the ECDF,
         The indices of the modal triangle
@@ -332,7 +364,7 @@ def _dip_python_impl(X: np.ndarray, debug: bool) -> (
 
 
 def dip_pval(dip_value: float, n_points: int, pval_strategy: str = "table", n_boots: int = 1000,
-             random_state: np.random.RandomState | int = None) -> float:
+             random_state: np.random.RandomState | int | None = None) -> float:
     """
     Get the p-value of a corresponding Dip-value.
     P-values depend on the input Dip-value and the sample size.
@@ -349,7 +381,7 @@ def dip_pval(dip_value: float, n_points: int, pval_strategy: str = "table", n_bo
         Specifies the strategy that should be used to calculate the p-value (default: 'table')
     n_boots : int
         Number of random data sets that should be created to calculate Dip-values. Only relevant if pval_strategy is 'bootstrap' (default: 1000)
-    random_state : np.random.RandomState | int
+    random_state : np.random.RandomState | int | None
         use a fixed random state to get a repeatable solution. Can also be of type int. Only relevant if pval_strategy is 'bootstrap' (default: None)
 
     Returns
@@ -376,7 +408,7 @@ def dip_pval(dip_value: float, n_points: int, pval_strategy: str = "table", n_bo
         pval = 1.0
     elif pval_strategy == "bootstrap":
         boot_dips = dip_boot_samples(int(n_points), n_boots, random_state)
-        pval = np.mean(dip_value <= boot_dips)
+        pval = float(np.mean(dip_value <= boot_dips))
     elif pval_strategy == "table":
         pval = _dip_pval_table(dip_value, n_points)
     elif pval_strategy == "function":
@@ -388,7 +420,7 @@ def dip_pval(dip_value: float, n_points: int, pval_strategy: str = "table", n_bo
 
 
 def dip_boot_samples(n_points: int, n_boots: int = 1000,
-                     random_state: np.random.RandomState | int = None) -> np.ndarray:
+                     random_state: np.random.RandomState | int | None = None) -> np.ndarray:
     """
     Sample random data sets and calculate corresponding Dip-values.
     E.g. used to determine p-values.
@@ -399,7 +431,7 @@ def dip_boot_samples(n_points: int, n_boots: int = 1000,
         The number of samples
     n_boots : int
         Number of random data sets that should be created to calculate Dip-values (default: 1000)
-    random_state : np.random.RandomState | int
+    random_state : np.random.RandomState | int | None
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Returns
@@ -410,11 +442,11 @@ def dip_boot_samples(n_points: int, n_boots: int = 1000,
     # random uniform vectors
     random_state = check_random_state(random_state)
     boot_samples = random_state.rand(n_boots, n_points)
-    boot_dips = np.array([dip_test(boot_s, just_dip=True, is_data_sorted=False) for boot_s in boot_samples])
+    boot_dips = np.array([dip_test(boot_s, is_data_sorted=False) for boot_s in boot_samples])
     return boot_dips
 
 
-def _get_complete_gcm_lcm(mn: np.ndarray, mj: np.ndarray, modal_interval: tuple) -> (np.ndarray, np.ndarray):
+def _get_complete_gcm_lcm(mn: np.ndarray, mj: np.ndarray, modal_interval: tuple) -> tuple[np.ndarray, np.ndarray]:
     """
     Complete the GCM and LCM returned by the Dip-test.
     Adapted from: https://github.com/samhelmholtz/skinny-dip/blob/master/code/skinny-dip/RPackageDipTestCustom/diptest/R/dip.R
@@ -555,10 +587,10 @@ Plot
 """
 
 
-def plot_dip(X: np.ndarray, is_data_sorted: bool = False, dip_value: float = None, modal_interval: tuple = None,
-             modal_triangle: tuple = None, gcm: np.ndarray = None, lcm: np.ndarray = None, linewidth_ecdf: float = 1,
+def plot_dip(X: np.ndarray, is_data_sorted: bool = False, dip_value: float | None = None, modal_interval: tuple | None = None,
+             modal_triangle: tuple | None = None, gcm: np.ndarray | None = None, lcm: np.ndarray | None = None, linewidth_ecdf: float = 1,
              linewidth_extra: float = 2, show_legend: bool = True, add_histogram: bool = True,
-             histogram_labels: np.ndarray = None, histogram_show_legend: bool = True, histogram_density: bool = True,
+             histogram_labels: np.ndarray | None = None, histogram_show_legend: bool = True, histogram_density: bool = True,
              histogram_n_bins: int = 100, height_ratio: tuple = (1, 2), show_plot: bool = True) -> None:
     """
     Plot a visual representation of the computational process of the Dip.
@@ -570,15 +602,15 @@ def plot_dip(X: np.ndarray, is_data_sorted: bool = False, dip_value: float = Non
         the given data set
     is_data_sorted : bool
         Should be True if the data set is already sorted (default: False)
-    dip_value : float
+    dip_value : float | None
         The Dip-value (default: None)
-    modal_interval : tuple
+    modal_interval : tuple | None
         Indices of the modal interval - corresponds to the steepest slope in the ECDF (default: None)
-    modal_triangle : tuple
+    modal_triangle : tuple | None
         Indices of the modal triangle (default: None)
-    gcm : np.ndarray
+    gcm : np.ndarray | None
         The indices of points that are part of the Greatest Convex Minorant (gcm) (default: None)
-    lcm : np.ndarray
+    lcm : np.ndarray | None
         The indices of points that are part of the Least Concave Majorant (lcm) (default None)
     linewidth_ecdf : flaot
         The linewidth for the eCDF (default: 1)
@@ -588,7 +620,7 @@ def plot_dip(X: np.ndarray, is_data_sorted: bool = False, dip_value: float = Non
         Defines whether the legend of the ECDF plot should be added (default: True)
     add_histogram : bool
         Defines whether the histogram should be shown above the ECDF plot (default: True)
-    histogram_labels : np.ndarray
+    histogram_labels : np.ndarray | None
         Labels used to color parts of the histogram (default: None)
     histogram_show_legend : bool
         Defines whether the legend of the histogram should be added (default: True)
@@ -685,14 +717,14 @@ def _dip_pval_table(dip_value: float, n_points: int) -> float:
             "[dip_pval_table] WARNING: The number of samples is too large for pval_strategy 'table' (max n_points is 72000), 'function' will be used instead.")
         return _dip_pval_function(dip_value, n_points)
     i1 = N.searchsorted(n_points, side='left')
-    i0 = i1 - 1
+    i0 = int(i1 - 1)
     # if n falls outside the range of tabulated sample sizes, use the
     # critical values for the nearest tabulated n (i.e. treat them as
     # 'asymptotic')
     i0 = max(0, i0)
     i1 = min(N.shape[0] - 1, i1)
     # interpolate on sqrt(n)
-    n0, n1 = N[[i0, i1]]
+    n0, n1 = N[i0], N[i1]
     if i0 != i1:
         fn = float(n_points - n0) / (n1 - n0)
     else:
@@ -755,7 +787,7 @@ def _dip_pval_function_get_b(n_points: int) -> float:
     return b
 
 
-def _get_dip_table_values() -> (np.ndarray, np.ndarray, np.ndarray):
+def _get_dip_table_values() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Get the values of the Dip-p-value lookup table.
 

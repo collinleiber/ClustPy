@@ -12,8 +12,8 @@ from clustpy.utils.checks import check_parameters
 from sklearn.utils.validation import check_is_fitted
 
 
-def _diana(X: np.ndarray, n_clusters: int, distance_threshold: float, construct_full_tree: bool, metric: str) -> (
-        np.ndarray, BinaryClusterTree):
+def _diana(X: np.ndarray, n_clusters: int, distance_threshold: float, construct_full_tree: bool, metric: str) -> tuple[
+        np.ndarray, BinaryClusterTree]:
     """
     Start the actual DIANA clustering procedure on the input data set.
     
@@ -32,7 +32,7 @@ def _diana(X: np.ndarray, n_clusters: int, distance_threshold: float, construct_
 
     Returns
     -------
-    tuple : (np.ndarray, BinaryClusterTree)
+    tuple : tuple[np.ndarray, BinaryClusterTree]:
         The final cluster labels,
         The resulting tree containing the cluster hierarchy
     """
@@ -48,7 +48,7 @@ def _diana(X: np.ndarray, n_clusters: int, distance_threshold: float, construct_
         split_cluster_id, cluster_distance_matrix = _get_cluster_with_max_diameter(
             global_distance_matrix, labels, current_n_clusters, distance_threshold)
         # Check if we only have clusters of size one or only clusters with diameter < distance_threshold
-        if split_cluster_id is None:
+        if split_cluster_id is None or cluster_distance_matrix is None:
             break
         else:
             # Split cluster by updating labels and tree
@@ -63,7 +63,7 @@ def _diana(X: np.ndarray, n_clusters: int, distance_threshold: float, construct_
 
 
 def _get_cluster_with_max_diameter(global_distance_matrix: np.ndarray, labels: np.ndarray, n_clusters: int,
-                                   distance_threshold: float) -> (int, np.ndarray):
+                                   distance_threshold: float) -> tuple[int | None, np.ndarray | None]:
     """
     Identify the cluster with the largest diameter, i.e. with the largest distance between two objects assigned to this cluster.
     Here, only diameters which are larger than distance_threshold are taken into account.
@@ -82,7 +82,7 @@ def _get_cluster_with_max_diameter(global_distance_matrix: np.ndarray, labels: n
 
     Returns
     -------
-    tuple: (int, np.ndarray)
+    tuple: tuple[int | None, np.ndarray | None]
         The id of the cluster that should be split,
         The pariwise distances of all points within that cluster
     """
@@ -160,7 +160,7 @@ class Diana(ClusterMixin, BaseEstimator):
 
     Parameters
     ----------
-    n_clusters : int
+    n_clusters : int | None
         The number of clusters. If n_clusters is None the tree will be constructed until the max diamater is below distance_threshold (default: None)
     distance_threshold : float
         The distance thresholds defines the minimum diameter that is considered. Must be 0 if n_clusters is specified (default: 0)
@@ -184,14 +184,14 @@ class Diana(ClusterMixin, BaseEstimator):
     Chapter six from Finding Groups in Data: An Introduction to Cluster Analysis. 1990.
     """
 
-    def __init__(self, n_clusters: int = None, distance_threshold: float = 0, construct_full_tree: bool = False,
+    def __init__(self, n_clusters: int | None = None, distance_threshold: float = 0, construct_full_tree: bool = False,
                  metric: str = "euclidean"):
         self.n_clusters = n_clusters
         self.distance_threshold = distance_threshold
         self.construct_full_tree = construct_full_tree
         self.metric = metric
 
-    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'Diana':
+    def fit(self, X: np.ndarray, y: np.ndarray | None = None) -> 'Diana':
         """
         Initiate the actual clustering process on the input data set.
         The resulting cluster labels will be stored in the labels_ attribute.
@@ -200,7 +200,7 @@ class Diana(ClusterMixin, BaseEstimator):
         ----------
         X : np.ndarray
             the given data set
-        y : np.ndarray
+        y : np.ndarray | None
             the labels (can be ignored)
 
         Returns

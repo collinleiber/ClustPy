@@ -4,7 +4,7 @@ from clustpy.data._utils import unflatten_images
 from pathlib import Path
 
 
-def _load_nr_data(file_name: str, n_labels: int) -> (np.ndarray, np.ndarray):
+def _load_nr_data(file_name: str, n_labels: int) -> tuple[np.ndarray, np.ndarray]:
     """
     Helper function to load a non-redundant data set from ClustPys internal data sets directory.
     The first n_labels columns will be specified as labels.
@@ -18,7 +18,7 @@ def _load_nr_data(file_name: str, n_labels: int) -> (np.ndarray, np.ndarray):
 
     Returns
     -------
-    data, labels : (np.ndarray, np.ndarray)
+    data, labels : tuple[np.ndarray, np.ndarray]
         the data numpy array, the labels numpy array
     """
     path = Path(__file__).parent / "datasets" / file_name
@@ -35,7 +35,7 @@ Actual datasets
 """
 
 
-def load_aloi_small(return_X_y: bool = False) -> Bunch:
+def load_aloi_small(return_X_y: bool = False) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load a subset of the Amsterdam Library of Object Image (ALOI) consisting of 288 images of the objects red ball,
     red cylinder, green ball and green cylinder. The two label sets are cylinder/ball and red/green.
@@ -48,7 +48,7 @@ def load_aloi_small(return_X_y: bool = False) -> Bunch:
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (288 x 611), the labels numpy array (288 x 2)
@@ -69,7 +69,7 @@ def load_aloi_small(return_X_y: bool = False) -> Bunch:
         return Bunch(dataset_name="ALOI_small", data=data, target=labels)
 
 
-def load_fruit(return_X_y: bool = False) -> Bunch:
+def load_fruit(return_X_y: bool = False) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the fruits data set. It consists of 105 preprocessed images of apples, bananas and grapes in red, green and yellow.
     N=105, d=6, k=[3,3].
@@ -81,7 +81,7 @@ def load_fruit(return_X_y: bool = False) -> Bunch:
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (105 x 6), the labels numpy array (105 x 2)
@@ -97,7 +97,7 @@ def load_fruit(return_X_y: bool = False) -> Bunch:
         return Bunch(dataset_name="FRUIT", data=data, target=labels)
 
 
-def load_nrletters(return_X_y: bool = False) -> Bunch:
+def load_nrletters(return_X_y: bool = False) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the NRLetters data set. It consists of 10000 9x7 images of the letters A, B, C, X, Y and Z in pink, cyan and
     yellow. Additionally, each image highlights one corner in color.
@@ -110,7 +110,7 @@ def load_nrletters(return_X_y: bool = False) -> Bunch:
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Furthermore, the original images are contained in the 'images' attribute.
         Note that the data within 'data' is in HWC format and within 'images' in the CHW format.
@@ -131,7 +131,7 @@ def load_nrletters(return_X_y: bool = False) -> Bunch:
                      image_format="CHW")
 
 
-def load_stickfigures(return_X_y: bool = False) -> Bunch:
+def load_stickfigures(return_X_y: bool = False) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the Dancing Stick Figures data set. It consists of 900 20x20 grayscale images of stick figures in different poses.
     The poses can be divided into three upp-body and three lower-body motions.
@@ -144,7 +144,7 @@ def load_stickfigures(return_X_y: bool = False) -> Bunch:
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Furthermore, the original images are contained in the 'images' attribute.
         Note that the data within 'data' is in HWC format and within 'images' in the CHW format.

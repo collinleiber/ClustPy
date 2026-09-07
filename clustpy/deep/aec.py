@@ -3,9 +3,11 @@
 Collin Leiber
 """
 
-from clustpy.deep._utils import encode_batchwise, mean_squared_error
+from clustpy.deep._utils import mean_squared_error
+from clustpy.deep._encoding_utils import encode_batchwise
 from clustpy.deep._train_utils import get_default_deep_clustering_initialization
 from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
+from clustpy.deep.neural_networks._abstract_neural_network import _AbstractNeuralNetwork
 import torch
 import numpy as np
 from sklearn.base import ClusterMixin
@@ -15,22 +17,23 @@ from collections.abc import Callable
 from pathlib import Path
 
 
-def _aec(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_params: dict,
+def _aec(X: np.ndarray | torch.Tensor, n_clusters: int | None, batch_size: int, pretrain_optimizer_params: dict,
          clustering_optimizer_params: dict, pretrain_epochs: int, clustering_epochs: int,
-         optimizer_class: torch.optim.Optimizer, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss,
-         neural_network: torch.nn.Module | tuple, neural_network_weights: str | Path,
+         optimizer_class: type[torch.optim.Optimizer], ssl_loss_fn: Callable | torch.nn.modules.loss._Loss,
+         neural_network: _AbstractNeuralNetwork | tuple[type[_AbstractNeuralNetwork], dict] | None, neural_network_weights: str | Path | None,
          embedding_size: int, clustering_loss_weight: float, ssl_loss_weight: float,
-         custom_dataloaders: tuple, augmentation_invariance: bool, initial_clustering_class: ClusterMixin,
-         initial_clustering_params: dict, device: torch.device,
-         random_state: np.random.RandomState) -> (np.ndarray, np.ndarray, np.ndarray, np.ndarray, torch.nn.Module):
+         custom_dataloaders: tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader] | tuple[str | Path, str | Path] | None,
+         augmentation_invariance: bool, initial_clustering_class: ClusterMixin | None,
+         initial_clustering_params: dict, device: torch.device | int | str | None,
+         random_state: np.random.RandomState) -> tuple[np.ndarray, np.ndarray, _AbstractNeuralNetwork]:
     """
     Start the actual AEC clustering procedure on the input data set.
 
     Parameters
     ----------
-    X : np.ndarray / torch.Tensor
+    X : np.ndarray | torch.Tensor
         the given data set. Can be a np.ndarray or a torch.Tensor
-    n_clusters : int
+    n_clusters : int | None
         number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN
     batch_size : int
         size of the data batches
@@ -42,14 +45,14 @@ def _aec(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_par
         number of epochs for the pretraining of the neural network
     clustering_epochs : int
         number of epochs for the actual clustering procedure
-    optimizer_class : torch.optim.Optimizer
+    optimizer_class : type[torch.optim.Optimizer]
         the optimizer class
     ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
          self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
-    neural_network : torch.nn.Module | tuple
+    neural_network : _AbstractNeuralNetwork | tuple[type[_AbstractNeuralNetwork], dict] | None
         the input neural network.
         Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict)
-    neural_network_weights : str | Path
+    neural_network_weights : str | Path | None
         Path to a file containing the state_dict of the neural_network.
     embedding_size : int
         size of the embedding within the neural network
@@ -57,7 +60,7 @@ def _aec(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_par
         weight of the clustering loss
     ssl_loss_weight : float
         weight of the self-supervised learning (ssl) loss
-    custom_dataloaders : tuple
+    custom_dataloaders : tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader] | tuple[str | Path, str | Path] | None
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         Can also be a tuple of strings, where the first entry is the path to a saved trainloader and the second entry the path to a saved testloader.
         In this case the dataloaders will be loaded by torch.load(PATH).
@@ -65,18 +68,18 @@ def _aec(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_par
     augmentation_invariance : bool
         If True, augmented samples provided in custom_dataloaders[0] will be used to learn
         cluster assignments that are invariant to the augmentation transformations
-    initial_clustering_class : ClusterMixin
+    initial_clustering_class : ClusterMixin | None
         clustering class to obtain the initial cluster labels after the pretraining
     initial_clustering_params : dict
         parameters for the initial clustering class
-    device : torch.device
+    device : torch.device | int | str | None
         The device on which to perform the computations
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution
 
     Returns
     -------
-    tuple : (np.ndarray, np.ndarray, np.ndarray, np.ndarray, torch.nn.Module)
+    tuple : tuple[np.ndarray, np.ndarray, _AbstractNeuralNetwork]
         The labels as identified by AEC after the training terminated,
         The cluster centers as identified by AEC after the training terminated,
         The final neural network
@@ -127,7 +130,7 @@ class _AEC_Module(_DCN_Module):
                  augmentation_invariance: bool = False):
         super().__init__(init_np_labels, init_np_centers, augmentation_invariance)
 
-    def update_centroids(self, embedded: np.ndarray, labels: np.ndarray) -> torch.Tensor:
+    def update_centroids_aec(self, embedded: np.ndarray, labels: np.ndarray) -> torch.Tensor:
         """
         Update the cluster centers of the _AEC_Module.
 
@@ -151,7 +154,7 @@ class _AEC_Module(_DCN_Module):
         centers_torch = torch.from_numpy(centers)
         return centers_torch
 
-    def fit(self, neural_network: torch.nn.Module, trainloader: torch.utils.data.DataLoader,
+    def fit(self, neural_network: _AbstractNeuralNetwork, trainloader: torch.utils.data.DataLoader,
             testloader: torch.utils.data.DataLoader, n_epochs: int, device: torch.device,
             optimizer: torch.optim.Optimizer, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss, clustering_loss_weight: float,
             ssl_loss_weight: float) -> '_AEC_Module':
@@ -160,7 +163,7 @@ class _AEC_Module(_DCN_Module):
 
         Parameters
         ----------
-        neural_network : torch.nn.Module
+        neural_network : _AbstractNeuralNetwork
             the neural network
         trainloader : torch.utils.data.DataLoader
             dataloader to be used for training
@@ -181,14 +184,14 @@ class _AEC_Module(_DCN_Module):
 
         Returns
         -------
-        self : _AE_Module
+        self : _AEC_Module
             this instance of the _AEC_Module
         """
         # AEC training loop
         tbar = tqdm.trange(n_epochs, desc="AEC training")
         for _ in tbar:
             # Update Network
-            total_loss = 0
+            total_loss = 0.
             for batch in trainloader:
                 # Beware that the clustering loss of DCN is divided by 2, therefore we use 2 * clustering_loss_weight
                 loss = self._loss(batch, neural_network, ssl_loss_fn, ssl_loss_weight,
@@ -203,7 +206,7 @@ class _AEC_Module(_DCN_Module):
             # Update Assignments and Centroids
             embedded = encode_batchwise(testloader, neural_network)
             # update centroids
-            centers = self.update_centroids(embedded, self.labels.cpu().detach().numpy())
+            centers = self.update_centroids_aec(embedded, self.labels.cpu().detach().numpy())
             self.centers = centers.to(device)
             # update assignments
             labels = self.predict_hard(torch.tensor(embedded).to(device))
@@ -220,19 +223,19 @@ class AEC(_AbstractDeepClusteringAlgo):
 
     Parameters
     ----------
-    n_clusters : int
+    n_clusters : int | None
         number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN (default: 8)
     batch_size : int
         size of the data batches (default: 256)
-    pretrain_optimizer_params : dict
+    pretrain_optimizer_params : dict | None
         parameters of the optimizer for the pretraining of the neural network, includes the learning rate. If None, it will be set to {"lr": 1e-3} (default: None)
-    clustering_optimizer_params : dict
+    clustering_optimizer_params : dict | None
         parameters of the optimizer for the actual clustering procedure, includes the learning rate. If None, it will be set to {"lr": 1e-4} (default: None)
     pretrain_epochs : int
         number of epochs for the pretraining of the neural network (default: 100)
     clustering_epochs : int
         number of epochs for the actual clustering procedure (default: 150)
-    optimizer_class : torch.optim.Optimizer
+    optimizer_class : type[torch.optim.Optimizer]
         the optimizer class (default: torch.optim.Adam)
     ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
          self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: mean_squared_error)
@@ -240,14 +243,14 @@ class AEC(_AbstractDeepClusteringAlgo):
         weight of the clustering loss (default: 0.1)
     ssl_loss_weight : float
         weight of the self-supervised learning (ssl) loss (default: 1.0)
-    neural_network : torch.nn.Module | tuple
+    neural_network : _AbstractNeuralNetwork | tuple[type[_AbstractNeuralNetwork], dict] | None
         the input neural network. If None, a new FeedforwardAutoencoder will be created.
         Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict) (default: None)
-    neural_network_weights : str | Path
+    neural_network_weights : str | Path | None
         Path to a file containing the state_dict of the neural_network (default: None)
     embedding_size : int
         size of the embedding within the neural network (default: 10)
-    custom_dataloaders : tuple
+    custom_dataloaders : tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader] | tuple[str | Path, str | Path] | None
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         Can also be a tuple of strings, where the first entry is the path to a saved trainloader and the second entry the path to a saved testloader.
         In this case the dataloaders will be loaded by torch.load(PATH).
@@ -255,15 +258,15 @@ class AEC(_AbstractDeepClusteringAlgo):
     augmentation_invariance : bool
         If True, augmented samples provided in custom_dataloaders[0] will be used to learn
         cluster assignments that are invariant to the augmentation transformations (default: False)
-    initial_clustering_class : ClusterMixin
+    initial_clustering_class : ClusterMixin | None
         clustering class to obtain the initial cluster labels after the pretraining.
         If this is None, random labels will be used (default: None)
-    initial_clustering_params : dict
+    initial_clustering_params : dict | None
         parameters for the initial clustering class. If None, it will be set to {} (default: None)
-    device : torch.device
+    device : torch.device | int | str | None
         The device on which to perform the computations.
         If device is None then it will be automatically chosen: if a gpu is available the gpu with the highest amount of free memory will be chosen (default: None)
-    random_state : np.random.RandomState | int
+    random_state : np.random.RandomState | int | None
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Attributes
@@ -272,7 +275,7 @@ class AEC(_AbstractDeepClusteringAlgo):
         The final labels (obtained by a final KMeans execution)
     cluster_centers_ : np.ndarray
         The final cluster centers (obtained by a final KMeans execution)
-    neural_network_trained_ : torch.nn.Module
+    neural_network_trained_ : _AbstractNeuralNetwork
         The final neural network
     n_features_in_ : int
         the number of features used for the fitting
@@ -292,15 +295,16 @@ class AEC(_AbstractDeepClusteringAlgo):
     CIARP 2013, Havana, Cuba, November 20-23, 2013, Proceedings, Part I 18. Springer Berlin Heidelberg, 2013.
     """
 
-    def __init__(self, n_clusters: int = 8, batch_size: int = 256, pretrain_optimizer_params: dict = None,
-                 clustering_optimizer_params: dict = None, pretrain_epochs: int = 100,
-                 clustering_epochs: int = 150, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
+    def __init__(self, n_clusters: int | None = 8, batch_size: int = 256, pretrain_optimizer_params: dict | None = None,
+                 clustering_optimizer_params: dict | None = None, pretrain_epochs: int = 100,
+                 clustering_epochs: int = 150, optimizer_class: type[torch.optim.Optimizer] = torch.optim.Adam,
                  ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error, clustering_loss_weight: float = 0.1,
-                 ssl_loss_weight: float = 1.0, neural_network: torch.nn.Module | tuple = None,
-                 neural_network_weights: str | Path = None, embedding_size: int = 10, custom_dataloaders: tuple = None,
-                 augmentation_invariance: bool = False, initial_clustering_class: ClusterMixin = None,
-                 initial_clustering_params: dict = None, device: torch.device = None,
-                 random_state: np.random.RandomState | int = None):
+                 ssl_loss_weight: float = 1.0, neural_network: _AbstractNeuralNetwork | tuple[type[_AbstractNeuralNetwork], dict] | None = None,
+                 neural_network_weights: str | Path | None = None, embedding_size: int = 10,
+                 custom_dataloaders: tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader] | tuple[str | Path, str | Path] | None = None,
+                 augmentation_invariance: bool = False, initial_clustering_class: ClusterMixin | None = None,
+                 initial_clustering_params: dict | None = None, device: torch.device | int | str | None = None,
+                 random_state: np.random.RandomState | int | None = None):
         super().__init__(batch_size, neural_network, neural_network_weights, embedding_size, device, random_state)
         self.n_clusters = n_clusters
         self.pretrain_optimizer_params = pretrain_optimizer_params
@@ -316,7 +320,7 @@ class AEC(_AbstractDeepClusteringAlgo):
         self.initial_clustering_class = initial_clustering_class
         self.initial_clustering_params = initial_clustering_params
 
-    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'AEC':
+    def fit(self, X: np.ndarray, y: np.ndarray | None = None) -> 'AEC':
         """
         Initiate the actual clustering process on the input data set.
         The resulting cluster labels will be stored in the labels_ attribute.
@@ -325,7 +329,7 @@ class AEC(_AbstractDeepClusteringAlgo):
         ----------
         X : np.ndarray
             the given data set
-        y : np.ndarray
+        y : np.ndarray | None
             the labels (can be ignored)
 
         Returns

@@ -5,11 +5,12 @@ Collin Leiber
 
 from sklearn.base import ClusterMixin
 from sklearn.cluster import KMeans
-from clustpy.utils import dip_test
+from clustpy.utils import dip_test_extended
 import torch
 import numpy as np
 from clustpy.density.skinnydip import _dip_mirrored_data
-from clustpy.deep._utils import detect_device, encode_batchwise, mean_squared_error
+from clustpy.deep._utils import detect_device, mean_squared_error
+from clustpy.deep._encoding_utils import encode_batchwise
 from clustpy.deep._train_utils import get_default_deep_clustering_initialization
 from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
 from clustpy.deep.neural_networks._resnet_ae_modules import EncoderBlock, DecoderBlock
@@ -18,6 +19,10 @@ from clustpy.utils import plot_scatter_matrix
 import tqdm
 from collections.abc import Callable
 from pathlib import Path
+from clustpy.deep.neural_networks._abstract_neural_network import _AbstractNeuralNetwork
+from clustpy.deep.neural_networks import FeedforwardAutoencoder, ConvolutionalAutoencoder
+from typing import Any
+
 
 """
 Dip module - holds backward functions
@@ -44,7 +49,7 @@ class _Dip_Module(torch.nn.Module):
         super(_Dip_Module, self).__init__()
         self.projection_axes = torch.nn.Parameter(torch.from_numpy(projection_axes).float())
 
-    def forward(self, X: torch.Tensor, projection_axis_index: int) -> (torch.Tensor, torch.Tensor, torch.Tensor):
+    def forward(self, X: torch.Tensor, projection_axis_index: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Calculate and return the Dip-value of the input data projected onto the projection axes at the specified index.
         The actual calculations will happen within the _Dip_Gradient class.
@@ -58,7 +63,7 @@ class _Dip_Module(torch.nn.Module):
 
         Returns
         -------
-        tuple : (torch.Tensor, torch.Tensor, torch.Tensor)
+        tuple[torch.Tensor, torch.Tensor, torch.Tensor]
             The Dip-value, the modal inveral ids, the modal triangle ids
         """
         dip_value, modal_interval, modal_triangle = _Dip_Gradient.apply(X, self.projection_axes[projection_axis_index])
@@ -74,7 +79,7 @@ class _Dip_Gradient(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx: torch.autograd.function._ContextMethodMixin, X: torch.Tensor,
-                projection_vector: torch.Tensor) -> (torch.Tensor, torch.Tensor, torch.Tensor):
+                projection_vector: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Execute the forward method which will return the Dip-value of the input data set projected onto the specified projection axis.
 
@@ -89,7 +94,7 @@ class _Dip_Gradient(torch.autograd.Function):
 
         Returns
         -------
-        tuple : (torch.Tensor, torch.Tensor, torch.Tensor)
+        tuple : tuple[torch.Tensor, torch.Tensor, torch.Tensor]
             The Dip-value, the modal inveral ids, the modal triangle ids
         """
         # Project data onto projection vector
@@ -99,7 +104,10 @@ class _Dip_Gradient(torch.autograd.Function):
         # Calculate dip
         sorted_data = X_proj[sorted_indices]
         sorted_data_numpy = sorted_data.detach().cpu().numpy()
-        dip_value, modal_interval, modal_triangle = dip_test(sorted_data_numpy, is_data_sorted=True, just_dip=False)
+        dip_output = dip_test_extended(sorted_data_numpy)
+        dip_value = dip_output[0]
+        modal_interval = dip_output[1]
+        modal_triangle = dip_output[2]
         dip_value_torch = torch.tensor(dip_value)
         modal_interval_torch = torch.tensor(modal_interval, dtype=torch.long)
         modal_triangle_torch = torch.tensor(modal_triangle, dtype=torch.long) 
@@ -108,24 +116,26 @@ class _Dip_Gradient(torch.autograd.Function):
         return dip_value_torch, sorted_indices[modal_interval_torch], sorted_indices[modal_triangle_torch]
 
     @staticmethod
-    def backward(ctx: torch.autograd.function._ContextMethodMixin, grad_output_dip: torch.Tensor, grad_output_modal_interval: torch.Tensor, 
-                 grad_output_modal_triangle: torch.Tensor) -> (torch.Tensor, torch.Tensor):
+    def backward(ctx: Any, *grad_outputs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Execute the backward method which will return the gradients of the Dip-value calculated in the forward method.
         First gradient corresponds the data, second gradient corresponds to the projection axis.
 
         Parameters
         ----------
-        ctx : torch.autograd.function._ContextMethodMixin
+        ctx : Any
             A context object used to load information from the forward method.
         grad_output : torch.Tensor
             Corresponds to the factor that the Dip-value has been multiplied by after it has been returned be the _Dip_Module
 
         Returns
         -------
-        gradient : (torch.Tensor, torch.Tensor)
+        gradient : tuple[torch.Tensor, torch.Tensor]
             The gradient of the Dip-value with respect to the data and with respect to the projection axis
         """
+        grad_output_dip = grad_outputs[0]
+        grad_output_modal_interval = grad_outputs[1]
+        grad_output_modal_triangle = grad_outputs[2]
         # Load parameters from forward
         X, X_proj, sorted_indices, projection_vector, modal_triangle = ctx.saved_tensors
         device = detect_device(projection_vector.get_device())
@@ -155,8 +165,8 @@ class _Dip_Gradient(torch.autograd.Function):
         return grad_output_dip * gradient_x, grad_output_dip * gradient_proj
 
 
-def _calculate_partial_derivative_x(X_proj, data_index_i1: torch.long, data_index_i2: torch.long,
-                                    data_index_i3: torch.long, device: torch.device) -> torch.Tensor:
+def _calculate_partial_derivative_x(X_proj, data_index_i1: torch.Tensor, data_index_i2: torch.Tensor,
+                                    data_index_i3: torch.Tensor, device: torch.device) -> torch.Tensor:
     """
     Calculate the gradient of the Dip-value with respect to the data.
 
@@ -164,11 +174,11 @@ def _calculate_partial_derivative_x(X_proj, data_index_i1: torch.long, data_inde
     ----------
     X_proj : torch.Tensor
         The projected data
-    data_index_i1 : torch.long
+    data_index_i1 : torch.Tensor
         Index of the first full-dimensional object of the modal triangle (beware that the index of the projected and non-projected data differs)
-    data_index_i2 : torch.long
+    data_index_i2 : torch.Tensor
         Index of the second full-dimensional object of the modal triangle (beware that the index of the projected and non-projected data differs)
-    data_index_i3 : torch.long
+    data_index_i3 : torch.Tensor
         Index of the third full-dimensional object of the modal triangle (beware that the index of the projected and non-projected data differs)
     device : torch.device
         device to be trained on
@@ -191,8 +201,8 @@ def _calculate_partial_derivative_x(X_proj, data_index_i1: torch.long, data_inde
     return gradient
 
 
-def _calculate_partial_derivative_proj(X: torch.Tensor, X_proj: torch.Tensor, data_index_i1: torch.long,
-                                       data_index_i2: torch.long, data_index_i3: torch.long) -> torch.Tensor:
+def _calculate_partial_derivative_proj(X: torch.Tensor, X_proj: torch.Tensor, data_index_i1: torch.Tensor,
+                                       data_index_i2: torch.Tensor, data_index_i3: torch.Tensor) -> torch.Tensor:
     """
     Calculate the gradient of the Dip-value with respect to the projection axis.
 
@@ -202,11 +212,11 @@ def _calculate_partial_derivative_proj(X: torch.Tensor, X_proj: torch.Tensor, da
         The data set
     X_proj : torch.Tensor
         The projected data
-    data_index_i1 : torch.long
+    data_index_i1 : torch.Tensor
         Index of the first full-dimensional object of the modal triangle (beware that the index of the projected and non-projected data differs)
-    data_index_i2 : torch.long
+    data_index_i2 : torch.Tensor
         Index of the second full-dimensional object of the modal triangle (beware that the index of the projected and non-projected data differs)
-    data_index_i3 : torch.long
+    data_index_i3 : torch.Tensor
         Index of the third full-dimensional object of the modal triangle (beware that the index of the projected and non-projected data differs)
 
     Returns
@@ -226,7 +236,7 @@ Module-helpers
 """
 
 
-def plot_dipencoder_embedding(X_embed: np.ndarray, n_clusters: int, labels: np.ndarray, projection_axes: np.ndarray,
+def plot_dipencoder_embedding(X_embed: np.ndarray, n_clusters: int | None, labels: np.ndarray, projection_axes: np.ndarray,
                               index_dict: dict, edge_width: float = 0.1, show_legend: bool = False,
                               show_plot: bool = True) -> None:
     """
@@ -237,7 +247,7 @@ def plot_dipencoder_embedding(X_embed: np.ndarray, n_clusters: int, labels: np.n
     ----------
     X_embed : np.ndarray
         The embedded data set
-    n_clusters : int
+    n_clusters : int | None
         Number of clusters
     labels : np.ndarray
         The cluster labels
@@ -252,6 +262,7 @@ def plot_dipencoder_embedding(X_embed: np.ndarray, n_clusters: int, labels: np.n
     show_plot : bool
         Specifies whether the plot should be plotted, i.e. if plt.show() should be executed (default: True)
     """
+    n_clusters = len(np.unique(labels)) if n_clusters is None else n_clusters
     # Get cluster means do plot projection axes
     means = [np.mean(X_embed[labels == i], axis=0) for i in range(n_clusters)]
     # Get min and max values to scale the plots
@@ -261,6 +272,7 @@ def plot_dipencoder_embedding(X_embed: np.ndarray, n_clusters: int, labels: np.n
     arbitrary_high_value = 999999  # used to have infinite projection axis
     # Plot the scatter matrix
     axes = plot_scatter_matrix(X_embed, labels=labels, show_plot=False, show_legend=show_legend)
+    assert isinstance(axes, np.ndarray), "Axes must be a numpy array"
     # Add projection axes
     for m in range(X_embed.shape[1]):
         for n in range(X_embed.shape[1]):
@@ -282,8 +294,8 @@ def plot_dipencoder_embedding(X_embed: np.ndarray, n_clusters: int, labels: np.n
         plt.show()
 
 
-def _get_ssl_loss_of_first_batch(trainloader: torch.utils.data.DataLoader, neural_network: torch.nn.Module,
-                                 ssl_loss_fn: Callable | torch.nn.modules.loss._Loss, device: torch.device) -> torch.Tensor:
+def _get_ssl_loss_of_first_batch(trainloader: torch.utils.data.DataLoader, neural_network: _AbstractNeuralNetwork,
+                                 ssl_loss_fn: Callable | torch.nn.modules.loss._Loss, device: torch.device) -> float:
     """
     Calculate the ssl loss of the first batch of data.
     Therefore, a new instance of the neural network will be created using the same architecture.
@@ -292,7 +304,7 @@ def _get_ssl_loss_of_first_batch(trainloader: torch.utils.data.DataLoader, neura
     ----------
     trainloader : torch.utils.data.DataLoader
         dataloader to be used for training
-    neural network : torch.nn.Module
+    neural network : _AbstractNeuralNetwork
         the neural_network
     ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
          self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
@@ -301,28 +313,31 @@ def _get_ssl_loss_of_first_batch(trainloader: torch.utils.data.DataLoader, neura
 
     Returns
     -------
-    ssl_loss : torch.Tensor
+    ssl_loss : float
         The ssl loss of the first batch of data
     """
-    neural_network_class = type(neural_network)
     # Create new instance of the neural network
-    if hasattr(neural_network, "encoder"):
+    if isinstance(neural_network, FeedforwardAutoencoder):
         # In case of Feedforward-based architectures
-        tmp_neural_network = neural_network_class(layers=neural_network.encoder.layers,
+        neural_network_class_ff = type(neural_network)
+        tmp_neural_network : _AbstractNeuralNetwork = neural_network_class_ff(layers=neural_network.encoder.layers,
                                                   decoder_layers=neural_network.decoder.layers).to(device)
-    else:
+    elif isinstance(neural_network, ConvolutionalAutoencoder):
         # In case of Conv-based architectures
+        neural_network_class_conv = type(neural_network)
         conv_encoder_name = "resnet18" if type(neural_network.conv_encoder.layer1[0]) is EncoderBlock else "resnet50"
         conv_decoder_name = "resnet18" if type(neural_network.conv_decoder.layer1[0]) is DecoderBlock else "resnet50"
-        tmp_neural_network = neural_network_class(input_height=neural_network.input_height,
+        tmp_neural_network = neural_network_class_conv(input_height=neural_network.input_height,
                                                   fc_layers=neural_network.fc_encoder.layers,
                                                   conv_encoder_name=conv_encoder_name,
                                                   fc_decoder_layers=neural_network.fc_decoder.layers,
                                                   conv_decoder_name=conv_decoder_name).to(device)
+    else:
+        raise ValueError("_get_ssl_loss_of_first_batch is currently only working with neural networks of type FeedforwardAutoencoder and ConvolutionalAutoencoder")
     # Get first batch of data and calculate ssl loss
     batch_init = next(iter(trainloader))
-    ssl_loss, _, _ = tmp_neural_network.loss(batch_init, ssl_loss_fn, device)
-    return ssl_loss.detach()
+    ssl_loss, _ = tmp_neural_network.loss(batch_init, ssl_loss_fn, device)
+    return float(ssl_loss.detach().cpu())
 
 
 def _predict_using_thresholds(X: np.ndarray, projections: np.ndarray, projection_thresholds: list,
@@ -376,7 +391,7 @@ class _DipEncoder_Module(torch.nn.Module):
         nNumber of clusters
     index_dict : dict
         A dictionary to match the indices of two clusters to a projection axis
-    dip_module : torch.nn.Module
+    dip_module : _Dip_Module
         The DipModule
     init_np_labelss : np.ndarray
         The initial cluster labels
@@ -397,7 +412,7 @@ class _DipEncoder_Module(torch.nn.Module):
         A list containing the thresholds for each projection axis and a tuple indicating which cluster is left and right of the threshold
     """
 
-    def __init__(self, n_clusters: int, index_dict: dict, dip_module: torch.nn.Module, 
+    def __init__(self, n_clusters: int, index_dict: dict, dip_module: _Dip_Module,
                  init_np_labels: np.ndarray, max_cluster_size_diff_factor: float, augmentation_invariance: bool = False, 
                  use_gt: bool = False):
         super().__init__()
@@ -409,7 +424,7 @@ class _DipEncoder_Module(torch.nn.Module):
         self.augmentation_invariance = augmentation_invariance
         self.use_gt = use_gt
 
-    def _update_labels_and_thresholds(self, X: np.ndarray) -> (np.ndarray, list):
+    def _update_labels_and_thresholds(self, X: np.ndarray) -> tuple[np.ndarray, list]:
         """
         Predict the clustering labels using the current structure of the neural network and DipModule.
         Therefore, we determine the modal interval for two clusters on their corresponding projection axis using X.
@@ -424,7 +439,7 @@ class _DipEncoder_Module(torch.nn.Module):
 
         Returns
         -------
-        tuple : (np.ndarray, list)
+        tuple : tuple[np.ndarray, list]
             The new labels,
             A list containing the thresholds for each projection axis and a tuple indicating which cluster is left and right of the threshold
         """
@@ -544,7 +559,7 @@ class _DipEncoder_Module(torch.nn.Module):
         dip_loss_new = 0.5 * (dip_value_m + dip_value_n) - dip_value_mn
         return dip_loss_new
 
-    def _loss(self, batch: list, labels_torch: torch.Tensor, neural_network: torch.nn.Module, 
+    def _loss(self, batch: list, labels_torch: torch.Tensor, neural_network: _AbstractNeuralNetwork,
               ssl_loss_fn: Callable | torch.nn.modules.loss._Loss, ssl_loss_weight: float, 
               clustering_loss_weight: float, device: torch.device) -> torch.Tensor:
         """
@@ -556,7 +571,7 @@ class _DipEncoder_Module(torch.nn.Module):
             the minibatch
         labels_torch : torch.Tensor
             the current cluster labels as torch tensor
-        neural_network : torch.nn.Module
+        neural_network : _AbstractNeuralNetwork
             the neural network
         ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
             self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
@@ -576,10 +591,10 @@ class _DipEncoder_Module(torch.nn.Module):
         ids = batch[0]
         # SSL Loss
         if self.augmentation_invariance:
-            ssl_loss, embedded, _, embedded_aug, _ = neural_network.loss_augmentation(batch, ssl_loss_fn,
+            ssl_loss, embedded, embedded_aug = neural_network.loss_augmentation(batch, ssl_loss_fn,
                                                                                     device)
         else:
-            ssl_loss, embedded, _ = neural_network.loss(batch, ssl_loss_fn, device)
+            ssl_loss, embedded = neural_network.loss(batch, ssl_loss_fn, device)
         # Get points within each cluster
         points_in_all_clusters = [torch.where(labels_torch[ids] == clus)[0].to(device) for clus in
                                 range(self.n_clusters)]
@@ -604,7 +619,7 @@ class _DipEncoder_Module(torch.nn.Module):
         loss = clustering_loss_weight * final_dip_loss + ssl_loss * ssl_loss_weight
         return loss
 
-    def fit(self, neural_network: torch.nn.Module, trainloader: torch.utils.data.DataLoader, 
+    def fit(self, neural_network: _AbstractNeuralNetwork, trainloader: torch.utils.data.DataLoader,
             testloader: torch.utils.data.DataLoader, n_epochs: int,
             device: torch.device, optimizer: torch.optim.Optimizer, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss,
             clustering_loss_weight: float, ssl_loss_weight: float) -> '_DipEncoder_Module':
@@ -613,7 +628,7 @@ class _DipEncoder_Module(torch.nn.Module):
 
         Parameters
         ----------
-        neural_network : torch.nn.Module
+        neural_network : _AbstractNeuralNetwork
             the neural network
         trainloader : torch.utils.data.DataLoader
             dataloader to be used for training
@@ -648,7 +663,7 @@ class _DipEncoder_Module(torch.nn.Module):
                 labels_torch = torch.from_numpy(self.labels).int().to(device)
             if iteration == n_epochs:
                 break
-            total_loss = 0
+            total_loss = 0.
             for batch in trainloader:
                 loss = self._loss(batch, labels_torch, neural_network, ssl_loss_fn, ssl_loss_weight, clustering_loss_weight, device)
                 total_loss += loss.item()
@@ -680,39 +695,39 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
 
     Parameters
     ----------
-    n_clusters : int
+    n_clusters : int | None
         number of clusters. Can be None if a corresponding initial_clustering_class is given, that can determine the number of clusters, e.g. DBSCAN (default: 8)
     batch_size : int
         size of the data batches for the actual training of the DipEncoder.
-        Should be larger the more clusters we have. If it is None, it will be set to (25 x n_clusters) (default: None)
-    pretrain_optimizer_params : dict
+        Should be larger the more clusters we have. If it is zero, it will be set to (25 x n_clusters) (default: 0)
+    pretrain_optimizer_params : dict | None
         parameters of the optimizer for the pretraining of the neural network, includes the learning rate. If None, it will be set to {"lr": 1e-3} (default: None)
-    clustering_optimizer_params : dict
+    clustering_optimizer_params : dict | None
         parameters of the optimizer for the actual clustering procedure, includes the learning rate. If None, it will be set to {"lr": 1e-4} (default: None)
     pretrain_epochs : int
         number of epochs for the pretraining of the neural network (default: 100)
     clustering_epochs : int
         number of epochs for the actual clustering procedure (default: 150)
-    optimizer_class : torch.optim.Optimizer
+    optimizer_class : type[torch.optim.Optimizer]
         the optimizer class (default: torch.optim.Adam)
     ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
          self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: mean_squared_error)
-    neural_network : torch.nn.Module | tuple
+    neural_network : _AbstractNeuralNetwork | tuple[type[_AbstractNeuralNetwork], dict] | None
         the input neural network. If None, a new FeedforwardAutoencoder will be created.
         Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict) (default: None)
-    neural_network_weights : str | Path
+    neural_network_weights : str | Path | None
         Path to a file containing the state_dict of the neural_network (default: None)
     embedding_size : int
         size of the embedding within the neural network (default: 10)
     max_cluster_size_diff_factor : float
         The maximum different in size when comparing two clusters regarding the number of samples.
-        If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) closest samples will be used (default: 3)
+        If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) closest samples will be used (default: 3.)
     clustering_loss_weight : float
         weight of the clustering loss (default: 1.0)
-    ssl_loss_weight : float
+    ssl_loss_weight : float | None
         weight of the self-supervised learning (ssl) loss.
         If None, it will be equal to 1/(4L), where L is the reconstruction loss of the first batch of an untrained neural network (default: None)
-    custom_dataloaders : tuple
+    custom_dataloaders : tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader] | tuple[str | Path, str | Path] | None
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         Can also be a tuple of strings, where the first entry is the path to a saved trainloader and the second entry the path to a saved testloader.
         In this case the dataloaders will be loaded by torch.load(PATH).
@@ -720,14 +735,14 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
     augmentation_invariance : bool
         If True, augmented samples provided in custom_dataloaders[0] will be used to learn
         cluster assignments that are invariant to the augmentation transformations (default: False)
-    initial_clustering_class : ClusterMixin
+    initial_clustering_class : ClusterMixin | None
         clustering class to obtain the initial cluster labels after the pretraining (default: KMeans)
-    initial_clustering_params : dict
+    initial_clustering_params : dict | None
         parameters for the initial clustering class. If None, it will be set to {} (default: None)
-    device : torch.device
+    device : torch.device | int | str | None
         The device on which to perform the computations.
         If device is None then it will be automatically chosen: if a gpu is available the gpu with the highest amount of free memory will be chosen (default: None)
-    random_state : np.random.RandomState | int
+    random_state : np.random.RandomState | int | None
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Attributes
@@ -760,16 +775,18 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
     Proceedings of the 28th ACM SIGKDD Conference on Knowledge Discovery & Data Mining. 2022.
     """
 
-    def __init__(self, n_clusters: int = 8, batch_size: int = None, pretrain_optimizer_params: dict = None,
-                 clustering_optimizer_params: dict = None, pretrain_epochs: int = 100,
-                 clustering_epochs: int = 150, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
+    def __init__(self, n_clusters: int | None = 8, batch_size: int = 0, pretrain_optimizer_params: dict | None = None,
+                 clustering_optimizer_params: dict | None = None, pretrain_epochs: int = 100,
+                 clustering_epochs: int = 150, optimizer_class: type[torch.optim.Optimizer] = torch.optim.Adam,
                  ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error,
-                 neural_network: torch.nn.Module | tuple = None, neural_network_weights: str | Path = None,
-                 embedding_size: int = 10, max_cluster_size_diff_factor: float = 3,
-                 clustering_loss_weight: float = 1., ssl_loss_weight: float = None,
-                 custom_dataloaders: tuple = None, augmentation_invariance: bool = False,
-                 initial_clustering_class: ClusterMixin = KMeans, initial_clustering_params: dict = None,
-                 device: torch.device = None, random_state: np.random.RandomState | int = None):
+                 neural_network: _AbstractNeuralNetwork | tuple[type[_AbstractNeuralNetwork], dict] | None = None,
+                 neural_network_weights: str | Path | None = None,
+                 embedding_size: int = 10, max_cluster_size_diff_factor: float = 3.,
+                 clustering_loss_weight: float = 1., ssl_loss_weight: float | None = None,
+                 custom_dataloaders: tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader] | tuple[str | Path, str | Path] | None = None,
+                 augmentation_invariance: bool = False,
+                 initial_clustering_class: ClusterMixin | None = KMeans, initial_clustering_params: dict | None = None,
+                 device: torch.device | int | str | None = None, random_state: np.random.RandomState | int | None = None):
         super().__init__(batch_size, neural_network, neural_network_weights, embedding_size, device, random_state)
         self.n_clusters = n_clusters
         self.pretrain_optimizer_params = pretrain_optimizer_params
@@ -786,7 +803,7 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
         self.initial_clustering_class = initial_clustering_class
         self.initial_clustering_params = initial_clustering_params
 
-    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DipEncoder':
+    def fit(self, X: np.ndarray, y: np.ndarray | None = None) -> 'DipEncoder':
         """
         Initiate the actual clustering/dimensionality reduction process on the input data set.
         If no ground truth labels are given, the resulting cluster labels will be stored in the labels_ attribute.
@@ -795,7 +812,7 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
         ----------
         X : np.ndarray
             The given (training) data set
-        y : np.ndarray
+        y : np.ndarray | None
             The ground truth labels. If None, the DipEncoder will be used for clustering (default: None)
 
         Returns
@@ -804,8 +821,8 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
             This instance of the DipEncoder
         """
         X, y, random_state, pretrain_optimizer_params, clustering_optimizer_params, initial_clustering_params = self._check_parameters(X, y=y)
-        assert self.batch_size is not None or self.n_clusters is not None, "n_clusters and batch_size can not both be None"
-        batch_size = 25 * self.n_clusters if self.batch_size is None else self.batch_size
+        assert self.batch_size > 0 or self.n_clusters is not None, "n_clusters cannot be None if batch_size is 0"
+        batch_size = 25 * self.n_clusters if (self.batch_size == 0 and self.n_clusters is not None) else self.batch_size
         # Get initial setting (device, dataloaders, pretrained AE and initial clustering result)
         device, trainloader, testloader, _, neural_network, X_embed, n_clusters, init_labels, init_centers, _ = get_default_deep_clustering_initialization(
             X, self.n_clusters, batch_size, pretrain_optimizer_params, self.pretrain_epochs, self.optimizer_class, self.ssl_loss_fn,
@@ -834,7 +851,7 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
         else:
             ssl_loss_weight = self.ssl_loss_weight
         # Create initial projections vectors by using difference between cluster centers
-        index_dict = {}
+        index_dict: dict[tuple[int, int], int] = {}
         projections = np.zeros((n_cluster_combinations, self.embedding_size))
         for m in range(n_clusters - 1):
             for n in range(m + 1, n_clusters):
@@ -861,7 +878,7 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
         self.set_n_features_in(X)
         return self
 
-    def predict(self, X: np.ndarray) -> np.ndarray:
+    def predict(self, X: np.ndarray, cluster_centers: np.ndarray | None = None) -> np.ndarray:
         """
         Predicts the labels of the input data.
 
@@ -869,6 +886,8 @@ class DipEncoder(_AbstractDeepClusteringAlgo):
         ----------
         X : np.ndarray
             input data
+        cluster_centers : np.ndarray | None
+            Not used (default: None)
 
         Returns
         -------

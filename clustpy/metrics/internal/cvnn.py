@@ -43,7 +43,7 @@ def cvnn_score(X: np.ndarray, labels: np.ndarray | int | tuple, n_neighbors: int
     Liu, Yanchi, et al. "Understanding and enhancement of internal clustering validation measures."
     IEEE transactions on cybernetics 43.3 (2013): 982-994.
     """
-    def _internal_cvnn_score(X: np.ndarray, labels: np.ndarray, nrbs_indices: np.ndarray, metric: str, noise_strategy: str) -> (float, float):
+    def _internal_cvnn_score(X: np.ndarray, labels: np.ndarray, nrbs_indices: np.ndarray, metric: str, noise_strategy: str) -> tuple[float, float]:
         """
         The real calculation method of the CVNN score.
 
@@ -62,11 +62,13 @@ def cvnn_score(X: np.ndarray, labels: np.ndarray | int | tuple, n_neighbors: int
 
         Returns
         -------
-        tuple : (float, float)
+        tuple : tuple[float, float]
             The cluster spearation and cluster compactness value
         """
         X, labels = _check_length_data_and_labels(X, labels)
-        labels, X, _ = handle_noise(labels, noise_strategy, X)
+        labels, X_noise_handled, _ = handle_noise(labels, noise_strategy, X)
+        assert X_noise_handled is not None, "X_noise_handled is None, but should not be None"
+        X = X_noise_handled
         assert isinstance(labels, np.ndarray), "labels must be of type np.ndarray. Your input has type {0}".format(type(labels))
         unique_clusters = np.unique(labels)
         # Calculate neighbor weights

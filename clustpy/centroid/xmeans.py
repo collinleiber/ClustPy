@@ -16,8 +16,8 @@ HELPERS also used by other classes
 """
 
 
-def _initial_kmeans_clusters(X: np.ndarray, n_clusters_init: int | np.ndarray, random_state: np.random.RandomState) -> (
-        int, np.ndarray, np.ndarray, float):
+def _initial_kmeans_clusters(X: np.ndarray, n_clusters_init: int | np.ndarray, random_state: np.random.RandomState) -> tuple[
+        int, np.ndarray, np.ndarray, float]:
     """
     Get the initial cluster centers and cluster labels based on the n_clusters_init parameter.
     If n_clusters_init is an integer, the cluster parameters are identified by KMeans with n_clusters_init als single input.
@@ -34,19 +34,19 @@ def _initial_kmeans_clusters(X: np.ndarray, n_clusters_init: int | np.ndarray, r
 
     Returns
     -------
-    tuple : (int, np.ndarray, np.ndarray, float)
+    tuple : tuple[int, np.ndarray, np.ndarray, float]
         The initial number of clusters,
         The initial cluster labels,
         The initial cluster centers,
         The Kmeans error of the initial clustering result
     """
-    if type(n_clusters_init) is int and n_clusters_init == 1:
+    if isinstance(n_clusters_init, int) and n_clusters_init == 1:
         n_clusters = n_clusters_init
         labels = np.zeros(X.shape[0], dtype=np.int32)
         centers = np.mean(X, axis=0).reshape(1, -1)
         kmeans_error = np.sum((X - centers) ** 2)
     else:
-        if type(n_clusters_init) is int:
+        if isinstance(n_clusters_init, int):
             # Normally, n_clusters_init is int
             n_clusters = n_clusters_init
             kmeans = KMeans(n_clusters=n_clusters, random_state=random_state)
@@ -62,7 +62,7 @@ def _initial_kmeans_clusters(X: np.ndarray, n_clusters_init: int | np.ndarray, r
 
 
 def _execute_two_means(X: np.ndarray, ids_in_each_cluster: list, cluster_id_to_split: int, centers: np.ndarray,
-                       n_split_trials: int, random_state: np.random.RandomState) -> (np.ndarray, np.ndarray, float):
+                       n_split_trials: int, random_state: np.random.RandomState) -> tuple[np.ndarray, np.ndarray, float]:
     """
     Execute 2-Means.
     Splits a cluster into two by first selecting a random object from the data set as first new cluster and then selects the coordinate on the opposite site of the original center as the second new center.
@@ -86,7 +86,7 @@ def _execute_two_means(X: np.ndarray, ids_in_each_cluster: list, cluster_id_to_s
 
     Returns
     -------
-    tuple : (np.ndarray, np.ndarray, float)
+    tuple : tuple[np.ndarray, np.ndarray, float]
         The resulting cluster labels,
         The resuling cluster centers,
         The Kmeans error of the clustering result
@@ -118,6 +118,7 @@ def _execute_two_means(X: np.ndarray, ids_in_each_cluster: list, cluster_id_to_s
         # Check squared distances to find best kmeans result
         if best_kmeans is None or best_kmeans.inertia_ - kmeans.inertia_ > 1e-6:
             best_kmeans = kmeans
+    assert best_kmeans is not None, "best_kmeans is None. This should not happen."
     return best_kmeans.labels_, best_kmeans.cluster_centers_, best_kmeans.inertia_
 
 
@@ -127,7 +128,7 @@ Actual XMeans methods
 
 
 def _xmeans(X: np.ndarray, n_clusters_init: int, max_n_clusters: int, check_global_score: bool, allow_merging: bool,
-            n_split_trials: int, split_criterion: str, random_state: np.random.RandomState) -> (int, np.ndarray, np.ndarray):
+            n_split_trials: int, split_criterion: str, random_state: np.random.RandomState) -> tuple[int, np.ndarray, np.ndarray]:
     """
     Start the actual XMeans clustering procedure on the input data set.
 
@@ -153,7 +154,7 @@ def _xmeans(X: np.ndarray, n_clusters_init: int, max_n_clusters: int, check_glob
 
     Returns
     -------
-    tuple : (int, np.ndarray, np.ndarray)
+    tuple : tuple[int, np.ndarray, np.ndarray]
         The final number of clusters,
         The labels as identified by XMeans,
         The cluster centers as identified by XMeans
@@ -213,8 +214,8 @@ def _xmeans(X: np.ndarray, n_clusters_init: int, max_n_clusters: int, check_glob
             # Update parameters of all clusters
             ids_in_each_cluster = [np.where(labels == c)[0] for c in range(n_clusters)]
             cluster_sizes = np.array([ids_in_cluster.shape[0] for ids_in_cluster in ids_in_each_cluster])
-            cluster_inertias = [np.sum((X[ids_in_each_cluster[c]] - centers[c]) ** 2) if cluster_sizes[c] > 1 else 0 for c in
-                                 range(n_clusters)]
+            cluster_inertias = np.array([np.sum((X[ids_in_each_cluster[c]] - centers[c]) ** 2) if cluster_sizes[c] > 1 else 0 for c in
+                                 range(n_clusters)])
             if check_global_score:
                 # Get new global score
                 new_global_score = _clustering_score(X.shape[0], cluster_sizes, n_dims, kmeans.inertia_, split_criterion)
@@ -235,7 +236,7 @@ def _xmeans(X: np.ndarray, n_clusters_init: int, max_n_clusters: int, check_glob
 
 
 def _merge_clusters(X: np.ndarray, n_clusters: int, labels: np.ndarray, centers: np.ndarray, ids_in_each_cluster: list,
-                    cluster_sizes: np.ndarray, cluster_inertias: np.ndarray, split_criterion: str) -> (int, np.ndarray, np.ndarray):
+                    cluster_sizes: np.ndarray, cluster_inertias: np.ndarray, split_criterion: str) -> tuple[int, np.ndarray, np.ndarray]:
     """
     Addition to XMeans by Ishioka et al..
     Attempts to repair errors caused by an unfortunate splitting order by merging clusters.
@@ -264,7 +265,7 @@ def _merge_clusters(X: np.ndarray, n_clusters: int, labels: np.ndarray, centers:
 
     Returns
     -------
-    tuple : (int, np.ndarray, np.ndarray)
+    tuple : tuple[int, np.ndarray, np.ndarray]
         The updated number of clusters,
         The updated labels,
         The updated cluster centers
@@ -382,7 +383,7 @@ class XMeans(ClusterMixin, BaseEstimator):
     n_clusters_init : int
         The initial number of clusters. Can also by of type np.ndarray if initial cluster centers are specified (default: 2)
     max_n_clusters : int
-        Maximum number of clusters. Must be larger than n_clusters_init (default: np.inf)
+        Maximum number of clusters. Must be larger than n_clusters_init (default: 1000)
     check_global_score : bool
         Defines whether the global score should be checked after the 'Improve-Params' step. Some implementations skip this step (default: True)
     allow_merging : bool
@@ -393,7 +394,7 @@ class XMeans(ClusterMixin, BaseEstimator):
     split_criterion : str
         The split criterion. Can be "bic-original" (BIC), "bic-corrected" (corrected BIC), 
         "aic-original" (AIC), or "aic-corrected" (corrected AIC) (default: bic-corrected)
-    random_state : np.random.RandomState | int
+    random_state : np.random.RandomState | int | None
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Attributes
@@ -436,9 +437,9 @@ class XMeans(ClusterMixin, BaseEstimator):
     https://github.com/bobhancock/goxmeans/blob/master/doc/BIC_notes.pdf
     """
 
-    def __init__(self, n_clusters_init: int = 2, max_n_clusters: int = np.inf, check_global_score: bool = True,
+    def __init__(self, n_clusters_init: int = 2, max_n_clusters: int = 1000, check_global_score: bool = True,
                  allow_merging: bool = False, n_split_trials: int = 10, split_criterion: str = "bic-corrected",
-                 random_state: np.random.RandomState | int = None):
+                 random_state: np.random.RandomState | int | None = None):
         self.n_clusters_init = n_clusters_init
         self.max_n_clusters = max_n_clusters
         self.check_global_score = check_global_score
@@ -447,7 +448,7 @@ class XMeans(ClusterMixin, BaseEstimator):
         self.split_criterion = split_criterion
         self.random_state = random_state
 
-    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'XMeans':
+    def fit(self, X: np.ndarray, y: np.ndarray | None = None) -> 'XMeans':
         """
         Initiate the actual clustering process on the input data set.
         The resulting cluster labels will be stored in the labels_ attribute.
@@ -456,7 +457,7 @@ class XMeans(ClusterMixin, BaseEstimator):
         ----------
         X : np.ndarray
             the given data set
-        y : np.ndarray
+        y : np.ndarray | None
             the labels (can be ignored)
 
         Returns

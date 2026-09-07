@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from clustpy.utils.checks import check_parameters
 from sklearn.utils.validation import check_is_fitted
 from sklearn.metrics.pairwise import pairwise_distances_argmin_min
-from sklearn.utils import check_random_state
+from clustpy.utils.checks import check_random_state
 from clustpy.metrics._metrics_utils import _check_length_data_and_labels
 import inspect
 
@@ -20,7 +20,7 @@ def gap_statistic_score(X: np.ndarray, labels: np.ndarray, n_clusters: int | Non
                   use_log: bool = True, weighted: bool = False, use_principal_components: bool = True, 
                   inertia: float | None = None, cluster_centers : np.ndarray | None = None, 
                   clustering_algorithm : ClusterMixin = KMeans, clustering_params: dict | None = None, 
-                  bootstrapped_data: np.ndarray | None = None, n_boots: int = 50, 
+                  bootstrapped_data: np.ndarray | list | None = None, n_boots: int = 50,
                   random_state: np.random.RandomState | int | None = None) -> float | tuple[float, float]:
     """
     Calculate the Gap Statistic for the given clustering result.
@@ -52,7 +52,7 @@ def gap_statistic_score(X: np.ndarray, labels: np.ndarray, n_clusters: int | Non
         The clustering algorithm run on the bootstraped data (default: KMeans)
     clustering_params : dict | None
         The parameters for the clustering algorithm. If None, it will be equal to {} (default: None)
-    bootstrapped_data : np.ndarray | None
+    bootstrapped_data : np.ndarray | list | None
         The bootstrapped data sets. If None, a new set of n_boots datasets will be created (default: None)
     n_boots : int
         Number of random data sets that should be created to calculate Gap Statistic. Has to match bootstrapped_data (default: 50)
@@ -63,7 +63,7 @@ def gap_statistic_score(X: np.ndarray, labels: np.ndarray, n_clusters: int | Non
     -------
     tuple : float | tuple[float, float]
         The Gap value,
-        Optionally the s_k value
+        Optionally the s_k value (if return_sk is True)
 
     References
     ----------
@@ -105,7 +105,7 @@ def gap_statistic_score(X: np.ndarray, labels: np.ndarray, n_clusters: int | Non
         # Save within cluster dispersion
         W_kbs[b] = _get_within_cluster_dispersion(bootstrapped_data[b], labels_boot, centers_boot, inertia_boot, use_log, weighted)
     # Calculate Gap Statistic
-    gap = np.mean(W_kbs) - W_k
+    gap = float(np.mean(W_kbs) - W_k)
     if return_sk:
         sk = np.sqrt(1 + 1 / n_boots) * np.std(W_kbs)
         return gap, sk
@@ -171,8 +171,8 @@ def _gap_statistic_clusterer(X: np.ndarray, min_n_clusters: int, max_n_clusters:
     # Create bootstrapped data
     bootstrapped_data = [_generate_random_data(X.shape, mins, maxs, pca, random_state) for _ in range(n_boots)]
     # Prepare parameters
-    gaps = []
-    sks = []
+    gaps_list = []
+    sks_list = []
     all_labels = []
     fulfills_gap_idx = None
     for n_clusters in range(min_n_clusters, max_n_clusters + 2): # +1 because max_n_clusters should be a potential output (we need to calculate Gap(k+1)) 
@@ -180,23 +180,25 @@ def _gap_statistic_clusterer(X: np.ndarray, min_n_clusters: int, max_n_clusters:
         labels, centers, inertia = _execute_clusterer(X, n_clusters, clustering_algorithm, clustering_params, random_state)
         # Save labels
         all_labels.append(labels)
-        gap_boot, sk_boot = gap_statistic_score(X, labels, n_clusters, True, use_log, weighted, use_principal_components, inertia, centers, 
+        gap_output = gap_statistic_score(X, labels, n_clusters, True, use_log, weighted, use_principal_components, inertia, centers,
                                                 clustering_algorithm, clustering_params, bootstrapped_data, n_boots, random_state)
+        assert isinstance(gap_output, tuple) and len(gap_output) == 2, f"gap_statistic_score has to return a tuple of length 2 but the output is {gap_output}"
+        gap_boot, sk_boot = gap_output
         # Save Gap Statistic
-        gaps.append(gap_boot)
-        sks.append(sk_boot)
-        if fulfills_gap_idx is None and n_clusters != min_n_clusters and gaps[-2] >= gaps[-1] - sks[-1]:
-            fulfills_gap_idx = len(gaps) - 2
+        gaps_list.append(gap_boot)
+        sks_list.append(sk_boot)
+        if fulfills_gap_idx is None and n_clusters != min_n_clusters and gaps_list[-2] >= gaps_list[-1] - sks_list[-1]:
+            fulfills_gap_idx = len(gaps_list) - 2
             if stopping_criterion == "original":
                 break
-    gaps = np.array(gaps)
-    sks = np.array(sks)
+    gaps = np.array(gaps_list)
+    sks = np.array(sks_list)
     ddgaps = None
     if stopping_criterion == "max":
-        fulfills_gap_idx = np.argmax(gaps)
+        fulfills_gap_idx = int(np.argmax(gaps))
     elif stopping_criterion == "ddgap":
         ddgaps = 2 * gaps[1:-1] - gaps[:-2] - gaps[2:]
-        fulfills_gap_idx = np.argmax(ddgaps) + 1
+        fulfills_gap_idx = int(np.argmax(ddgaps)) + 1
     # Prepare final result
     if fulfills_gap_idx is not None:
         best_n_clusters = fulfills_gap_idx + min_n_clusters
@@ -362,6 +364,7 @@ def _get_within_cluster_dispersion(X: np.ndarray, labels : np.ndarray, centers :
         else:
             squared_distances = [np.sum((X[labels == l] - centers[l]) ** 2) for l in range(n_clusters)]
         inertia = np.sum(squared_distances)
+    assert inertia is not None, "Inertia has to be calculated at this point"
     W_k = np.log(inertia) if use_log else inertia
     return W_k
 
@@ -448,7 +451,7 @@ class GapStatistic(ClusterMixin, BaseEstimator):
     def __init__(self, min_n_clusters: int = 1, max_n_clusters: int = 10, stopping_criterion: str = "original", 
                  use_log: bool = True, weighted: bool= False, use_principal_components: bool = True, 
                  clustering_algorithm: ClusterMixin = KMeans,
-                 clustering_params: dict | None = None, n_boots: int = 50, random_state: np.random.RandomState | int = None):
+                 clustering_params: dict | None = None, n_boots: int = 50, random_state: np.random.RandomState | int | None = None):
         self.min_n_clusters = min_n_clusters
         self.max_n_clusters = max_n_clusters
         self.stopping_criterion = stopping_criterion
@@ -460,7 +463,7 @@ class GapStatistic(ClusterMixin, BaseEstimator):
         self.n_boots = n_boots
         self.random_state = random_state
 
-    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'GapStatistic':
+    def fit(self, X: np.ndarray, y: np.ndarray | None = None) -> 'GapStatistic':
         """
         Initiate the actual clustering process on the input data set.
         The resulting cluster labels will be stored in the labels_ attribute.
@@ -469,7 +472,7 @@ class GapStatistic(ClusterMixin, BaseEstimator):
         ----------
         X : np.ndarray
             the given data set
-        y : np.ndarray
+        y : np.ndarray | None
             the labels (can be ignored)
 
         Returns
