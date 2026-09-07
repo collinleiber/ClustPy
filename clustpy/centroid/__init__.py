@@ -7,6 +7,9 @@ from .dipext import DipExt, DipInit
 from .subkmeans import SubKmeans
 from .ldakmeans import LDAKmeans
 from .gapstatistic import GapStatistic
+from .poissonl import PoissonC, PoissonL
+from .threecpo import ThreeCPO
+from .spherical_kmeans import SphericalKMeans
 
 __all__ = ['GMeans',
            'PGMeans',
@@ -17,4 +20,8 @@ __all__ = ['GMeans',
            'DipInit',
            'SubKmeans',
            'LDAKmeans',
-           'GapStatistic']
+           'GapStatistic',
+           'PoissonL',
+           'PoissonC',
+           'ThreeCPO',
+           'SphericalKMeans']
