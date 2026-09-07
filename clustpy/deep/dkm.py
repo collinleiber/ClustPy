@@ -550,5 +550,5 @@ class DKM(_AbstractDeepClusteringAlgo):
         self.dkm_labels_ = dkm_labels
         self.dkm_cluster_centers_ = dkm_centers
         self.neural_network_trained_ = neural_network
-        self.set_n_featrues_in(X)
+        self.set_n_features_in(X)
         return self

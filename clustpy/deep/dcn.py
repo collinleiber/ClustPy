@@ -516,5 +516,5 @@ class DCN(_AbstractDeepClusteringAlgo):
         self.dcn_labels_ = dcn_labels
         self.dcn_cluster_centers_ = dcn_centers
         self.neural_network_trained_ = neural_network
-        self.set_n_featrues_in(X)
+        self.set_n_features_in(X)
         return self

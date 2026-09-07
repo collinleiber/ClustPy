@@ -2105,7 +2105,7 @@ class ENRC(_AbstractDeepClusteringAlgo):
         self.betas = betas
         self.n_clusters_out_ = n_clusters
         self.neural_network_trained_ = neural_network
-        self.set_n_featrues_in(X)
+        self.set_n_features_in(X)
         return self
 
     def predict(self, X: np.ndarray = None, use_P: bool = True,

@@ -762,7 +762,7 @@ class DipDECK(_AbstractDeepClusteringAlgo):
         self.n_clusters_ = dipdeck_module.n_clusters_current
         self.cluster_centers_ = dipdeck_module.cluster_centers.detach().cpu().numpy()
         self.neural_network_trained_ = neural_network
-        self.set_n_featrues_in(X)
+        self.set_n_features_in(X)
         return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:

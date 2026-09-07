@@ -656,7 +656,7 @@ class DeepECT(_AbstractDeepClusteringAlgo):
         self.tree_ = tree
         self.labels_ = labels
         self.neural_network_trained_ = neural_network
-        self.set_n_featrues_in(X)
+        self.set_n_features_in(X)
         return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:
