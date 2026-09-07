@@ -3,10 +3,18 @@ from clustpy.data._utils import _get_download_dir, _download_file
 from sklearn.datasets._base import Bunch
 import zipfile
 from pathlib import Path
+from ._cache import cache_dataset, USE_CACHE_DEFAULT
 
 
-def _load_timeseries_classification_data(dataset_name: str, subset: str, labels_minus_one: bool, file_type: str,
-                                         last_column_are_labels: bool, return_X_y: bool, downloads_path: str | Path) -> Bunch:
+def _load_timeseries_classification_data(
+    dataset_name: str,
+    subset: str,
+    labels_minus_one: bool,
+    file_type: str,
+    last_column_are_labels: bool,
+    return_X_y: bool,
+    downloads_path: str | Path,
+) -> Bunch:
     """
     Helper function to load timeseries data from www.timeseriesclassification.com.
 
@@ -36,16 +44,21 @@ def _load_timeseries_classification_data(dataset_name: str, subset: str, labels_
         the data numpy array, the labels numpy array
     """
     subset = subset.lower()
-    assert subset in ["all", "train",
-                      "test"], "subset must match 'all', 'train' or 'test'. Your input {0}".format(subset)
+    assert subset in [
+        "all",
+        "train",
+        "test",
+    ], f"subset must match 'all', 'train' or 'test'. Your input {subset}"
     directory = _get_download_dir(downloads_path) / dataset_name
     filename = directory / (dataset_name + ".zip")
     if not filename.is_file():
         directory.mkdir(parents=False, exist_ok=True)
-        _download_file("http://www.timeseriesclassification.com/aeon-toolkit/" + dataset_name + ".zip",
-                       filename)
+        _download_file(
+            "http://www.timeseriesclassification.com/aeon-toolkit/" + dataset_name + ".zip",
+            filename,
+        )
         # Unpack zipfile
-        with zipfile.ZipFile(filename, 'r') as zipf:
+        with zipfile.ZipFile(filename, "r") as zipf:
             zipf.extractall(directory)
     # Load data and labels
     if subset == "all" or subset == "train":
@@ -97,10 +110,20 @@ def _load_timeseries_classification_data(dataset_name: str, subset: str, labels_
     if return_X_y:
         return data, labels
     else:
-        return Bunch(dataset_name=dataset_name, data=data, target=labels)
+        return Bunch(
+            dataset_name=dataset_name,
+            data=data,
+            target=labels,
+        )
 
 
-def load_motestrain(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+@cache_dataset
+def load_motestrain(
+    subset: str = "all",
+    return_X_y: bool = False,
+    downloads_path: str | Path = None,
+    use_cache=USE_CACHE_DEFAULT,
+) -> Bunch:
     """
     Load the motestrain data set. It consists of 1272 samples belonging to one of 2 classes.
     The data set is composed of 20 training and 1252 test samples.
@@ -126,10 +149,24 @@ def load_motestrain(subset: str = "all", return_X_y: bool = False, downloads_pat
     -------
     http://www.timeseriesclassification.com/description.php?Dataset=MoteStrain
     """
-    return _load_timeseries_classification_data("MoteStrain", subset, True, "txt", False, return_X_y, downloads_path)
+    return _load_timeseries_classification_data(
+        dataset_name="MoteStrain",
+        subset=subset,
+        labels_minus_one=True,
+        file_type="txt",
+        last_column_are_labels=False,
+        return_X_y=return_X_y,
+        downloads_path=downloads_path,
+    )
 
 
-def load_proximal_phalanx_outline(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+@cache_dataset
+def load_proximal_phalanx_outline(
+    subset: str = "all",
+    return_X_y: bool = False,
+    downloads_path: str | Path = None,
+    use_cache=USE_CACHE_DEFAULT,
+) -> Bunch:
     """
     Load the proximal phalanx outline data set. It consists of 876 samples belonging to one of 2 classes.
     The data set is composed of 600 training and 276 test samples.
@@ -155,11 +192,24 @@ def load_proximal_phalanx_outline(subset: str = "all", return_X_y: bool = False,
     -------
     http://www.timeseriesclassification.com/description.php?Dataset=ProximalPhalanxOutlineCorrect
     """
-    return _load_timeseries_classification_data("DistalPhalanxOutlineCorrect", subset, False, "txt", False,
-                                                return_X_y, downloads_path)
+    return _load_timeseries_classification_data(
+        dataset_name="DistalPhalanxOutlineCorrect",
+        subset=subset,
+        labels_minus_one=False,
+        file_type="txt",
+        last_column_are_labels=False,
+        return_X_y=return_X_y,
+        downloads_path=downloads_path,
+    )
 
 
-def load_diatom_size_reduction(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+@cache_dataset
+def load_diatom_size_reduction(
+    subset: str = "all",
+    return_X_y: bool = False,
+    downloads_path: str | Path = None,
+    use_cache=USE_CACHE_DEFAULT,
+) -> Bunch:
     """
     Load the diatom size reduction data set. It consists of 322 samples belonging to one of 4 classes.
     The data set is composed of 16 training and 306 test samples.
@@ -185,11 +235,24 @@ def load_diatom_size_reduction(subset: str = "all", return_X_y: bool = False, do
     -------
     http://www.timeseriesclassification.com/description.php?Dataset=DiatomSizeReduction
     """
-    return _load_timeseries_classification_data("DiatomSizeReduction", subset, True, "txt", False,
-                                                return_X_y, downloads_path)
+    return _load_timeseries_classification_data(
+        dataset_name="DiatomSizeReduction",
+        subset=subset,
+        labels_minus_one=True,
+        file_type="txt",
+        last_column_are_labels=False,
+        return_X_y=return_X_y,
+        downloads_path=downloads_path,
+    )
 
 
-def load_symbols(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+@cache_dataset
+def load_symbols(
+    subset: str = "all",
+    return_X_y: bool = False,
+    downloads_path: str | Path = None,
+    use_cache=USE_CACHE_DEFAULT,
+) -> Bunch:
     """
     Load the symbols data set. It consists of 1020 samples belonging to one of 6 classes.
     The data set is composed of 25 training and 995 test samples.
@@ -215,10 +278,24 @@ def load_symbols(subset: str = "all", return_X_y: bool = False, downloads_path: 
     -------
     http://www.timeseriesclassification.com/description.php?Dataset=Symbols
     """
-    return _load_timeseries_classification_data("Symbols", subset, True, "txt", False, return_X_y, downloads_path)
+    return _load_timeseries_classification_data(
+        dataset_name="Symbols",
+        subset=subset,
+        labels_minus_one=True,
+        file_type="txt",
+        last_column_are_labels=False,
+        return_X_y=return_X_y,
+        downloads_path=downloads_path,
+    )
 
 
-def load_olive_oil(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+@cache_dataset
+def load_olive_oil(
+    subset: str = "all",
+    return_X_y: bool = False,
+    downloads_path: str | Path = None,
+    use_cache=USE_CACHE_DEFAULT,
+) -> Bunch:
     """
     Load the OliveOil data set. It consists of 60 samples belonging to one of 4 classes.
     The data set is composed of 30 training and 30 test samples.
@@ -244,10 +321,24 @@ def load_olive_oil(subset: str = "all", return_X_y: bool = False, downloads_path
     -------
     http://www.timeseriesclassification.com/description.php?Dataset=OliveOil
     """
-    return _load_timeseries_classification_data("OliveOil", subset, True, "txt", False, return_X_y, downloads_path)
+    return _load_timeseries_classification_data(
+        dataset_name="OliveOil",
+        subset=subset,
+        labels_minus_one=True,
+        file_type="txt",
+        last_column_are_labels=False,
+        return_X_y=return_X_y,
+        downloads_path=downloads_path,
+    )
 
 
-def load_plane(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+@cache_dataset
+def load_plane(
+    subset: str = "all",
+    return_X_y: bool = False,
+    downloads_path: str | Path = None,
+    use_cache=USE_CACHE_DEFAULT,
+) -> Bunch:
     """
     Load the plane data set. It consists of 210 samples belonging to one of 7 classes.
     The data set is composed of 105 training and 105 test samples.
@@ -273,10 +364,24 @@ def load_plane(subset: str = "all", return_X_y: bool = False, downloads_path: st
     -------
     http://www.timeseriesclassification.com/description.php?Dataset=Plane
     """
-    return _load_timeseries_classification_data("Plane", subset, True, "txt", False, return_X_y, downloads_path)
+    return _load_timeseries_classification_data(
+        dataset_name="Plane",
+        subset=subset,
+        labels_minus_one=True,
+        file_type="txt",
+        last_column_are_labels=False,
+        return_X_y=return_X_y,
+        downloads_path=downloads_path,
+    )
 
 
-def load_sony_aibo_robot_surface(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+@cache_dataset
+def load_sony_aibo_robot_surface(
+    subset: str = "all",
+    return_X_y: bool = False,
+    downloads_path: str | Path = None,
+    use_cache=USE_CACHE_DEFAULT,
+) -> Bunch:
     """
     Load the Sony AIBO Robot Surface 1 data set. It consists of 621 samples belonging to one of 2 classes.
     The data set is composed of 20 training and 601 test samples.
@@ -302,11 +407,24 @@ def load_sony_aibo_robot_surface(subset: str = "all", return_X_y: bool = False, 
     -------
     http://www.timeseriesclassification.com/description.php?Dataset=SonyAIBORobotSurface1
     """
-    return _load_timeseries_classification_data("SonyAIBORobotSurface1", subset, True, "txt", False,
-                                                return_X_y, downloads_path)
+    return _load_timeseries_classification_data(
+        dataset_name="SonyAIBORobotSurface1",
+        subset=subset,
+        labels_minus_one=True,
+        file_type="txt",
+        last_column_are_labels=False,
+        return_X_y=return_X_y,
+        downloads_path=downloads_path,
+    )
 
 
-def load_two_patterns(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+@cache_dataset
+def load_two_patterns(
+    subset: str = "all",
+    return_X_y: bool = False,
+    downloads_path: str | Path = None,
+    use_cache=USE_CACHE_DEFAULT,
+) -> Bunch:
     """
     Load the two patterns data set. It consists of 5000 samples belonging to one of 4 classes.
     The data set is composed of 1000 training and 4000 test samples.
@@ -332,10 +450,24 @@ def load_two_patterns(subset: str = "all", return_X_y: bool = False, downloads_p
     -------
     http://www.timeseriesclassification.com/description.php?Dataset=TwoPatterns
     """
-    return _load_timeseries_classification_data("TwoPatterns", subset, True, "txt", False, return_X_y, downloads_path)
+    return _load_timeseries_classification_data(
+        dataset_name="TwoPatterns",
+        subset=subset,
+        labels_minus_one=True,
+        file_type="txt",
+        last_column_are_labels=False,
+        return_X_y=return_X_y,
+        downloads_path=downloads_path,
+    )
 
 
-def load_lsst(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+@cache_dataset
+def load_lsst(
+    subset: str = "all",
+    return_X_y: bool = False,
+    downloads_path: str | Path = None,
+    use_cache=USE_CACHE_DEFAULT,
+) -> Bunch:
     """
     Load the LSST data set. It consists of 4925 samples belonging to one of 14 classes.
     The data set is composed of 2459 training and 2466 test samples.
@@ -361,7 +493,15 @@ def load_lsst(subset: str = "all", return_X_y: bool = False, downloads_path: str
     -------
     http://www.timeseriesclassification.com/description.php?Dataset=LSST
     """
-    dataset = _load_timeseries_classification_data("LSST", subset, True, "ts", True, False, downloads_path)
+    dataset = _load_timeseries_classification_data(
+        dataset_name="LSST",
+        subset=subset,
+        labels_minus_one=True,
+        file_type="ts",
+        last_column_are_labels=True,
+        return_X_y=False,
+        downloads_path=downloads_path,
+    )
     data = dataset.data
     labels = dataset.target
     # Current labels are: 5, 14, 15, 41, 51, 52, ... -> change to: 0, 1, 2, 3, 4, ...
@@ -370,4 +510,8 @@ def load_lsst(subset: str = "all", return_X_y: bool = False, downloads_path: str
     if return_X_y:
         return data, labels
     else:
-        return Bunch(dataset_name="LSST", data=data, target=labels)
+        return Bunch(
+            dataset_name="LSST",
+            data=data,
+            target=labels,
+        )

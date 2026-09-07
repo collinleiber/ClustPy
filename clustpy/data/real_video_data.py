@@ -1,13 +1,15 @@
 try:
     import cv2
 except:
-    print("[WARNING] Could not import cv2 in clustpy.data.real_video_data. Please install cv2 by 'pip install opencv-python' if necessary")
+    print(
+        "[WARNING] Could not import cv2 in clustpy.data.real_video_data. Please install cv2 by 'pip install opencv-python' if necessary"
+    )
 from clustpy.data._utils import _download_file, _get_download_dir, flatten_images
 import numpy as np
 import zipfile
 from sklearn.datasets._base import Bunch
 from pathlib import Path
-
+from ._cache import cache_dataset, USE_CACHE_DEFAULT
 
 """
 Helpers
@@ -59,8 +61,11 @@ def _load_video(path: str | Path, image_size: tuple) -> np.ndarray:
     return video_array
 
 
-def _downsample_frames(data: np.ndarray, labels: np.ndarray, frame_sampling_ratio: float = 1) -> (
-        np.ndarray, np.ndarray):
+def _downsample_frames(
+    data: np.ndarray,
+    labels: np.ndarray,
+    frame_sampling_ratio: float = 1,
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Downsample the number of frames within a video.
 
@@ -87,9 +92,8 @@ def _downsample_frames(data: np.ndarray, labels: np.ndarray, frame_sampling_rati
         indices_to_delete = np.round(np.linspace(0, n_samples_orig - 1, n_to_delete)).astype(int)
         data = np.delete(data, indices_to_delete, axis=0)
         labels = np.delete(labels, indices_to_delete, axis=0)
-        assert frame_sampling_ratio <= data.shape[
-            0] / n_samples_orig, "Difference between frame_sampling_ratio ({0}) and actual sampling ratio ({1}) is too large".format(
-            frame_sampling_ratio, data.shape[0] / n_samples_orig)
+        assertion_err_msg = f"Difference between frame_sampling_ratio ({frame_sampling_ratio}) and actual sampling ratio ({data.shape[0] / n_samples_orig}) is too large"
+        assert frame_sampling_ratio <= data.shape[0] / n_samples_orig, assertion_err_msg
     return data, labels
 
 
@@ -98,9 +102,16 @@ Actual datasets
 """
 
 
-def load_video_weizmann(use_actions : tuple = None, use_persons : tuple = None, 
-                        image_size: tuple = None, frame_sampling_ratio: float = 1, return_X_y: bool = False,
-                        downloads_path: str | Path = None) -> Bunch:
+@cache_dataset
+def load_video_weizmann(
+    use_actions: tuple = None,
+    use_persons: tuple = None,
+    image_size: tuple = None,
+    frame_sampling_ratio: float = 1,
+    return_X_y: bool = False,
+    downloads_path: str | Path = None,
+    use_cache=USE_CACHE_DEFAULT,
+) -> Bunch:
     """
     Load the Weizmann video data set.
     It consists of 93 videos showing 9 different persons performing 10 different activities.
@@ -159,9 +170,10 @@ def load_video_weizmann(use_actions : tuple = None, use_persons : tuple = None,
             directory.mkdir(parents=False, exist_ok=True)
             _download_file(
                 "https://www.wisdom.weizmann.ac.il/~vision/VideoAnalysis/Demos/SpaceTimeActions/DB/" + my_zip_file,
-                filename)
+                filename,
+            )
             # Unpack zipfile
-            with zipfile.ZipFile(filename, 'r') as zipf:
+            with zipfile.ZipFile(filename, "r") as zipf:
                 zipf.extractall(directory)
     # Load data, iterate over all video files
     for v_file in directory.iterdir():
@@ -202,12 +214,25 @@ def load_video_weizmann(use_actions : tuple = None, use_persons : tuple = None,
         # Get images in correct format
         data_image = np.transpose(all_data, [0, 3, 1, 2])
         image_format = "CHW"
-        return Bunch(dataset_name="VideoWeizmann", data=data_flatten, target=labels, images=data_image,
-                     image_format=image_format, classes=(use_actions, use_persons))
+        return Bunch(
+            dataset_name="VideoWeizmann",
+            data=data_flatten,
+            target=labels,
+            images=data_image,
+            image_format=image_format,
+            classes=(use_actions, use_persons),
+        )
 
 
-def load_video_keck_gesture(subset: str = "all", image_size: tuple = (200, 200), frame_sampling_ratio: float = 1,
-                            return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+@cache_dataset
+def load_video_keck_gesture(
+    subset: str = "all",
+    image_size: tuple = (200, 200),
+    frame_sampling_ratio: float = 1,
+    return_X_y: bool = False,
+    downloads_path: str | Path = None,
+    use_cache=USE_CACHE_DEFAULT,
+) -> Bunch:
     """
     Load the Keck Gesture video data set.
     It consists of 42 training and 56 testing videos showing 4 different persons performing 14 different gestures.
@@ -276,8 +301,10 @@ def load_video_keck_gesture(subset: str = "all", image_size: tuple = (200, 200),
                     person = int(line.split("_")[0].replace("person ", "")) - 1
                     gesture = int(line.split("_")[1].replace("gesture", ""))
                     frame_limits = line.split("frames ")[1].split(",")
-                    frames = [(int(single_limit.split("-")[0]), int(single_limit.split("-")[1]) + 1) for single_limit in
-                              frame_limits]
+                    frames = [
+                        (int(single_limit.split("-")[0]), int(single_limit.split("-")[1]) + 1)
+                        for single_limit in frame_limits
+                    ]
                     if train_data:
                         # Train data entry
                         train_dict[(gesture, person)] = frames
@@ -291,19 +318,24 @@ def load_video_keck_gesture(subset: str = "all", image_size: tuple = (200, 200),
 
     # Start loading the dataset
     subset = subset.lower()
-    assert subset in ["all", "train",
-                      "test"], "subset must match 'all', 'train' or 'test'. Your input {0}".format(subset)
+    assert subset in ["all", "train", "test"], f"subset must match 'all', 'train' or 'test'. Your input {subset}"
     directory = _get_download_dir(downloads_path) / "Video_Keck_Gesture"
     filename = directory / "Keck_Dataset.zip"
     frames_file = directory / "sequences.txt"
     if not filename.is_file():
         directory.mkdir(parents=False, exist_ok=True)
-        _download_file("http://www.zhuolin.umiacs.io/PrototypeTree/Keck_Dataset.zip", filename)
+        _download_file(
+            "http://www.zhuolin.umiacs.io/PrototypeTree/Keck_Dataset.zip",
+            filename,
+        )
         # Unpack zipfile
-        with zipfile.ZipFile(filename, 'r') as zipf:
+        with zipfile.ZipFile(filename, "r") as zipf:
             zipf.extractall(directory)
         # Get Relevant frames
-        _download_file("http://www.zhuolin.umiacs.io/PrototypeTree/sequences.txt", frames_file)
+        _download_file(
+            "http://www.zhuolin.umiacs.io/PrototypeTree/sequences.txt",
+            frames_file,
+        )
     # Load data and labels
     all_data_list = []
     labels_list = []
@@ -351,5 +383,10 @@ def load_video_keck_gesture(subset: str = "all", image_size: tuple = (200, 200),
         # Get images in correct format
         data_image = np.transpose(all_data, [0, 3, 1, 2])
         image_format = "CHW"
-        return Bunch(dataset_name="VideoKeckGesture", data=data_flatten, target=labels, images=data_image,
-                     image_format=image_format)
+        return Bunch(
+            dataset_name="VideoKeckGesture",
+            data=data_flatten,
+            target=labels,
+            images=data_image,
+            image_format=image_format,
+        )

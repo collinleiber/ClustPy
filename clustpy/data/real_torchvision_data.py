@@ -4,15 +4,17 @@ import numpy as np
 from clustpy.data._utils import _get_download_dir, _load_image_data, flatten_images
 from sklearn.datasets._base import Bunch
 from pathlib import Path
-
+from ._cache import cache_dataset, USE_CACHE_DEFAULT
 
 """
 Torchvision datasets helpers
 """
 
 
-def _get_data_and_labels(dataset: torchvision.datasets.VisionDataset, image_size: tuple) -> (
-        torch.Tensor, torch.Tensor):
+def _get_data_and_labels(
+    dataset: torchvision.datasets.VisionDataset,
+    image_size: tuple,
+) -> (torch.Tensor, torch.Tensor):
     """
     Extract data and labels from a torchvision dataset object.
 
@@ -56,8 +58,15 @@ def _get_data_and_labels(dataset: torchvision.datasets.VisionDataset, image_size
     return data, labels
 
 
-def _load_torch_image_data(data_source: torchvision.datasets.VisionDataset, subset: str, uses_train_param: bool,
-                           image_format: str, return_X_y: bool, downloads_path: str | Path, image_size: tuple = None) -> Bunch:
+def _load_torch_image_data(
+    data_source: torchvision.datasets.VisionDataset,
+    subset: str,
+    uses_train_param: bool,
+    image_format: str,
+    return_X_y: bool,
+    downloads_path: str | Path,
+    image_size: tuple = None,
+) -> Bunch:
     """
     Helper function to load a data set from the torchvision package.
     All data sets will be returned as a two-dimensional tensor, created out of the HWC (height, width, color channels) image representation.
@@ -87,8 +96,7 @@ def _load_torch_image_data(data_source: torchvision.datasets.VisionDataset, subs
         the data numpy array, the labels numpy array
     """
     subset = subset.lower()
-    assert subset in ["all", "train",
-                      "test"], "subset must match 'all', 'train' or 'test'. Your input {0}".format(subset)
+    assert subset in ["all", "train", "test"], f"subset must match 'all', 'train' or 'test'. Your input {subset}"
     # Get data from source
     if subset == "all" or subset == "train":
         # Load training data
@@ -119,7 +127,8 @@ def _load_torch_image_data(data_source: torchvision.datasets.VisionDataset, subs
     # Check data dimensions
     if data.dim() < 3 or data.dim() > 5:
         raise Exception(
-            "Number of dimensions for torchvision data sets should be 3, 4 or 5. Here dim={0}".format(data.dim()))
+            "Number of dimensions for torchvision data sets should be 3, 4 or 5. Here dim={0}".format(data.dim())
+        )
     # Transform data to numpy array
     data_image = data.detach().cpu().numpy()
     labels_numpy = labels.detach().cpu().numpy()
@@ -133,12 +142,15 @@ def _load_torch_image_data(data_source: torchvision.datasets.VisionDataset, subs
             data_image = np.transpose(data_image, [0, 3, 1, 2])
             image_format = "CHW"
         # Some dataset (e.g., SVHN) do not have the class information included
-        if hasattr(dataset, "classes"):
-            return Bunch(dataset_name=dataset.__class__.__name__, data=data_flatten, target=labels_numpy,
-                         images=data_image, image_format=image_format, classes=dataset.classes.copy())
-        else:
-            return Bunch(dataset_name=dataset.__class__.__name__, data=data_flatten, target=labels_numpy,
-                         images=data_image, image_format=image_format)
+        return Bunch(
+            dataset_name=dataset.__class__.__name__,
+            data=data_flatten,
+            target=labels_numpy,
+            images=data_image,
+            image_format=image_format,
+            # Returns the copy classes if it exists
+            **{"classes": dataset.classes.copy()} if hasattr(dataset, "classes") else {},
+        )
 
 
 """
@@ -146,7 +158,13 @@ Actual datasets
 """
 
 
-def load_mnist(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+@cache_dataset
+def load_mnist(
+    subset: str = "all",
+    return_X_y: bool = False,
+    downloads_path: str | Path = None,
+    use_cache=USE_CACHE_DEFAULT,
+) -> Bunch:
     """
     Load the MNIST data set. It consists of 70000 28x28 grayscale images showing handwritten digits (0 to 9).
     The data set is composed of 60000 training and 10000 test images.
@@ -179,10 +197,23 @@ def load_mnist(subset: str = "all", return_X_y: bool = False, downloads_path: st
     LeCun, Yann, et al. "Gradient-based learning applied to document recognition."
     Proceedings of the IEEE 86.11 (1998): 2278-2324.
     """
-    return _load_torch_image_data(torchvision.datasets.MNIST, subset, True, "HW", return_X_y, downloads_path)
+    return _load_torch_image_data(
+        data_source=torchvision.datasets.MNIST,
+        subset=subset,
+        uses_train_param=True,
+        image_format="HW",
+        return_X_y=return_X_y,
+        downloads_path=downloads_path,
+    )
 
 
-def load_kmnist(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+@cache_dataset
+def load_kmnist(
+    subset: str = "all",
+    return_X_y: bool = False,
+    downloads_path: str | Path = None,
+    use_cache=USE_CACHE_DEFAULT,
+) -> Bunch:
     """
     Load the Kuzushiji-MNIST data set. It consists of 70000 28x28 grayscale images showing Kanji characters.
     It is composed of 10 different characters, each representing one column of hiragana.
@@ -216,10 +247,23 @@ def load_kmnist(subset: str = "all", return_X_y: bool = False, downloads_path: s
     Clanuwat, Tarin, et al. "Deep learning for classical japanese literature."
     arXiv preprint arXiv:1812.01718 (2018).
     """
-    return _load_torch_image_data(torchvision.datasets.KMNIST, subset, True, "HW", return_X_y, downloads_path)
+    return _load_torch_image_data(
+        data_source=torchvision.datasets.KMNIST,
+        subset=subset,
+        uses_train_param=True,
+        image_format="HW",
+        return_X_y=return_X_y,
+        downloads_path=downloads_path,
+    )
 
 
-def load_fmnist(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+@cache_dataset
+def load_fmnist(
+    subset: str = "all",
+    return_X_y: bool = False,
+    downloads_path: str | Path = None,
+    use_cache=USE_CACHE_DEFAULT,
+) -> Bunch:
     """
     Load the Fashion-MNIST data set. It consists of 70000 28x28 grayscale images showing articles from the Zalando online store.
     Each sample belongs to one of 10 product groups.
@@ -253,10 +297,23 @@ def load_fmnist(subset: str = "all", return_X_y: bool = False, downloads_path: s
     Xiao, Han, Kashif Rasul, and Roland Vollgraf. "Fashion-mnist: a novel image dataset for benchmarking machine learning algorithms."
     arXiv preprint arXiv:1708.07747 (2017).
     """
-    return _load_torch_image_data(torchvision.datasets.FashionMNIST, subset, True, "HW", return_X_y, downloads_path)
+    return _load_torch_image_data(
+        data_source=torchvision.datasets.FashionMNIST,
+        subset=subset,
+        uses_train_param=True,
+        image_format="HW",
+        return_X_y=return_X_y,
+        downloads_path=downloads_path,
+    )
 
 
-def load_usps(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+@cache_dataset
+def load_usps(
+    subset: str = "all",
+    return_X_y: bool = False,
+    downloads_path: str | Path = None,
+    use_cache=USE_CACHE_DEFAULT,
+) -> Bunch:
     """
     Load the USPS data set. It consists of 9298 16x16 grayscale images showing handwritten digits (0 to 9).
     The data set is composed of 7291 training and 2007 test images.
@@ -289,10 +346,23 @@ def load_usps(subset: str = "all", return_X_y: bool = False, downloads_path: str
     Hull, Jonathan J. "A database for handwritten text recognition research."
     IEEE Transactions on pattern analysis and machine intelligence 16.5 (1994): 550-554.
     """
-    return _load_torch_image_data(torchvision.datasets.USPS, subset, True, "HW", return_X_y, downloads_path)
+    return _load_torch_image_data(
+        data_source=torchvision.datasets.USPS,
+        subset=subset,
+        uses_train_param=True,
+        image_format="HW",
+        return_X_y=return_X_y,
+        downloads_path=downloads_path,
+    )
 
 
-def load_cifar10(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+@cache_dataset
+def load_cifar10(
+    subset: str = "all",
+    return_X_y: bool = False,
+    downloads_path: str | Path = None,
+    use_cache=USE_CACHE_DEFAULT,
+) -> Bunch:
     """
     Load the CIFAR10 data set. It consists of 60000 32x32 color images showing different objects.
     The classes are airplane, automobile, bird, cat, deer, dog, frog, horse, ship and truck.
@@ -325,11 +395,24 @@ def load_cifar10(subset: str = "all", return_X_y: bool = False, downloads_path: 
 
     Krizhevsky, Alex, and Geoffrey Hinton. "Learning multiple layers of features from tiny images." (2009): 7.
     """
-    return _load_torch_image_data(torchvision.datasets.CIFAR10, subset, True, "HWC", return_X_y, downloads_path)
+    return _load_torch_image_data(
+        data_source=torchvision.datasets.CIFAR10,
+        subset=subset,
+        uses_train_param=True,
+        image_format="HWC",
+        return_X_y=return_X_y,
+        downloads_path=downloads_path,
+    )
 
 
-def load_cifar100(subset: str = "all", use_superclasses: bool = False, return_X_y: bool = False,
-                  downloads_path: str | Path = None) -> Bunch:
+@cache_dataset
+def load_cifar100(
+    subset: str = "all",
+    use_superclasses: bool = False,
+    return_X_y: bool = False,
+    downloads_path: str | Path = None,
+    use_cache=USE_CACHE_DEFAULT,
+) -> Bunch:
     """
     Load the CIFAR100 data set. It consists of 60000 32x32 color images showing different objects.
     A total of 100 classes are included, each depicting a specific of objects. Each class contains 600 objects.
@@ -365,28 +448,37 @@ def load_cifar100(subset: str = "all", use_superclasses: bool = False, return_X_
 
     Krizhevsky, Alex, and Geoffrey Hinton. "Learning multiple layers of features from tiny images." (2009): 7.
     """
-    dataset = _load_torch_image_data(torchvision.datasets.CIFAR100, subset, True, "HWC", False, downloads_path)
+    dataset = _load_torch_image_data(
+        data_source=torchvision.datasets.CIFAR100,
+        subset=subset,
+        uses_train_param=True,
+        image_format="HWC",
+        return_X_y=False,
+        downloads_path=downloads_path,
+    )
     if use_superclasses:
-        new_labels = {0: ["beaver", "dolphin", "otter", "seal", "whale"],
-                      1: ["aquarium_fish", "flatfish", "ray", "shark", "trout"],
-                      2: ["orchid", "poppy", "rose", "sunflower", "tulip"],
-                      3: ["bottle", "bowl", "can", "cup", "plate"],
-                      4: ["apple", "mushroom", "orange", "pear", "sweet_pepper"],
-                      5: ["clock", "keyboard", "lamp", "telephone", "television"],
-                      6: ["bed", "chair", "couch", "table", "wardrobe"],
-                      7: ["bee", "beetle", "butterfly", "caterpillar", "cockroach"],
-                      8: ["bear", "leopard", "lion", "tiger", "wolf"],
-                      9: ["bridge", "castle", "house", "road", "skyscraper"],
-                      10: ["cloud", "forest", "mountain", "plain", "sea"],
-                      11: ["camel", "cattle", "chimpanzee", "elephant", "kangaroo"],
-                      12: ["fox", "porcupine", "possum", "raccoon", "skunk"],
-                      13: ["crab", "lobster", "snail", "spider", "worm"],
-                      14: ["baby", "boy", "girl", "man", "woman"],
-                      15: ["crocodile", "dinosaur", "lizard", "snake", "turtle"],
-                      16: ["hamster", "mouse", "rabbit", "shrew", "squirrel"],
-                      17: ["maple_tree", "oak_tree", "palm_tree", "pine_tree", "willow_tree"],
-                      18: ["bicycle", "bus", "motorcycle", "pickup_truck", "train"],
-                      19: ["lawn_mower", "rocket", "streetcar", "tank", "tractor"]}
+        new_labels = {
+            0: ["beaver", "dolphin", "otter", "seal", "whale"],
+            1: ["aquarium_fish", "flatfish", "ray", "shark", "trout"],
+            2: ["orchid", "poppy", "rose", "sunflower", "tulip"],
+            3: ["bottle", "bowl", "can", "cup", "plate"],
+            4: ["apple", "mushroom", "orange", "pear", "sweet_pepper"],
+            5: ["clock", "keyboard", "lamp", "telephone", "television"],
+            6: ["bed", "chair", "couch", "table", "wardrobe"],
+            7: ["bee", "beetle", "butterfly", "caterpillar", "cockroach"],
+            8: ["bear", "leopard", "lion", "tiger", "wolf"],
+            9: ["bridge", "castle", "house", "road", "skyscraper"],
+            10: ["cloud", "forest", "mountain", "plain", "sea"],
+            11: ["camel", "cattle", "chimpanzee", "elephant", "kangaroo"],
+            12: ["fox", "porcupine", "possum", "raccoon", "skunk"],
+            13: ["crab", "lobster", "snail", "spider", "worm"],
+            14: ["baby", "boy", "girl", "man", "woman"],
+            15: ["crocodile", "dinosaur", "lizard", "snake", "turtle"],
+            16: ["hamster", "mouse", "rabbit", "shrew", "squirrel"],
+            17: ["maple_tree", "oak_tree", "palm_tree", "pine_tree", "willow_tree"],
+            18: ["bicycle", "bus", "motorcycle", "pickup_truck", "train"],
+            19: ["lawn_mower", "rocket", "streetcar", "tank", "tractor"],
+        }
         labels_new = np.full(dataset.target.shape, -1, dtype=np.int32)
         for nl in new_labels.keys():
             labels_new[np.isin(np.array(dataset.classes)[dataset.target], new_labels[nl])] = nl
@@ -397,7 +489,13 @@ def load_cifar100(subset: str = "all", use_superclasses: bool = False, return_X_
         return dataset
 
 
-def load_svhn(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+@cache_dataset
+def load_svhn(
+    subset: str = "all",
+    return_X_y: bool = False,
+    downloads_path: str | Path = None,
+    use_cache=USE_CACHE_DEFAULT,
+) -> Bunch:
     """
     Load the SVHN data set. It consists of 99289 32x32 color images showing house numbers (0 to 9).
     The data set is composed of 73257 training and 26032 test images.
@@ -429,10 +527,23 @@ def load_svhn(subset: str = "all", return_X_y: bool = False, downloads_path: str
 
     Netzer, Yuval, et al. "Reading digits in natural images with unsupervised feature learning." (2011).
     """
-    return _load_torch_image_data(torchvision.datasets.SVHN, subset, False, "CHW", return_X_y, downloads_path)
+    return _load_torch_image_data(
+        data_source=torchvision.datasets.SVHN,
+        subset=subset,
+        uses_train_param=False,
+        image_format="CHW",
+        return_X_y=return_X_y,
+        downloads_path=downloads_path,
+    )
 
 
-def load_stl10(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+@cache_dataset
+def load_stl10(
+    subset: str = "all",
+    return_X_y: bool = False,
+    downloads_path: str | Path = None,
+    use_cache=USE_CACHE_DEFAULT,
+) -> Bunch:
     """
     Load the STL10 data set. It consists of 13000 96x96 color images showing different objects.
     The classes are airplane, bird, car, cat, deer, dog, horse, monkey, ship and truck.
@@ -466,11 +577,24 @@ def load_stl10(subset: str = "all", return_X_y: bool = False, downloads_path: st
     Coates, Adam, Andrew Ng, and Honglak Lee. "An analysis of single-layer networks in unsupervised feature learning."
     Proceedings of the fourteenth international conference on artificial intelligence and statistics. JMLR Workshop and Conference Proceedings, 2011.
     """
-    return _load_torch_image_data(torchvision.datasets.STL10, subset, False, "CHW", return_X_y, downloads_path)
+    return _load_torch_image_data(
+        data_source=torchvision.datasets.STL10,
+        subset=subset,
+        uses_train_param=False,
+        image_format="CHW",
+        return_X_y=return_X_y,
+        downloads_path=downloads_path,
+    )
 
 
-def load_gtsrb(subset: str = "all", image_size: tuple = (32, 32), return_X_y: bool = False,
-               downloads_path: str | Path = None) -> Bunch:
+@cache_dataset
+def load_gtsrb(
+    subset: str = "all",
+    image_size: tuple = (32, 32),
+    return_X_y: bool = False,
+    downloads_path: str | Path = None,
+    use_cache=USE_CACHE_DEFAULT,
+) -> Bunch:
     """
     Load the GTSRB (German Traffic Sign Recognition Benchmark) data set. It consists of 39270 color images showing 43 different traffic signs.
     Example classes are: stop sign, speed limit 50 sign, speed limit 70 sign, construction site sign and many others.
@@ -511,5 +635,12 @@ def load_gtsrb(subset: str = "all", image_size: tuple = (32, 32), return_X_y: bo
     Stallkamp, Johannes, et al. "Man vs. computer: Benchmarking machine learning algorithms for traffic sign recognition."
     Neural networks 32 (2012): 323-332.
     """
-    return _load_torch_image_data(torchvision.datasets.GTSRB, subset, False, "HWC", return_X_y, downloads_path,
-                                  image_size)
+    return _load_torch_image_data(
+        data_source=torchvision.datasets.GTSRB,
+        subset=subset,
+        uses_train_param=False,
+        image_format="HWC",
+        return_X_y=return_X_y,
+        downloads_path=downloads_path,
+        image_size=image_size,
+    )
