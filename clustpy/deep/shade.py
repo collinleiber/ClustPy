@@ -23,7 +23,7 @@ class SHADE(_AbstractDeepClusteringAlgo):
     """
     The Structure-preserving High-dimensional Analysis with Density-based Exploration (SHADE) algorithm.
     A neural network (autoencoder AE) will be trained with the reconstruction loss and the d_dc loss function.
-    Afterward, KMeans or HDBSCAN identifies the initial clusters.
+    Afterward, DCTree_Clusterer identifies the final clusters.
 
     Parameters
     ----------
@@ -54,7 +54,7 @@ class SHADE(_AbstractDeepClusteringAlgo):
     optimizer_class : torch.optim.Optimizer
         the optimizer class (default: torch.optim.Adam)
     ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
-         self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: mean_squared_error)
+        self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: mean_squared_error)
     neural_network : torch.nn.Module | tuple
         the input neural network. If None, a new FeedforwardAutoencoder will be created.
         Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict) (default: None)
@@ -95,6 +95,7 @@ class SHADE(_AbstractDeepClusteringAlgo):
     Examples
     --------
     >>> from clustpy.data import create_subspace_data
+    >>> from clustpy.deep import SHADE
     >>> data, labels = create_subspace_data(1500, subspace_features=(3, 50), random_state=1)
     >>> shade = SHADE()
     >>> shade.fit(data)
@@ -108,27 +109,27 @@ class SHADE(_AbstractDeepClusteringAlgo):
 
     def __init__(
         self,
-        clustering_class : Optional[ClusterMixin] = DCTree_Clusterer,
-        clustering_params : dict = None,
+        clustering_class : type[ClusterMixin] = DCTree_Clusterer,
+        clustering_params : Optional[dict] = None,
         min_points : int = 5,
         use_complete_dc_tree: bool = True,
         use_matrix_dc_distance: bool = True,
         use_less_memory: bool = False,
         batch_size: int = 500,
-        pretrain_optimizer_params: dict = None,
-        clustering_optimizer_params : dict = None,
+        pretrain_optimizer_params: Optional[dict] = None,
+        clustering_optimizer_params : Optional[dict] = None,
         pretrain_epochs : int = 0,
         clustering_epochs : int = 100,
         optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
         ssl_loss_fn : Callable | torch.nn.modules.loss._Loss = mean_squared_error,
         neural_network : torch.nn.Module | tuple = None,
-        neural_network_weights : str = None,
+        neural_network_weights : Optional[str] = None,
         embedding_size : int = 10,
         density_loss_weight : float = 1.0,
         ssl_loss_weight : float = 1.0,
-        custom_dataloaders : tuple = None,
+        custom_dataloaders : Optional[tuple] = None,
         device : torch.device = None,
-        random_state : np.random.RandomState | int = None,
+        random_state : Optional[np.random.RandomState | int] = None,
     ):
         super().__init__(batch_size, neural_network, neural_network_weights, embedding_size, device, random_state)
         self.clustering_class = clustering_class
@@ -147,7 +148,7 @@ class SHADE(_AbstractDeepClusteringAlgo):
         self.ssl_loss_weight = ssl_loss_weight
         self.custom_dataloaders = custom_dataloaders
 
-    def fit(self, X: np.ndarray, y: np.ndarray=None) -> SHADE:
+    def fit(self, X: np.ndarray, y: Optional[np.ndarray]=None) -> SHADE:
         """
         Cluster the input dataset with the SHADE algorithm.
         The resulting cluster labels will be stored in the `labels_` attribute.
@@ -217,7 +218,7 @@ class SHADE(_AbstractDeepClusteringAlgo):
         """
         Predicts the labels of the input data.
         Note that this is just a very imprecise estimation as we are not using the DC Tree to predict the labels.
-        The prediction is calculated by checking the distance to the clostest mean of samples in a cluster within the embedding of the AE.
+        The prediction is calculated by checking the distance to the closest mean of samples in a cluster within the embedding of the AE.
 
         Parameters
         ----------
@@ -336,7 +337,7 @@ class _SHADE_Module(torch.nn.Module):
         X: np.ndarray,
         batch: list,
         matrix_dc_distance_torch: torch.Tensor
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    ) -> torch.Tensor:
         """
         Calculate the autoencoder reconstruction + d_dc loss.
 
@@ -354,7 +355,7 @@ class _SHADE_Module(torch.nn.Module):
         loss : torch.Tensor
             The final SHADE loss.
         """
-        # Reconstrucion
+        # Reconstruction
         ssl_loss, embedded, _ = self.neural_network.loss(batch, self.ssl_loss_fn, self.device)
         # Density loss
         if self.dc_tree is None:

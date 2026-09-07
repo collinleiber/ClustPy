@@ -325,8 +325,13 @@ def int_to_one_hot(int_tensor: torch.Tensor, n_integers: int) -> torch.Tensor:
     return onehot
 
 
-def run_initial_clustering(X: np.ndarray, n_clusters: int, clustering_class: ClusterMixin, clustering_params: dict,
-                           random_state: np.random.RandomState) -> (int, np.ndarray, np.ndarray, ClusterMixin):
+def run_initial_clustering(
+        X: np.ndarray, 
+        n_clusters: int, 
+        clustering_class: type[ClusterMixin], 
+        clustering_params: dict, 
+        random_state: np.random.RandomState
+    ) -> tuple[int, np.ndarray, np.ndarray, ClusterMixin]:
     """
     Get an initial clustering result for a deep clustering algorithm.
     This result can then be refined by the optimization of the neural network.
@@ -356,26 +361,23 @@ def run_initial_clustering(X: np.ndarray, n_clusters: int, clustering_class: Clu
     if clustering_class is None:
         clustering_algo = ClusterMixin()
         clustering_algo.labels_ = np.random.randint(n_clusters, size=X.shape[0])
+    elif clustering_class.__name__ == "SHiP": 
+        clustering_algo = clustering_class(data=X, **clustering_params)
+        clustering_algo.fit()
     else:
         # Get possible input parameters of the clustering algorithm
-        clustering_class_parameters = inspect.getfullargspec(clustering_class).args + inspect.getfullargspec(
-            clustering_class).kwonlyargs
-        # Check if n_clusters or n_components is contained in the possible parameters
-        if "n_clusters" in clustering_class_parameters:
-            if "random_state" in clustering_class_parameters and "random_state" not in clustering_params.keys():
-                clustering_algo = clustering_class(n_clusters=n_clusters, random_state=random_state, **clustering_params)
-            else:
-                clustering_algo = clustering_class(n_clusters=n_clusters, **clustering_params)
-        elif "n_components" in clustering_class_parameters:  # in case of GMM
-            if "random_state" in clustering_class_parameters and "random_state" not in clustering_params.keys():
-                clustering_algo = clustering_class(n_components=n_clusters, random_state=random_state, **clustering_params)
-            else:
-                clustering_algo = clustering_class(n_components=n_clusters, **clustering_params)
-        else:  # in case of e.g., DBSCAN
-            if "random_state" in clustering_class_parameters and "random_state" not in clustering_params.keys():
-                clustering_algo = clustering_class(random_state=random_state, **clustering_params)
-            else:
-                clustering_algo = clustering_class(**clustering_params)
+        clustering_class_parameters = inspect.getfullargspec(clustering_class).args + inspect.getfullargspec(clustering_class).kwonlyargs
+        # Add clustering specific parameters
+        new_clustering_params = clustering_params.copy()
+        if "random_state" in clustering_class_parameters and "random_state" not in clustering_params.keys():
+            new_clustering_params["random_state"] = random_state
+        if "n_clusters" in clustering_class_parameters:  # for k-Means, and other methods which need n_clusters
+            new_clustering_params["n_clusters"] = n_clusters
+        if "n_components" in clustering_class_parameters:  # in case of GMM
+            new_clustering_params["n_components"] = n_clusters
+        # In case of e.g., DBSCAN, `n_clusters` is not needed
+        # -> clustering_class is just called with original clustering_params
+        clustering_algo = clustering_class(**new_clustering_params)
         # Run algorithm
         clustering_algo.fit(X)
     # Check if clustering algorithm return cluster centers

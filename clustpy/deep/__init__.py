@@ -10,6 +10,7 @@ from .aec import AEC
 from .deepect import DeepECT
 from .den import DEN
 from .shade import SHADE
+from .deepsync import DeepSynC
 from ._data_utils import get_dataloader, get_default_augmented_dataloaders
 from ._train_utils import get_trained_network, get_neural_network
 from ._utils import encode_batchwise, decode_batchwise, encode_decode_batchwise, predict_batchwise, detect_device, \
@@ -30,6 +31,7 @@ __all__ = ['DEC',
            'DeepECT',
            'DEN',
            'SHADE',
+           'DeepSynC',
            'get_dataloader',
            'get_default_augmented_dataloaders',
            'get_neural_network'
