@@ -5,7 +5,7 @@ from clustpy.centroid.threecpo import initial_poisson_clustering_labels, get_log
 from sklearn.utils.validation import check_is_fitted
 
 
-class PoissonL(BaseEstimator, ClusterMixin):
+class PoissonL(ClusterMixin, BaseEstimator):
     """
     Execute the PoissonL/PoissonC clustering procedure.
     The algorithms are specifically designed for count data.
@@ -24,6 +24,8 @@ class PoissonL(BaseEstimator, ClusterMixin):
     init_strat : str
         The initialization strategy. Can be 'random', 'random-centers', 'random-centers-dist', 
         'kmeans', 'kmeans++', 'rf+kmeans', 'rf+kmeans++', 'poisson++-dist', or 'poisson++' (default: 'random')
+    allow_negative_values : bool
+        Should negative values be allowed by shifting the whole data matrix according to the minimum value (default: False)
     random_state : np.random.RandomState | int | None
         Use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
@@ -46,11 +48,12 @@ class PoissonL(BaseEstimator, ClusterMixin):
     Genome biology 5.7 (2004): R51.
     """
     def __init__(self, n_clusters: int = 8, max_iter: int = 300, n_init: int = 10, init_strat: str = "random", 
-                 random_state: np.random.RandomState | int | None = None):
+                 allow_negative_values: bool = False, random_state: np.random.RandomState | int | None = None):
         self.n_clusters = n_clusters
         self.max_iter = max_iter
         self.n_init = n_init
-        self.init_strat = init_strat.lower()
+        self.init_strat = init_strat
+        self.allow_negative_values = allow_negative_values
         self.random_state = random_state
 
     def update_column_lambdas(self, X: np.ndarray, labels: np.ndarray) -> np.ndarray:
@@ -147,6 +150,8 @@ class PoissonL(BaseEstimator, ClusterMixin):
         """
         X, _, random_state = check_parameters(X=X, y=y, random_state=self.random_state)
         assert self.n_clusters < X.shape[0]
+        if self.allow_negative_values and np.any(X < 0):
+            X = X - X.min()
         assert np.all(X >= 0)
         X = X.astype(float)
         X += 1e-3
@@ -154,7 +159,7 @@ class PoissonL(BaseEstimator, ClusterMixin):
         self.reward_ = -np.inf
         for _ in range(self.n_init):
             # Initialize
-            labels = initial_poisson_clustering_labels(X, self.n_clusters, self.init_strat, random_state)
+            labels = initial_poisson_clustering_labels(X, self.n_clusters, self.init_strat.lower(), random_state)
             # Start procdeure
             for iteration in range(self.max_iter):
                 column_lambdas = self.update_column_lambdas(X, labels)

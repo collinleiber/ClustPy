@@ -5,7 +5,7 @@ from sklearn.base import BaseEstimator, ClusterMixin
 from sklearn.preprocessing import normalize
 from clustpy.utils.checks import check_parameters
 
-class SphericalKMeans(BaseEstimator, ClusterMixin):
+class SphericalKMeans(ClusterMixin, BaseEstimator):
     """
     The Spherical-k-Means algorithm.
     Instead of using the Euclidean distance, it uses the cosince distance.

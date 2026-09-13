@@ -6,7 +6,6 @@ import matplotlib.pyplot as plt
 from scipy.special import xlogy
 from clustpy.utils.checks import check_random_state, check_parameters
 from clustpy.utils._information_theory import integer_costs
-from sklearn.utils.validation import check_is_fitted
 from pathlib import Path
 
 """
@@ -57,6 +56,8 @@ def poisson_dist(X: np.ndarray, Y: np.ndarray) -> np.ndarray:
         dist = dist[0, 0]
     elif Y.ndim == 1:
         dist = dist[:, 0]
+    elif X.ndim == 1:
+        dist = dist[0, :]
     return dist
 
 
@@ -89,7 +90,6 @@ def poisson_seeding(X: np.ndarray, n_clusters: int, alpha: float = 1., subset_si
     if n_local_trials is None:
         # Strategy taken from sklearn
         n_local_trials = 2 + int(np.log(n_clusters))
-    n_local_trials_final = min(n_local_trials, X.shape[0])
     random_state = check_random_state(random_state)
     if subset_size is not None:
         if subset_size == "auto":
@@ -110,6 +110,8 @@ def poisson_seeding(X: np.ndarray, n_clusters: int, alpha: float = 1., subset_si
             distance_closest_row_adj = distance_closest_row_adj ** alpha
         denominator = distance_closest_row_adj.sum()
         probs = distance_closest_row_adj / denominator if denominator > 0 else None
+        n_probs_gt_zero = len(probs[probs > 0]) if probs is not None else 1
+        n_local_trials_final = min(n_local_trials, n_probs_gt_zero)
         new_row_ids = random_state.choice(X.shape[0], size=n_local_trials_final, p=probs, replace=False)
         if n_local_trials_final > 1:
             distances_to_new_rows = poisson_dist(X, X[new_row_ids])
@@ -154,14 +156,14 @@ def initial_poisson_clustering_labels(X: np.ndarray, n_clusters: int, init_strat
     Initialize the labels for Poisson-based clustering.
     The initialization strategy can be:
     - labels obtained uniformly at random (random)
-    - labels obtained by a random set of initial center used for assignments with the poisson distance (random-centers-dist)
-    - labels obtained by a random set of initial center used for assignments with the poisson log probability (random-centers)
+    - labels obtained by a random set of initial centers used for assignments with the poisson distance (random-centers-dist)
+    - labels obtained by a random set of initial centers used for assignments with the poisson log probability (random-centers)
     - labels obtained by a full kmeans run (kmeans)
     - labels obtained by kmeans++ seeding (kmeans++)
     - labels obtained by normalizing the rows considering relative frequencies followed by a full kmaens run (rf+kmeans)
     - labels obtained by normalizing the rows considering relative frequencies followed by kmeans++ seeding (rf+kmeans++)
-    - labels obtained by kmeans++ seeding using the poisson distance used for assignments with the poisson distance (poisson++-dist)
-    - labels obtained by kmeans++ seeding using the poisson distance used for assignments with the poisson log probability (poisson++)
+    - labels obtained by kmeans++ seeding using the poisson distance for assignments with the poisson distance (poisson++-dist)
+    - labels obtained by kmeans++ seeding using the poisson distance for assignments with the poisson log probability (poisson++)
 
     Parameters
     ----------
@@ -274,7 +276,7 @@ def get_log_probs_poisson(X: np.ndarray, row_lambdas: np.ndarray, column_lambdas
     return log_probs
 
 
-class ThreeCPO(BaseEstimator, ClusterMixin):
+class ThreeCPO(ClusterMixin, BaseEstimator):
     """
     The 3CPO algorithm.
 
@@ -306,6 +308,8 @@ class ThreeCPO(BaseEstimator, ClusterMixin):
     track_reward : bool
         track a list of the reward after each operation.
         Makes the execution slightly slower (default: False)
+    allow_negative_values : bool
+        Should negative values be allowed by shifting the whole data matrix according to the minimum value (default: False)
     random_state : np.random.RandomState | int | None
         The random state (default: None)
 
@@ -341,7 +345,8 @@ class ThreeCPO(BaseEstimator, ClusterMixin):
     """
     def __init__(self, n_clusters: int = 8, max_iter: int = 300, n_init: int = 10, outliers: bool = False, re_init_empty_clusters: bool = False,
                 init_strat_rows: str = "poisson++", init_strat_columns: str = "strategy", column_bias_type: str = "mdl", ignore_c_minus: bool = False,
-                ignore_c_zero: bool = False, track_reward: bool = False, random_state: np.random.RandomState | int | None = None):
+                ignore_c_zero: bool = False, track_reward: bool = False, allow_negative_values: bool = False,
+                random_state: np.random.RandomState | int | None = None):
         self.n_clusters = n_clusters
         self.n_init = n_init
         self.max_iter = max_iter
@@ -353,6 +358,7 @@ class ThreeCPO(BaseEstimator, ClusterMixin):
         self.ignore_c_minus = ignore_c_minus
         self.ignore_c_zero = ignore_c_zero
         self.track_reward = track_reward
+        self.allow_negative_values = allow_negative_values
         self.random_state = random_state
 
     def init_column_partitions(self, X: np.ndarray, column_sums: np.ndarray,
@@ -694,6 +700,8 @@ class ThreeCPO(BaseEstimator, ClusterMixin):
         """
         X, _, random_state = check_parameters(X=X, y=y, random_state=self.random_state)
         assert self.n_clusters < X.shape[0]
+        if self.allow_negative_values and np.any(X < 0):
+            X = X - X.min()
         assert np.all(X >= 0)
         X = X.astype(float)
         X += 1e-3
