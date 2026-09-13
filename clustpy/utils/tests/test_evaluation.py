@@ -12,16 +12,16 @@ from clustpy.deep import set_torch_seed
 from sklearn.base import ClusterMixin
 
 
-def _add_value(X: np.ndarray, value: int = 1) -> float:
+def _add_value(X: np.ndarray, value: int = 1) -> np.ndarray:
     return X + value
 
 
-def _add_value1_divide_by_value2(X: np.ndarray, value1: int, value2: float) -> float:
+def _add_value1_divide_by_value2(X: np.ndarray, value1: int, value2: float) -> np.ndarray:
     return (X + value1) / value2
 
 
 def _custom_evaluation_metric(X: np.ndarray, labels_true: np.ndarray, labels_pred: np.ndarray,
-                              algo_obj: ClusterMixin) -> float:
+                              algo_obj: ClusterMixin) -> float | None:
     if hasattr(algo_obj, "inertia_"):
         return algo_obj.inertia_
     else:
@@ -80,7 +80,7 @@ def test_get_fixed_seed_for_each_run():
     assert all([isinstance(s, (int, np.integer)) for s in seeds])
     seeds_input = [1,2,3,4,5,6,7,8,9]
     seeds = _get_fixed_seed_for_each_run(9, seeds_input)
-    assert seeds == seeds_input
+    assert np.array_equal(seeds, seeds_input)
 
 
 def test_evaluate_dataset():

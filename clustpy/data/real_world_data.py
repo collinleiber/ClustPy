@@ -20,7 +20,7 @@ Load Sklearn datasets
 """
 
 
-def load_iris(return_X_y: bool = False) -> Bunch:
+def load_iris(return_X_y: bool = False) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the iris data set. It consists of the petal and sepal width and length of three different types of irises (Setosa,
     Versicolour, Virginica).
@@ -33,7 +33,7 @@ def load_iris(return_X_y: bool = False) -> Bunch:
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (150 x 4), the labels numpy array (150)
@@ -49,7 +49,7 @@ def load_iris(return_X_y: bool = False) -> Bunch:
     return dataset
 
 
-def load_wine(return_X_y: bool = False) -> Bunch:
+def load_wine(return_X_y: bool = False) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the wine data set. It consists of 13 different properties of three different types of wine.
     N=178, d=13, k=3.
@@ -62,7 +62,7 @@ def load_wine(return_X_y: bool = False) -> Bunch:
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (178 x 13), the labels numpy array (178)
@@ -78,7 +78,7 @@ def load_wine(return_X_y: bool = False) -> Bunch:
     return dataset
 
 
-def load_breast_cancer(return_X_y: bool = False) -> Bunch:
+def load_breast_cancer(return_X_y: bool = False) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the breast cancer wisconsin data set. It consists of 32 features computed from digitized images of fine needle
     aspirate of breast mass. The classes are the result of a diagnosis (malignant or benign).
@@ -91,7 +91,7 @@ def load_breast_cancer(return_X_y: bool = False) -> Bunch:
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (569 x 30), the labels numpy array (569)
@@ -107,7 +107,7 @@ def load_breast_cancer(return_X_y: bool = False) -> Bunch:
     return dataset
 
 
-def load_olivetti_faces(return_X_y: bool = False) -> Bunch:
+def load_olivetti_faces(return_X_y: bool = False) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the olivetti faces data set. It consists of 400 64x64 grayscale images showing faces of 40 different persons.
     N=400, d=4096, k=40.
@@ -119,7 +119,7 @@ def load_olivetti_faces(return_X_y: bool = False) -> Bunch:
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Furthermore, the original images are contained in the 'images' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
@@ -140,7 +140,7 @@ def load_olivetti_faces(return_X_y: bool = False) -> Bunch:
 
 def load_newsgroups(subset: str = "all", use_tfidf: bool = True, use_stemming: bool = True, use_stop_words: bool = True, 
                     max_df: float | int = 1., min_df: float | int = 1, max_features: int = 2000, min_variance : float = 0., 
-                    sublinear_tf: bool = False, return_X_y: bool = False) -> Bunch:
+                    sublinear_tf: bool = False, return_X_y: bool = False) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the 20 newsgroups data set. It consists of a collection of 18846 newsgroup documents, partitioned
     (nearly) evenly across 20 different newsgroups. The documents are usually converted into feature vectors using tf-idf.
@@ -176,7 +176,7 @@ def load_newsgroups(subset: str = "all", use_tfidf: bool = True, use_stemming: b
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (18846 x 2000 - using the default settings), the labels numpy array (18846)
@@ -198,8 +198,8 @@ def load_newsgroups(subset: str = "all", use_tfidf: bool = True, use_stemming: b
         return Bunch(dataset_name="20Newsgroups", data=data, target=newsgroups.target, columns=vocabulary)
 
 
-def load_rcv1(subset: str = "all", n_features: int = 2000, categories: tuple = ("CCAT", "GCAT", "MCAT", "ECAT"),
-                 return_X_y: bool = False) -> Bunch:
+def load_rcv1(subset: str = "all", n_features: int = 2000, categories: list[str] | tuple[str, ...] = ("CCAT", "GCAT", "MCAT", "ECAT"),
+                 return_X_y: bool = False) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the RCV1 data set. It consists of over 800000 manually categorized newswire stories made available by rcv1,
     Ltd. The non-zero values in the data array correspond to cosine-normalized, log tf-idf vectors.
@@ -214,14 +214,14 @@ def load_rcv1(subset: str = "all", n_features: int = 2000, categories: tuple = (
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     n_features : int
         number of features used (default: 2000)
-    categories : tuple
+    categories : list[str] | tuple[str, ...]
         the categories that should be contained (default: ("CCAT", "GCAT", "MCAT", "ECAT"))
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (685071 x 2000 - using the default settings), the labels numpy array (685071 - using the default settings)
@@ -281,13 +281,13 @@ Other datasets
 
 def load_imagenet_dog(subset: str = "all",
                       image_size: tuple = (224, 224),
-                      breeds: list = ["n02085936-Maltese_dog", "n02086646-Blenheim_spaniel", "n02088238-basset",
+                      breeds: list[str] | tuple[str, ...] | None = ("n02085936-Maltese_dog", "n02086646-Blenheim_spaniel", "n02088238-basset",
                                       "n02091467-Norwegian_elkhound", "n02097209-standard_schnauzer",
                                       "n02099601-golden_retriever", "n02101388-Brittany_spaniel", "n02101556-clumber",
                                       "n02102177-Welsh_springer_spaniel", "n02105056-groenendael", "n02105412-kelpie",
                                       "n02105855-Shetland_sheepdog", "n02107142-Doberman", "n02110958-pug",
-                                      "n02112137-chow"],
-                      return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+                                      "n02112137-chow"),
+                      return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the ImageNet Dog data set. It consists of 20580 color images of different sizes showing 120 breeds of dogs.
     The data set is composed of 12000 training and 8580 test images.
@@ -303,18 +303,18 @@ def load_imagenet_dog(subset: str = "all",
     image_size : tuple
         the images of various sizes must be converted into a coherent size.
         The tuple equals (width, height) of the images (default: (224, 224))
-    breeds : list
+    breeds : list[str] | tuple[str, ...] | None
         list containing all the identifiers of the dog breeds that should be extracted. All entries must be of type str.
         If None, all breeds will be extracted.
         Usually, a subset consisting of 15 breeds is extracted (default: list with 15 dog breeds)
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Furthermore, the original images are contained in the 'images' attribute.
         Note that the data within 'data' is in HWC format and within 'images' in the CHW format.
@@ -392,7 +392,7 @@ def load_imagenet_dog(subset: str = "all",
                      images=data_image, image_format=image_format, classes=breeds)
 
 
-def load_imagenet10(use_224_size: bool = True, return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+def load_imagenet10(use_224_size: bool = True, return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the ImageNet-10 data set. This is a subset of the well-known ImageNet data set with only 10 classes.
     It consists of 13000 224x224 (or 96x96) color images showing different objects.
@@ -404,12 +404,12 @@ def load_imagenet10(use_224_size: bool = True, return_X_y: bool = False, downloa
         defines wheter the images should be loaded in the size (224 x 224) or (96 x 96) (default: True)
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Furthermore, the original images are contained in the 'images' attribute.
         Note that the data within 'data' is in HWC format and within 'images' in the CHW format.
@@ -459,7 +459,7 @@ def load_imagenet10(use_224_size: bool = True, return_X_y: bool = False, downloa
                      images=data_image, image_format=image_format)
 
 
-def load_coil20(return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+def load_coil20(return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the COIL-20 data set.
     It consists of 1440 128x128 gray-scale images of 20 objects photographed from 72 different angles.
@@ -469,12 +469,12 @@ def load_coil20(return_X_y: bool = False, downloads_path: str | Path = None) -> 
     ----------
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Furthermore, the original images are contained in the 'images' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
@@ -516,7 +516,7 @@ def load_coil20(return_X_y: bool = False, downloads_path: str | Path = None) -> 
         return Bunch(dataset_name="COIL20", data=data_flatten, target=labels, images=data_image, image_format="HW")
 
 
-def load_coil100(return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+def load_coil100(return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the COIL-100 data set.
     It consists of 7200 128x128 color images of 100 objects photographed from 72 different angles.
@@ -526,12 +526,12 @@ def load_coil100(return_X_y: bool = False, downloads_path: str | Path = None) ->
     ----------
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Furthermore, the original images are contained in the 'images' attribute.
         Note that the data within 'data' is in HWC format and within 'images' in the CHW format.
@@ -581,12 +581,12 @@ Load WebKB
 """
 
 
-def load_webkb(use_universities: tuple = ("cornell", "texas", "washington", "wisconsin"),
-               use_categories: tuple = ("course", "faculty", "project", "student"), use_tfidf: bool = True, 
-               use_stemming: bool = True, use_stop_words: bool = True, max_df: float | int = 1., 
-               min_df: float | int = 1, max_features: int = 2000, min_variance : float = 0., 
-               sublinear_tf: bool = False, remove_headers: bool = True, return_X_y: bool = False, 
-               downloads_path: str | Path = None) -> Bunch:
+def load_webkb(use_universities: list[str] |tuple[str, ...] | None = ("cornell", "texas", "washington", "wisconsin"),
+               use_categories: list[str] |tuple[str, ...] | None = ("course", "faculty", "project", "student"), use_tfidf: bool = True,
+               use_stemming: bool = True, use_stop_words: bool = True, max_df: float | int = 1.,
+               min_df: float | int = 1, max_features: int = 2000, min_variance : float = 0.,
+               sublinear_tf: bool = False, remove_headers: bool = True, return_X_y: bool = False,
+               downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the WebKB data set. It consists of 8282 Html documents from different universities ("wisconsin", "washington", "texas", "cornell", "misc").
     These web pages have a specified category ("student", "staff", "project", "faculty", "department", "course", "other").
@@ -598,9 +598,9 @@ def load_webkb(use_universities: tuple = ("cornell", "texas", "washington", "wis
 
     Parameters
     ----------
-    use_universities : tuple
+    use_universities : list[str] | tuple[str, ...] | None
         specify the universities. Can be None if all universities should be used (default: ("cornell", "texas", "washington", "wisconsin"))
-    use_categories : tuple
+    use_categories : list[str] | tuple[str, ...] | None
         specify the categories. Can be None if all categories should be used (default: ("course", "faculty", "project", "student"))
     use_tfidf : bool
         If true, tf-idf will be applied as the last step of the pipeline (default: True)
@@ -626,12 +626,12 @@ def load_webkb(use_universities: tuple = ("cornell", "texas", "washington", "wis
         Specifies if the headers of the Html files should be removed (default: True)
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (1041 x 323 - using the default settings), the labels numpy array (1041 x 2 - using the default settings)
@@ -641,13 +641,11 @@ def load_webkb(use_universities: tuple = ("cornell", "texas", "washington", "wis
     http://www.cs.cmu.edu/~webkb/
     """
     possible_universities = ["misc", "wisconsin", "washington", "texas", "cornell"]
+    universities_list = possible_universities.copy() if use_universities is None else use_universities
     possible_categories = ["student", "staff", "project", "other", "faculty", "department", "course"]
-    if use_universities is None:
-        use_universities = possible_universities.copy()
-    assert all([uni in possible_universities for uni in use_universities])
-    if use_categories is None:
-        use_categories = possible_categories.copy()
-    assert all([cat in possible_categories for cat in use_categories])
+    categories_list = possible_categories.copy() if use_categories is None else use_categories
+    assert all([uni in possible_universities for uni in universities_list])
+    assert all([cat in possible_categories for cat in categories_list])
     # Check if data is already downloaded
     directory = _get_download_dir(downloads_path) / "WebKB"
     filename = directory / "webkb-data.gtar.gz"
@@ -667,30 +665,31 @@ def load_webkb(use_universities: tuple = ("cornell", "texas", "washington", "wis
                         "\r", "")
                     # Get file content
                     f = tar.extractfile(obj)
+                    assert f is not None, "File {0} could not be extracted.".format(obj.name)
                     lines = f.readlines()
                     # Write file
                     with open(directory / new_name, "wb") as output:
                         for line in lines:
                             output.write(line)
-    texts = []
+    texts: list[str] = []
     labels = np.empty((0, 2), dtype=np.int32)
-    hmtl_tags = re.compile(r'<[^>]+>')
+    html_tags = re.compile(r'<[^>]+>')
     head_tags = re.compile(r'MIME-Version:[:,./\-\w\s]+<html>')
     number_tags = re.compile(r'\d*')
     # Read files
-    for i, category in enumerate(use_categories):
-        for j, univerity in enumerate(use_universities):
-            inner_directory = directory / "webkb" / category / univerity
+    for i, category in enumerate(categories_list):
+        for j, university in enumerate(universities_list):
+            inner_directory = directory / "webkb" / category / university
             for file in inner_directory.iterdir():
-                with open(file, "r", encoding='latin-1') as f:
-                    lines = f.read()
+                with open(file, "r", encoding='latin-1') as f2:
+                    file_lines = f2.read()
                     if remove_headers:
                         # Remove header
-                        lines = head_tags.sub('', lines)
+                        file_lines = head_tags.sub('', file_lines)
                     # Remove HTML tags
-                    lines = hmtl_tags.sub('', lines)
-                    lines = number_tags.sub('', lines)
-                    texts.append(lines)
+                    file_lines = html_tags.sub('', file_lines)
+                    file_lines = number_tags.sub('', file_lines)
+                    texts.append(file_lines)
                     labels = np.r_[labels, [[i, j]]]
     # Transform raw data
     data, vocabulary = _transform_text_data(texts, use_tfidf, use_stemming, use_stop_words, max_df, min_df, max_features, min_variance, 
@@ -699,7 +698,7 @@ def load_webkb(use_universities: tuple = ("cornell", "texas", "washington", "wis
     if return_X_y:
         return data, labels
     else:
-        return Bunch(dataset_name="WebKB", data=data, target=labels, classes=(use_categories, use_universities), columns=vocabulary)
+        return Bunch(dataset_name="WebKB", data=data, target=labels, classes=(categories_list, universities_list), columns=vocabulary)
 
 
 """
@@ -709,7 +708,7 @@ BBC Data
 
 def load_bbcsport(use_tfidf: bool = True, use_stemming: bool = True, use_stop_words: bool = True, max_df: float | int = 1., 
                min_df: float | int = 1, max_features: int = 2000, min_variance : float = 0., sublinear_tf: bool = False, 
-               return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+               return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the BBC Sport data set. It consists of a collection of 18846 BBC sport documents, partitioned
     into the topics "athletics", "cricket", "football", "rugby", and "tennis". 
@@ -740,12 +739,12 @@ def load_bbcsport(use_tfidf: bool = True, use_stemming: bool = True, use_stop_wo
         Apply sublinear term frequency scaling, i.e. replace tf with 1 + log(tf) (see sklearn TfidfTransformer) (default: False)
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (737 x 2000 - using the default settings), the labels numpy array (737)
@@ -777,17 +776,17 @@ def load_bbcsport(use_tfidf: bool = True, use_stemming: bool = True, use_stop_wo
     # Transform raw data
     data, vocabulary = _transform_text_data(texts, use_tfidf, use_stemming, use_stop_words, max_df, min_df, max_features, min_variance, 
                                 sublinear_tf)
-    labels = np.array(labels)
+    labels_np = np.array(labels, dtype=np.int32)
     # Return values
     if return_X_y:
-        return data, labels
+        return data, labels_np
     else:
-        return Bunch(dataset_name="BBCSport", data=data, target=labels, classes=topics, columns=vocabulary)
+        return Bunch(dataset_name="BBCSport", data=data, target=labels_np, classes=topics, columns=vocabulary)
     
 
 def load_bbcnews(use_tfidf: bool = True, use_stemming: bool = True, use_stop_words: bool = True, max_df: float | int = 1., 
                min_df: float | int = 1, max_features: int = 2000, min_variance : float = 0., sublinear_tf: bool = False, 
-               return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+               return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the BBC News data set. It consists of a collection of 2225 BBC news documents, partitioned
     into the topics "business", "entertainment", "politics", "sport", and "tech". 
@@ -818,12 +817,12 @@ def load_bbcnews(use_tfidf: bool = True, use_stemming: bool = True, use_stop_wor
         Apply sublinear term frequency scaling, i.e. replace tf with 1 + log(tf) (see sklearn TfidfTransformer) (default: False)
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (2225 x 2000 - using the default settings), the labels numpy array (2225)
@@ -855,9 +854,9 @@ def load_bbcnews(use_tfidf: bool = True, use_stemming: bool = True, use_stop_wor
     # Transform raw data
     data, vocabulary = _transform_text_data(texts, use_tfidf, use_stemming, use_stop_words, max_df, min_df, max_features, min_variance, 
                                 sublinear_tf)
-    labels = np.array(labels)
+    labels_np = np.array(labels, dtype=np.int32)
     # Return values
     if return_X_y:
-        return data, labels
+        return data, labels_np
     else:
-        return Bunch(dataset_name="BBCNews", data=data, target=labels, classes=topics, columns=vocabulary)
+        return Bunch(dataset_name="BBCNews", data=data, target=labels_np, classes=topics, columns=vocabulary)

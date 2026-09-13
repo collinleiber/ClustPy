@@ -108,11 +108,11 @@ class SubKmeans(TransformerMixin, ClusterMixin, BaseEstimator):
     ----------
     n_clusters : int
         the number of clusters (deafault: 8)
-    V_init : np.ndarray
+    V_init : np.ndarray | None
         the orthonormal rotation matrix (default: None)
-    m_init : int
+    m_init : int | None
         the initial dimensionality of the clustered space (default: None)
-    cluster_centers_init : np.ndarray
+    cluster_centers_init : np.ndarray | None
         list containing the initial cluster centers (default: None)
     mdl_for_noisespace : bool
         defines if MDL should be used to identify noise space dimensions instead of only considering negative eigenvalues (default: False)
@@ -128,11 +128,11 @@ class SubKmeans(TransformerMixin, ClusterMixin, BaseEstimator):
         Only relevant if n_init is larger than 1 (default: "default")
     threshold_negative_eigenvalue : float
         threshold to consider an eigenvalue as negative. Used for the update of the subspace dimensions (default: -1e-7)
-    max_distance : float
+    max_distance : float | None
         distance used to encode cluster centers and outliers. Only relevant if a MDL strategy is used (default: None)
-    precision : float
+    precision : float | None
         precision used to convert probability densities to actual probabilities. Only relevant if a MDL strategy is used (default: None)
-    random_state : np.random.RandomState | int
+    random_state : np.random.RandomState | int | None
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
     debug : bool
         If true, additional information will be printed to the console (default: False)
@@ -160,11 +160,11 @@ class SubKmeans(TransformerMixin, ClusterMixin, BaseEstimator):
     Society for Industrial and Applied Mathematics, 2022.
     """
 
-    def __init__(self, n_clusters: int = 8, V_init: np.ndarray = None, m_init: int = None,
-                 cluster_centers_init: np.ndarray = None, mdl_for_noisespace: bool = False, outliers: bool = False,
+    def __init__(self, n_clusters: int = 8, V_init: np.ndarray | None = None, m_init: int | None = None,
+                 cluster_centers_init: np.ndarray | None = None, mdl_for_noisespace: bool = False, outliers: bool = False,
                  max_iter: int = 300, n_init: int = 1, cost_type: str = "default",
-                 threshold_negative_eigenvalue: float = -1e-7, max_distance: float = None, precision: float = None,
-                 random_state: np.random.RandomState | int = None, debug: bool = False):
+                 threshold_negative_eigenvalue: float = -1e-7, max_distance: float | None = None, precision: float | None = None,
+                 random_state: np.random.RandomState | int | None = None, debug: bool = False):
         # Fixed attributes
         self.max_iter = max_iter
         self.n_init = n_init
@@ -182,14 +182,14 @@ class SubKmeans(TransformerMixin, ClusterMixin, BaseEstimator):
         self.V_init = V_init
         self.m_init = m_init
 
-    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'SubKmeans':
+    def fit(self, X: np.ndarray, y: np.ndarray | None = None) -> 'SubKmeans':
         """
         Initiate the actual clustering process on the input data set.
         The resulting cluster labels will be stored in the labels_ attribute.
 
         X : np.ndarray
             the given data set
-        y : np.ndarray
+        y : np.ndarray | None
             the labels (can be ignored)
 
         Returns
@@ -203,12 +203,12 @@ class SubKmeans(TransformerMixin, ClusterMixin, BaseEstimator):
             m_init = _transform_subkmeans_m_to_nrkmeans_m(self.m_init, X.shape[1])
             P_init = _transform_subkmeans_P_to_nrkmeans_P(self.m_init, X.shape[1])
         else:
-            m_init = self.m_init
+            m_init = None
             P_init = None
         if self.cluster_centers_init is not None:
             cluster_centers_init = _transform_subkmeans_centers_to_nrkmeans_centers(X, self.cluster_centers_init)
         else:
-            cluster_centers_init = self.cluster_centers_init
+            cluster_centers_init = None
         nrkmeans = NrKmeans(n_clusters, V_init=self.V_init, m_init=m_init, P_init=P_init, cluster_centers_init=cluster_centers_init,
                             mdl_for_noisespace=self.mdl_for_noisespace, outliers=self.outliers,
                             max_iter=self.max_iter, n_init=self.n_init,
@@ -273,7 +273,7 @@ class SubKmeans(TransformerMixin, ClusterMixin, BaseEstimator):
         rotated_data = np.matmul(X, clustered_space_V)
         return rotated_data
 
-    def fit_transform(self, X: np.ndarray, y: np.ndarray=None):
+    def fit_transform(self, X: np.ndarray, y: np.ndarray | None = None):
         """
         Train the clusterin algorithm on the given data set and return the final embedded version of the data using the obtained subspace.
 
@@ -281,7 +281,7 @@ class SubKmeans(TransformerMixin, ClusterMixin, BaseEstimator):
         ----------
         X: np.ndarray
             The given data set
-        y : np.ndarray
+        y : np.ndarray | None
             the labels (can usually be ignored)
 
         Returns
@@ -293,8 +293,8 @@ class SubKmeans(TransformerMixin, ClusterMixin, BaseEstimator):
         X_embed = self.transform(X)
         return X_embed
 
-    def plot_clustered_space(self, X: np.ndarray, labels: np.ndarray = None, plot_centers: bool = False,
-                             gt: np.ndarray = None, equal_axis=False) -> None:
+    def plot_clustered_space(self, X: np.ndarray, labels: np.ndarray | None = None, plot_centers: bool = False,
+                             gt: np.ndarray | None = None, equal_axis=False) -> None:
         """
         Plot the clustered space identified by SubKmeans as scatter matrix plot.
 
@@ -302,11 +302,11 @@ class SubKmeans(TransformerMixin, ClusterMixin, BaseEstimator):
         ----------
         X : np.ndarray
             the given data set
-        labels : np.ndarray
+        labels : np.ndarray | None
             the cluster labels used for coloring the plot. If none, the labels identified by the fit() function will be used (default: None)
         plot_centers : bool
             defines whether the cluster centers should be plotted (default: False)
-        gt : np.ndarray
+        gt : np.ndarray | None
             the ground truth labels. In contrast to the labels parameter this will be displayed using different markers instead of colors (default: None)
         equal_axis : bool
             defines whether the axes should be scaled equally
@@ -320,7 +320,7 @@ class SubKmeans(TransformerMixin, ClusterMixin, BaseEstimator):
                             self.transform(self.cluster_centers_) if
                             plot_centers else None, true_labels=gt, equal_axis=equal_axis)
 
-    def calculate_mdl_costs(self, X: np.ndarray) -> (float, float, list):
+    def calculate_mdl_costs(self, X: np.ndarray) -> tuple[float, float, list[float]]:
         """
         Calculate the Mdl Costs of this SubKmeans result.
 
@@ -331,7 +331,7 @@ class SubKmeans(TransformerMixin, ClusterMixin, BaseEstimator):
 
         Returns
         -------
-        tuple : (float, float, list)
+        tuple : tuple[float, float, list[float]]
             The total costs (global costs + sum of subspace costs),
             The global costs,
             The subspace specific costs (one entry for each subspace)

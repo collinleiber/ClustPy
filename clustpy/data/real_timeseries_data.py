@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 def _load_timeseries_classification_data(dataset_name: str, subset: str, labels_minus_one: bool, file_type: str,
-                                         last_column_are_labels: bool, return_X_y: bool, downloads_path: str | Path) -> Bunch:
+                                         last_column_are_labels: bool, return_X_y: bool, downloads_path: str | Path | None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Helper function to load timeseries data from www.timeseriesclassification.com.
 
@@ -24,13 +24,13 @@ def _load_timeseries_classification_data(dataset_name: str, subset: str, labels_
         specifies if the last column contains the labels. If false labels should be contained in the first column
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored. If input was None this will be equal to
         '[USER]/Downloads/clustpy_datafiles'
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array, the labels numpy array
@@ -100,7 +100,7 @@ def _load_timeseries_classification_data(dataset_name: str, subset: str, labels_
         return Bunch(dataset_name=dataset_name, data=data, target=labels)
 
 
-def load_motestrain(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+def load_motestrain(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the motestrain data set. It consists of 1272 samples belonging to one of 2 classes.
     The data set is composed of 20 training and 1252 test samples.
@@ -112,12 +112,12 @@ def load_motestrain(subset: str = "all", return_X_y: bool = False, downloads_pat
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (1272 x 84), the labels numpy array (1272)
@@ -129,7 +129,7 @@ def load_motestrain(subset: str = "all", return_X_y: bool = False, downloads_pat
     return _load_timeseries_classification_data("MoteStrain", subset, True, "txt", False, return_X_y, downloads_path)
 
 
-def load_proximal_phalanx_outline(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+def load_proximal_phalanx_outline(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the proximal phalanx outline data set. It consists of 876 samples belonging to one of 2 classes.
     The data set is composed of 600 training and 276 test samples.
@@ -141,12 +141,12 @@ def load_proximal_phalanx_outline(subset: str = "all", return_X_y: bool = False,
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (876 x 80), the labels numpy array (876)
@@ -159,7 +159,7 @@ def load_proximal_phalanx_outline(subset: str = "all", return_X_y: bool = False,
                                                 return_X_y, downloads_path)
 
 
-def load_diatom_size_reduction(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+def load_diatom_size_reduction(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the diatom size reduction data set. It consists of 322 samples belonging to one of 4 classes.
     The data set is composed of 16 training and 306 test samples.
@@ -171,12 +171,12 @@ def load_diatom_size_reduction(subset: str = "all", return_X_y: bool = False, do
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (322 x 345), the labels numpy array (322)
@@ -189,7 +189,7 @@ def load_diatom_size_reduction(subset: str = "all", return_X_y: bool = False, do
                                                 return_X_y, downloads_path)
 
 
-def load_symbols(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+def load_symbols(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the symbols data set. It consists of 1020 samples belonging to one of 6 classes.
     The data set is composed of 25 training and 995 test samples.
@@ -201,12 +201,12 @@ def load_symbols(subset: str = "all", return_X_y: bool = False, downloads_path: 
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (1020 x 398), the labels numpy array (1020)
@@ -218,7 +218,7 @@ def load_symbols(subset: str = "all", return_X_y: bool = False, downloads_path: 
     return _load_timeseries_classification_data("Symbols", subset, True, "txt", False, return_X_y, downloads_path)
 
 
-def load_olive_oil(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+def load_olive_oil(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the OliveOil data set. It consists of 60 samples belonging to one of 4 classes.
     The data set is composed of 30 training and 30 test samples.
@@ -230,12 +230,12 @@ def load_olive_oil(subset: str = "all", return_X_y: bool = False, downloads_path
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (60 x 570), the labels numpy array (60)
@@ -247,7 +247,7 @@ def load_olive_oil(subset: str = "all", return_X_y: bool = False, downloads_path
     return _load_timeseries_classification_data("OliveOil", subset, True, "txt", False, return_X_y, downloads_path)
 
 
-def load_plane(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+def load_plane(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the plane data set. It consists of 210 samples belonging to one of 7 classes.
     The data set is composed of 105 training and 105 test samples.
@@ -259,12 +259,12 @@ def load_plane(subset: str = "all", return_X_y: bool = False, downloads_path: st
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (210 x 144), the labels numpy array (210)
@@ -276,7 +276,7 @@ def load_plane(subset: str = "all", return_X_y: bool = False, downloads_path: st
     return _load_timeseries_classification_data("Plane", subset, True, "txt", False, return_X_y, downloads_path)
 
 
-def load_sony_aibo_robot_surface(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+def load_sony_aibo_robot_surface(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the Sony AIBO Robot Surface 1 data set. It consists of 621 samples belonging to one of 2 classes.
     The data set is composed of 20 training and 601 test samples.
@@ -288,12 +288,12 @@ def load_sony_aibo_robot_surface(subset: str = "all", return_X_y: bool = False, 
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (621 x 70), the labels numpy array (621)
@@ -306,7 +306,7 @@ def load_sony_aibo_robot_surface(subset: str = "all", return_X_y: bool = False, 
                                                 return_X_y, downloads_path)
 
 
-def load_two_patterns(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+def load_two_patterns(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the two patterns data set. It consists of 5000 samples belonging to one of 4 classes.
     The data set is composed of 1000 training and 4000 test samples.
@@ -318,12 +318,12 @@ def load_two_patterns(subset: str = "all", return_X_y: bool = False, downloads_p
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (5000 x 128), the labels numpy array (5000)
@@ -335,7 +335,7 @@ def load_two_patterns(subset: str = "all", return_X_y: bool = False, downloads_p
     return _load_timeseries_classification_data("TwoPatterns", subset, True, "txt", False, return_X_y, downloads_path)
 
 
-def load_lsst(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+def load_lsst(subset: str = "all", return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the LSST data set. It consists of 4925 samples belonging to one of 14 classes.
     The data set is composed of 2459 training and 2466 test samples.
@@ -347,12 +347,12 @@ def load_lsst(subset: str = "all", return_X_y: bool = False, downloads_path: str
         can be 'all', 'test' or 'train'. 'all' combines test and train data (default: 'all')
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Alternatively, if return_X_y is True two arrays will be returned:
         the data numpy array (4925 x 216), the labels numpy array (4925)
@@ -362,6 +362,7 @@ def load_lsst(subset: str = "all", return_X_y: bool = False, downloads_path: str
     http://www.timeseriesclassification.com/description.php?Dataset=LSST
     """
     dataset = _load_timeseries_classification_data("LSST", subset, True, "ts", True, False, downloads_path)
+    assert isinstance(dataset, Bunch), "Expected a Bunch object from _load_timeseries_classification_data"
     data = dataset.data
     labels = dataset.target
     # Current labels are: 5, 14, 15, 41, 51, 52, ... -> change to: 0, 1, 2, 3, 4, ...

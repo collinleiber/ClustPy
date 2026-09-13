@@ -4,7 +4,7 @@ Collin Leiber
 """
 
 import numpy as np
-from clustpy.utils import dip_test, dip_pval, dip_pval_gradient
+from clustpy.utils import dip_test, dip_test_extended, dip_pval, dip_pval_gradient
 from clustpy.density import UniDip
 from sklearn.decomposition import PCA
 from clustpy.centroid.dipext import _angle, _n_starting_vectors_default, _ambiguous_modal_triangle_random
@@ -14,7 +14,7 @@ from clustpy.utils.checks import check_parameters
 
 def _dip_n_sub(X: np.ndarray, significance: float, threshold: float, step_size: float, momentum: float,
                n_starting_vectors: int, add_tails: bool, outliers: bool, consider_duplicates: bool,
-               random_state: np.random.RandomState, debug: bool) -> (int, np.ndarray, np.ndarray):
+               random_state: np.random.RandomState, debug: bool) -> tuple[int, np.ndarray, np.ndarray]:
     """
     Start the actual DipNSub clustering procedure on the input data set.
 
@@ -45,7 +45,7 @@ def _dip_n_sub(X: np.ndarray, significance: float, threshold: float, step_size: 
 
     Returns
     -------
-    tuple : (int, np.ndarray, np.ndarray)
+    tuple : tuple[int, np.ndarray, np.ndarray]
         The final number of clusters,
         The labels as identified by DipNSub,
         The resulting feature space (Number of samples x number of components)
@@ -117,8 +117,8 @@ def _dip_n_sub(X: np.ndarray, significance: float, threshold: float, step_size: 
 def _find_min_dippvalue_by_grouped_sgd(X: np.ndarray, labels: np.ndarray, n_clusters: int, step_size: float,
                                        momentum: float, n_starting_vectors: int,
                                        cluster_sizes: np.ndarray, consider_duplicates: bool,
-                                       random_state: np.random.RandomState, debug: bool) -> (
-        np.ndarray, np.ndarray, np.ndarray):
+                                       random_state: np.random.RandomState, debug: bool) -> tuple[
+        np.ndarray, np.ndarray, np.ndarray]:
     """
     Find the axes with n_starting_vectors highest weighted dip-p-values and start gradient descent from there.
 
@@ -147,14 +147,14 @@ def _find_min_dippvalue_by_grouped_sgd(X: np.ndarray, labels: np.ndarray, n_clus
 
     Returns
     -------
-    tuple : (np.ndarray, np.ndarray, np.ndarray)
+    tuple : tuple[np.ndarray, np.ndarray, np.ndarray]
         The best identified weighted dip-p-values,
         The corresponing projection axis responsible for the dip-p-values,
         The data projected onto that projection axis
     """
     # Get dip-p-value of each cluster on each axis
     axis_dips = [
-        np.array([dip_test(X[labels == j, d], just_dip=True, is_data_sorted=False) for j in range(n_clusters)]) for d in
+        np.array([dip_test(X[labels == j, d], is_data_sorted=False) for j in range(n_clusters)]) for d in
         range(X.shape[1])]
     axis_pvalues = [np.array(
         [dip_pval(d_inner, cluster_sizes[j], pval_strategy="function") for j, d_inner in enumerate(single_axis_dips)])
@@ -224,7 +224,7 @@ def _find_min_dippvalue_by_grouped_sgd_with_start(X: np.ndarray, labels: np.ndar
                                                   projection: np.ndarray, step_size: float, momentum: float,
                                                   cluster_sizes: np.ndarray, consider_duplicates: bool,
                                                   random_state: np.random.RandomState,
-                                                  debug: bool) -> (np.ndarray, np.ndarray, np.ndarray, float):
+                                                  debug: bool) -> tuple[np.ndarray, np.ndarray, np.ndarray, float]:
     """
     Perform gradient descent to find the projection vector with the minimum weighted dip-p-value.
 
@@ -253,17 +253,17 @@ def _find_min_dippvalue_by_grouped_sgd_with_start(X: np.ndarray, labels: np.ndar
 
     Returns
     -------
-    tuple : (np.ndarray, np.ndarray, np.ndarray, float)
+    tuple : tuple[np.ndarray, np.ndarray, np.ndarray, float]
         The best identified weighted dip-p-values,
         The corresponing projection axis responsible for the dip-p-values,
         The data projected onto that projection axis,
         The sum of the weighted dip-p-values
     """
     # Initial values
-    total_angle = 0
-    best_projection = None
-    best_projected_data = None
-    best_pvalues = None
+    total_angle = 0.
+    best_projection = np.zeros(X.shape[1])
+    best_projected_data = np.zeros(X.shape[0])
+    best_pvalues = np.zeros(n_clusters)
     direction = np.zeros(X.shape[1])
     min_sum_weighted_pvalues = np.inf
     n_equal_results = 1
@@ -316,8 +316,8 @@ def _find_min_dippvalue_by_grouped_sgd_with_start(X: np.ndarray, labels: np.ndar
 
 def _get_min_dippvalue_using_grouped_gradient(X: np.ndarray, labels: np.ndarray, n_clusters: int,
                                               projection_vector: np.ndarray, cluster_sizes: np.ndarray,
-                                              consider_duplicates: bool, random_state: np.random.RandomState) -> (
-        np.ndarray, np.ndarray, np.ndarray):
+                                              consider_duplicates: bool, random_state: np.random.RandomState) -> tuple[
+        np.ndarray, np.ndarray, np.ndarray]:
     """
     Use current projection_vector to calculate the dip-value and a corresponding modal_triangle.
     The modal_triangle is then used to calculate the gradient of the used projection axis.
@@ -341,7 +341,7 @@ def _get_min_dippvalue_using_grouped_gradient(X: np.ndarray, labels: np.ndarray,
 
     Returns
     -------
-    tuple : (np.ndarray, np.ndarray, np.ndarray)
+    tuple : tuple[np.ndarray, np.ndarray, np.ndarray]
         The gradient,
         List containing the dip-value of each cluster,
         The data set projected onto the projection axis
@@ -358,8 +358,9 @@ def _get_min_dippvalue_using_grouped_gradient(X: np.ndarray, labels: np.ndarray,
             continue
         sorted_indices = np.argsort(projected_data[points_in_cluster])
         sorted_projected_data_in_cluster = projected_data[points_in_cluster][sorted_indices]
-        dip_value, _, modal_triangle = dip_test(sorted_projected_data_in_cluster, just_dip=False,
-                                                is_data_sorted=True)
+        dip_output = dip_test_extended(sorted_projected_data_in_cluster)
+        dip_value = dip_output[0]
+        modal_triangle = dip_output[2]
         if modal_triangle[0] == -1:
             continue
         if consider_duplicates:
@@ -394,7 +395,7 @@ class DipNSub(ClusterMixin, BaseEstimator):
         Step size used for gradient descent (default: 0.1)
     momentum : float
         Momentum used for gradient descent (default: 0.95)
-    n_starting_vectors : int
+    n_starting_vectors : int | None
         The number of starting vectors for gradient descent. Can be None, in that case it will be equal to np.log(data dimensionality) + 1 (default: None)
     add_tails : bool
         Defines if TailoredDip should try to add tails to the surrounding clusters (default: True)
@@ -402,7 +403,7 @@ class DipNSub(ClusterMixin, BaseEstimator):
         Defines if outliers should be identified as described by UniDip (default: False)
     consider_duplicates : bool
         If multiple instances on the projection axis share a value, the gradient is ambiguous. If those duplicate values should be considered a random instances will be choses for furhter calculations. Beware: The calculation will not be deterministic anymore (default: False)
-    random_state : np.random.RandomState | int
+    random_state : np.random.RandomState | int | None
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
     debug : bool
         If true, additional information will be printed to the console (default: False)
@@ -425,8 +426,8 @@ class DipNSub(ClusterMixin, BaseEstimator):
     """
 
     def __init__(self, significance: float = 0.01, threshold: float = 0.15, step_size: float = 0.1,
-                 momentum: float = 0.95, n_starting_vectors: int = None, add_tails=True, outliers=False,
-                 consider_duplicates: bool = False, random_state: np.random.RandomState | int = None,
+                 momentum: float = 0.95, n_starting_vectors: int | None = None, add_tails=True, outliers=False,
+                 consider_duplicates: bool = False, random_state: np.random.RandomState | int | None = None,
                  debug: bool = False):
         self.significance = significance
         self.threshold = threshold
@@ -439,7 +440,7 @@ class DipNSub(ClusterMixin, BaseEstimator):
         self.random_state = random_state
         self.debug = debug
 
-    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DipNSub':
+    def fit(self, X: np.ndarray, y: np.ndarray | None = None) -> 'DipNSub':
         """
         Initiate the actual clustering process on the input data set.
         The resulting cluster labels will be stored in the labels_ attribute.
@@ -448,7 +449,7 @@ class DipNSub(ClusterMixin, BaseEstimator):
         ----------
         X : np.ndarray
             the given data set
-        y : np.ndarray
+        y : np.ndarray | None
             the labels (can be ignored)
 
         Returns

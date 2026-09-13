@@ -3,16 +3,15 @@
 Collin Leiber
 """
 
-from clustpy.utils import dip_test, dip_pval
+from clustpy.utils import dip_test, dip_test_extended, dip_pval
 import numpy as np
 from sklearn.base import BaseEstimator, ClusterMixin
-from sklearn.utils import check_random_state
 from clustpy.utils.checks import check_parameters
 
 
 def _skinnydip(X: np.ndarray, significance: float, pval_strategy: str, n_boots: int, add_tails: bool, outliers: bool,
-               max_cluster_size_diff_factor: float, random_state: np.random.RandomState, debug: bool) -> (
-        int, np.ndarray):
+               max_cluster_size_diff_factor: float, random_state: np.random.RandomState, debug: bool) -> tuple[
+        int, np.ndarray]:
     """
     Start the actual SkinnyDip clustering procedure on the input data set.
 
@@ -40,14 +39,9 @@ def _skinnydip(X: np.ndarray, significance: float, pval_strategy: str, n_boots: 
 
     Returns
     -------
-    tuple : (int, np.ndarray)
+    tuple : tuple[int, np.ndarray]
         The final number of clusters,
         The labels as identified by SkinnyDip
-
-    References
-    ----------
-    Maurus, Samuel, and Claudia Plant. "Skinny-dip: clustering in a sea of noise."
-    Proceedings of the 22nd ACM SIGKDD international conference on Knowledge discovery and data mining. 2016.
     """
     # Check if we have a multidimensional dataset
     if X.ndim == 1:
@@ -80,8 +74,8 @@ def _skinnydip(X: np.ndarray, significance: float, pval_strategy: str, n_boots: 
 
 
 def _unidip_original(X_1d: np.ndarray, significance: float, already_sorted: bool, pval_strategy: str, n_boots: int,
-                     max_cluster_size_diff_factor: float, random_state: np.random.RandomState, debug: bool) -> (
-        int, np.ndarray, np.ndarray, np.ndarray, list):
+                     max_cluster_size_diff_factor: float, random_state: np.random.RandomState, debug: bool) -> tuple[
+        int, np.ndarray, np.ndarray, np.ndarray, list]:
     """
     Start the actual UniDip clustering procedure on the univariate input data set.
 
@@ -107,7 +101,7 @@ def _unidip_original(X_1d: np.ndarray, significance: float, already_sorted: bool
 
     Returns
     -------
-    tuple : (int, np.ndarray, np.ndarray, np.ndarray, list)
+    tuple : tuple[int, np.ndarray, np.ndarray, np.ndarray, list]
         The final number of clusters,
         The labels as identified by UniDip,
         The sorted input data set,
@@ -121,7 +115,7 @@ def _unidip_original(X_1d: np.ndarray, significance: float, already_sorted: bool
     """
     assert significance >= 0 and significance <= 1, "[UniDip] significance must be a value in the range [0, 1]"
     assert X_1d.ndim == 1, "[UniDip] Data must be 1-dimensional. Your input has shape: {0}".format(X_1d.shape)
-    cluster_boundaries = []
+    cluster_boundaries : list[tuple[int, int]] = []
     # Check if data is already sorted
     if already_sorted:
         argsorted = np.arange(X_1d.shape[0])
@@ -137,7 +131,9 @@ def _unidip_original(X_1d: np.ndarray, significance: float, already_sorted: bool
             print("[UniDip] Checking interval {0} / Current clusters: {1}".format((start, end), cluster_boundaries))
         # Get part of data
         tmp_X_1d = X_1d_sorted[start:end]
-        dip_value, modal_interval, _ = dip_test(tmp_X_1d, just_dip=False, is_data_sorted=True)
+        dip_output = dip_test_extended(tmp_X_1d)
+        dip_value = dip_output[0]
+        modal_interval = dip_output[1]
         dip_pvalue = dip_pval(dip_value, n_points=tmp_X_1d.shape[0], pval_strategy=pval_strategy,
                               n_boots=n_boots, random_state=random_state)
         low = modal_interval[0]
@@ -169,7 +165,9 @@ def _unidip_original(X_1d: np.ndarray, significance: float, already_sorted: bool
             # Other clusters to the right? (right must be handled before left)
             if cluster_end != search_space_end:
                 right_X_1d = X_1d_sorted[cluster_start:search_space_end]
-                dip_value, modal_interval, _ = dip_test(right_X_1d, just_dip=False, is_data_sorted=True)
+                dip_output = dip_test_extended(right_X_1d)
+                dip_value = dip_output[0]
+                modal_interval = dip_output[1]
                 low, high = modal_interval
                 dip_pvalue = dip_pval(dip_value, n_points=right_X_1d.shape[0], pval_strategy=pval_strategy,
                                       n_boots=n_boots, random_state=random_state)
@@ -192,7 +190,9 @@ def _unidip_original(X_1d: np.ndarray, significance: float, already_sorted: bool
             # Other clusters to the left?
             if cluster_start != search_space_start:
                 left_X_1d = X_1d_sorted[search_space_start:cluster_end]
-                dip_value, modal_interval, _ = dip_test(left_X_1d, just_dip=False, is_data_sorted=True)
+                dip_output = dip_test_extended(left_X_1d)
+                dip_value = dip_output[0]
+                modal_interval = dip_output[1]
                 low, high = modal_interval
                 dip_pvalue = dip_pval(dip_value, n_points=left_X_1d.shape[0], pval_strategy=pval_strategy,
                                       n_boots=n_boots, random_state=random_state)
@@ -231,7 +231,7 @@ def _unidip_original(X_1d: np.ndarray, significance: float, already_sorted: bool
     return n_clusters, labels, X_1d_sorted, argsorted, cluster_boundaries
 
 
-def _dip_mirrored_data(X_1d_sorted: np.ndarray, orig_modal_interval: tuple) -> (float, int, int):
+def _dip_mirrored_data(X_1d_sorted: np.ndarray, orig_modal_interval: tuple | None) -> tuple[float, int, int]:
     """
     Mirror the data to get a more accurate modal interval.
     For more information see 'The DipEncoder: Enforcing Multimodality in Autoencoders'.
@@ -240,12 +240,12 @@ def _dip_mirrored_data(X_1d_sorted: np.ndarray, orig_modal_interval: tuple) -> (
     ----------
     X_1d_sorted : np.ndarray
         the input data set, must be sorted
-    orig_modal_interval : tuple
+    orig_modal_interval : tuple | None
         Tuple containing the starting and ending index of the original modal interval. Can be None
 
     Returns
     -------
-    tuple : (float, int, int)
+    tuple : tuple[float, int, int]
         The highest obtained Dip-value,
         The new starting index of the modal interval,
         The new ending index of the modal interval
@@ -258,11 +258,15 @@ def _dip_mirrored_data(X_1d_sorted: np.ndarray, orig_modal_interval: tuple) -> (
     # Left mirror
     mirrored_addition_left = X_1d_sorted[0] - np.flip(X_1d_sorted[1:] - X_1d_sorted[0])
     X_1d_left_mirrored = np.append(mirrored_addition_left, X_1d_sorted)
-    dip_value_left, modal_interval_left, _ = dip_test(X_1d_left_mirrored, just_dip=False, is_data_sorted=True)
+    dip_output_left = dip_test_extended(X_1d_left_mirrored)
+    dip_value_left = dip_output_left[0]
+    modal_interval_left = dip_output_left[1]
     # Right mirror
     mirrored_addition_right = X_1d_sorted[-1] + np.flip(X_1d_sorted[-1] - X_1d_sorted[:-1])
     X_1d_right_mirrored = np.append(X_1d_sorted, mirrored_addition_right)
-    dip_value_right, modal_interval_right, _ = dip_test(X_1d_right_mirrored, just_dip=False, is_data_sorted=True)
+    dip_output_right = dip_test_extended(X_1d_right_mirrored)
+    dip_value_right = dip_output_right[0]
+    modal_interval_right = dip_output_right[1]
     # Get interval of larger dip
     if dip_value_left > dip_value_right:
         low = modal_interval_left[0]
@@ -270,7 +274,8 @@ def _dip_mirrored_data(X_1d_sorted: np.ndarray, orig_modal_interval: tuple) -> (
         if low < X_1d_sorted.shape[0] and high >= X_1d_sorted.shape[0]:
             if orig_modal_interval is None:
                 # If no orig_modal_interval input is given, calculate modal_interval of original dataset
-                _, orig_modal_interval, _ = dip_test(X_1d_sorted, just_dip=False, is_data_sorted=True)
+                dip_output_interval= dip_test_extended(X_1d_sorted)
+                orig_modal_interval = dip_output_interval[1]
             return dip_value_left, orig_modal_interval[0], orig_modal_interval[1]
         if low >= X_1d_sorted.shape[0]:
             return dip_value_left, low - (X_1d_sorted.shape[0] - 1), high - (X_1d_sorted.shape[0] - 1)
@@ -282,7 +287,8 @@ def _dip_mirrored_data(X_1d_sorted: np.ndarray, orig_modal_interval: tuple) -> (
         if low < X_1d_sorted.shape[0] and high >= X_1d_sorted.shape[0]:
             if orig_modal_interval is None:
                 # If no orig_modal_interval input is given, calculate modal_interval of original dataset
-                _, orig_modal_interval, _ = dip_test(X_1d_sorted, just_dip=False, is_data_sorted=True)
+                dip_output_interval = dip_test_extended(X_1d_sorted)
+                orig_modal_interval = dip_output_interval[1]
             return dip_value_right, orig_modal_interval[0], orig_modal_interval[1]
         if high < X_1d_sorted.shape[0]:
             return dip_value_right, low, high
@@ -292,8 +298,8 @@ def _dip_mirrored_data(X_1d_sorted: np.ndarray, orig_modal_interval: tuple) -> (
 
 def _merge_clusters(X_1d_sorted: np.ndarray, argsorted: np.ndarray, labels: np.ndarray, n_clusters: int,
                     cluster_boundaries: list, significance: float, pval_strategy: str, n_boots: int,
-                    max_cluster_size_diff_factor: float, random_state: np.random.RandomState) -> (
-        int, np.ndarray, list):
+                    max_cluster_size_diff_factor: float, random_state: np.random.RandomState) -> tuple[
+        int, np.ndarray, list]:
     """
     Check for each cluster if it can be merged with the left or right neighboring cluster.
     The first and the last cluster will hereby handled by its more central neighbors.
@@ -325,7 +331,7 @@ def _merge_clusters(X_1d_sorted: np.ndarray, argsorted: np.ndarray, labels: np.n
 
     Returns
     -------
-    tuple : (int, np.ndarray, list)
+    tuple : tuple[int, np.ndarray, list]
         The final number of clusters,
         The labels after merging,
         Updated list of tuples containing the id of the first sample in a cluster and the first sample that is not part of the cluster anymore
@@ -341,7 +347,7 @@ def _merge_clusters(X_1d_sorted: np.ndarray, argsorted: np.ndarray, labels: np.n
                        int(cluster_boundaries[i][0] + max_cluster_size_diff_factor * cluster_size_left))
         tmp_X_1d = X_1d_sorted[start_left:end_left]
         # Run dip-test
-        dip_value = dip_test(tmp_X_1d, just_dip=True, is_data_sorted=True)
+        dip_value = dip_test(tmp_X_1d, is_data_sorted=True)
         dip_pvalue_left = dip_pval(dip_value, n_points=tmp_X_1d.shape[0], pval_strategy=pval_strategy,
                                    n_boots=n_boots, random_state=random_state)
         # Dip of i combined with right (i + 1)
@@ -352,7 +358,7 @@ def _merge_clusters(X_1d_sorted: np.ndarray, argsorted: np.ndarray, labels: np.n
                         int(cluster_boundaries[i + 1][0] + max_cluster_size_diff_factor * cluster_size_center))
         tmp_X_1d = X_1d_sorted[start_right:end_right]
         # Run dip-test
-        dip_value = dip_test(tmp_X_1d, just_dip=True, is_data_sorted=True)
+        dip_value = dip_test(tmp_X_1d, is_data_sorted=True)
         dip_pvalue_right = dip_pval(dip_value, n_points=tmp_X_1d.shape[0], pval_strategy=pval_strategy,
                                     n_boots=n_boots, random_state=random_state)
         if dip_pvalue_left >= dip_pvalue_right and dip_pvalue_left >= significance:
@@ -381,7 +387,7 @@ TailoredDip (UniDip improvements)
 
 def _tailoreddip(X_1d: np.ndarray, significance: float, pval_strategy: str, n_boots: int, add_tails: bool,
                  outliers: bool, max_cluster_size_diff_factor: float, random_state: np.random.RandomState,
-                 debug: bool) -> (int, np.ndarray, list):
+                 debug: bool) -> tuple[int, np.ndarray, list]:
     """
     Start the actual TailoredDip clustering procedure on the univariate input data set.
     TailoredDip is an extension of UniDip that is able to better capture the tails of distributions.
@@ -411,7 +417,7 @@ def _tailoreddip(X_1d: np.ndarray, significance: float, pval_strategy: str, n_bo
 
     Returns
     -------
-    tuple : (int, np.ndarray, list)
+    tuple : tuple[int, np.ndarray, list]
         The final number of clusters,
         The labels as identified by UniDip,
         List of tuples containing the id of the first sample in a cluster and the first sample that is not part of the cluster anymore
@@ -437,8 +443,8 @@ def _tailoreddip(X_1d: np.ndarray, significance: float, pval_strategy: str, n_bo
 
 def _add_tails(X_1d: np.ndarray, labels: np.ndarray, sorted_X_1d: np.ndarray, argsorted: np.ndarray,
                cluster_boundaries_orig: list, significance: float, pval_strategy: str, n_boots: int,
-               max_cluster_size_diff_factor: float, random_state: np.random.RandomState, debug: bool) -> (
-        np.ndarray, list):
+               max_cluster_size_diff_factor: float, random_state: np.random.RandomState, debug: bool) -> tuple[
+        np.ndarray, list]:
     """
     Add the tails of distributions to the surrounding clusters.
     This happens by mirroring the area between two clusters and checking whether this are is uni- or multimodal.
@@ -473,7 +479,7 @@ def _add_tails(X_1d: np.ndarray, labels: np.ndarray, sorted_X_1d: np.ndarray, ar
 
     Returns
     -------
-    tuple : (np.ndarray, list)
+    tuple : tuple[np.ndarray, list]
         The updated labels after adding the tails,
         Updated list of tuples containing the id of the first sample in a cluster and the first sample that is not part of the cluster anymore
     """
@@ -512,8 +518,8 @@ def _add_tails(X_1d: np.ndarray, labels: np.ndarray, sorted_X_1d: np.ndarray, ar
                 if debug:
                     print("[UniDip Add Tails] -> Identified the clusters {0} in the interval {1}".format(
                         cluster_boundaries_new, (start, end)))
-                dip_pvalue_left = -1
-                dip_pvalue_right = -1
+                dip_pvalue_left = -1.
+                dip_pvalue_right = -1.
                 # Append first found structure to cluster before
                 # Calculate dip of first found structure with cluster before
                 if i != 0:
@@ -522,7 +528,7 @@ def _add_tails(X_1d: np.ndarray, labels: np.ndarray, sorted_X_1d: np.ndarray, ar
                     start_left = max(cluster_boundaries_orig[i - 1][0],
                                      int(cluster_boundaries_orig[i - 1][1] - max_cluster_size_diff_factor * cluster_range))
                     end_left = start + cluster_boundaries_new[0][1]
-                    dip_value_left = dip_test(sorted_X_1d[start_left:end_left], just_dip=True, is_data_sorted=True)
+                    dip_value_left = dip_test(sorted_X_1d[start_left:end_left], is_data_sorted=True)
                     dip_pvalue_left = dip_pval(dip_value_left, n_points=end_left - start_left,
                                                pval_strategy=pval_strategy, n_boots=n_boots, random_state=random_state)
                     if debug:
@@ -537,8 +543,7 @@ def _add_tails(X_1d: np.ndarray, labels: np.ndarray, sorted_X_1d: np.ndarray, ar
                     # Use a maximum of cluster_range points of right cluster to see if transition is unimodal
                     end_right = min(cluster_boundaries_orig[i][1],
                                     int(cluster_boundaries_orig[i][0] + max_cluster_size_diff_factor * cluster_range))
-                    dip_value_right = dip_test(sorted_X_1d[start_right:end_right], just_dip=True,
-                                               is_data_sorted=True)
+                    dip_value_right = dip_test(sorted_X_1d[start_right:end_right], is_data_sorted=True)
                     dip_pvalue_right = dip_pval(dip_value_right, n_points=end_right - start_right,
                                                 pval_strategy=pval_strategy, n_boots=n_boots, random_state=random_state)
                     if debug:
@@ -653,7 +658,7 @@ class SkinnyDip(ClusterMixin, BaseEstimator):
     max_cluster_size_diff_factor : float
         The maximum different in size when comparing two clusters regarding the number of samples.
         If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) closest samples will be used for merging and assigning tails of distributions if 'add_tails' is True (default: 2)
-    random_state : np.random.RandomState
+    random_state : np.random.RandomState | int | None
         use a fixed random state to get a repeatable solution. Can also be of type int. Only relevant if pval_strategy is 'bootstrap' (default: None)
     debug : bool
         If true, additional information will be printed to the console (default: False)
@@ -687,7 +692,7 @@ class SkinnyDip(ClusterMixin, BaseEstimator):
 
     def __init__(self, significance: float = 0.05, pval_strategy: str = "table", n_boots: int = 1000,
                  add_tails: bool = False, outliers: bool = True, max_cluster_size_diff_factor: float = 2,
-                 random_state: np.random.RandomState = None, debug: bool = False):
+                 random_state: np.random.RandomState | int | None = None, debug: bool = False):
         self.significance = significance
         self.pval_strategy = pval_strategy
         self.n_boots = n_boots
@@ -697,7 +702,7 @@ class SkinnyDip(ClusterMixin, BaseEstimator):
         self.random_state = random_state
         self.debug = debug
 
-    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'SkinnyDip':
+    def fit(self, X: np.ndarray, y: np.ndarray | None = None) -> 'SkinnyDip':
         """
         Initiate the actual clustering process on the input data set.
         The resulting cluster labels will be stored in the labels_ attribute.
@@ -706,7 +711,7 @@ class SkinnyDip(ClusterMixin, BaseEstimator):
         ----------
         X : np.ndarray
             the given data set
-        y : np.ndarray
+        y : np.ndarray | None
             the labels (can be ignored)
 
         Returns
@@ -747,7 +752,7 @@ class UniDip(ClusterMixin, BaseEstimator):
     max_cluster_size_diff_factor : float
         The maximum different in size when comparing two clusters regarding the number of samples.
         If one cluster surpasses this difference factor, only the max_cluster_size_diff_factor*(size of smaller cluster) closest samples will be used for merging and assigning tails of distributions if 'add_tails' is True (default: 2)
-    random_state : np.random.RandomState | int
+    random_state : np.random.RandomState | int | None
         use a fixed random state to get a repeatable solution. Can also be of type int. Only relevant if pval_strategy is 'bootstrap'  (default: None)
     debug : bool
         If true, additional information will be printed to the console (default: False)
@@ -776,7 +781,7 @@ class UniDip(ClusterMixin, BaseEstimator):
 
     def __init__(self, significance: float = 0.05, pval_strategy: str = "table", n_boots: int = 1000,
                  add_tails: bool = False, outliers: bool = True, max_cluster_size_diff_factor: float = 2,
-                 random_state: np.random.RandomState | int = None, debug: bool = False):
+                 random_state: np.random.RandomState | int | None = None, debug: bool = False):
         self.significance = significance
         self.pval_strategy = pval_strategy
         self.n_boots = n_boots
@@ -786,7 +791,7 @@ class UniDip(ClusterMixin, BaseEstimator):
         self.random_state = random_state
         self.debug = debug
 
-    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'UniDip':
+    def fit(self, X: np.ndarray, y: np.ndarray | None = None) -> 'UniDip':
         """
         Initiate the actual clustering process on the input data set.
         The resulting cluster labels will be stored in the labels_ attribute.
@@ -795,7 +800,7 @@ class UniDip(ClusterMixin, BaseEstimator):
         ----------
         X : np.ndarray
             the given data set
-        y : np.ndarray
+        y : np.ndarray | None
             the labels (can be ignored)
 
         Returns

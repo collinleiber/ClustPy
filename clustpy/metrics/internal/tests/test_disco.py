@@ -1,5 +1,5 @@
 import numpy as np
-from clustpy.metrics.internal.disco import disco_score, disco_samples, p_cluster, p_noise
+from clustpy.metrics.internal.disco import disco_score, disco_samples, _p_cluster, _p_noise
 import pytest
 from sklearn.metrics import silhouette_samples
 from sklearn.neighbors import KDTree
@@ -170,32 +170,32 @@ def test_disco_samples_single_cluster_with_noise_scores_shape():
 
 
 def test_p_cluster_empty_returns_empty():
-    result = p_cluster(np.empty((0, 2)), np.array([]))
+    result = _p_cluster(np.empty((0, 2)), np.array([]))
     assert result.shape == (0,)
 
 
 def test_p_cluster_single_sample_returns_zero():
-    result = p_cluster(np.array([[1.0, 2.0]]), np.array([0]))
+    result = _p_cluster(np.array([[1.0, 2.0]]), np.array([0]))
     assert result == pytest.approx(np.array([0.0]))
 
 
 def test_p_cluster_all_same_label_returns_zeros():
     X = np.array([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
     labels = np.array([0, 0, 0])
-    result = p_cluster(X, labels)
+    result = _p_cluster(X, labels)
     assert np.all(result == 0.0)
 
 
 def test_p_cluster_each_own_label_returns_zeros():
     X = np.array([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
     labels = np.array([0, 1, 2])
-    result = p_cluster(X, labels)
+    result = _p_cluster(X, labels)
     assert np.all(result == 0.0)
 
 
 def test_p_cluster_length_mismatch_raises():
     with pytest.raises(ValueError):
-        p_cluster(np.array([[0, 0], [1, 1]]), np.array([0, 0, 1]))
+        _p_cluster(np.array([[0, 0], [1, 1]]), np.array([0, 0, 1]))
 
 
 def test_p_cluster_precomputed_matches_sklearn_silhouette():
@@ -203,7 +203,7 @@ def test_p_cluster_precomputed_matches_sklearn_silhouette():
     n = 6
     D = _make_symmetric_dist_matrix(n)
     labels = np.array([0, 0, 0, 1, 1, 1])
-    result = p_cluster(D, labels, precomputed_dc_dists=True)
+    result = _p_cluster(D, labels, precomputed_dc_dists=True)
     expected = silhouette_samples(D, labels, metric="precomputed")
     np.testing.assert_allclose(result, expected)
 
@@ -211,12 +211,12 @@ def test_p_cluster_precomputed_matches_sklearn_silhouette():
 def test_p_cluster_precomputed_invalid_matrix_raises():
     """Non-square matrix with precomputed=True must raise."""
     with pytest.raises(ValueError):
-        p_cluster(np.zeros((3, 4)), np.array([0, 0, 1]), precomputed_dc_dists=True)
+        _p_cluster(np.zeros((3, 4)), np.array([0, 0, 1]), precomputed_dc_dists=True)
 
 
 def test_p_cluster_output_range():
     X, labels = _make_two_blobs()
-    result = p_cluster(X, labels)
+    result = _p_cluster(X, labels)
     assert result.shape == (len(X),)
     assert np.all(result >= -1.0)
     assert np.all(result <= 1.0)
@@ -224,7 +224,7 @@ def test_p_cluster_output_range():
 
 def test_p_cluster_well_separated_blobs_high_score():
     X, labels = _make_two_blobs()
-    result = p_cluster(X, labels, min_points=2)
+    result = _p_cluster(X, labels, min_points=2)
     p_cluster_values = np.array(
         [0.91161165, 0.91161165, 0.91161165, 0.91161165, 0.91161165, 0.91161165, 0.91161165, 0.91161165]
     )
@@ -238,25 +238,25 @@ def test_p_cluster_well_separated_blobs_high_score():
 
 def test_p_noise_empty_raises():
     with pytest.raises(ValueError, match="empty"):
-        p_noise(np.empty((0, 2)), np.array([]))
+        _p_noise(np.empty((0, 2)), np.array([]))
 
 
 def test_p_noise_length_mismatch_raises():
     with pytest.raises(ValueError):
-        p_noise(np.array([[0, 0], [1, 1]]), np.array([0, 0, -1]))
+        _p_noise(np.array([[0, 0], [1, 1]]), np.array([0, 0, -1]))
 
 
 def test_p_noise_only_noise_returns_minus_one():
     X = np.array([[0.0, 0.0], [1.0, 1.0], [2.0, 2.0]])
     labels = np.array([-1, -1, -1])
-    p_sparse, p_far = p_noise(X, labels)
+    p_sparse, p_far = _p_noise(X, labels)
     assert np.all(p_sparse == -1.0)
     assert np.all(p_far == -1.0)
 
 
 def test_p_noise_no_noise_returns_empty_arrays():
     X, labels = _make_two_blobs()
-    p_sparse, p_far = p_noise(X, labels)
+    p_sparse, p_far = _p_noise(X, labels)
     assert len(p_sparse) == 0
     assert len(p_far) == 0
 
@@ -268,7 +268,7 @@ def test_p_noise_output_count_matches_noise_count():
         dtype=float,
     )
     labels = np.array([0, 0, 1, 1, -1])
-    p_sparse, p_far = p_noise(X, labels)
+    p_sparse, p_far = _p_noise(X, labels)
     n_noise = (labels == -1).sum()
     assert p_sparse.shape == (n_noise,)
     assert p_far.shape == (n_noise,)
@@ -280,7 +280,7 @@ def test_p_noise_output_range():
         dtype=float,
     )
     labels = np.array([0, 0, 1, 1, -1])
-    p_sparse, p_far = p_noise(X, labels)
+    p_sparse, p_far = _p_noise(X, labels)
     assert np.all(p_sparse >= -1.0) and np.all(p_sparse <= 1.0)
     assert np.all(p_far >= -1.0) and np.all(p_far <= 1.0)
 
@@ -301,8 +301,8 @@ def test_p_noise_precomputed_dc_dists_gives_same_result():
             [70.71067812, 70.71067812, 70.71067812, 70.71067812, 0.0],
         ]
     )
-    p_sparse_pre, p_far_pre = p_noise(X, labels, dc_dists=dc_dists)
-    p_sparse_calc, p_far_calc = p_noise(X, labels)
+    p_sparse_pre, p_far_pre = _p_noise(X, labels, dc_dists=dc_dists)
+    p_sparse_calc, p_far_calc = _p_noise(X, labels)
     np.testing.assert_allclose(p_sparse_pre, p_sparse_calc, rtol=0, atol=1e-10)
     np.testing.assert_allclose(p_far_pre, p_far_calc, rtol=0, atol=1e-10)
 
@@ -325,7 +325,7 @@ def test_p_noise_far_noise_higher_p_far_than_nearby_noise():
         dtype=float,
     )
     labels = np.array([0, 0, 0, 0, 1, 1, 1, 1, -1, -1])
-    _, p_far = p_noise(X, labels)
+    _, p_far = _p_noise(X, labels)
     # p_far index 0 = close noise, index 1 = far noise
     assert p_far[1] > p_far[0]
 
@@ -373,5 +373,5 @@ def test_p_noise_sparse_formula_with_precomputed():
         p_sparse_formula(noise_core[0], max_core_cluster1),
     )
 
-    p_sparse, _ = p_noise(X, labels, min_points=min_points)
+    p_sparse, _ = _p_noise(X, labels, min_points=min_points)
     assert p_sparse[0] == pytest.approx(expected, abs=1e-9)

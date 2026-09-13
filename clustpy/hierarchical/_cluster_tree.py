@@ -1,3 +1,4 @@
+from __future__ import annotations
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
 from collections.abc import Callable
@@ -15,7 +16,7 @@ class _ClusterTreeNode:
         the initial labels assigned to this node
     tree : BinaryClusterTree
         the tree that contains this node
-    parent_node : _ClusterTreeNode
+    parent_node : _ClusterTreeNode | None
         the parent of this node
 
     Attributes
@@ -24,26 +25,26 @@ class _ClusterTreeNode:
         a list containing all cluster labels that are below this node
     tree : BinaryClusterTree
         the tree that contains this node
-    parent_node : _ClusterTreeNode
+    parent_node : _ClusterTreeNode | None
         the parent node. Is None in the case of the root node
-    left_node_ : _ClusterTreeNode
+    left_node_ : _ClusterTreeNode | None
         the left child node. Can be None if node is a leaf node
-    right_node_ : _ClusterTreeNode
+    right_node_ : _ClusterTreeNode | None
         the right child node. Can be None if node is a leaf node
     node_id_ : int
         the ID of this node
     """
 
     def __init__(
-        self, labels: list, tree: "BinaryClusterTree", parent_node: "_ClusterTreeNode"
+        self, labels: list, tree: BinaryClusterTree, parent_node: _ClusterTreeNode | None
     ):
         self.labels = labels
         self.tree = tree
         self.parent_node = parent_node
         self.node_id_ = tree.get_current_node_id_counter()
         self.tree.n_leaf_nodes_ += 1
-        self.left_node_ = None
-        self.right_node_ = None
+        self.left_node_ : _ClusterTreeNode | None = None
+        self.right_node_ : _ClusterTreeNode | None = None
 
     def is_leaf_node(self) -> bool:
         """
@@ -64,8 +65,8 @@ class _ClusterTreeNode:
         self,
         split_cluster_id: int,
         new_cluster_id: int,
-        cluster_tree_node_class: "_ClusterTreeNode",
-    ) -> ("_ClusterTreeNode", "_ClusterTreeNode"):
+        cluster_tree_node_class: type[_ClusterTreeNode],
+    ) -> tuple[_ClusterTreeNode, _ClusterTreeNode]:
         """
         Split this node.
         Checks if the reference cluster is contained on the left or right side.
@@ -78,12 +79,12 @@ class _ClusterTreeNode:
             the cluster ID of the cluster that should be split
         new_cluster_id : int
             the new cluster ID that should be added to the tree
-        cluster_tree_node_class : _ClusterTreeNode
+        cluster_tree_node_class : type[_ClusterTreeNode]
             the class used to create the new cluster tree nodes (default: _ClusterTreeNode)
 
         Returns
         -------
-        tuple : (_ClusterTreeNode, _ClusterTreeNode)
+        tuple : tuple[_ClusterTreeNode, _ClusterTreeNode]
             The two newly created nodes
         """
         assert (
@@ -102,18 +103,21 @@ class _ClusterTreeNode:
             self.tree.n_leaf_nodes_ -= 1  # This node switches from split to leaf node
             to_return = (self.left_node_, self.right_node_)
         else:
-            if split_cluster_id in self.left_node_.labels:
-                to_return = self.left_node_.split_cluster(
+            left_node = self.left_node_
+            right_node = self.right_node_
+            assert left_node is not None and right_node is not None
+            if split_cluster_id in left_node.labels:
+                to_return = left_node.split_cluster(
                     split_cluster_id, new_cluster_id, cluster_tree_node_class
                 )
             else:
-                to_return = self.right_node_.split_cluster(
+                to_return = right_node.split_cluster(
                     split_cluster_id, new_cluster_id, cluster_tree_node_class
                 )
         self.labels.append(new_cluster_id)
         return to_return
 
-    def delete_node(self) -> "_ClusterTreeNode":
+    def delete_node(self) -> _ClusterTreeNode | None:
         """
         Delete this node from the cluster tree. Also deletes all children of this node and the parent.
         The sibling will get the position of the former parent.
@@ -121,7 +125,7 @@ class _ClusterTreeNode:
 
         Returns
         -------
-        sibling : _ClusterTreeNode
+        sibling : _ClusterTreeNode | None
             The sibling node that substitutes the former parent node. Can be None if node has already been deleted
         """
         # Check if node was already (recursively) removed from tree or is root
@@ -134,6 +138,7 @@ class _ClusterTreeNode:
             i = 0
             while i < len(nodes_to_check):
                 node = nodes_to_check[i]
+                assert node is not None, "Node is None"
                 # Set parent to None -> marks deletion
                 node.parent_node = None
                 if not node.is_leaf_node():
@@ -147,10 +152,12 @@ class _ClusterTreeNode:
             self.tree.n_leaf_nodes_ -= 1
         # Delete labels from all parents
         parent_node_to_check = self.parent_node
-        while parent_node_to_check is not None:
+        while True:
             for l in self.labels:
                 if l in parent_node_to_check.labels:
                     parent_node_to_check.labels.remove(l)
+            if parent_node_to_check.parent_node is None:
+                break
             parent_node_to_check = parent_node_to_check.parent_node
         # Update parent by replacing with sibling
         sibling = self.get_sibling()
@@ -160,11 +167,13 @@ class _ClusterTreeNode:
             self.tree.root_node_ = sibling
         else:
             # Change parent of sibling and child of parents parent
-            sibling.parent_node = self.parent_node.parent_node
-            if self.parent_node.parent_node.left_node_ is self.parent_node:
-                self.parent_node.parent_node.left_node_ = sibling
+            new_parent = self.parent_node.parent_node
+            assert new_parent is not None, "Parent of parent is None"
+            sibling.parent_node = new_parent
+            if new_parent.left_node_ is self.parent_node:
+                new_parent.left_node_ = sibling
             else:
-                self.parent_node.parent_node.right_node_ = sibling
+                new_parent.right_node_ = sibling
             # Set parent to None -> marks deletion
             self.parent_node.parent_node = None
         self.tree.n_split_nodes_ -= 1  # The parent
@@ -172,7 +181,7 @@ class _ClusterTreeNode:
         self.parent_node = None
         return sibling
 
-    def get_sibling(self) -> "_ClusterTreeNode":
+    def get_sibling(self) -> _ClusterTreeNode:
         """
         Get the sibling of this node.
 
@@ -181,10 +190,12 @@ class _ClusterTreeNode:
         sibling : _ClusterTreeNode
             The sibling node
         """
+        assert self.parent_node is not None, "This node has no parent and thus no sibling"
         if self == self.parent_node.left_node_:
             sibling = self.parent_node.right_node_
         else:
             sibling = self.parent_node.left_node_
+        assert sibling is not None, "This node has no sibling"
         return sibling
 
     def __str__(self) -> str:
@@ -219,7 +230,7 @@ class BinaryClusterTree:
 
     Parameters
     ----------
-    cluster_tree_node_class : _ClusterTreeNode
+    cluster_tree_node_class : type[_ClusterTreeNode]
         the class used to create new cluster tree nodes (default: _ClusterTreeNode)
 
     Attributes
@@ -234,7 +245,7 @@ class BinaryClusterTree:
         the number of split nodes contained in the tree
     """
 
-    def __init__(self, cluster_tree_node_class: "_ClusterTreeNode" = _ClusterTreeNode):
+    def __init__(self, cluster_tree_node_class: type[_ClusterTreeNode] = _ClusterTreeNode):
         self.node_id_counter_ = 0
         self.n_leaf_nodes_ = 0
         self.n_split_nodes_ = 0
@@ -255,8 +266,8 @@ class BinaryClusterTree:
         return current_counter
 
     def split_cluster(
-        self, split_cluster_id: int, new_cluster_id: int = None
-    ) -> ("_ClusterTreeNode", "_ClusterTreeNode"):
+        self, split_cluster_id: int, new_cluster_id: int | None = None
+    ) -> tuple[_ClusterTreeNode, _ClusterTreeNode]:
         """
         Split a specific cluster in the tree by creating two new nodes; one containing the split_cluster_id label and one with new the new_cluster_id label.
 
@@ -264,12 +275,12 @@ class BinaryClusterTree:
         ----------
         split_cluster_id : int
             The cluster id to split
-        new_cluster_id : int
+        new_cluster_id : int | None
             the new cluster ID that should be added to the tree. If None, it will be specified automatically (default: None)
 
         Returns
         -------
-        tuple : (_ClusterTreeNode, _ClusterTreeNode)
+        tuple : tuple[_ClusterTreeNode, _ClusterTreeNode]
             The two newly created cluster tree nodes
         """
         assert (
@@ -291,7 +302,7 @@ class BinaryClusterTree:
         return new_left_node, new_right_node
 
     def prune_to_n_leaf_nodes(
-        self, n_leaf_nodes_to_keep: int, labels: np.ndarray = None
+        self, n_leaf_nodes_to_keep: int, labels: np.ndarray | None = None
     ) -> np.ndarray:
         """
         Prune the tree by only keeping the first n_leaf_nodes_to_keep leaf nodes in the tree.
@@ -301,7 +312,7 @@ class BinaryClusterTree:
         ----------
         n_leaf_nodes_to_keep : int
             The number of leaf nodes to keep in the cluster tree
-        labels : np.ndarray
+        labels : np.ndarray | None
             an optional labels array that should be adjusted by considering the new structure (default: None)
 
         Returns
@@ -322,16 +333,19 @@ class BinaryClusterTree:
         while i < len(nodes_to_check):
             node = nodes_to_check[i]
             if not node.is_leaf_node():
+                left_node = node.left_node_
+                right_node = node.right_node_
+                assert left_node is not None and right_node is not None
                 if (
-                    node.left_node_.node_id_ <= highest_node_id_to_keep
-                    or node.right_node_.node_id_ <= highest_node_id_to_keep
+                    left_node.node_id_ <= highest_node_id_to_keep
+                    or right_node.node_id_ <= highest_node_id_to_keep
                 ) and len(nodes_to_check) < n_total_nodes_to_keep:
-                    nodes_to_check.append(node.left_node_)
-                    nodes_to_check.append(node.right_node_)
+                    nodes_to_check.append(left_node)
+                    nodes_to_check.append(right_node)
                 else:
-                    node.left_node_.parent_node = None
+                    left_node.parent_node = None
                     node.left_node_ = None
-                    node.right_node_.prent_node = None
+                    right_node.parent_node = None
                     node.right_node_ = None
                     min_label = np.min(node.labels)
                     if labels is not None:
@@ -345,7 +359,7 @@ class BinaryClusterTree:
 
     def get_least_common_ancestor(
         self, label_1: int, label_2: int
-    ) -> "_ClusterTreeNode":
+    ) -> _ClusterTreeNode:
         """
         Get the first node that contains label_1 and label_2.
 
@@ -372,32 +386,35 @@ class BinaryClusterTree:
         while True:
             if least_common_ancestor.is_leaf_node():
                 break
+            left_node = least_common_ancestor.left_node_
+            right_node = least_common_ancestor.right_node_
+            assert left_node is not None and right_node is not None
             all_in_left = (
-                label_1 in least_common_ancestor.left_node_.labels
-                and label_2 in least_common_ancestor.left_node_.labels
+                label_1 in left_node.labels
+                and label_2 in left_node.labels
             )
             # Both labels are contained in the left part of the tree
             if all_in_left:
-                least_common_ancestor = least_common_ancestor.left_node_
+                least_common_ancestor = left_node
             else:
                 all_in_right = (
-                    label_1 in least_common_ancestor.right_node_.labels
-                    and label_2 in least_common_ancestor.right_node_.labels
+                    label_1 in right_node.labels
+                    and label_2 in right_node.labels
                 )
                 # Both labels are contained in the right part of the tree
                 if all_in_right:
-                    least_common_ancestor = least_common_ancestor.right_node_
+                    least_common_ancestor = right_node
                 else:
                     break
         return least_common_ancestor
 
-    def get_leaf_and_split_nodes(self) -> (list, list):
+    def get_leaf_and_split_nodes(self) -> tuple[list, list]:
         """
         Get all leaf and split nodes of the tree.
 
         Returns
         -------
-        tuple : (list, list)
+        tuple : tuple[list, list]
             A list containing all leaf nodes,
             A list containing all split nodes
         """
@@ -410,6 +427,7 @@ class BinaryClusterTree:
             if node.is_leaf_node():
                 leaf_nodes.append(node)
             else:
+                assert node.left_node_ is not None and node.right_node_ is not None
                 split_nodes.append(node)
                 nodes_to_check.append(node.left_node_)
                 nodes_to_check.append(node.right_node_)

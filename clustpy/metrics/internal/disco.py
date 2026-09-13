@@ -9,7 +9,7 @@ from sklearn.metrics import silhouette_samples
 from sklearn.neighbors import KDTree
 from sklearn.preprocessing import LabelEncoder
 from clustpy.utils.dctree import DCTree
-from clustpy.metrics._metrics_utils import handle_noise
+from clustpy.metrics._metrics_utils import handle_noise, _check_length_data_and_labels
 
 
 def disco_score(X: np.ndarray, labels: np.ndarray, min_points: int = 5, noise_strategy: str = "keep") -> float:
@@ -141,7 +141,7 @@ def disco_samples(X: np.ndarray, labels: np.ndarray, min_points: int = 5, noise_
 
     Example
     -------
-    >>> from disco import disco_score
+    >>> from disco import disco_samples
     >>> from sklearn.datasets import make_moons
     >>> from sklearn.cluster import HDBSCAN
     >>> X, y = make_moons(random_state=42)
@@ -158,10 +158,10 @@ def disco_samples(X: np.ndarray, labels: np.ndarray, min_points: int = 5, noise_
 
     if len(X) == 0:
         raise ValueError("Can't calculate DISCO score for empty dataset.")
-    if len(X) != len(labels):
-        raise ValueError("Dataset size differs from label size.")
+    X, labels = _check_length_data_and_labels(X, labels, allow_single_cluster=True)
 
-    labels, X, _ = handle_noise(labels, strategy=noise_strategy, X=X)
+    labels, X_noise_handled, _ = handle_noise(labels, strategy=noise_strategy, X=X)
+    assert X_noise_handled is not None
     labels[labels != -1] = LabelEncoder().fit_transform(labels[labels != -1])
 
     # Labels needs to be a one dimensional vector
@@ -170,33 +170,32 @@ def disco_samples(X: np.ndarray, labels: np.ndarray, min_points: int = 5, noise_
 
     # Only noise
     if label_set == {-1}:
-        return np.full(len(X), -1)
+        return np.full(len(X_noise_handled), -1)
+    elif len(label_set) == 1:
+        # One cluster without noise
+        return np.full(len(X_noise_handled), 0)
 
-    # One cluster without noise
-    if len(label_set) == 1 and label_set != {-1}:
-        return np.full(len(X), 0)
-
-    dc_dists = dc_distances(X, min_points=min_points)
+    dc_dists = DCTree(X_noise_handled, min_points=min_points).dc_distances()
     # One cluster with noise
     if len(label_set) == 2 and -1 in label_set:
         l_ = labels.copy()
         l_[l_ == -1] = np.arange(-1, -len(l_[l_ == -1]) - 1, -1)
-        disco_values = np.empty(len(X))
-        disco_values[labels != -1] = p_cluster(dc_dists, l_, precomputed_dc_dists=True)[labels != -1]
-        disco_values[labels == -1] = np.minimum(*p_noise(X, labels, min_points=min_points, dc_dists=dc_dists))
+        disco_values = np.empty(len(X_noise_handled))
+        disco_values[labels != -1] = _p_cluster(dc_dists, l_, precomputed_dc_dists=True)[labels != -1]
+        disco_values[labels == -1] = np.minimum(*_p_noise(X_noise_handled, labels, min_points=min_points, dc_dists=dc_dists))
         return disco_values
 
     # More then one cluster with optional noise
     else:
-        disco_values = np.empty(len(X))
+        disco_values = np.empty(len(X_noise_handled))
         non_noise_dc_dists = dc_dists[np.ix_(labels != -1, labels != -1)]
         non_noise_labels = labels[labels != -1]
-        disco_values[labels != -1] = p_cluster(non_noise_dc_dists, non_noise_labels, precomputed_dc_dists=True)
-        disco_values[labels == -1] = np.minimum(*p_noise(X, labels, min_points=min_points, dc_dists=dc_dists))
+        disco_values[labels != -1] = _p_cluster(non_noise_dc_dists, non_noise_labels, precomputed_dc_dists=True)
+        disco_values[labels == -1] = np.minimum(*_p_noise(X_noise_handled, labels, min_points=min_points, dc_dists=dc_dists))
         return disco_values
 
 
-def p_cluster(
+def _p_cluster(
     X: np.ndarray,
     labels: np.ndarray,
     *,
@@ -237,13 +236,13 @@ def p_cluster(
 
     Example
     -------
-    >>> from disco import p_cluster
+    >>> from disco import _p_cluster
     >>> from sklearn.datasets import make_moons
     >>> from sklearn.cluster import HDBSCAN
     >>> X, y = make_moons(random_state=42)
     >>> hdbscan = HDBSCAN()
     >>> labels = hdbscan.fit_predict(X).labels_
-    >>> p_cluster(X, labels)
+    >>> _p_cluster(X, labels)
     """
     if len(X) != len(labels):
         raise ValueError("Dataset size of `X` differs from label size of `lables`.")
@@ -262,12 +261,12 @@ def p_cluster(
             raise ValueError("`X` needs to be a distance matrix if `precomputed_dc_dists` is `True`.")
         dc_dists = X
     else:
-        dc_dists = dc_distances(X, min_points=min_points)
+        dc_dists = DCTree(X, min_points=min_points).dc_distances()
 
     return silhouette_samples(dc_dists, labels, metric="precomputed")
 
 
-def p_noise(
+def _p_noise(
     X: np.ndarray,
     labels: np.ndarray,
     *,
@@ -312,13 +311,13 @@ def p_noise(
 
     Example
     -------
-    >>> from disco import p_noise
+    >>> from disco import _p_noise
     >>> from sklearn.datasets import make_moons
     >>> from sklearn.cluster import HDBSCAN
     >>> X, y = make_moons(random_state=42)
     >>> hdbscan = HDBSCAN()
     >>> labels = hdbscan.fit_predict(X).labels_
-    >>> p_noise(X, labels)
+    >>> _p_noise(X, labels)
     """
     if len(X) == 0:
         raise ValueError("Can't calculate noise score for empty dataset.")
@@ -337,7 +336,7 @@ def p_noise(
 
     ## At least one cluster and noise ##
     if dc_dists is None:
-        dc_dists = dc_distances(X, min_points=min_points)
+        dc_dists = DCTree(X, min_points=min_points).dc_distances()
 
     tree = KDTree(X)
     core_dists, _ = tree.query(X, k=min_points)
@@ -377,8 +376,3 @@ def p_noise(
         p_far = np.minimum(p_far, p_far_i)
 
     return p_sparse, p_far
-
-
-def dc_distances(X, min_points=5):
-    dc_dists = DCTree(X, min_points=min_points).dc_distances()
-    return dc_dists

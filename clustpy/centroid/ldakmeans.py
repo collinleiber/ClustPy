@@ -16,7 +16,7 @@ from sklearn.metrics.pairwise import pairwise_distances_argmin_min
 
 
 def _lda_kmeans(X: np.ndarray, n_clusters: int, n_dims: int, max_iter: int, kmeans_repetitions: int,
-                random_state: np.random.RandomState) -> (np.ndarray, np.ndarray, np.ndarray, float, int):
+                random_state: np.random.RandomState) -> tuple[np.ndarray, np.ndarray, np.ndarray, float, int]:
     """
     Start the actual LDA-Kmeans clustering procedure on the input data set.
 
@@ -37,7 +37,7 @@ def _lda_kmeans(X: np.ndarray, n_clusters: int, n_dims: int, max_iter: int, kmea
 
     Returns
     -------
-    tuple : (np.ndarray, np.ndarray, np.ndarray, float, int)
+    tuple : tuple[np.ndarray, np.ndarray, np.ndarray, float, int]
         The labels as identified by LDAKmeans,
         The final rotation matrix,
         The cluster centers in the subspace,
@@ -95,7 +95,7 @@ class LDAKmeans(TransformerMixin, ClusterMixin, BaseEstimator):
     ----------
     n_clusters : int
         the number of clusters (default: 8)
-    n_dims : int
+    n_dims : int | None
         The number of features in the resulting subspace. If None this will be equal to n_clusters - 1 (default: None)
     max_iter : int
         the maximum number of iterations (default: 300)
@@ -103,7 +103,7 @@ class LDAKmeans(TransformerMixin, ClusterMixin, BaseEstimator):
         number of times LDAKmeans is executed using different seeds. The final result will be the one with lowest costs (default: 1)
     kmeans_repetitions : int
         Number of repetitions when executing KMeans. For more information see sklearn.cluster.KMeans (default: 10)
-    random_state : np.random.RandomState | int
+    random_state : np.random.RandomState | int | None
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Attributes
@@ -125,8 +125,8 @@ class LDAKmeans(TransformerMixin, ClusterMixin, BaseEstimator):
     Proceedings of the 24th international conference on Machine learning. 2007.
     """
 
-    def __init__(self, n_clusters: int = 8, n_dims: int = None, max_iter: int = 300, n_init: int = 1,
-                 kmeans_repetitions: int = 10, random_state: np.random.RandomState | int = None):
+    def __init__(self, n_clusters: int = 8, n_dims: int | None = None, max_iter: int = 300, n_init: int = 1,
+                 kmeans_repetitions: int = 10, random_state: np.random.RandomState | int | None = None):
         self.n_clusters = n_clusters
         self.n_dims = n_dims
         self.max_iter = max_iter
@@ -134,7 +134,7 @@ class LDAKmeans(TransformerMixin, ClusterMixin, BaseEstimator):
         self.kmeans_repetitions = kmeans_repetitions
         self.random_state = random_state
 
-    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'LDAKmeans':
+    def fit(self, X: np.ndarray, y: np.ndarray | None = None) -> 'LDAKmeans':
         """
         Initiate the actual clustering process on the input data set.
         The resulting cluster labels are contained in the labels_ attribute.
@@ -143,7 +143,7 @@ class LDAKmeans(TransformerMixin, ClusterMixin, BaseEstimator):
         ----------
         X : np.ndarray
             the given data set
-        y : np.ndarray
+        y : np.ndarray | None
             the labels (can be ignored)
 
         Returns
@@ -212,7 +212,7 @@ class LDAKmeans(TransformerMixin, ClusterMixin, BaseEstimator):
         predicted_labels = predicted_labels.astype(np.int32)
         return predicted_labels
 
-    def fit_transform(self, X: np.ndarray, y: np.ndarray=None):
+    def fit_transform(self, X: np.ndarray, y: np.ndarray | None = None):
         """
         Train the clusterin algorithm on the given data set and return the final embedded version of the data using the obtained subspace.
 
@@ -220,7 +220,7 @@ class LDAKmeans(TransformerMixin, ClusterMixin, BaseEstimator):
         ----------
         X: np.ndarray
             The given data set
-        y : np.ndarray
+        y : np.ndarray | None
             the labels (can usually be ignored)
 
         Returns

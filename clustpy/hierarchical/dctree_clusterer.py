@@ -6,11 +6,9 @@ Pascal Weber
 # - Author: Pascal Weber
 # - Source: https://github.com/pasiweber/SHADE
 
-from __future__ import annotations
 import numpy as np
 import sys
 from clustpy.utils.dctree import DCTree, _DCNode
-from typing import Optional
 from sklearn.base import ClusterMixin, BaseEstimator
 from clustpy.utils.checks import check_parameters
 
@@ -53,7 +51,7 @@ class DCTree_Clusterer(ClusterMixin, BaseEstimator):
         self.min_points = min_points
         self.use_less_memory = use_less_memory
 
-    def fit(self, X: np.ndarray, y: np.ndarray=None) -> 'DCTree_Clusterer':
+    def fit(self, X: np.ndarray, y: np.ndarray | None = None) -> 'DCTree_Clusterer':
         """
         Initiate the actual clustering process on the input data set.
         The resulting cluster labels will be stored in the labels_ attribute.
@@ -62,7 +60,7 @@ class DCTree_Clusterer(ClusterMixin, BaseEstimator):
         ----------
         X : np.ndarray
             the given data set
-        y : np.ndarray
+        y : np.ndarray | None
             the labels (can be ignored)
 
         Returns
@@ -82,19 +80,19 @@ class DCTree_Clusterer(ClusterMixin, BaseEstimator):
         self.n_features_in_ = X.shape[1]
         return self
 
-    def _condense(self, node: Optional[_DCNode]) -> Optional[_DCNode]:
+    def _condense(self, node: _DCNode | None) -> _DCNode | None:
         """
         Condense the tree to nodes, where both children contain at least min_points leaves.
         Uses a recursive strategy that checks each node separately.
 
         Parameters
         ----------
-        node : _DCNode
+        node : _DCNode | None
             the node that is checked for its children
 
         Returns
         -------
-        condensed_node : _DCNode
+        condensed_node : _DCNode | None
             either a condensed node or None
         """
         if node is None or len(node.leaves) < self.min_points:
@@ -118,15 +116,15 @@ class DCTree_Clusterer(ClusterMixin, BaseEstimator):
             return _DCNode(node.id, R.dist, node.leaves, R.left, R.right)
         return None
 
-    def _get_stable_nodes(self, node: Optional[_DCNode], parent_dist: float = None) -> list:
+    def _get_stable_nodes(self, node: _DCNode | None, parent_dist: float | None = None) -> list:
         """
         Identify stable nodes in the tree.
 
         Parameters
         ----------
-        node : _DCNode
+        node : _DCNode | None
             the node that is checked.
-        parent_dist : float
+        parent_dist : float | None
             Distance in the parent node. Can be None in the case of the root (default: None)
 
         Returns
@@ -136,18 +134,20 @@ class DCTree_Clusterer(ClusterMixin, BaseEstimator):
         """
         if node is None: # In case root is None
             return []
-        node.stability_ = (1.0/node.dist - 1.0/parent_dist) * len(node.leaves) if parent_dist is not None else 0
+        stability = (1.0 / node.dist - 1.0 / parent_dist) * len(node.leaves) if parent_dist is not None else 0
+        setattr(node, 'stability_', stability)
         # Calculate stability for children
         sum_child_stabilities = 0
         child_results = []
         for child in [node.left, node.right]:
             if child is not None:
                 child_results += self._get_stable_nodes(child, node.dist)
+                assert hasattr(child, 'stability_'), "Child node does not have stability attribute"
                 sum_child_stabilities += child.stability_
         # Flag stable nodes
-        if node.stability_ >= sum_child_stabilities:
+        if stability >= sum_child_stabilities:
             stable_nodes = [node]
         else:
-            node.stability_ = sum_child_stabilities
+            stability = sum_child_stabilities
             stable_nodes = child_results
         return stable_nodes

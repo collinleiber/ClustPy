@@ -15,7 +15,7 @@ from sklearn.metrics.pairwise import pairwise_distances_argmin_min
 
 def _proj_dipmeans(X: np.ndarray, significance: float, n_random_projections: int, pval_strategy: str, n_boots: int,
                    n_split_trials: int, n_clusters_init: int, max_n_clusters: int,
-                   random_state: np.random.RandomState) -> (int, np.ndarray, np.ndarray):
+                   random_state: np.random.RandomState) -> tuple[int, np.ndarray, np.ndarray]:
     """
     Start the actual ProjectedDipMeans clustering procedure on the input data set.
 
@@ -42,7 +42,7 @@ def _proj_dipmeans(X: np.ndarray, significance: float, n_random_projections: int
 
     Returns
     -------
-    tuple : (int, np.ndarray, np.ndarray)
+    tuple : tuple[int, np.ndarray, np.ndarray]
         The final number of clusters,
         The labels as identified by ProjectedDipMeans,
         The cluster centers as identified by ProjectedDipMeans
@@ -61,7 +61,7 @@ def _proj_dipmeans(X: np.ndarray, significance: float, n_random_projections: int
             # Get projections
             projected_data = _get_projected_data(X[ids_in_cluster], n_random_projections, random_state)
             # Calculate dip values for the distances of each point
-            cluster_dips = np.array([dip_test(projected_data[:, p], just_dip=True, is_data_sorted=False) for p in
+            cluster_dips = np.array([dip_test(projected_data[:, p], is_data_sorted=False) for p in
                                      range(projected_data.shape[1])])
             # Calculate p-values of maximum dip
             pval = dip_pval(np.max(cluster_dips), ids_in_cluster.shape[0], pval_strategy=pval_strategy, n_boots=n_boots,
@@ -69,7 +69,7 @@ def _proj_dipmeans(X: np.ndarray, significance: float, n_random_projections: int
             # Calculate cluster score
             cluster_scores[c] = pval
         # Get cluster with minimum pval
-        cluster_id_to_split = np.argmin(cluster_scores)
+        cluster_id_to_split = int(np.argmin(cluster_scores))
         # Check if any cluster has to be split
         if cluster_scores[cluster_id_to_split] < significance:
             # Split cluster using bisecting kmeans
@@ -136,8 +136,8 @@ class ProjectedDipMeans(ClusterMixin, BaseEstimator):
     n_clusters_init : int
         The initial number of clusters. Can also by of type np.ndarray if initial cluster centers are specified (default: 1)
     max_n_clusters : int
-        Maximum number of clusters. Must be larger than n_clusters_init (default: np.inf)
-    random_state : np.random.RandomState | int
+        Maximum number of clusters. Must be larger than n_clusters_init (default: 1000)
+    random_state : np.random.RandomState | int | None
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Attributes
@@ -158,8 +158,8 @@ class ProjectedDipMeans(ClusterMixin, BaseEstimator):
     """
 
     def __init__(self, significance: float = 0.001, n_random_projections: int = 0, pval_strategy: str = "table",
-                 n_boots: int = 1000, n_split_trials: int = 10, n_clusters_init: int = 1, max_n_clusters: int = np.inf,
-                 random_state: np.random.RandomState | int = None):
+                 n_boots: int = 1000, n_split_trials: int = 10, n_clusters_init: int = 1, max_n_clusters: int = 1000,
+                 random_state: np.random.RandomState | int | None = None):
         self.significance = significance
         self.n_random_projections = n_random_projections
         self.pval_strategy = pval_strategy
@@ -169,7 +169,7 @@ class ProjectedDipMeans(ClusterMixin, BaseEstimator):
         self.max_n_clusters = max_n_clusters
         self.random_state = random_state
 
-    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'ProjectedDipMeans':
+    def fit(self, X: np.ndarray, y: np.ndarray | None = None) -> 'ProjectedDipMeans':
         """
         Initiate the actual clustering process on the input data set.
         The resulting cluster labels will be stored in the labels_ attribute.
@@ -178,7 +178,7 @@ class ProjectedDipMeans(ClusterMixin, BaseEstimator):
         ----------
         X : np.ndarray
             the given data set
-        y : np.ndarray
+        y : np.ndarray | None
             the labels (can be ignored)
 
         Returns

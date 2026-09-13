@@ -63,7 +63,7 @@ def leaf_purity(
     """
     cm = ConfusionMatrix(labels_true, labels_pred)
     leaf_nodes, _ = tree.get_leaf_and_split_nodes()
-    leaf_purity = 0
+    leaf_purity = 0.
     for leaf_node in leaf_nodes:
         relevant_columns = np.isin(cm.pred_clusters, leaf_node.labels)
         column_sum = cm.confusion_matrix[:, relevant_columns].sum(1)
@@ -106,7 +106,7 @@ def dendrogram_purity(
     if labels_pred is None:
         labels_pred = np.arange(labels_true.shape[0])
     labels_true, labels_pred = _check_labels_arrays(labels_true, labels_pred)
-    if type(dendrogram) is BinaryClusterTree:
+    if isinstance(dendrogram, BinaryClusterTree):
         # Transform ClusterTree to sklearn dendrogram
         dendrogram = dendrogram.export_sklearn_dendrogram()
     num_true_classes = labels_true.max() + 1

@@ -29,7 +29,7 @@ def set_torch_seed(random_state: np.random.RandomState | int) -> None:
     random.seed(seed)
 
 
-def mean_squared_error(tensor1: torch.Tensor, tensor2: torch.Tensor, weights: torch.Tensor = None) -> torch.Tensor:
+def mean_squared_error(tensor1: torch.Tensor, tensor2: torch.Tensor, weights: torch.Tensor | None = None) -> torch.Tensor:
     """
     Calculate the mean squared error between two tensors.
     Each row in the tensors is interpreted as a separate object, while each column represents its features.
@@ -42,7 +42,7 @@ def mean_squared_error(tensor1: torch.Tensor, tensor2: torch.Tensor, weights: to
         the first tensor
     tensor2 : torch.Tensor
         the second tensor
-    weights : torch.Tensor
+    weights : torch.Tensor | None
         tensor containing the weights of the features (default: None)
 
     Returns
@@ -60,7 +60,7 @@ def mean_squared_error(tensor1: torch.Tensor, tensor2: torch.Tensor, weights: to
 
 
 def squared_euclidean_distance(tensor1: torch.Tensor, tensor2: torch.Tensor,
-                               weights: torch.Tensor = None) -> torch.Tensor:
+                               weights: torch.Tensor | None = None) -> torch.Tensor:
     """
     Calculate the pairwise squared Euclidean distance between two tensors.
     Each row in the tensors is interpreted as a separate object, while each column represents its features.
@@ -74,7 +74,7 @@ def squared_euclidean_distance(tensor1: torch.Tensor, tensor2: torch.Tensor,
         the first tensor
     tensor2 : torch.Tensor
         the second tensor
-    weights : torch.Tensor
+    weights : torch.Tensor | None
         tensor containing the weights of the features (default: None)
 
     Returns
@@ -94,7 +94,7 @@ def squared_euclidean_distance(tensor1: torch.Tensor, tensor2: torch.Tensor,
     return squared_diffs
 
 
-def detect_device(device: torch.device | int | str = None) -> torch.device:
+def detect_device(device: torch.device | int | str | None = None) -> torch.device:
     """
     Automatically detects if you have a cuda enabled GPU.
     Device can also be read from environment variable "CLUSTPY_DEVICE".
@@ -102,7 +102,7 @@ def detect_device(device: torch.device | int | str = None) -> torch.device:
 
     Parameters
     ----------
-    device : torch.device | int | str
+    device : torch.device | int | str | None
         the input device. Will be returned if it is not None (default: None)
 
     Returns
@@ -110,7 +110,7 @@ def detect_device(device: torch.device | int | str = None) -> torch.device:
     device : torch.device
         device on which the prediction should take place
     """
-    assert device is None or type(device) is torch.device or type(device) is int or type(device) is str, "device must be None or of type torch.device, int or str"
+    assert device is None or isinstance(device, (torch.device, int, str)), "device must be None or of type torch.device, int or str"
     if device == -1:
         # Special case
         device = torch.device('cpu')
@@ -133,7 +133,7 @@ def detect_device(device: torch.device | int | str = None) -> torch.device:
                 device = torch.device('cpu')
         else:
             device = torch.device(env_device)
-    elif type(device) is int or type(device) is str:
+    elif isinstance(device, (int, str)):
         device = torch.device(device)
     return device
 
@@ -158,137 +158,6 @@ def get_device_from_module(neural_network: torch.nn.Module) -> torch.device:
     else:
         device = torch.device('cpu')
     return device
-
-
-def encode_batchwise(dataloader: torch.utils.data.DataLoader, neural_network: torch.nn.Module) -> np.ndarray:
-    """
-    Utility function for embedding the whole data set in a mini-batch fashion
-
-    Parameters
-    ----------
-    dataloader : torch.utils.data.DataLoader
-        data to embed
-    neural_network : torch.nn.Module
-        the neural network that is used for the encoding (e.g. an autoencoder)
-
-    Returns
-    -------
-    embeddings_numpy : np.ndarray
-        The embedded data set
-    """
-    device = get_device_from_module(neural_network)
-    embeddings_numpy = None
-    for batch in dataloader:
-        batch_data = batch[1].to(device)
-        embedded_data = neural_network.encode(batch_data)
-        # In case encode() returns more than one value (e.g., for a variational autoencoder), we will pick the first
-        if type(embedded_data) is tuple:
-            embedded_data = embedded_data[0]
-        if embeddings_numpy is None:
-            embeddings_numpy = np.zeros([len(dataloader.dataset)] + list(embedded_data.shape[1:]), dtype=float)
-        embeddings_numpy[batch[0]] = embedded_data.detach().cpu().numpy()
-    return embeddings_numpy
-
-
-def decode_batchwise(dataloader: torch.utils.data.DataLoader, neural_network: torch.nn.Module) -> np.ndarray:
-    """
-    Utility function for decoding the whole data set in a mini-batch fashion, e.g., with an autoencoder.
-    Note: Assumes an implemented decode function
-
-    Parameters
-    ----------
-    dataloader : torch.utils.data.DataLoader
-        data to decode
-    neural_network : torch.nn.Module
-        the neural network that is used for the decoding (e.g. an autoencoder)
-
-    Returns
-    -------
-    decodings_numpy : np.ndarray
-        The decoded data set
-    """
-    device = get_device_from_module(neural_network)
-    decodings_numpy = None
-    for batch in dataloader:
-        batch_data = batch[1].to(device)
-        embedded_data = neural_network.encode(batch_data)
-        # In case encode() returns more than one value (e.g., for a variational autoencoder), we all of them will be used for decoding
-        if type(embedded_data) is tuple:
-            decoded_data = neural_network.decode(*embedded_data)
-        else:
-            decoded_data = neural_network.decode(embedded_data)
-        if decodings_numpy is None:
-            decodings_numpy = np.zeros([len(dataloader.dataset)] + list(decoded_data.shape[1:]), dtype=float)
-        decodings_numpy[batch[0]] = decoded_data.detach().cpu().numpy()
-    return decodings_numpy
-
-
-def encode_decode_batchwise(dataloader: torch.utils.data.DataLoader, neural_network: torch.nn.Module) -> (
-        np.ndarray, np.ndarray):
-    """
-    Utility function for encoding and decoding the whole data set in a mini-batch fashion, e.g., with an autoencoder.
-    Note: Assumes an implemented decode function
-
-    Parameters
-    ----------
-    dataloader : torch.utils.data.DataLoader
-        dataloader to be used
-    neural_network : torch.nn.Module
-        the neural network that is used for the encoding and decoding (e.g. an autoencoder)
-
-    Returns
-    -------
-    tuple : (np.ndarray, np.ndarray)
-        The embedded data set,
-        The decoded data set
-    """
-    device = get_device_from_module(neural_network)
-    embeddings_numpy = None
-    decodings_numpy = None
-    for batch in dataloader:
-        batch_data = batch[1].to(device)
-        embedded_data = neural_network.encode(batch_data)
-        # In case encode() returns more than one value (e.g., for a variational autoencoder), we all of them will be used for decoding
-        if type(embedded_data) is tuple:
-            decoded_data = neural_network.decode(*embedded_data)
-            embedded_data = embedded_data[0]
-        else:
-            decoded_data = neural_network.decode(embedded_data)
-        if embeddings_numpy is None:
-            embeddings_numpy = np.zeros([len(dataloader.dataset)] + list(embedded_data.shape[1:]), dtype=float)
-            decodings_numpy = np.zeros([len(dataloader.dataset)] + list(decoded_data.shape[1:]), dtype=float)
-        embeddings_numpy[batch[0]] = embedded_data.detach().cpu().numpy()
-        decodings_numpy[batch[0]] = decoded_data.detach().cpu().numpy()
-    return embeddings_numpy, decodings_numpy
-
-
-def predict_batchwise(dataloader: torch.utils.data.DataLoader, neural_network: torch.nn.Module,
-                      cluster_module: torch.nn.Module) -> np.ndarray:
-    """
-    Utility function for predicting the cluster labels over the whole data set in a mini-batch fashion.
-    Method calls the predict_hard method of the cluster_module for each batch of data.
-
-    Parameters
-    ----------
-    dataloader : torch.utils.data.DataLoader
-        dataloader to be used
-    neural_network : torch.nn.Module
-        the neural network that is used for the encoding (e.g. an autoencoder)
-    cluster_module : torch.nn.Module
-        the cluster module that is used for the encoding (e.g. DEC). Usually contains the predict method.
-
-    Returns
-    -------
-    predictions_numpy : np.ndarray
-        The predictions of the cluster_module for the data set
-    """
-    device = get_device_from_module(neural_network)
-    predictions_numpy = np.zeros(len(dataloader.dataset), dtype=np.int32)
-    for batch in dataloader:
-        batch_data = batch[1].to(device)
-        prediction = cluster_module.predict_hard(neural_network.encode(batch_data)).detach().cpu()
-        predictions_numpy[batch[0]] = prediction
-    return predictions_numpy
 
 
 # def add_noise(batch):
@@ -325,8 +194,8 @@ def int_to_one_hot(int_tensor: torch.Tensor, n_integers: int) -> torch.Tensor:
     return onehot
 
 
-def run_initial_clustering(X: np.ndarray, n_clusters: int, clustering_class: ClusterMixin, clustering_params: dict,
-                           random_state: np.random.RandomState) -> (int, np.ndarray, np.ndarray, ClusterMixin):
+def run_initial_clustering(X: np.ndarray, n_clusters: int | None, clustering_class: ClusterMixin | None, clustering_params: dict | None,
+                           random_state: np.random.RandomState) -> tuple[int, np.ndarray, np.ndarray, ClusterMixin]:
     """
     Get an initial clustering result for a deep clustering algorithm.
     This result can then be refined by the optimization of the neural network.
@@ -335,28 +204,35 @@ def run_initial_clustering(X: np.ndarray, n_clusters: int, clustering_class: Clu
     ----------
     X : np.ndarray
         the embedded data set
-    n_clusters : int
+    n_clusters : int | None
         number of clusters. Can be None if a corresponding initial_clustering_class is given, e.g. DBSCAN
-    clustering_class : ClusterMixin
+    clustering_class : ClusterMixin | None
         the class of the initial clustering algorithm.
         If it is None, random labels will be chosen
-    clustering_params : dict
+    clustering_params : dict | None
         the parameters for the initial clustering algorithm
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution
 
     Returns
     -------
-    tuple : (int, np.ndarray, np.ndarray, ClusterMixin)
+    tuple : tuple[int, np.ndarray, np.ndarray, ClusterMixin]
         The number of clusters (can change if e.g. DBSCAN is used),
         The initial cluster labels,
         The initial cluster centers,
         The clustering object
+
+    Raises
+    ----------
+    ValueError : if clustering_class and n_clusters is None.
     """
     if clustering_class is None:
+        if n_clusters is None:
+            raise ValueError("n_clusters can not be None if clustering_class is None")
         clustering_algo = ClusterMixin()
         clustering_algo.labels_ = np.random.randint(n_clusters, size=X.shape[0])
     else:
+        clustering_params = clustering_params if clustering_params is not None else {}
         # Get possible input parameters of the clustering algorithm
         clustering_class_parameters = inspect.getfullargspec(clustering_class).args + inspect.getfullargspec(
             clustering_class).kwonlyargs
@@ -388,5 +264,5 @@ def run_initial_clustering(X: np.ndarray, n_clusters: int, clustering_class: Clu
     else:  # in case of e.g., DBSCAN
         labels = clustering_algo.labels_
         centers = np.array([np.mean(X[labels == i], axis=0) for i in np.unique(labels) if i >= 0])
-    n_clusters = np.sum(np.unique(labels) >= 0)  # Needed for DBSCAN, XMeans, GMeans, ...
+    n_clusters = int(np.sum(np.unique(labels) >= 0))  # Needed for DBSCAN, XMeans, GMeans, ...
     return n_clusters, labels, centers, clustering_algo

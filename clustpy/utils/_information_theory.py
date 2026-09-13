@@ -97,7 +97,7 @@ Gaussian Mixture Models
 
 
 def mdl_costs_gmm_multiple_covariances(n_dims: int, scatter_matrices: np.ndarray, labels: np.ndarray,
-                                       rotation: np.ndarray = None, covariance_type: str = "spherical") -> float:
+                                       rotation: np.ndarray | None = None, covariance_type: str = "spherical") -> float:
     """
     Calculate the coding costs of all points within a Gaussian Mixture Model (GMM).
     Calculates log(pdf(X)) with help of the scatter matrices of the clusters.
@@ -111,7 +111,7 @@ def mdl_costs_gmm_multiple_covariances(n_dims: int, scatter_matrices: np.ndarray
         Array containing the scatter matrix of each cluster
     labels : np.ndarray
         The cluster labels
-    rotation : np.ndarray
+    rotation : np.ndarray | None
         An optional rotation matrix for the feature space (default: None)
     covariance_type : str
         The type of covariance matrix.
@@ -125,8 +125,8 @@ def mdl_costs_gmm_multiple_covariances(n_dims: int, scatter_matrices: np.ndarray
     assert covariance_type in ["spherical", "diag",
                                "full"], "covariance_type must equal 'spherical', 'diag' or 'full'"
     if n_dims == 0:
-        return 0
-    full_pdf_costs = 0
+        return 0.
+    full_pdf_costs = 0.
     # Get costs for each cluster
     for cluster_index, scatter_matrix_cluster in enumerate(scatter_matrices):
         # Get number of points in this cluster
@@ -138,7 +138,7 @@ def mdl_costs_gmm_multiple_covariances(n_dims: int, scatter_matrices: np.ndarray
 
 
 def mdl_costs_gmm_common_covariance(n_dims: int, scatter_matrix: np.ndarray, n_points: int,
-                                    rotation: np.ndarray = None, covariance_type: str = "spherical") -> float:
+                                    rotation: np.ndarray | None = None, covariance_type: str = "spherical") -> float:
     """
     Calculate the coding costs of all points within a Gaussian Mixture Model (GMM).
     In this special case all Gaussians within the GMM share a common covariance matrix.
@@ -154,7 +154,7 @@ def mdl_costs_gmm_common_covariance(n_dims: int, scatter_matrix: np.ndarray, n_p
         Either a single scatter matrix or an array containing the scatter matrix of each cluster
     n_points : int
         The number of samples in all clusters
-    rotation : np.ndarray
+    rotation : np.ndarray | None
         An optional rotation matrix for the feature space (default: None)
     covariance_type : str
         The type of covariance matrix.
@@ -184,7 +184,7 @@ Single Gaussian
 
 
 def _mdl_costs_gaussian(n_dims: int, scatter_matrix_cluster: np.ndarray, n_points_in_cluster: int,
-                        rotation: np.ndarray = None, covariance_type: str = "spherical") -> float:
+                        rotation: np.ndarray | None = None, covariance_type: str = "spherical") -> float:
     """
     Calculate the coding costs of all points within a single Gaussian cluster.
     Calculates log(pdf(X)) with help of the scatter matrix of the cluster.
@@ -197,7 +197,7 @@ def _mdl_costs_gaussian(n_dims: int, scatter_matrix_cluster: np.ndarray, n_point
         The scatter matrix of the cluster
     n_points_in_cluster : int
         The number of samples in the cluster
-    rotation : np.ndarray
+    rotation : np.ndarray | None
         An optional rotation matrix for the feature space (default: None)
     covariance_type : str
         The type of covariance matrix.
@@ -223,7 +223,7 @@ def _mdl_costs_gaussian(n_dims: int, scatter_matrix_cluster: np.ndarray, n_point
 
 
 def mdl_costs_gaussian_spherical_covariance(n_dims: int, scatter_matrix_cluster: np.ndarray, n_points_in_cluster: int,
-                                            rotation: np.ndarray = None) -> float:
+                                            rotation: np.ndarray | None = None) -> float:
     """
     Calculate the coding costs of all points within a single Gaussian cluster.
     This Gaussian has the same variance for each feature and no covariances.
@@ -237,7 +237,7 @@ def mdl_costs_gaussian_spherical_covariance(n_dims: int, scatter_matrix_cluster:
         The scatter matrix of the cluster
     n_points_in_cluster : int
         The number of samples in the cluster
-    rotation : np.ndarray
+    rotation : np.ndarray | None
         An optional rotation matrix for the feature space (default: None)
 
     Returns
@@ -262,7 +262,7 @@ def mdl_costs_gaussian_spherical_covariance(n_dims: int, scatter_matrix_cluster:
 
 
 def mdl_costs_gaussian_diagonal_covariance(n_dims: int, scatter_matrix_cluster: np.ndarray, n_points_in_cluster: int,
-                                           rotation: np.ndarray = None) -> float:
+                                           rotation: np.ndarray | None = None) -> float:
     """
     Calculate the coding costs of all points within a single Gaussian cluster.
     This Gaussian has a different variance for each feature and no covariances.
@@ -276,7 +276,7 @@ def mdl_costs_gaussian_diagonal_covariance(n_dims: int, scatter_matrix_cluster: 
         The scatter matrix of the cluster
     n_points_in_cluster : int
         The number of samples in the cluster
-    rotation : np.ndarray
+    rotation : np.ndarray | None
         An optional rotation matrix for the feature space (default: None)
 
     Returns
@@ -297,7 +297,7 @@ def mdl_costs_gaussian_diagonal_covariance(n_dims: int, scatter_matrix_cluster: 
 
 
 def mdl_costs_gaussian_full_covariance(n_dims: int, scatter_matrix_cluster: np.ndarray, n_points_in_cluster: int,
-                                       rotation: np.ndarray = None) -> float:
+                                       rotation: np.ndarray | None = None) -> float:
     """
     Calculate the coding costs of all points within a single Gaussian cluster.
     This Gaussian has a different variance for each feature and includes all covariances.
@@ -311,7 +311,7 @@ def mdl_costs_gaussian_full_covariance(n_dims: int, scatter_matrix_cluster: np.n
         The scatter matrix of the cluster
     n_points_in_cluster : int
         The number of samples in the cluster
-    rotation : np.ndarray
+    rotation : np.ndarray | None
         An optional rotation matrix for the feature space (default: None)
 
     Returns

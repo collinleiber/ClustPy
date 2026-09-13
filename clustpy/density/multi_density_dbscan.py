@@ -9,7 +9,7 @@ from sklearn.base import BaseEstimator, ClusterMixin
 from clustpy.utils.checks import check_parameters
 
 
-def _multi_density_dbscan(X: np.ndarray, k: int, var: float, min_cluster_size: int) -> (int, np.ndarray, list):
+def _multi_density_dbscan(X: np.ndarray, k: int, var: float, min_cluster_size: int) -> tuple[int, np.ndarray, list]:
     """
     Start the actual Multiple Density DBSCAN clustering procedure on the input data set.
 
@@ -26,7 +26,7 @@ def _multi_density_dbscan(X: np.ndarray, k: int, var: float, min_cluster_size: i
 
     Returns
     -------
-    tuple : (int, np.ndarray, list)
+    tuple : tuple[int, np.ndarray, list]
         The identified number of clusters
         The cluster labels
         The final cluster densities
@@ -61,8 +61,8 @@ def _multi_density_dbscan(X: np.ndarray, k: int, var: float, min_cluster_size: i
     return n_clusters, labels, cluster_densities
 
 
-def _gather(p1: int, c_id: int, densities: np.ndarray, knns: np.ndarray, labels: np.ndarray, var: float) -> (
-        list, float):
+def _gather(p1: int, c_id: int, densities: np.ndarray, knns: np.ndarray, labels: np.ndarray, var: float) -> tuple[
+        list, float]:
     """
     Expand the current cluster (consisting of a single most dense point).
     Check each added point's neighbors to see if their density is low enough to add them the cluster.
@@ -84,7 +84,7 @@ def _gather(p1: int, c_id: int, densities: np.ndarray, knns: np.ndarray, labels:
 
     Returns
     -------
-    tuple : (list, float)
+    tuple : tuple[list, float]
         The ids of the points in this cluster
         The density of the cluster
     """
@@ -112,14 +112,14 @@ def _gather(p1: int, c_id: int, densities: np.ndarray, knns: np.ndarray, labels:
     return cluster_points, cluster_density
 
 
-def _sort_neighbors_by_densities(neighbors: list, densities: np.ndarray) -> list:
+def _sort_neighbors_by_densities(neighbors: list | np.ndarray, densities: np.ndarray) -> list:
     """
     Sort the available neighbors by their densities. Sort in ascending order.
     If densities are equal samples will be sorted by their id.
 
     Parameters
     ----------
-    neighbors : list
+    neighbors : list | np.ndarray
         the ids of the neighbors
     densities : np.ndarray
         the densities
@@ -141,7 +141,7 @@ def _add_neighbors_to_neighbor_list(densities: np.ndarray, labels: np.ndarray, c
     Result should be equal to:
     current_neighbors += [kn for kn in new_neighbors if labels[kn] == -1]
     current_neighbors = list(set(current_neighbors))
-    current_neighbors = _sort_neighbors_by_densities(neighbors, densities)
+    current_neighbors = _sort_neighbors_by_densities(current_neighbors, densities)
 
     Parameters
     ----------
@@ -151,7 +151,7 @@ def _add_neighbors_to_neighbor_list(densities: np.ndarray, labels: np.ndarray, c
         The current cluster labels
     current_neighbors : list
         The current list of neighbors of cluster objects
-    new_neighbors : list
+    new_neighbors : np.ndarray
         The new neighbors that should be added to the neighbor list
 
     Returns
@@ -213,7 +213,7 @@ class MultiDensityDBSCAN(ClusterMixin, BaseEstimator):
         self.var = var
         self.min_cluster_size = min_cluster_size
 
-    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'MultiDensityDBSCAN':
+    def fit(self, X: np.ndarray, y: np.ndarray | None = None) -> 'MultiDensityDBSCAN':
         """
         Initiate the actual clustering process on the input data set.
         The resulting cluster labels will be stored in the labels_ attribute.
@@ -222,7 +222,7 @@ class MultiDensityDBSCAN(ClusterMixin, BaseEstimator):
         ----------
         X : np.ndarray
             the given data set
-        y : np.ndarray
+        y : np.ndarray | None
             the labels (can be ignored)
 
         Returns

@@ -14,15 +14,15 @@ Helpers
 """
 
 
-def _load_video(path: str | Path, image_size: tuple) -> np.ndarray:
+def _load_video(path: str | Path, image_size: tuple | None) -> np.ndarray:
     """
     Load a video by saving each frame within a numpy array.
 
     Parameters
     ----------
-    path : Path | Path
+    path : str | Path
         Path to the video
-    image_size : tuple
+    image_size : tuple | None
         The single frames can be downsized. This is necessary for large datasets.
         The tuple equals (width, height) of the images.
         Can also be None if the image size should not be changed
@@ -33,7 +33,7 @@ def _load_video(path: str | Path, image_size: tuple) -> np.ndarray:
         The array containing the frames
     """
     # Load video
-    vid = cv2.VideoCapture(path)
+    vid = cv2.VideoCapture(path if isinstance(path, str) else str(path))
     if not vid.isOpened():
         vid.release()
         raise IOError(f"OpenCV could not open {path}. This usually indicates missing codecs (ffmpeg/libav).")
@@ -55,12 +55,12 @@ def _load_video(path: str | Path, image_size: tuple) -> np.ndarray:
     if len(video_array) == 0:
         raise ValueError(f"Video at {path} yielded 0 frames. File might be corrupted.")
     # Transform list to numpy array
-    video_array = np.array(video_array, dtype="uint8")
-    return video_array
+    video_np = np.array(video_array, dtype="uint8")
+    return video_np
 
 
-def _downsample_frames(data: np.ndarray, labels: np.ndarray, frame_sampling_ratio: float = 1) -> (
-        np.ndarray, np.ndarray):
+def _downsample_frames(data: np.ndarray, labels: np.ndarray, frame_sampling_ratio: float = 1) -> tuple[
+        np.ndarray, np.ndarray]:
     """
     Downsample the number of frames within a video.
 
@@ -76,7 +76,7 @@ def _downsample_frames(data: np.ndarray, labels: np.ndarray, frame_sampling_rati
 
     Returns
     -------
-    data, labels : (np.ndarray, np.ndarray)
+    data, labels : tuple[np.ndarray, np.ndarray]
         The updated data array, the updated labels array
     """
     assert frame_sampling_ratio > 0 and frame_sampling_ratio <= 1, "frame_sampling_ratio must be within (0, 1]"
@@ -98,9 +98,9 @@ Actual datasets
 """
 
 
-def load_video_weizmann(use_actions : tuple = None, use_persons : tuple = None, 
-                        image_size: tuple = None, frame_sampling_ratio: float = 1, return_X_y: bool = False,
-                        downloads_path: str | Path = None) -> Bunch:
+def load_video_weizmann(use_actions : list[str] | None = None, use_persons : list[str] | None = None,
+                        image_size: tuple | None = None, frame_sampling_ratio: float = 1, return_X_y: bool = False,
+                        downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the Weizmann video data set.
     It consists of 93 videos showing 9 different persons performing 10 different activities.
@@ -111,11 +111,11 @@ def load_video_weizmann(use_actions : tuple = None, use_persons : tuple = None,
 
     Parameters
     ----------
-    use_actions : tuple
+    use_actions : list[str] | None
         Specify the actions. Can be None if all actions should be used (default: None)
-    use_persons : tuple
+    use_persons : list[str] | None
         Specify the persons. Can be None if all persons should be used (default: None)
-    image_size : tuple
+    image_size : tuple | None
         The single frames can be downsized. This is necessary for large datasets.
         The tuple equals (width, height) of the images.
         Can also be None if the image size should not be changed (default: None)
@@ -124,12 +124,12 @@ def load_video_weizmann(use_actions : tuple = None, use_persons : tuple = None,
         Can take values within (0, 1] (default: 1)
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Furthermore, the original images are contained in the 'images' attribute.
         Note that the data within 'data' is in HWC format and within 'images' in the CHW format.
@@ -142,17 +142,15 @@ def load_video_weizmann(use_actions : tuple = None, use_persons : tuple = None,
     """
     directory = _get_download_dir(downloads_path) / "Video_Weizmann"
     all_actions = ["walk", "run", "jump", "side", "bend", "wave1", "wave2", "pjump", "jack", "skip"]
-    if use_actions is None:
-        use_actions = all_actions.copy()
-    assert all([action in all_actions for action in use_actions])
+    actions_list = all_actions.copy() if use_actions is None else use_actions
+    assert all([action in all_actions for action in actions_list])
     all_persons = ["daria", "denis", "eli", "ido", "ira", "lena", "lyova", "moshe", "shahar"]
-    if use_persons is None:
-        use_persons = all_persons.copy()
-    assert all([person in all_persons for person in use_persons])
+    persons_list = all_persons.copy() if use_persons is None else use_persons
+    assert all([person in all_persons for person in persons_list])
     all_data_list = []
     labels_list = []
     # Download data
-    for action in use_actions:
+    for action in actions_list:
         my_zip_file = action + ".zip"
         filename = directory / my_zip_file
         if not filename.is_file():
@@ -176,13 +174,13 @@ def load_video_weizmann(use_actions : tuple = None, use_persons : tuple = None,
                 action = action[:-1]
             assert person in all_persons, "Wrong person. {0} is unknown".format(person)
             assert action in all_actions, "Wrong action. {0} is unknown".format(action)
-            if person not in use_persons or action not in use_actions:
+            if person not in persons_list or action not in actions_list:
                 continue
             # Load video
             data_local = _load_video(directory / v_file, image_size)
             # Transform string to label
-            label_person = use_persons.index(person)
-            label_action = use_actions.index(action)
+            label_person = persons_list.index(person)
+            label_action = actions_list.index(action)
             labels_local = np.array([[label_action, label_person]] * data_local.shape[0], dtype="int32")
             # Downsample frames
             data_local, labels_local = _downsample_frames(data_local, labels_local, frame_sampling_ratio)
@@ -203,11 +201,11 @@ def load_video_weizmann(use_actions : tuple = None, use_persons : tuple = None,
         data_image = np.transpose(all_data, [0, 3, 1, 2])
         image_format = "CHW"
         return Bunch(dataset_name="VideoWeizmann", data=data_flatten, target=labels, images=data_image,
-                     image_format=image_format, classes=(use_actions, use_persons))
+                     image_format=image_format, classes=(actions_list, persons_list))
 
 
 def load_video_keck_gesture(subset: str = "all", image_size: tuple = (200, 200), frame_sampling_ratio: float = 1,
-                            return_X_y: bool = False, downloads_path: str | Path = None) -> Bunch:
+                            return_X_y: bool = False, downloads_path: str | Path | None = None) -> Bunch | tuple[np.ndarray, np.ndarray]:
     """
     Load the Keck Gesture video data set.
     It consists of 42 training and 56 testing videos showing 4 different persons performing 14 different gestures.
@@ -234,12 +232,12 @@ def load_video_keck_gesture(subset: str = "all", image_size: tuple = (200, 200),
         Can take values within (0, 1] (default: 1)
     return_X_y : bool
         If True, returns (data, target) instead of a Bunch object. See below for more information about the data and target object (default: False)
-    downloads_path : str | Path
+    downloads_path : str | Path | None
         path to the directory where the data is stored (default: None -> [USER]/Downloads/clustpy_datafiles)
 
     Returns
     -------
-    bunch : Bunch
+    bunch : Bunch | tuple[np.ndarray, np.ndarray]
         A Bunch object containing the data in the 'data' attribute and the labels in the 'target' attribute.
         Furthermore, the original images are contained in the 'images' attribute.
         Note that the data within 'data' is in HWC format and within 'images' in the CHW format.
@@ -251,18 +249,18 @@ def load_video_keck_gesture(subset: str = "all", image_size: tuple = (200, 200),
     http://www.zhuolin.umiacs.io/Keckgesturedataset.html
     """
 
-    def parse_frames_file(frames_file: str) -> (dict, dict):
+    def parse_frames_file(frames_file: Path) -> tuple[dict, dict]:
         """
         Get the specific frames for each gesture from the frames.txt.
 
         Parameters
         ----------
-        frames_file : str
+        frames_file : Path
             path to the frames txt.
 
         Returns
         -------
-        train_dict, test_dict : (dict, dict)
+        train_dict, test_dict : tuple[dict, dict]
             The dictionary for the training data, the dictionary for the testing data
         """
         train_dict = {}

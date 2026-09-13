@@ -29,18 +29,15 @@ def test_abstract_autoencoder_with_dummy_torch_parameter():
     autoencoder.dummy_parameter = torch.nn.Parameter(torch.tensor([0.]))  # Needed for fit to work
     autoencoder.encode = lambda x: x + autoencoder.dummy_parameter
     # Test loss
-    loss, embedded, decoded = autoencoder.loss(data_batch, loss_fn, torch.device("cpu"))
+    loss, embedded = autoencoder.loss(data_batch, loss_fn, torch.device("cpu"))
     assert torch.equal(data_batch[1], embedded)
-    assert torch.equal(data_batch[1], decoded)
     assert torch.equal(loss, torch.tensor(0.))
     # Test augmented loss
     data_batch_aug = [torch.arange(30), torch.Tensor(data[batch_size:2 * batch_size]), torch.Tensor(data[:batch_size])]
-    loss, embedded, decoded, embedded_aug, decoded_aug = autoencoder.loss_augmentation(
+    loss, embedded, embedded_aug = autoencoder.loss_augmentation(
         data_batch_aug, loss_fn, torch.device("cpu"))
     assert torch.equal(data_batch_aug[2], embedded)
-    assert torch.equal(data_batch_aug[2], decoded)
     assert torch.equal(data_batch_aug[1], embedded_aug)
-    assert torch.equal(data_batch_aug[1], decoded_aug)
     assert torch.equal(loss, torch.tensor(0.))
     # Test evaluate
     dataloader = get_dataloader(data, batch_size)

@@ -5,7 +5,8 @@ Collin Leiber
 
 import torch
 import numpy as np
-from clustpy.deep._utils import detect_device, encode_batchwise, run_initial_clustering, mean_squared_error
+from clustpy.deep._utils import detect_device, run_initial_clustering, mean_squared_error
+from clustpy.deep._encoding_utils import encode_batchwise
 from clustpy.deep._data_utils import get_train_and_test_dataloader
 from clustpy.deep._train_utils import get_trained_network
 from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
@@ -17,24 +18,27 @@ import inspect
 from collections.abc import Callable
 from clustpy.utils.checks import check_parameters
 from pathlib import Path
+from clustpy.deep.neural_networks._abstract_neural_network import _AbstractNeuralNetwork
 
 
-def _manifold_based_sequential_dc(X: np.ndarray, n_clusters: int, batch_size: int, pretrain_optimizer_params: dict,
-                                  pretrain_epochs: int, optimizer_class: torch.optim.Optimizer,
-                                  ssl_loss_fn: Callable | torch.nn.modules.loss._Loss, neural_network: torch.nn.Module | tuple,
-                                  neural_network_weights: str | Path, embedding_size: int, custom_dataloaders: tuple,
+def _manifold_based_sequential_dc(X: np.ndarray | torch.Tensor, n_clusters: int | None, batch_size: int, pretrain_optimizer_params: dict,
+                                  pretrain_epochs: int, optimizer_class: type[torch.optim.Optimizer],
+                                  ssl_loss_fn: Callable | torch.nn.modules.loss._Loss,
+                                  neural_network: _AbstractNeuralNetwork | tuple[type[_AbstractNeuralNetwork], dict] | None,
+                                  neural_network_weights: str | Path | None, embedding_size: int,
+                                  custom_dataloaders: tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader] | tuple[str | Path, str | Path] | None,
                                   manifold_class: TransformerMixin, manifold_params: dict,
-                                  clustering_class: ClusterMixin, clustering_params: dict, device: torch.device,
-                                  random_state: np.random.RandomState) -> (
-        int, np.ndarray, np.ndarray, torch.nn.Module, TransformerMixin):
+                                  clustering_class: ClusterMixin, clustering_params: dict, device: torch.device | int | str | None,
+                                  random_state: np.random.RandomState) -> tuple[
+        int, np.ndarray, np.ndarray, np.ndarray, _AbstractNeuralNetwork, TransformerMixin]:
     """
     Execute a manifold-based sequential deep clustering procedure on the input data set.
 
     Parameters
     ----------
-    X : np.ndarray / torch.Tensor
+    X : np.ndarray | torch.Tensor
         the given data set. Can be a np.ndarray or a torch.Tensor
-    n_clusters : int
+    n_clusters : int | None
         number of clusters (can be None)
     batch_size : int
         size of the data batches
@@ -42,18 +46,18 @@ def _manifold_based_sequential_dc(X: np.ndarray, n_clusters: int, batch_size: in
         parameters of the optimizer for the pretraining of the neural network, includes the learning rate
     pretrain_epochs : int
         number of epochs for the pretraining of the neural network
-    optimizer_class : torch.optim.Optimizer
+    optimizer_class : type[torch.optim.Optimizer]
         the optimizer class
     ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
          self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders
-    neural_network : torch.nn.Module | tuple
+    neural_network : _AbstractNeuralNetwork | tuple[type[_AbstractNeuralNetwork], dict] | None
         the input neural network.
         Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict)
-    neural_network_weights : str | Path
+    neural_network_weights : str | Path | None
         Path to a file containing the state_dict of the neural_network.
     embedding_size : int
         size of the embedding within the neural network
-    custom_dataloaders : tuple
+    custom_dataloaders : tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader] | tuple[str | Path, str | Path] | None
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         Can also be a tuple of strings, where the first entry is the path to a saved trainloader and the second entry the path to a saved testloader.
         In this case the dataloaders will be loaded by torch.load(PATH).
@@ -66,14 +70,14 @@ def _manifold_based_sequential_dc(X: np.ndarray, n_clusters: int, batch_size: in
         clustering class to obtain the cluster labels after pretraining the neural network and learning the manifold
     clustering_params : dict
         parameters for the clustering class
-    device : torch.device
+    device : torch.device | int | str | None
         The device on which to perform the computations
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution
 
     Returns
     -------
-    tuple : (int, np.ndarray, np.ndarray, torch.nn.Module, TransformerMixin)
+    tuple : tuple[int, np.ndarray, np.ndarray, np.ndarray, _AbstractNeuralNetwork, TransformerMixin]
         The number of clusters,
         The cluster labels,
         The cluster centers in the embedding of the AE,
@@ -136,7 +140,7 @@ class DDC_density_peak_clustering(ClusterMixin, BaseEstimator):
     def __init__(self, ratio: float):
         self.ratio = ratio
 
-    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DDC_density_peak_clustering':
+    def fit(self, X: np.ndarray, y: np.ndarray | None = None) -> 'DDC_density_peak_clustering':
         """
         Initiate the actual clustering process on the input data set.
         The resulting cluster labels will be stored in the labels_ attribute.
@@ -145,7 +149,7 @@ class DDC_density_peak_clustering(ClusterMixin, BaseEstimator):
         ----------
         X : np.ndarray
             the given data set
-        y : np.ndarray
+        y : np.ndarray | None
             the labels (can be ignored)
 
         Returns
@@ -161,7 +165,7 @@ class DDC_density_peak_clustering(ClusterMixin, BaseEstimator):
         return self
 
 
-def _density_peak_clustering(X: np.ndarray, ratio: float) -> (int, np.ndarray):
+def _density_peak_clustering(X: np.ndarray, ratio: float) -> tuple[int, np.ndarray]:
     """
     Execute the variant of the Density Peak Algorithm as proposed in the paper.
 
@@ -174,7 +178,7 @@ def _density_peak_clustering(X: np.ndarray, ratio: float) -> (int, np.ndarray):
 
     Returns
     -------
-    tuple : (int,np.ndarray)
+    tuple : tuple[int, np.ndarray]
         The number of clusters,
         The cluster labels
     """
@@ -204,7 +208,7 @@ def _density_peak_clustering(X: np.ndarray, ratio: float) -> (int, np.ndarray):
             chain_of_ids.append(i)
             distances_i = distances[i].copy()
             distances_i[rhos <= rhos[i]] = max_dist  # Equation 8
-            nn_with_higher_dens = np.argmin(distances_i)  # Equation 8
+            nn_with_higher_dens = int(np.argmin(distances_i))  # Equation 8
             deltas[i] = distances_i[nn_with_higher_dens]  # Equation 8
             # Check if i is local cluster center
             if deltas[i] > d_c and rhos[i] > avg_rho:  # Equation 9
@@ -251,33 +255,33 @@ class DDC(_AbstractDeepClusteringAlgo):
         The ratio parameter, defining the cutoff distance d_c by calculating: average pairwise distance * ratio (default: 0.1)
     batch_size : int
         size of the data batches (default: 256)
-    pretrain_optimizer_params : dict
+    pretrain_optimizer_params : dict | None
         parameters of the optimizer for the pretraining of the neural network, includes the learning rate. If None, it will be set to {"lr": 1e-3} (default: None)
     pretrain_epochs : int
         number of epochs for the pretraining of the neural network (default: 100)
-    optimizer_class : torch.optim.Optimizer
+    optimizer_class : type[torch.optim.Optimizer]
         the optimizer class (default: torch.optim.Adam)
     ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
          self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: mean_squared_error)
-    neural_network : torch.nn.Module | tuple
+    neural_network : _AbstractNeuralNetwork | tuple[type[_AbstractNeuralNetwork], dict] | None
         the input neural network. If None, a new FeedforwardAutoencoder will be created.
         Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict) (default: None)
-    neural_network_weights : str | Path
+    neural_network_weights : str | Path | None
         Path to a file containing the state_dict of the neural_network (default: None)
     embedding_size : int
         size of the embedding within the neural network (default: 10)
-    custom_dataloaders : tuple
+    custom_dataloaders : tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader] | tuple[str | Path, str | Path] | None
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         Can also be a tuple of strings, where the first entry is the path to a saved trainloader and the second entry the path to a saved testloader.
         In this case the dataloaders will be loaded by torch.load(PATH).
         If None, the default dataloaders will be used (default: None)
-    tsne_params : dict
+    tsne_params : dict | None
         Parameters for the t-SNE execution. For example, perplexity can be changed by setting tsne_params to {"n_components": 2, "perplexity": 25}.
         Check out sklearn.manifold.TSNE for more information. If None, it will be set to {"n_components": 2} (default: None)
-    device : torch.device
+    device : torch.device | int | str | None
         The device on which to perform the computations.
         If device is None then it will be automatically chosen: if a gpu is available the gpu with the highest amount of free memory will be chosen (default: None)
-    random_state : np.random.RandomState | int
+    random_state : np.random.RandomState | int | None
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Attributes
@@ -286,7 +290,7 @@ class DDC(_AbstractDeepClusteringAlgo):
         The final number of clusters
     labels_ : np.ndarray
         The final labels (obtained by a variant of Density Peak Clustering)
-    neural_network_trained_ : torch.nn.Module
+    neural_network_trained_ : _AbstractNeuralNetwork
         The final neural network
     tsne_ : TSNE
         The t-SNE object
@@ -309,12 +313,13 @@ class DDC(_AbstractDeepClusteringAlgo):
     Knowledge-Based Systems 197 (2020): 105841.
     """
 
-    def __init__(self, ratio: float = 0.1, batch_size: int = 256, pretrain_optimizer_params: dict = None,
-                 pretrain_epochs: int = 100, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
+    def __init__(self, ratio: float = 0.1, batch_size: int = 256, pretrain_optimizer_params: dict | None = None,
+                 pretrain_epochs: int = 100, optimizer_class: type[torch.optim.Optimizer] = torch.optim.Adam,
                  ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error,
-                 neural_network: torch.nn.Module | tuple = None, neural_network_weights: str | Path = None,
-                 embedding_size: int = 10, custom_dataloaders: tuple = None, tsne_params: dict = None,
-                 device: torch.device = None, random_state: np.random.RandomState | int = None):
+                 neural_network:  _AbstractNeuralNetwork | tuple[type[_AbstractNeuralNetwork], dict] | None = None,
+                 neural_network_weights: str | Path | None = None, embedding_size: int = 10,
+                 custom_dataloaders: tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader] | tuple[str | Path, str | Path] | None = None,
+                 tsne_params: dict | None = None, device: torch.device | int | str | None = None, random_state: np.random.RandomState | int | None = None):
         super().__init__(batch_size, neural_network, neural_network_weights, embedding_size, device, random_state)
         self.ratio = ratio
         self.pretrain_optimizer_params = pretrain_optimizer_params
@@ -324,7 +329,7 @@ class DDC(_AbstractDeepClusteringAlgo):
         self.custom_dataloaders = custom_dataloaders
         self.tsne_params = tsne_params
 
-    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'DDC':
+    def fit(self, X: np.ndarray, y: np.ndarray | None = None) -> 'DDC':
         """
         Initiate the actual clustering process on the input data set.
         The resulting cluster labels will be stored in the labels_ attribute.
@@ -333,7 +338,7 @@ class DDC(_AbstractDeepClusteringAlgo):
         ----------
         X : np.ndarray
             the given data set
-        y : np.ndarray
+        y : np.ndarray | None
             the labels (can be ignored)
 
         Returns
@@ -365,8 +370,8 @@ class DDC(_AbstractDeepClusteringAlgo):
         self.tsne_ = tsne
         self.set_n_features_in(X)
         return self
-    
-    def predict(self, X: np.ndarray,) -> np.ndarray:
+
+    def predict(self, X: np.ndarray, cluster_centers: np.ndarray | None = None) -> np.ndarray:
         """
         Predicts the labels of the input data.
         Note that this is just a very imprecise estimation as the manifold does not learn a function f() to map the data into the final embedding.
@@ -376,6 +381,8 @@ class DDC(_AbstractDeepClusteringAlgo):
         ----------
         X : np.ndarray
             input data
+        cluster_centers : np.ndarray | None
+            Not used (default: None)
 
         Returns
         -------
@@ -399,37 +406,37 @@ class N2D(_AbstractDeepClusteringAlgo):
         number of clusters (default: 8)
     batch_size : int
         size of the data batches (default: 256)
-    pretrain_optimizer_params : dict
+    pretrain_optimizer_params : dict | None
         parameters of the optimizer for the pretraining of the neural network, includes the learning rate. If None, it will be set to {"lr": 1e-3} (default: None)
     pretrain_epochs : int
         number of epochs for the pretraining of the neural network (default: 100)
-    optimizer_class : torch.optim.Optimizer
+    optimizer_class : type[torch.optim.Optimizer]
         the optimizer class (default: torch.optim.Adam)
     ssl_loss_fn : Callable | torch.nn.modules.loss._Loss
          self-supervised learning (ssl) loss function for training the network, e.g. reconstruction loss for autoencoders (default: mean_squared_error)
-    neural_network : torch.nn.Module | tuple
+    neural_network : _AbstractNeuralNetwork | tuple[type[_AbstractNeuralNetwork], dict] | None
         the input neural network. If None, a new FeedforwardAutoencoder will be created.
         Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict) (default: None)
-    neural_network_weights : str | Path
+    neural_network_weights : str | Path | None
         Path to a file containing the state_dict of the neural_network (default: None)
     embedding_size : int
         size of the embedding within the neural network (default: 10)
-    custom_dataloaders : tuple
+    custom_dataloaders : tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader] | tuple[str | Path, str | Path] | None
         tuple consisting of a trainloader (random order) at the first and a test loader (non-random order) at the second position.
         Can also be a tuple of strings, where the first entry is the path to a saved trainloader and the second entry the path to a saved testloader.
         In this case the dataloaders will be loaded by torch.load(PATH).
         If None, the default dataloaders will be used (default: None)
     manifold_class : TransformerMixin
         the manifold technique class (default: TSNE)
-    manifold_params : dict
+    manifold_params : dict | None
         Parameters for the manifold execution. For example, perplexity can be changed for TSNE by setting manifold_params to {"n_components": 2, "perplexity": 25}.
         Check out e.g. sklearn.manifold.TSNE for more information. If None, it will be set to {"n_components": n_clusters} (default: None)
-    initial_clustering_params : dict
+    initial_clustering_params : dict | None
         parameters for the GMM clustering class. If None, it will be set to {} (default: None)
-    device : torch.device
+    device : torch.device | int | str | None
         The device on which to perform the computations.
         If device is None then it will be automatically chosen: if a gpu is available the gpu with the highest amount of free memory will be chosen (default: None)
-    random_state : np.random.RandomState | int
+    random_state : np.random.RandomState | int | None
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
     Attributes
@@ -438,7 +445,7 @@ class N2D(_AbstractDeepClusteringAlgo):
         The final labels
     cluster_centers_manifold_ : np.ndarray
         The final cluster centers within the embedding of the manifold
-    neural_network_trained_ : torch.nn.Module
+    neural_network_trained_ : _AbstractNeuralNetwork
         The final neural network
     manifold_ : TransformerMixin
         The manifold object
@@ -453,13 +460,15 @@ class N2D(_AbstractDeepClusteringAlgo):
     2020 25th international conference on pattern recognition (ICPR). IEEE, 2021.
     """
 
-    def __init__(self, n_clusters: int = 8, batch_size: int = 256, pretrain_optimizer_params: dict = None,
-                 pretrain_epochs: int = 100, optimizer_class: torch.optim.Optimizer = torch.optim.Adam,
+    def __init__(self, n_clusters: int = 8, batch_size: int = 256, pretrain_optimizer_params: dict | None = None,
+                 pretrain_epochs: int = 100, optimizer_class: type[torch.optim.Optimizer] = torch.optim.Adam,
                  ssl_loss_fn: Callable | torch.nn.modules.loss._Loss = mean_squared_error,
-                 neural_network: torch.nn.Module | tuple = None, neural_network_weights: str | Path = None,
-                 embedding_size: int = 10, custom_dataloaders: tuple = None, manifold_class: TransformerMixin = TSNE,
-                 manifold_params: dict = None, initial_clustering_params: dict = None, device: torch.device = None,
-                 random_state: np.random.RandomState | int = None):
+                 neural_network: _AbstractNeuralNetwork | tuple[type[_AbstractNeuralNetwork], dict] | None = None,
+                 neural_network_weights: str | Path | None = None, embedding_size: int = 10,
+                 custom_dataloaders: tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader] | tuple[str | Path, str | Path] | None = None,
+                 manifold_class: TransformerMixin = TSNE, manifold_params: dict | None = None,
+                 initial_clustering_params: dict | None = None, device: torch.device | int | str | None = None,
+                 random_state: np.random.RandomState | int | None = None):
         super().__init__(batch_size, neural_network, neural_network_weights, embedding_size, device, random_state)
         self.n_clusters = n_clusters
         self.pretrain_optimizer_params = pretrain_optimizer_params
@@ -471,7 +480,7 @@ class N2D(_AbstractDeepClusteringAlgo):
         self.manifold_params = manifold_params
         self.initial_clustering_params = initial_clustering_params
 
-    def fit(self, X: np.ndarray, y: np.ndarray = None) -> 'N2D':
+    def fit(self, X: np.ndarray, y: np.ndarray | None = None) -> 'N2D':
         """
         Initiate the actual clustering process on the input data set.
         The resulting cluster labels will be stored in the labels_ attribute.
@@ -480,7 +489,7 @@ class N2D(_AbstractDeepClusteringAlgo):
         ----------
         X : np.ndarray
             the given data set
-        y : np.ndarray
+        y : np.ndarray | None
             the labels (can be ignored)
 
         Returns
@@ -513,7 +522,7 @@ class N2D(_AbstractDeepClusteringAlgo):
         self.set_n_features_in(X)
         return self
     
-    def predict(self, X: np.ndarray,) -> np.ndarray:
+    def predict(self, X: np.ndarray, cluster_centers: np.ndarray | None = None) -> np.ndarray:
         """
         Predicts the labels of the input data.
         Note that this is just a very imprecise estimation as the manifold does not learn a function f() to map the data into the final embedding.
@@ -523,6 +532,8 @@ class N2D(_AbstractDeepClusteringAlgo):
         ----------
         X : np.ndarray
             input data
+        cluster_centers : np.ndarray | None
+            Not used (default: None)
 
         Returns
         -------

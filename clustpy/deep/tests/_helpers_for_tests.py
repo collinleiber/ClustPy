@@ -2,6 +2,7 @@ import torch
 import numpy as np
 from clustpy.data import create_subspace_data, create_nr_data
 from clustpy.deep.neural_networks import FeedforwardAutoencoder
+from clustpy.deep.neural_networks._abstract_autoencoder import _AbstractAutoencoder
 from clustpy.deep._abstract_deep_clustering_algo import _AbstractDeepClusteringAlgo
 from clustpy.deep import get_default_augmented_dataloaders
 from clustpy.data import load_optdigits
@@ -101,7 +102,7 @@ def _get_test_dataloader(data, batch_size, shuffle, drop_last):
     return dataloader
 
 
-class _TestAutoencoder(torch.nn.Module):
+class _TestAutoencoder(_AbstractAutoencoder):
     """
     A simple autoencoder only for test purposes.
     Encoder layers: [input_dim, embedding]
@@ -111,7 +112,7 @@ class _TestAutoencoder(torch.nn.Module):
     """
 
     def __init__(self, input_dim, embedding_dim):
-        super(_TestAutoencoder, self).__init__()
+        super().__init__(True, 0)
         self.encoder = torch.nn.Linear(input_dim, embedding_dim, bias=False)
         self.encoder.weight.data.fill_(1)
         self.decoder = torch.nn.Linear(embedding_dim, input_dim, bias=False)

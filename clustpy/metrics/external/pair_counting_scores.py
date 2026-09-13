@@ -314,7 +314,7 @@ def pc_f1_score(labels_true: np.ndarray, labels_pred: np.ndarray) -> float:
     return score
 
 
-def _get_pair_counting_categories(labels_true: np.ndarray, labels_pred: np.ndarray) -> (int, int, int, int):
+def _get_pair_counting_categories(labels_true: np.ndarray, labels_pred: np.ndarray) -> tuple[int, int, int, int]:
     """
     Get the number of 'true positives', 'false positives', 'false negatives' and 'true negatives' to calculate pair-counting scores.
 
@@ -327,7 +327,7 @@ def _get_pair_counting_categories(labels_true: np.ndarray, labels_pred: np.ndarr
 
     Returns
     -------
-    tuple : (int, int, int, int)
+    tuple : tuple[int, int, int, int]
         The number of true positives,
         The number of false positives,
         The number of false negatives,

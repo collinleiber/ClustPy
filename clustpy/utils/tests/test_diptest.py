@@ -1,4 +1,4 @@
-from clustpy.utils import dip_test, dip_pval, dip_boot_samples, plot_dip, dip_gradient, dip_pval_gradient
+from clustpy.utils import dip_test, dip_test_extended, dip_pval, dip_boot_samples, plot_dip, dip_gradient, dip_pval_gradient
 from clustpy.utils.diptest import _dip_c_impl, _dip_python_impl, _dip_pval_function, _dip_pval_table, \
     _get_dip_table_values
 import numpy as np
@@ -34,16 +34,19 @@ def test_dip_test():
     # Shifted and scaled
     dip_shifted = dip_test((X - 5) / 3)
     assert dip == dip_shifted
+
+
+def test_dip_test_extended():
+    X = np.array([-2, 0, 0.25, 0.5, 1, 1.1, 1.2, 1.3, 1.4, 1.5, 2, 3, 4, 4.5])
     # Test modal interval and modal triangle
-    dip_param, modal_interval, modal_triangle = dip_test(np.sort(X), just_dip=False, is_data_sorted=True)
-    assert dip == dip_param
+    dip_param, modal_interval, modal_triangle = dip_test_extended(np.sort(X))
+    assert 0.0535714 == np.round(dip_param, 7)
     assert modal_interval == (4, 9)
     assert modal_triangle == (1, 3, 4)
     # Test also gcm, lcm, mn and mj
-    dip_param, modal_interval, modal_triangle, gcm, lcm, mn, mj = dip_test(np.sort(X), just_dip=False,
-                                                                           is_data_sorted=True,
-                                                                           return_gcm_lcm_mn_mj=True, use_c=True)
-    assert dip == dip_param
+    dip_param_1, modal_interval, modal_triangle, gcm, lcm, mn, mj = dip_test_extended(np.sort(X),
+                                                                                    return_gcm_lcm_mn_mj=True, use_c=True)
+    assert dip_param == dip_param_1
     assert modal_interval == (4, 9)
     assert modal_triangle == (1, 3, 4)
     assert np.array_equal(gcm, np.array([9, 5, 4, 1, 0]))
@@ -51,11 +54,10 @@ def test_dip_test():
     assert np.array_equal(mn, np.array([0, 0, 1, 1, 1, 4, 5, 5, 7, 5, 4, 4, 1, 1]))
     assert np.array_equal(mj, np.array([9, 9, 9, 9, 8, 6, 8, 8, 9, 10, 13, 13, 13, 13]))
     # Test if python implementation returns the same result
-    dip_param2, modal_interval2, modal_triangle2, gcm2, lcm2, mn2, mj2 = dip_test(np.sort(X), just_dip=False,
-                                                                                  is_data_sorted=True,
+    dip_param2, modal_interval2, modal_triangle2, gcm2, lcm2, mn2, mj2 = dip_test_extended(np.sort(X),
                                                                                   return_gcm_lcm_mn_mj=True,
                                                                                   use_c=False)
-    assert dip == dip_param2
+    assert dip_param == dip_param2
     assert modal_interval2 == modal_interval
     assert modal_triangle2 == modal_triangle
     assert np.array_equal(gcm2, gcm)
@@ -151,7 +153,7 @@ def test_dip_gradient():
     proj = np.random.rand(n_dims)
     X_proj = np.matmul(X, proj)
     argsorted = np.argsort(X_proj)
-    dip, modal_interval, modal_triangle = dip_test(X_proj[argsorted], just_dip=False, is_data_sorted=True, use_c=False)
+    dip, modal_interval, modal_triangle = dip_test_extended(X_proj[argsorted], use_c=False)
     grad = dip_gradient(X, X_proj, argsorted, modal_triangle)
     assert grad.shape == (n_dims,)
 
@@ -162,7 +164,7 @@ def test_dip_pval_gradient():
     proj = np.random.rand(n_dims)
     X_proj = np.matmul(X, proj)
     argsorted = np.argsort(X_proj)
-    dip, modal_interval, modal_triangle = dip_test(X_proj[argsorted], just_dip=False, is_data_sorted=True, use_c=False)
+    dip, modal_interval, modal_triangle = dip_test_extended(X_proj[argsorted], use_c=False)
     grad = dip_pval_gradient(X, X_proj, argsorted, modal_triangle, dip)
     assert grad.shape == (n_dims,)
 
@@ -179,8 +181,7 @@ def test_dip_boot_samples():
 def test_plot_dip(mock_fig):
     X = np.sort(np.r_[np.random.rand(50), np.random.rand(50) + 1.3])
     L = np.array([-1] + [0] * 49 + [1] * 49 + [-1])
-    dip, modal_interval, modal_triangle, gcm, lcm, mn, mj = dip_test(X, is_data_sorted=True, just_dip=False,
-                                                                     return_gcm_lcm_mn_mj=True)
+    dip, modal_interval, modal_triangle, gcm, lcm, mn, mj = dip_test_extended(X, return_gcm_lcm_mn_mj=True)
     assert None == plot_dip(X, False, dip, modal_interval, modal_triangle, gcm, lcm, 1, 2, True, True, L, True, True, 20,
                             (1, 1), True)
 

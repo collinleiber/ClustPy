@@ -7,6 +7,7 @@ from clustpy.utils.checks import check_parameters
 from sklearn.utils.validation import check_is_fitted
 from sklearn.metrics.pairwise import pairwise_distances_argmin_min
 from pathlib import Path
+from clustpy.deep.neural_networks._abstract_neural_network import _AbstractNeuralNetwork
 
 
 class _AbstractDeepClusteringAlgo(TransformerMixin, ClusterMixin, BaseEstimator):
@@ -17,21 +18,22 @@ class _AbstractDeepClusteringAlgo(TransformerMixin, ClusterMixin, BaseEstimator)
     ----------
     batch_size : int
         size of the data batches
-    neural_network : torch.nn.Module | tuple
+    neural_network : _AbstractNeuralNetwork | tuple[type[_AbstractNeuralNetwork], dict] | None
         the neural network used for the computations.
-        Can also be a tuple consisting of the neural network class (torch.nn.Module) and the initialization parameters (dict).
-    neural_network_weights : str | Path
+        Can also be a tuple consisting of the neural network class (_AbstractNeuralNetwork) and the initialization parameters (dict).
+    neural_network_weights : str | Path | None
         Path to a file containing the state_dict of the neural_network.
     embedding_size : int
         size of the embedding within the autoencoder
-    device : torch.device
+    device : torch.device | int | str | None
         The device on which to perform the computations
-    random_state : np.random.RandomState | int
+    random_state : np.random.RandomState | int | None
         use a fixed random state to get a repeatable solution. Can also be of type int
     """
 
-    def __init__(self, batch_size: int, neural_network: torch.nn.Module | tuple, neural_network_weights: str | Path,
-                 embedding_size: int, device: torch.device, random_state: np.random.RandomState | int):
+    def __init__(self, batch_size: int, neural_network: _AbstractNeuralNetwork | tuple[type[_AbstractNeuralNetwork], dict] | None,
+                 neural_network_weights: str | Path | None,
+                 embedding_size: int, device: torch.device | int | str | None, random_state: np.random.RandomState | int | None = None):
         self.batch_size = batch_size
         self.neural_network = neural_network
         self.neural_network_weights = neural_network_weights
@@ -39,7 +41,8 @@ class _AbstractDeepClusteringAlgo(TransformerMixin, ClusterMixin, BaseEstimator)
         self.device = device
         self.random_state = random_state
 
-    def _check_parameters(self, X: np.ndarray, *, y: np.ndarray=None) -> (np.ndarray, np.ndarray, np.random.RandomState, dict, dict, dict):
+    def _check_parameters(self, X: np.ndarray, *, y: np.ndarray | None = None) -> tuple[np.ndarray, np.ndarray | None,
+                                                                                        np.random.RandomState, dict, dict, dict]:
         """
         Check if parameters for X, y and random_state are defined in accordance with the sklearn standard.
         Furthermore, it checks the deep clustering specific settings for augmentation_invariance and verifies the values for pretrain_optimizer_params, clustering_optimizer_params and initial_clustering_params.
@@ -52,12 +55,12 @@ class _AbstractDeepClusteringAlgo(TransformerMixin, ClusterMixin, BaseEstimator)
         ----------
         X : np.ndarray
             the given data set
-        y : np.ndarray
+        y : np.ndarray | None
             the labels (can usually be ignored) (default: None)
 
         Returns
         -------
-        tuple : (np.ndarray, np.ndarray, np.random.RandomState, dict, dict, dict)
+        tuple : tuple[np.ndarray, np.ndarray | None, np.random.RandomState, dict, dict, dict]
             the checked data set,
             the checked labels,
             the checked random_state,
@@ -71,18 +74,18 @@ class _AbstractDeepClusteringAlgo(TransformerMixin, ClusterMixin, BaseEstimator)
             assert hasattr(self,
                            "custom_dataloaders"), "If class uses augmentation_invariance it also requires the attribute custom_dataloaders"
             augmentation_invariance_check(self.augmentation_invariance, self.custom_dataloaders)
-        if hasattr(self, "pretrain_optimizer_params"):
-            pretrain_optimizer_params = {"lr": 1e-3} if self.pretrain_optimizer_params is None else self.pretrain_optimizer_params
+        if hasattr(self, "pretrain_optimizer_params") and self.pretrain_optimizer_params is not None:
+            pretrain_optimizer_params = self.pretrain_optimizer_params
         else:
-            pretrain_optimizer_params = None
-        if hasattr(self, "clustering_optimizer_params"):
-            clustering_optimizer_params = {"lr": 1e-4} if self.clustering_optimizer_params is None else self.clustering_optimizer_params
+            pretrain_optimizer_params = {"lr": 1e-3}
+        if hasattr(self, "clustering_optimizer_params") and self.clustering_optimizer_params is not None:
+            clustering_optimizer_params = self.clustering_optimizer_params
         else:
-            clustering_optimizer_params = None
-        if hasattr(self, "initial_clustering_params"):
-            initial_clustering_params = {} if self.initial_clustering_params is None else self.initial_clustering_params
+            clustering_optimizer_params = {"lr": 1e-4}
+        if hasattr(self, "initial_clustering_params") and self.initial_clustering_params is not None:
+            initial_clustering_params = self.initial_clustering_params
         else:
-            initial_clustering_params = None
+            initial_clustering_params = {}
         return X, y, random_state, pretrain_optimizer_params, clustering_optimizer_params, initial_clustering_params
 
     def transform(self, X: np.ndarray) -> np.ndarray:
@@ -100,11 +103,13 @@ class _AbstractDeepClusteringAlgo(TransformerMixin, ClusterMixin, BaseEstimator)
             The embedded data set
         """
         check_is_fitted(self, ["labels_", "neural_network_trained_", "n_features_in_"])
-        X, _, _ = check_parameters(X, allow_size_1=True, allow_nd=self.neural_network_trained_.allow_nd_input, estimator_obj=self)
-        X_embed = self.neural_network_trained_.transform(X)
+        assert isinstance(self.neural_network_trained_, _AbstractNeuralNetwork), "neural_network_trained_ must be of type _AbstractNeuralNetwork. Your input has type {0}".format(type(self.neural_network_trained_))
+        neural_network = self.neural_network_trained_
+        X, _, _ = check_parameters(X, allow_size_1=True, allow_nd=neural_network.allow_nd_input, estimator_obj=self)
+        X_embed = neural_network.transform(X)
         return X_embed
 
-    def fit(self, X: np.ndarray, y: np.ndarray = None) -> '_AbstractDeepClusteringAlgo':
+    def fit(self, X: np.ndarray, y: np.ndarray | None = None) -> '_AbstractDeepClusteringAlgo':
         """
         Placeholder for the fit function of deep clustering algorithms.
 
@@ -112,7 +117,7 @@ class _AbstractDeepClusteringAlgo(TransformerMixin, ClusterMixin, BaseEstimator)
         ----------
         X : np.ndarray
             the given data set
-        y : np.ndarray
+        y : np.ndarray | None
             the labels (can be ignored)
 
         Returns
@@ -124,7 +129,7 @@ class _AbstractDeepClusteringAlgo(TransformerMixin, ClusterMixin, BaseEstimator)
         self.set_n_features_in(X)
         return self
 
-    def fit_transform(self, X: np.ndarray, y: np.ndarray=None):
+    def fit_transform(self, X: np.ndarray, y: np.ndarray | None = None):
         """
         Train the deep clustering algorithm on the given data set and return the final embedded version of the data using the trained neural network.
 
@@ -132,7 +137,7 @@ class _AbstractDeepClusteringAlgo(TransformerMixin, ClusterMixin, BaseEstimator)
         ----------
         X: np.ndarray
             The given data set
-        y : np.ndarray
+        y : np.ndarray | None
             the labels (can usually be ignored)
 
         Returns
@@ -144,7 +149,7 @@ class _AbstractDeepClusteringAlgo(TransformerMixin, ClusterMixin, BaseEstimator)
         X_embed = self.transform(X)
         return X_embed
 
-    def predict(self, X: np.ndarray, cluster_centers: np.ndarray = None) -> np.ndarray:
+    def predict(self, X: np.ndarray, cluster_centers: np.ndarray | None = None) -> np.ndarray:
         """
         Predicts the labels of the input data.
         The labels will be equal to the id of the closest cluster center in the embedding of the autoencoder.
@@ -154,7 +159,7 @@ class _AbstractDeepClusteringAlgo(TransformerMixin, ClusterMixin, BaseEstimator)
         ----------
         X : np.ndarray
             input data
-        cluster_centers : np.ndarray
+        cluster_centers : np.ndarray | None
             the cluster centers. It is expected that the cluster centers lie within the embedded feature space, not in the original.
             Can be None if attribute cluster_centers_ is defined
 
@@ -182,4 +187,5 @@ class _AbstractDeepClusteringAlgo(TransformerMixin, ClusterMixin, BaseEstimator)
             The input data
         """
         self.n_features_in_ = X.shape[1]
+        assert isinstance(self.neural_network_trained_, _AbstractNeuralNetwork), "neural_network_trained_ must be of type _AbstractNeuralNetwork. Your input has type {0}".format(type(self.neural_network_trained_))
         self.neural_network_trained_.fitted = True

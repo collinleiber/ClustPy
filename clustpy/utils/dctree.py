@@ -14,8 +14,81 @@ Pascal Weber
 
 from __future__ import annotations
 import numpy as np
-from typing import List, Optional, Sequence, Tuple, Union
 from scipy.spatial.distance import pdist, cdist, squareform
+
+
+class _DCNode:
+    """
+    A node in a DCTree.
+    Each node contains a set of leaves and can have a left and a right child node.
+
+    Parameters
+    ----------
+    id : int
+        the id of the node
+    dist : float
+        the dc distance
+    leaves : list[int]
+        list of the ids of its child nodes
+    left : _DCNode | None
+        the left child node (default: None)
+    right : _DCNode | None
+        the right child node (default: None)
+    parent : _DCNode | None
+        the parent node. If None, it will be set to itself (default: None)
+    root : _DCNode | None
+        the root node (default: None)
+    """
+
+    def __init__(
+        self,
+        id: int,
+        dist: float,
+        leaves: list[int],
+        left: _DCNode | None = None,
+        right: _DCNode | None = None,
+        parent: _DCNode | None = None,
+        root: _DCNode | None = None
+    ):
+        self.id = id
+        self.dist = dist
+        self.leaves = leaves
+        self.left = left
+        self.right = right
+        if not parent:
+            self.parent = self
+        else:
+            self.parent = parent
+        self.root = root
+
+    def __repr__(self) -> str:
+        """
+        Return a string containing the id and dist of this node.
+
+        Returns
+        -------
+        to_str : str
+            The string
+        """
+        to_str = f"DCNode #{self.id} ({self.dist})"
+        return to_str
+
+    def __lt__(self, other_node: _DCNode) -> bool:
+        """
+        Less than method of the node. Compares the dist with respect to the other input node.
+
+        Parameters
+        ----------
+        other_node : _DCNode
+            the other node
+
+        Returns
+        -------
+        is_less : bool
+            True if dist is smaller than dist of the other node
+        """
+        less_than = self.dist < other_node.dist
+        return less_than
 
 
 class DCTree:
@@ -115,7 +188,7 @@ class DCTree:
             idx += 1
         return new_root_node
 
-    def _get_root(self, node: _DCNode) -> '_DCNode':
+    def _get_root(self, node: _DCNode) -> _DCNode:
         """
         Get the root of a node and update all root_ entries that have been visited.
 
@@ -135,7 +208,7 @@ class DCTree:
         # Override old roots
         if root_node is not node:
             current_node = node
-            while current_node.root != root_node:
+            while current_node.root is not None and current_node.root != root_node:
                 next_node = current_node.root
                 current_node.root = root_node
                 current_node = next_node
@@ -146,16 +219,16 @@ class DCTree:
         Build a fast index structure for the DCTree.
         """
         n_nodes = 2 * self.n - 1
-        self.euler = []
-        self.level = []
-        self.f_occur = [None] * n_nodes
+        self.euler : list[_DCNode] = []
+        self.level : list[int] = []
+        self.f_occur : list[int] = [-1] * n_nodes
         # Euler tour to get the euler, level, and f_occur lists in O(n) time.
         DOWN, UP = 0, 1
         stack = [(self.root, 0, DOWN)]  # (node, level, DOWN / UP)
         while len(stack) > 0:
             (node, level, status) = stack.pop()
             if status == DOWN:
-                if self.f_occur[node.id] is None:
+                if self.f_occur[node.id] == -1:
                     self.f_occur[node.id] = len(self.euler)
                 self.euler.append(node)
                 self.level.append(level) 
@@ -186,27 +259,35 @@ class DCTree:
 
     def __getitem__(
         self,
-        point_idx: Union[int, Sequence[int], np.ndarray]
-    ) -> Union[_DCNode, List[_DCNode]]:
+        point_idx: int | list[int] | np.ndarray
+    ) -> _DCNode | list[_DCNode]:
         """
         Returns the _DCNode of given index if `point_idx` is an integer or a list of _DCNodes if `point_idx' is a Sequence.
 
         Parameters
         ----------
-        point_idx : Union[int, Sequence[int], np.ndarray]
+        point_idx : int | list[int] | np.ndarray
             The input parameter as described above
 
         Returns
         -------
-        result : Union[_DCNode, List[_DCNode]]
+        result : _DCNode | list[_DCNode]
             The querried nodes in the tree
         """
-        if isinstance(point_idx, int):
-            return self.euler[self.f_occur[point_idx]]
-        elif isinstance(point_idx, (Sequence, np.ndarray)):
-            return [self.euler[self.f_occur[i]] for i in point_idx]
+        if isinstance(point_idx, (int, np.integer)):
+            assert 0 <= point_idx < len(self.f_occur), f"point_idx {point_idx} is out of bounds for the DCTree with {len(self.f_occur)} points"
+            occur = self.f_occur[point_idx]
+            assert occur != -1, f"point_idx {point_idx} has no occurrence in the euler tour of the DCTree"
+            return self.euler[occur]
+        elif isinstance(point_idx, (list, np.ndarray)):
+            eulers = []
+            for i in point_idx:
+                new_node = self[i]
+                assert isinstance(new_node, _DCNode), f"Index {i} in point_idx {point_idx} is out of bounds for the DCTree with {len(self.f_occur)} points"
+                eulers.append(new_node)
+            return eulers
         else:
-            raise IndexError(f"`{point_idx}` needs to be an integer, Sequence or np.ndarray!")
+            raise IndexError(f"`{point_idx}` needs to be an integer, list or np.ndarray!")
 
     def dc_dist(self, i: int, j: int) -> float:
         """
@@ -239,8 +320,8 @@ class DCTree:
 
     def dc_distances(
         self,
-        idx_X: Union[Sequence[int], np.ndarray, None] = None,
-        idx_Y: Union[Sequence[int], np.ndarray, None] = None,
+        idx_X: range | list[int] | np.ndarray | None = None,
+        idx_Y: range | list[int] | np.ndarray | None = None,
         access_method: str = "tree",
     ) -> np.ndarray:
         """
@@ -250,9 +331,9 @@ class DCTree:
 
         Parameters
         ----------
-        idx_X : Union[Sequence[int], np.ndarray, None]
+        idx_X : range | list[int] | np.ndarray | None
             the first set of indices
-        idx_Y : Union[Sequence[int], np.ndarray, None]
+        idx_Y : range | list[int] | np.ndarray | None
             the second set of indices
         access_method : str
             "tree":     traverses the tree in O(n) time (n = len(points)), no matter the size of X / Y.
@@ -261,7 +342,7 @@ class DCTree:
         
         Returns
         -------
-        dc_dists : np.array
+        dc_dists : np.ndarray
             ndarray of shape (n_samples_X, n_samples_Y) containing the distances
         """
         if idx_X is None:
@@ -308,11 +389,13 @@ class DCTree:
             raise ValueError(f"'{access_method}' is no valid `access_method`")
         if idx_X is idx_Y:
             # Mirror values
-            dc_dists = dc_dists + dc_dists.T
-        return dc_dists
+            dc_dists_final = dc_dists + dc_dists.T
+        else:
+            dc_dists_final = dc_dists
+        return dc_dists_final
 
 
-    def _traverse_until_k_clusters(self, n_clusters: int) -> List[_DCNode]:
+    def _traverse_until_k_clusters(self, n_clusters: int) -> list[_DCNode]:
         """
         Traverse the tree to identify n_clusters nodes that minimize the maximum within-cluster distance.
 
@@ -323,7 +406,7 @@ class DCTree:
 
         Returns
         -------
-        result_nodes : List[_DCNode]
+        result_nodes : list[_DCNode]
             List of nodes, where each node represents the root of a cluster
         """
         assert n_clusters <= self.n, "n_clusters can not be larger than the number of input points"
@@ -405,13 +488,13 @@ class DCTree:
         repr_string += f"{self.__repr__help(self.root.right, pointer_right, '', False)}"
         return repr_string
 
-    def __repr__help(self, node: Optional[_DCNode], pointer: str, padding: str, has_right_sibling: bool) -> str:
+    def __repr__help(self, node: _DCNode | None, pointer: str, padding: str, has_right_sibling: bool) -> str:
         """
         Helper for the __repr__ function.
 
         Parameters
         ----------
-        node : Optional[_DCNode]
+        node : _DCNode | None
             The current node
         pointer : str
             The pointer string
@@ -436,80 +519,6 @@ class DCTree:
         repr_string += f"{self.__repr__help(node.right, pointer_right, padding_for_both, False)}" 
         repr_string += f"\n   {padding.replace('|', ' ')}// #endregion"
         return repr_string
-
-
-class _DCNode:
-    """
-    A node in a DCTree.
-    Each node contains a set of leaves and can have a left and a right child node.
-
-    Parameters
-    ----------
-    id : int
-        the id of the node
-    dist : float
-        the dc distance
-    leaves : List[int]
-        list of the ids of its child nodes
-    left : Optional[_DCNode]
-        the left child node (default: None)
-    right : Optional[_DCNode]
-        the right child node (default: None)
-    parent : Optional[_DCNode]
-        the parent node. If None, it will be set to itself (default: None)
-    root : Optional[_DCNode]
-        the root node (default: None)
-    """
-
-    def __init__(
-        self,
-        id: int,
-        dist: float,
-        leaves: List[int],
-        left: Optional[_DCNode] = None,
-        right: Optional[_DCNode] = None,
-        parent: Optional[_DCNode] = None,
-        root: Optional[_DCNode] = None
-    ):
-        self.id = id
-        self.dist = dist
-        self.leaves = leaves
-        self.left = left
-        self.right = right
-        if not parent:
-            self.parent = self
-        else:
-            self.parent = parent
-        self.root = root
-
-    def __repr__(self) -> str:
-        """
-        Return a string containing the id and dist of this node.
-
-        Returns
-        -------
-        to_str : str
-            The string
-        """
-        to_str = f"DCNode #{self.id} ({self.dist})"
-        return to_str
-
-    def __lt__(self, other_node: _DCNode) -> bool:
-        """
-        Less than method of the node. Compares the dist with respect to the other input node.
-
-        Parameters
-        ----------
-        other_node : _DCNode
-            the other node
-
-        Returns
-        -------
-        is_less : bool
-            True if dist is smaller than dist of the other node
-        """
-        less_than = self.dist < other_node.dist
-        return less_than
 
 
 def reachability_distances(X: np.ndarray, min_points: int = 5) -> np.ndarray:
@@ -544,7 +553,7 @@ def reachability_distances(X: np.ndarray, min_points: int = 5) -> np.ndarray:
     return reach_distances
 
 
-def minimum_spanning_tree_prims(matrix: np.ndarray, use_less_memory: bool = False, min_points: int = None) -> np.ndarray:
+def minimum_spanning_tree_prims(matrix: np.ndarray, use_less_memory: bool = False, min_points: int | None = None) -> np.ndarray:
     """
     Create a Minimum-spanning-tree of a given matrix using Prim's algorithm.
     The tree will be build in O(n^2) time.
@@ -556,7 +565,7 @@ def minimum_spanning_tree_prims(matrix: np.ndarray, use_less_memory: bool = Fals
     use_less_memory : bool
         If true, the MST will not directly be build for the input matrix but the matrix will be used to construct a distance matrix first.
         Saves quadratic RAM usage, but also needs double the time for computing (default: False)
-    min_points : int
+    min_points : int | None
         Min_points for calculating the reachability distance. Only relevant if use_less_memory is True.
         If min_points is None, the euclidean distance will be used (default: None)
 
@@ -597,7 +606,7 @@ def minimum_spanning_tree_prims(matrix: np.ndarray, use_less_memory: bool = Fals
         parent[update_mask] = u
         # Select next closest unvisited node
         masked_dists = np.where(not_in_mst, nodes_min_dist, np.inf)
-        u = np.argmin(masked_dists)
+        u = int(np.argmin(masked_dists))
         mst_edges[i] = (parent[u], u, nodes_min_dist[u])
         not_in_mst[u] = False
     return mst_edges
