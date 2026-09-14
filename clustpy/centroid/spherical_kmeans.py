@@ -35,6 +35,11 @@ class SphericalKMeans(ClusterMixin, BaseEstimator):
         The number of used iterations
     n_features_in_ : int
         the number of features used for the fitting
+
+    References
+    -------
+    Dhillon, Inderjit S., and Dharmendra S. Modha. "Concept decompositions for large sparse text data using clustering."
+    Machine learning 42.1 (2001): 143-175.
     """
     def __init__(self, n_clusters: int = 8, max_iter: int = 300, n_init: int = 10, tol: float = 1e-5,
                  random_state: np.random.RandomState | int | None = None):
