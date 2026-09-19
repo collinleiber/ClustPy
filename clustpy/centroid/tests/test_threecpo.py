@@ -268,9 +268,10 @@ def test_simple_threecpo():
     assert threecpo.labels_.shape == labels.shape
     assert threecpo.column_lambdas_one_.shape == (threecpo.n_clusters, X.shape[1])
     assert threecpo.column_lambdas_zero_.shape == (X.shape[1],)
-    assert np.sum(threecpo.column_lambdas_zero_) == 0
     assert threecpo.column_lambdas_minus_.shape == (X.shape[1],)
-    assert np.sum(threecpo.column_lambdas_minus_) == 0
+    assert np.sum(threecpo.c_one_) == X.shape[1]
+    assert np.sum(threecpo.c_zero_) == 0
+    assert np.sum(threecpo.c_minus_) == 0
     assert len(np.unique(threecpo.labels_)) == threecpo.n_clusters + 1
     assert np.array_equal(np.unique(threecpo.labels_), np.arange(-1, threecpo.n_clusters))
 
