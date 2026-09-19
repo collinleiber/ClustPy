@@ -342,6 +342,11 @@ class ThreeCPO(ClusterMixin, BaseEstimator):
         Is None if track_reward is False
     n_features_in_ : int
         the number of features used for the fitting
+
+    References
+    -------
+    Leiber, Collin, Kai Puolamäki, and Heikki Mannila. "Poisson Subspace Clustering: Focusing on the Essentials in Count Data."
+    arXiv preprint arXiv:2608.23287 (2026).
     """
     def __init__(self, n_clusters: int = 8, max_iter: int = 300, n_init: int = 10, outliers: bool = False, re_init_empty_clusters: bool = False,
                 init_strat_rows: str = "poisson++", init_strat_columns: str = "strategy", column_bias_type: str = "mdl", ignore_c_minus: bool = False,

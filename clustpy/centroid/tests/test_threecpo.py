@@ -89,6 +89,9 @@ def test_poisson_seeding():
     S_trials = poisson_seeding(X, n_clusters=5, n_local_trials=100, random_state=0)
     assert S_trials.shape == (5, X.shape[1])
     assert rows_in_X(S_trials, X)
+    S_trials = poisson_seeding(X, n_clusters=5, n_local_trials=1, random_state=0)
+    assert S_trials.shape == (5, X.shape[1])
+    assert rows_in_X(S_trials, X)
     # alpha parameter
     S = poisson_seeding(X, n_clusters=n_clusters, alpha=10, random_state=42)
     assert S.shape == (n_clusters, X.shape[1])
@@ -140,7 +143,6 @@ def test_initial_poisson_clustering_labels():
         assert np.array_equal(labels, labels2)
         if strat in ["rf+kmeans", "rf+kmeans++"]:
             X_rf = X /  X.sum(1).reshape((-1, 1))
-            print(strat[3:])
             labels_no_rf = initial_poisson_clustering_labels(X_rf, n_clusters, strat[3:], random_state=42)
             assert np.array_equal(labels, labels_no_rf)
 
@@ -236,7 +238,7 @@ def test_simple_threecpo():
     assert np.array_equal(threecpo.column_lambdas_minus_, threecpo2.column_lambdas_minus_)
     # Test with parameters
     threecpo = ThreeCPO(3, outliers=True, re_init_empty_clusters=True, init_strat_columns="random",
-                        column_bias_type="bic", ignore_c_minus=True, ignore_c_zero=True,
+                        column_bias_type="bic", ignore_c_minus=False, ignore_c_zero=False,
                         allow_negative_values=True, random_state=1)
     threecpo.fit(X)
     assert threecpo.labels_.dtype == np.int32
@@ -244,6 +246,31 @@ def test_simple_threecpo():
     assert threecpo.column_lambdas_one_.shape == (threecpo.n_clusters, X.shape[1])
     assert threecpo.column_lambdas_zero_.shape == (X.shape[1],)
     assert threecpo.column_lambdas_minus_.shape == (X.shape[1],)
+    assert len(np.unique(threecpo.labels_)) == threecpo.n_clusters + 1
+    assert np.array_equal(np.unique(threecpo.labels_), np.arange(-1, threecpo.n_clusters))
+    # Test with different parameters
+    threecpo = ThreeCPO(3, outliers=True, re_init_empty_clusters=True, init_strat_columns="none",
+                        column_bias_type="none", ignore_c_minus=False, ignore_c_zero=False,
+                        allow_negative_values=True, random_state=1)
+    threecpo.fit(X)
+    assert threecpo.labels_.dtype == np.int32
+    assert threecpo.labels_.shape == labels.shape
+    assert threecpo.column_lambdas_one_.shape == (threecpo.n_clusters, X.shape[1])
+    assert threecpo.column_lambdas_zero_.shape == (X.shape[1],)
+    assert threecpo.column_lambdas_minus_.shape == (X.shape[1],)
+    assert len(np.unique(threecpo.labels_)) == threecpo.n_clusters + 1
+    assert np.array_equal(np.unique(threecpo.labels_), np.arange(-1, threecpo.n_clusters))
+    # Test with ignored column selection
+    threecpo = ThreeCPO(3, outliers=True, ignore_c_minus=True, ignore_c_zero=True,
+                        random_state=1)
+    threecpo.fit(X)
+    assert threecpo.labels_.dtype == np.int32
+    assert threecpo.labels_.shape == labels.shape
+    assert threecpo.column_lambdas_one_.shape == (threecpo.n_clusters, X.shape[1])
+    assert threecpo.column_lambdas_zero_.shape == (X.shape[1],)
+    assert np.sum(threecpo.column_lambdas_zero_) == 0
+    assert threecpo.column_lambdas_minus_.shape == (X.shape[1],)
+    assert np.sum(threecpo.column_lambdas_minus_) == 0
     assert len(np.unique(threecpo.labels_)) == threecpo.n_clusters + 1
     assert np.array_equal(np.unique(threecpo.labels_), np.arange(-1, threecpo.n_clusters))
 
