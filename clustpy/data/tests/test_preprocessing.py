@@ -1,4 +1,4 @@
-from clustpy.data import ZNormalizer, z_normalization
+from clustpy.data import ZNormalizer, z_normalization, bm25
 import numpy as np
 
 
@@ -92,3 +92,25 @@ def test_ZNormalizer_color_images():
     assert data.shape == data_z.shape
     assert np.array_equal(data_z, z_normalization(data, feature_or_channel_wise=True))
     assert np.allclose(data, normalizer.inverse_transform(data_z))
+
+
+def test_bm25():
+    # Tiny, interpretable example
+    X = np.array([[1.0, 0.0],
+                  [0.0, 1.0]])
+    k = 1.5
+    b = 0.75
+    out = bm25(X, k=k, b=b)
+    assert out.shape == X.shape
+    # With this X, df = [1,1], N=2 -> idf = log(1 + (2-1+0.5)/(1+0.5)) = log(2)
+    expected_idf = np.log(2.0)
+    # doc_len = [1,1], avgdl=1 -> denom_norm = k*(1 - b + b*1) = k
+    # tf_sat for nonzero f=1 -> (1*(k+1))/(1 + k) = 1; zeros remain zero
+    expected = np.array([[expected_idf, 0.0],
+                         [0.0, expected_idf]])
+    assert np.allclose(out, expected, rtol=1e-12, atol=1e-12)
+    # Edge case: all-empty documents -> output all zeros
+    Z = np.zeros((3, 2), dtype=float)
+    outZ = bm25(Z, k=k, b=b)
+    assert outZ.shape == Z.shape
+    assert np.all(outZ == 0.0)

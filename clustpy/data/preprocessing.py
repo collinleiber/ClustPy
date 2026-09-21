@@ -133,7 +133,7 @@ def z_normalization(X: np.ndarray, feature_or_channel_wise: bool = False) -> np.
     Parameters
     ----------
     X : np.ndarray
-            the given data set
+        the given data set
     feature_or_channel_wise : bool
         Specifies if all data should be used for the normalization or if a feature-/channel-wise normalization should be applied (default: False)
 
@@ -144,4 +144,45 @@ def z_normalization(X: np.ndarray, feature_or_channel_wise: bool = False) -> np.
     """
     znorm = ZNormalizer(feature_or_channel_wise)
     X_transform = znorm.fit_transform(X)
+    return X_transform
+
+
+def bm25(X: np.ndarray, k: float=1.5, b: float = 0.75) -> np.ndarray:
+    """
+    Perform a BM25 transformation.
+    Takes a matrix containing word counts and changes its representation by considering the number of documents containing a word and the length of the documents.
+    Similiar to TF-IDF.
+
+    Parameters
+    ----------
+    X : np.ndarray
+        the given data set
+    k : float
+        the k parameter of BM25. Usually within [1.2, 2.0] (default: 1.5)
+    b : float
+        the b parameter of BM25. Has to be within [0, 1] (default: 0.75)
+
+    Returns
+    -------
+    X_transform : np.ndarray
+        The transformed data set
+
+    References
+    ----------
+    Robertson, Stephen, and Hugo Zaragoza. "The probabilistic relevance framework: BM25 and beyond."
+    Foundations and trends in information retrieval 4.1-2 (2009): 1-174.
+    """
+    assert np.all(X >= 0), "X must be non-negative (counts)"
+    assert k > 0, "k must be > 0"
+    assert 0.0 <= b <= 1.0, "b must be in [0, 1]"
+    X = np.asarray(X, dtype=float)
+    n_documents_with_q = (X > 0).sum(0)
+    N = X.shape[0]
+    idf = np.log((N - n_documents_with_q + 0.5) / (n_documents_with_q + 0.5) + 1)
+    length_D = X.sum(1)
+    avgdl = length_D.mean()
+    if avgdl == 0:
+        return np.zeros_like(X)
+    bm25 = X * (k + 1) / (X + k * (1 - b + b * length_D.reshape((-1, 1)) / avgdl))
+    X_transform = bm25 * idf.reshape((1, -1))
     return X_transform

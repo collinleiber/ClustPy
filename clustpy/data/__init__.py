@@ -17,7 +17,7 @@ from .real_medical_mnist_data import load_path_mnist, load_chest_mnist, load_der
     load_organ_c_mnist, load_organ_s_mnist, load_organ_mnist_3d, load_nodule_mnist_3d, load_adrenal_mnist_3d, \
     load_fracture_mnist_3d, load_vessel_mnist_3d, load_synapse_mnist_3d
 from clustpy.data.real_video_data import load_video_weizmann, load_video_keck_gesture
-from clustpy.data.preprocessing import ZNormalizer, z_normalization
+from clustpy.data.preprocessing import ZNormalizer, z_normalization, bm25
 from clustpy.data._utils import flatten_images, unflatten_images
 
 __all__ = ['create_subspace_data',
@@ -107,4 +107,5 @@ __all__ = ['create_subspace_data',
            'load_wholesale_customers',
            'load_reuters21578',
            'load_bbcsport',
-           'load_bbcnews']
+           'load_bbcnews',
+           'bm25']
