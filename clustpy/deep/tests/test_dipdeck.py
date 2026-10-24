@@ -73,3 +73,34 @@ def test_get_dip_matrix():
     dip_matrix_tmp = dip_matrix + np.identity(3) * 0.1
     assert np.max(dip_matrix_tmp) <= 1
     assert np.min(dip_matrix_tmp) >= 0
+
+
+def test_dipdeck_module_to_device():
+    import torch
+    from clustpy.deep.dipdeck import _DipDECK_Module
+
+    labels = np.array([0, 1, 0, 1], dtype=np.int32)
+    centers = np.array([[1.0, 2.0], [3.0, 4.0]])
+    dip_matrix = np.array([[0.0, 0.5], [0.5, 0.0]])
+    module = _DipDECK_Module(
+        n_clusters=2, init_np_labels=labels, init_np_centers=centers,
+        dip_matrix_cpu=dip_matrix, dip_merge_threshold=0.9,
+        max_n_clusters=5, min_n_clusters=1, max_cluster_size_diff_factor=2,
+        pval_strategy="table", n_boots=100, random_state=np.random.RandomState(1),
+    )
+    assert module.to_device(torch.device("cpu")) is module
+    torch.testing.assert_close(module.labels, torch.tensor(labels, dtype=torch.int32))
+    torch.testing.assert_close(module.cluster_centers, torch.tensor(centers, dtype=torch.float32))
+    torch.testing.assert_close(module.dip_matrix, torch.tensor(dip_matrix, dtype=torch.float32))
+
+    # A real non-CPU transfer exposes discarded Tensor.to return values without
+    # requiring CUDA hardware. Meta checks placement and metadata, not training.
+    assert module.to_device(torch.device("meta")) is module
+    assert module.labels.device.type == "meta"
+    assert module.cluster_centers.device.type == "meta"
+    assert module.dip_matrix.device.type == "meta"
+    assert module.labels.dtype == torch.int32
+    assert module.cluster_centers.dtype == module.dip_matrix.dtype == torch.float32
+    assert module.labels.shape == (4,)
+    assert module.cluster_centers.shape == (2, 2)
+    assert module.dip_matrix.shape == (2, 2)
