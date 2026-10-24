@@ -68,7 +68,7 @@ def _specialk(X: np.ndarray, significance: float, n_dimensions: int,
         raise ValueError(
             "similarity_matrix must be 'NAM' (Neighborhood Adjacency Matrix), 'SAM' (Symmetrically Normalized Adjacency Matrix) or a numpy array.")
     # Get eigenvalues and eigenvectors
-    my_lambda, V = scipy.sparse.linalg.eigsh(final_similarity_matrix, k=n_dimensions, which="LM")
+    my_lambda, V = scipy.sparse.linalg.eigsh(final_similarity_matrix, k=n_dimensions, which="LM", rng=random_state)
     my_lambda, D = np.absolute(my_lambda), np.absolute(V)
     D = D * np.sqrt(my_lambda)
     # Initial values
