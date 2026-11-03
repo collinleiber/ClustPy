@@ -5,3 +5,4 @@ tutorials
    :maxdepth: 2
 
    stacked_denoising_autoencoder
+   spectralnet
