@@ -37,3 +37,36 @@ def test_simple_SpecialK():
     assert specialk.labels_.shape == labels.shape
     assert len(np.unique(specialk.labels_)) == specialk.n_clusters_
     assert np.array_equal(np.unique(specialk.labels_), np.arange(specialk.n_clusters_))
+
+
+@pytest.mark.parametrize("similarity_matrix", ["NAM", "SAM"])
+@pytest.mark.parametrize("state_type", [int, np.random.RandomState])
+def test_specialk_reproducible_probability_bounds(monkeypatch, similarity_matrix, state_type):
+    # Disconnected blob neighborhoods have repeated eigenvalues. Arbitrary
+    # eigensolver starts can rotate their eigenvectors and change the bounds,
+    # even when the final clustering happens to remain the same.
+    import clustpy.spectral.specialk as specialk_module
+
+    original_bound = specialk_module._log_zz_top_bound
+    bounds = []
+
+    def record_bound(*args, **kwargs):
+        value = original_bound(*args, **kwargs)
+        bounds.append(value)
+        return value
+
+    monkeypatch.setattr(specialk_module, "_log_zz_top_bound", record_bound)
+    X, _ = make_blobs(250, centers=3, n_features=4, cluster_std=0.5, random_state=2)
+    results = []
+    for _ in range(2):
+        bounds.clear()
+        estimator = SpecialK(
+            random_state=state_type(1), similarity_matrix=similarity_matrix,
+            n_dimensions=200, max_n_clusters=5,
+        ).fit(X)
+        results.append((estimator.n_clusters_, estimator.labels_.copy(), bounds.copy()))
+
+    assert results[0][0] == results[1][0]
+    np.testing.assert_array_equal(results[0][1], results[1][1])
+    assert len(results[0][2]) == len(results[1][2])
+    np.testing.assert_allclose(results[0][2], results[1][2], rtol=1e-12, atol=1e-12)
