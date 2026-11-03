@@ -278,8 +278,10 @@ class _ENRC_Module(torch.nn.Module):
         z_rot = self.rotate(z)
         z_rot_back = self.rotate_back(z_rot)
 
+        device = get_device_from_module(self)
+
         subspace_betas = self.subspace_betas()
-        subspace_losses = torch.tensor(0.)
+        subspace_losses = torch.tensor(0.).to(device)
 
         if assignment_matrix_dict is None:
             assignment_matrix_dict = {}
@@ -1144,7 +1146,7 @@ def _determine_sgd_init_costs(enrc: _ENRC_Module, dataloader: torch.utils.data.D
         the costs,
         the rotated data (if return_rot is true)
     """
-    cost = torch.tensor(0.)
+    cost = torch.tensor(0.).to(device)
     rotated_data = []
     with torch.no_grad():
         for batch in dataloader:
