@@ -26,7 +26,8 @@ def _dec(X: np.ndarray | torch.Tensor, n_clusters: int | None, alpha: float, bat
          embedding_size: int, clustering_loss_weight: float, ssl_loss_weight: float,
          custom_dataloaders: tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader] | tuple[str | Path, str | Path] | None,
          augmentation_invariance: bool, initial_clustering_class: ClusterMixin | None, initial_clustering_params: dict,
-         device: torch.device | int | str | None, random_state: np.random.RandomState) -> tuple[
+         device: torch.device | int | str | None, random_state: np.random.RandomState,
+         scheduler: type[torch.optim.lr_scheduler.LRScheduler] | None = None, scheduler_params: dict | None = None) -> tuple[
         np.ndarray, np.ndarray, np.ndarray, np.ndarray, _AbstractNeuralNetwork]:
     """
     Start the actual DEC clustering procedure on the input data set.
@@ -80,6 +81,10 @@ def _dec(X: np.ndarray | torch.Tensor, n_clusters: int | None, alpha: float, bat
         The device on which to perform the computations
     random_state : np.random.RandomState
         use a fixed random state to get a repeatable solution
+    scheduler : type[torch.optim.lr_scheduler.LRScheduler] | None
+        epoch scheduler for the clustering optimizer only
+    scheduler_params : dict | None
+        scheduler constructor arguments
 
     Returns
     -------
@@ -100,9 +105,10 @@ def _dec(X: np.ndarray | torch.Tensor, n_clusters: int | None, alpha: float, bat
     # Use DEC optimizer parameters (usually learning rate is reduced by a magnitude of 10)
     optimizer = optimizer_class(list(neural_network.parameters()) + list(dec_module.parameters()),
                                 **clustering_optimizer_params)
+    scheduler_obj = None if scheduler is None else scheduler(optimizer, **({} if scheduler_params is None else scheduler_params))
     # DEC Training loop
     dec_module.fit(neural_network, trainloader, clustering_epochs, device, optimizer, ssl_loss_fn,
-                   clustering_loss_weight, ssl_loss_weight)
+                   clustering_loss_weight, ssl_loss_weight, scheduler_obj)
     # Get labels
     dec_labels = predict_batchwise(testloader, neural_network, dec_module)
     dec_centers = dec_module.centers.detach().cpu().numpy()
@@ -363,7 +369,8 @@ class _DEC_Module(torch.nn.Module):
 
     def fit(self, neural_network: _AbstractNeuralNetwork, trainloader: torch.utils.data.DataLoader, n_epochs: int,
             device: torch.device, optimizer: torch.optim.Optimizer, ssl_loss_fn: Callable | torch.nn.modules.loss._Loss,
-            clustering_loss_weight: float, ssl_loss_weight: float) -> '_DEC_Module':
+            clustering_loss_weight: float, ssl_loss_weight: float,
+            scheduler: torch.optim.lr_scheduler.LRScheduler | None = None) -> '_DEC_Module':
         """
         Trains the _DEC_Module in place.
 
@@ -385,6 +392,8 @@ class _DEC_Module(torch.nn.Module):
             weight of the clustering loss
         ssl_loss_weight : float
             weight of the self-supervised learning (ssl) loss
+        scheduler : torch.optim.lr_scheduler.LRScheduler | None
+            initialized epoch scheduler bound to optimizer, or None
 
         Returns
         -------
@@ -402,6 +411,8 @@ class _DEC_Module(torch.nn.Module):
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
+            if scheduler is not None:
+                scheduler.step()
             postfix_str = {"Loss": total_loss}
             tbar.set_postfix(postfix_str)
         return self
@@ -461,6 +472,13 @@ class DEC(_AbstractDeepClusteringAlgo):
     random_state : np.random.RandomState | int | None
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
+    scheduler : type[torch.optim.lr_scheduler.LRScheduler] | None
+        epoch-based learning rate scheduler for the clustering optimizer only.
+        A fresh scheduler is constructed for each fit and stepped after every clustering epoch.
+        Metric-based ReduceLROnPlateau is not supported because no validation loss is available (default: None)
+    scheduler_params : dict | None
+        parameters passed to the scheduler constructor; None uses an empty dictionary (default: None)
+
     Attributes
     ----------
     labels_ : np.ndarray
@@ -501,7 +519,9 @@ class DEC(_AbstractDeepClusteringAlgo):
                  custom_dataloaders: tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader] | tuple[str | Path, str | Path] | None = None,
                  augmentation_invariance: bool = False, initial_clustering_class: ClusterMixin | None = KMeans,
                  initial_clustering_params: dict | None = None, device: torch.device | int | str | None = None,
-                 random_state: np.random.RandomState | int | None = None):
+                 random_state: np.random.RandomState | int | None = None,
+                 scheduler: type[torch.optim.lr_scheduler.LRScheduler] | None = None,
+                 scheduler_params: dict | None = None):
         super().__init__(batch_size, neural_network, neural_network_weights, embedding_size, device, random_state)
         self.n_clusters = n_clusters
         self.alpha = alpha
@@ -516,6 +536,8 @@ class DEC(_AbstractDeepClusteringAlgo):
         self.augmentation_invariance = augmentation_invariance
         self.initial_clustering_class = initial_clustering_class
         self.initial_clustering_params = initial_clustering_params
+        self.scheduler = scheduler
+        self.scheduler_params = scheduler_params
 
     def fit(self, X: np.ndarray, y: np.ndarray | None = None) -> 'DEC':
         """
@@ -534,6 +556,8 @@ class DEC(_AbstractDeepClusteringAlgo):
         self : DEC
             this instance of the DEC algorithm
         """
+        if self.scheduler is not None and issubclass(self.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+            raise ValueError("DEC/IDEC support epoch schedulers; ReduceLROnPlateau requires a validation loss.")
         ssl_loss_weight = self.ssl_loss_weight if hasattr(self, "ssl_loss_weight") else 0 # DEC does not use ssl loss when clustering
         X, _, random_state, pretrain_optimizer_params, clustering_optimizer_params, initial_clustering_params = self._check_parameters(X, y=y)
         kmeans_labels, kmeans_centers, dec_labels, dec_centers, neural_network = _dec(X, self.n_clusters, self.alpha,
@@ -553,7 +577,7 @@ class DEC(_AbstractDeepClusteringAlgo):
                                                                                       self.augmentation_invariance,
                                                                                       self.initial_clustering_class,
                                                                                       initial_clustering_params,
-                                                                                      self.device, random_state)
+                                                                                      self.device, random_state, self.scheduler, self.scheduler_params)
         self.labels_ = kmeans_labels
         self.cluster_centers_ = kmeans_centers
         self.dec_labels_ = dec_labels
@@ -618,6 +642,13 @@ class IDEC(DEC):
     random_state : np.random.RandomState | int | None
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
 
+    scheduler : type[torch.optim.lr_scheduler.LRScheduler] | None
+        epoch-based learning rate scheduler for the clustering optimizer only.
+        A fresh scheduler is constructed for each fit and stepped after every clustering epoch.
+        Metric-based ReduceLROnPlateau is not supported because no validation loss is available (default: None)
+    scheduler_params : dict | None
+        parameters passed to the scheduler constructor; None uses an empty dictionary (default: None)
+
     Attributes
     ----------
     labels_ : np.ndarray
@@ -657,10 +688,12 @@ class IDEC(DEC):
                  custom_dataloaders: tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader] | tuple[str | Path, str | Path] | None = None,
                  augmentation_invariance: bool = False,
                  initial_clustering_class: ClusterMixin | None = KMeans, initial_clustering_params: dict | None = None,
-                 device: torch.device | int | str | None = None, random_state: np.random.RandomState | int | None = None):
+                 device: torch.device | int | str | None = None, random_state: np.random.RandomState | int | None = None,
+                 scheduler: type[torch.optim.lr_scheduler.LRScheduler] | None = None,
+                 scheduler_params: dict | None = None):
         super().__init__(n_clusters, alpha, batch_size, pretrain_optimizer_params, clustering_optimizer_params,
                          pretrain_epochs, clustering_epochs, optimizer_class, ssl_loss_fn, neural_network,
                          neural_network_weights, embedding_size, clustering_loss_weight, custom_dataloaders,
                          augmentation_invariance, initial_clustering_class,
-                         initial_clustering_params, device, random_state)
+                         initial_clustering_params, device, random_state, scheduler, scheduler_params)
         self.ssl_loss_weight = ssl_loss_weight
