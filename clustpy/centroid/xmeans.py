@@ -410,7 +410,7 @@ class XMeans(ClusterMixin, BaseEstimator):
 
     Examples
     ----------
-    >>> from clustpy.partition import XMeans
+    >>> from clustpy.centroid import XMeans
     >>> from sklearn.datasets import make_blobs
     >>> from clustpy.utils import plot_with_transformation
     >>> rs = np.random.RandomState(11)
