@@ -131,7 +131,7 @@ class _AbstractDeepClusteringAlgo(TransformerMixin, ClusterMixin, BaseEstimator)
 
     def fit_transform(self, X: np.ndarray, y: np.ndarray | None = None):
         """
-        Train the deep clusterin algorithm on the given data set and return the final embedded version of the data using the trained neural network.
+        Train the deep clustering algorithm on the given data set and return the final embedded version of the data using the trained neural network.
 
         Parameters
         ----------
@@ -161,7 +161,7 @@ class _AbstractDeepClusteringAlgo(TransformerMixin, ClusterMixin, BaseEstimator)
             input data
         cluster_centers : np.ndarray | None
             the cluster centers. It is expected that the cluster centers lie within the embedded feature space, not in the original.
-            Can be None if attibute cluster_centers_ is defined
+            Can be None if attribute cluster_centers_ is defined
 
         Returns
         -------
