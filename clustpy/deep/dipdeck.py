@@ -368,9 +368,9 @@ class _DipDECK_Module(torch.nn.Module):
         self : _DipDECK_Module
             this instance of the _DipDECK_Module
         """
-        self.labels.to(device)
-        self.cluster_centers.to(device)
-        self.dip_matrix.to(device)
+        self.labels = self.labels.to(device)
+        self.cluster_centers = self.cluster_centers.to(device)
+        self.dip_matrix = self.dip_matrix.to(device)
         return self
 
     def _update_centers_labels_dipmatrix_cpu(self, X: np.ndarray, embedded_data: np.ndarray, 
