@@ -1499,4 +1499,4 @@ def load_reuters21578(subset: str = "all", categories: tuple[str, ...] | list[st
     if return_X_y:
         return data, labels
     else:
-        return Bunch(dataset_name="Reuters21578", data=data, target=labels, classes=categories, columns=vocabulary)
+        return Bunch(dataset_name="Reuters21578", data=data, target=labels, classes=final_topics, columns=vocabulary)

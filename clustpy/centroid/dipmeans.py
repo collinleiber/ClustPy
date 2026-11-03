@@ -55,7 +55,7 @@ def _dipmeans(X: np.ndarray, significance: float, split_viewers_threshold: float
     data_dist_matrix = squareform(pdist(X, 'euclidean'))
     # Initialize parameters
     n_clusters, labels, centers, _ = _initial_kmeans_clusters(X, n_clusters_init, random_state)
-    while n_clusters <= max_n_clusters:
+    while n_clusters < max_n_clusters:
         # Default score is 0 for all clusters
         cluster_scores = np.zeros(n_clusters)
         ids_in_each_cluster = [np.where(labels == c)[0] for c in range(n_clusters)]
@@ -123,7 +123,7 @@ class DipMeans(ClusterMixin, BaseEstimator):
         The initial number of clusters. Can also by of type np.ndarray if initial cluster centers are specified (default: 1)
     max_n_clusters : int
         Maximum number of clusters. Must be larger than n_clusters_init (default: 1000)
-    random_state : np.random.RandomState | int
+    random_state : np.random.RandomState | int | None
         use a fixed random state to get a repeatable solution. Can also be of type int (default: None)
     debug : bool
         If true, additional information will be printed to the console (default: False)
@@ -148,7 +148,7 @@ class DipMeans(ClusterMixin, BaseEstimator):
 
     def __init__(self, significance: float = 0.001, split_viewers_threshold: float = 0.01,
                  pval_strategy: str = "table", n_boots: int = 1000, n_split_trials: int = 10, n_clusters_init: int = 1,
-                 max_n_clusters: int = 1000, random_state: np.random.RandomState | int | None= None, debug: bool = False):
+                 max_n_clusters: int = 1000, random_state: np.random.RandomState | int | None = None, debug: bool = False):
         self.significance = significance
         self.split_viewers_threshold = split_viewers_threshold
         self.pval_strategy = pval_strategy

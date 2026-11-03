@@ -313,8 +313,8 @@ class PGMeans(ClusterMixin, BaseEstimator):
             n_samples = self.n_samples
 
         if n_samples < n:
-                # scale the significance level if using less than n generated points for KS test
-                alpha = np.sqrt(n_samples / n) * alpha
+            # scale the significance level if using less than n generated points for KS test
+            alpha = np.sqrt(n_samples / n) * alpha
         
 
         n_samples = min(n_samples, X.shape[0])

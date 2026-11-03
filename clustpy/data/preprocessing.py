@@ -183,6 +183,6 @@ def bm25(X: np.ndarray, k: float=1.5, b: float = 0.75) -> np.ndarray:
     avgdl = length_D.mean()
     if avgdl == 0:
         return np.zeros_like(X)
-    bm25 = X * (k + 1) / (X + k * (1 - b + b * length_D.reshape((-1, 1)) / avgdl))
-    X_transform = bm25 * idf.reshape((1, -1))
+    tf_sat = X * (k + 1) / (X + k * (1 - b + b * length_D.reshape((-1, 1)) / avgdl))
+    X_transform = tf_sat * idf.reshape((1, -1))
     return X_transform

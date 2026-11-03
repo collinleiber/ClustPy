@@ -51,7 +51,7 @@ def _proj_dipmeans(X: np.ndarray, significance: float, n_random_projections: int
     assert significance >= 0 and significance <= 1, "significance must a value in the range [0, 1]"
     # Initialize parameters
     n_clusters, labels, centers, _ = _initial_kmeans_clusters(X, n_clusters_init, random_state)
-    while n_clusters <= max_n_clusters:
+    while n_clusters < max_n_clusters:
         # Default score is 0 for all clusters
         cluster_scores = np.zeros(n_clusters)
         ids_in_each_cluster = []
